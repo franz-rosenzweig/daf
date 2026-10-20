@@ -97,7 +97,9 @@ struct RouteView: View {
 
     var body: some View {
         Group {
-            if parts.first == "read", parts.count > 1 {
+            if parts.first == "mread", parts.count > 1 {
+                MangaReader(id: parts[1])
+            } else if parts.first == "read", parts.count > 1 {
                 if let reader, reader.doc != nil { ArticleReader(model: reader) }
                 else if let e = reader?.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }
                 else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }

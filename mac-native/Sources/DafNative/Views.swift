@@ -4,6 +4,8 @@ import SwiftUI
 /// The window: the sidebar, the list, and what's open, with the inspector beside it.
 struct MainView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         @Bindable var model = model
@@ -12,7 +14,12 @@ struct MainView: View {
                 NavigationSplitView {
                     Sidebar().navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
                 } detail: {
-                    if model.place == .review { ReviewView() } else { StatsView() }
+                    switch model.place {
+                    case .review: ReviewView()
+                    case .podcasts: PodcastsView()
+                    case .sources: SourcesView()
+                    default: StatsView()
+                    }
                 }
             } else {
                 NavigationSplitView {
@@ -22,6 +29,7 @@ struct MainView: View {
                         switch model.place {
                         case .today: TodayView()
                         case .highlights: HighlightGroups()
+                        case .torah: TorahList()
                         default: ItemList()
                         }
                     }
@@ -45,6 +53,16 @@ struct MainView: View {
             }
         }
         .animation(.snappy, value: model.toast)
+        .onChange(of: model.showSettings) { _, on in
+            guard on else { return }
+            openSettings()
+            model.showSettings = false
+        }
+        .onChange(of: model.openRoute) { _, r in
+            guard let r else { return }
+            openWindow(id: "route", value: r)
+            model.openRoute = nil
+        }
         .sheet(item: $model.sheet) { s in
             switch s {
             case .addLink: AddLinkSheet().environment(model)
@@ -92,8 +110,14 @@ struct Sidebar: View {
             }
             Section("Reading") {
                 row(.books, "Books", "books.vertical")
+                row(.manga, "Manga", "book.pages")
+                row(.torah, "Torah", "scroll")
+                row(.podcasts, "Podcasts", "headphones")
                 row(.highlights, "Highlights", "highlighter")
                 row(.stats, "Stats", "chart.bar")
+            }
+            Section {
+                row(.sources, "Sources", "arrow.triangle.2.circlepath")
             }
             if model.place == .search {
                 Section("Search") { Label("“\(model.query)”", systemImage: "magnifyingglass").tag(Place.search) }
@@ -349,7 +373,7 @@ struct Detail: View {
             }
         }
         .toolbar {
-            if let item = model.selected, !item.isBook {
+            if let item = model.selected, item.isDoc {
                 ToolbarItemGroup {
                     if item.whereIn == "feed" {
                         Button { Task { await model.saveToLibrary(item) } } label: { Label("Save to Library", systemImage: "tray.and.arrow.down") }
@@ -378,7 +402,8 @@ struct Opened: View {
         @Bindable var model = model
         Group {
             switch (item.isBook, item.kind) {
-            case (true, _): WebPane(route: "#ebook/" + API.enc(item.id))
+            case (_, "series"): SeriesView(id: item.id)
+            case (true, _): BookPage(id: item.id)
             case (_, "pdf") where item.j.b("has_pdf") || item.kind == "pdf": PDFPane(id: item.id)
             case (_, "video"), (_, "podcast"): WebPane(route: "#read/" + API.enc(item.id))
             case (_, "manga"): WebPane(route: "#mread/" + API.enc(item.id))
@@ -395,7 +420,7 @@ struct Opened: View {
             Inspector(item: item, reader: reader).inspectorColumnWidth(min: 240, ideal: 280, max: 380)
         }
         .task(id: item.id) {
-            guard !item.isBook, !["pdf", "video", "podcast", "manga"].contains(item.kind) else { return }
+            guard item.isDoc, !["pdf", "video", "podcast", "manga"].contains(item.kind) else { return }
             // the same article made again by SwiftUI (a list refreshing beside it): the one already open
             if let r = model.reader, r.id == item.id, r.doc != nil { reader = r; return }
             let r = ReaderModel(id: item.id)

@@ -5,6 +5,7 @@ import SwiftUI
 struct DafNativeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel.shared
+    @AppStorage("menuBar") private var menuBar = false
 
     var body: some Scene {
         WindowGroup("Daf", id: "main") {
@@ -27,7 +28,12 @@ struct DafNativeApp: App {
                 Button("Feed") { model.place = .feed(nil) }.keyboardShortcut("4")
                 Button("Highlights") { model.place = .highlights }.keyboardShortcut("5")
                 Button("Books") { model.place = .books }.keyboardShortcut("6")
-                Button("Stats") { model.place = .stats }.keyboardShortcut("7")
+                Button("Manga") { model.place = .manga }.keyboardShortcut("7")
+                Button("Stats") { model.place = .stats }.keyboardShortcut("8")
+                Divider()
+                Button("Torah") { model.place = .torah }
+                Button("Podcasts") { model.place = .podcasts }
+                Button("Sources") { model.place = .sources }
             }
             CommandMenu("Article") {
                 Button("Highlight the Selection") { Task { await model.reader?.highlightSelection() } }
@@ -46,8 +52,15 @@ struct DafNativeApp: App {
         .defaultSize(width: 860, height: 760)
 
         Settings {
-            SettingsView().environment(model)
+            PrefsView().environment(model)
         }
+
+        MenuBarExtra(isInserted: $menuBar) {
+            MenuBarPanel().environment(model)
+        } label: {
+            MenuBarLabel().environment(model)
+        }
+        .menuBarExtraStyle(.window)
     }
 }
 

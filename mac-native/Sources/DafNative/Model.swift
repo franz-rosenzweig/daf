@@ -9,12 +9,16 @@ enum Place: Hashable {
     case shortlist
     case feed(String?)                // nil: everything unseen; else a category
     case books
+    case manga
+    case torah
+    case podcasts
     case highlights
     case stats
+    case sources
     case search
 
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
-    var isPage: Bool { self == .review || self == .stats }
+    var isPage: Bool { self == .review || self == .stats || self == .podcasts || self == .sources }
 
     var title: String {
         switch self {
@@ -23,6 +27,10 @@ enum Place: Hashable {
         case .shortlist: return "Shortlist"
         case .highlights: return "Highlights"
         case .stats: return "Stats"
+        case .manga: return "Manga"
+        case .torah: return "Torah"
+        case .podcasts: return "Podcasts"
+        case .sources: return "Sources"
         case .library(let tab): return ["inbox": "Inbox", "later": "Later", "archive": "Archive"][tab] ?? tab.capitalized
         case .feed(let cat): return cat ?? "All Feeds"
         case .books: return "Books"
@@ -48,6 +56,8 @@ struct Item: Identifiable, Hashable {
     var whereIn: String? { j.s("where_") }
     var status: String? { j.s("status") }
     var isBook: Bool { type == "book" || kind == "book" }
+    var isSeries: Bool { type == "series" }
+    var isDoc: Bool { !isBook && !isSeries }
 
     init(_ j: J) {
         self.j = j
@@ -64,6 +74,7 @@ final class AppModel {
     var counts: J?
     var today: J?
     var home: J?
+    var torah: J?
     var loading = false
     var error: String?
     var needsSignIn = false
@@ -85,6 +96,10 @@ final class AppModel {
     let highlights = HighlightsModel()
     var review = ReviewModel()
     var sheet: Sheet?
+    /// A route to open in a window of its own ("#ebook/…", "#mread/…"), from code (menus, the self-test).
+    var openRoute: String?
+    /// Settings, opened from code (the self-test; ⌘, opens it by hand).
+    var showSettings = false
 
     enum Sheet: String, Identifiable { case addLink, paper; var id: String { rawValue } }
 
@@ -98,6 +113,7 @@ final class AppModel {
             MainActor.assumeIsolated { self?.needsSignIn = true }
         }
         needsSignIn = API.shared.cookie == nil
+        startClock()
     }
 
     func reload() {
@@ -124,8 +140,26 @@ final class AppModel {
             case .shortlist:
                 let j = try await API.shared.json("/api/docs?where=library&tab=inbox&kind=starred&limit=200")
                 items = j.a("items").map(Item.init)
-            case .review, .highlights, .stats:
+            case .review, .highlights, .stats, .podcasts, .sources:
                 items = []
+            case .manga:
+                let j = try await API.shared.json("/api/manga")
+                var seen = Set<String>(), out: [Item] = []
+                for s in j.a("continue") + j.a("series") {
+                    guard let id = s.s("id"), seen.insert(id).inserted else { continue }
+                    var raw = s.raw
+                    raw["type"] = "series"
+                    raw["kind"] = "series"
+                    raw["title"] = s.s("name")
+                    raw["source"] = "\(s.i("count") ?? 0) volumes" + ((s.i("read") ?? 0) > 0 ? " · \(s.i("read")!) read" : "")
+                    raw["thumb"] = s.s("cover").map { "/api/manga/thumb/b/" + API.enc($0) }
+                    out.append(Item(J(raw)))
+                }
+                items = out
+            case .torah:
+                let t = try await API.shared.json("/api/torah")
+                torah = t
+                items = (t.a("week") + t.a("ruach") + t.a("earlier")).map(Item.init)
             case .feed(let cat):
                 let j = try await API.shared.json("/api/docs?where=feed&tab=unseen&limit=200" + (cat.map { "&cat=" + API.enc($0) } ?? ""))
                 items = j.a("items").map(Item.init)
