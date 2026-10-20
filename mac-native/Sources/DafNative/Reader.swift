@@ -231,7 +231,7 @@ final class ReaderModel {
         s.addAttribute(.paragraphStyle, value: para(18, align: .center), range: NSRange(location: 0, length: s.length))
         let url = src.hasPrefix("/") ? API.shared.url(src) : (URL(string: src, relativeTo: baseURL)?.absoluteURL ?? API.shared.url(src))
         Task { [weak self] in
-            guard let data = try? await API.shared.session.data(from: url).0, let img = NSImage(data: data), img.size.width > 0 else { return }
+            guard let data = await API.shared.picture(url), let img = NSImage(data: data), img.size.width > 0 else { return }
             let w = min(Self.column, img.size.width), h = img.size.height * w / img.size.width
             att.image = img
             att.bounds = CGRect(x: 0, y: 0, width: w, height: h)

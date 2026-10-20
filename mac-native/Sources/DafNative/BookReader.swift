@@ -77,15 +77,22 @@ final class BookModel {
         } catch { self.error = error.localizedDescription }
     }
 
-    /// The book's file: the copy kept on this Mac when it's the same size as Calibre's, else Daf's.
-    private func file(size: Int?) async throws -> Data {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Daf Native/Books", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent(id.replacingOccurrences(of: "[^A-Za-z0-9_-]", with: "_", options: .regularExpression) + ".epub")
-        if let have = try? Data(contentsOf: url), size == nil || have.count == size { return have }
-        let data = try await API.shared.data("/api/ebooks/\(API.enc(id))/file")
-        try? data.write(to: url, options: .atomic)
-        return data
+    private func file(size: Int?) async throws -> Data { try await Self.file(for: id, size: size) }
+
+    /// A book's file: the copy kept on this Mac when it's the same size as Calibre's (or there's no
+    /// connection), else Daf's, kept for next time.
+    static func file(for id: String, size: Int?) async throws -> Data {
+        let url = Store.folder("Books").appendingPathComponent(id.replacingOccurrences(of: "[^A-Za-z0-9_-]", with: "_", options: .regularExpression) + ".epub")
+        let have = try? Data(contentsOf: url)
+        if let have, size == nil || have.count == size || Connection.shared.offline { return have }
+        do {
+            let data = try await API.shared.data("/api/ebooks/\(API.enc(id))/file")
+            try? data.write(to: url, options: .atomic)
+            return data
+        } catch {
+            if let have { return have }
+            throw error
+        }
     }
 
     @discardableResult

@@ -1,6 +1,6 @@
-# Daf Native (the Mac trial)
+# Daf for the Mac
 
-This is Daf for the Mac made the way a Mac app is made: SwiftUI and AppKit, with the system's own window, sidebar, toolbar, search, inspector and Settings, instead of the web page in a window. It sits beside the regular Daf app (`mac/`) as its own app, **Daf Native** (`xyz.tiresia.daf.native`), so I can use both for a while and decide.
+This is Daf for the Mac made the way a Mac app is made: SwiftUI and AppKit, with the system's own window, sidebar, toolbar, search, inspector and Settings, instead of the web page in a window. It began beside the web-view app (`mac/`) as "Daf Native" so I could try both; since 0.3.0 it *is* Daf (`xyz.tiresia.daf`), in its place in /Applications, with everything the web-view app did for me: Save to Daf in the share menu, Daf for Safari, alerts for new posts, today's minutes in the menu bar, and reading with no connection. The first time it opens it takes the web-view app's address, menu bar choice and sign-in, so there's nothing to set up.
 
 It talks to Daf the same way the page does, through Daf's own API, so nothing changes on the server and everything I do in it shows up everywhere else.
 
@@ -25,6 +25,10 @@ It talks to Daf the same way the page does, through Daf's own API, so nothing ch
 - **PDFs** open in Apple's own PDF view.
 - **Settings** (⌘,) has the address and sign-in, today's minutes in the menu bar (off unless I turn it on), and Daf's reading preferences: highlights and flashcards a day, how long unseen Feed items stay, the voice and the speed for reading aloud.
 - **File menu.** Add a Link… (⌘L) and Log Paper Minutes… (⇧⌘P).
+- **Save to Daf** in the share menu of Safari and every other app puts the link in the Library (it hands it to the app as `daf://save?url=…`); `daf://go/review` and the like open a place, for Shortcuts.
+- **Daf for Safari** (Settings, or the Daf menu): the app makes the extension's token with my sign-in and hands it over, then opens Safari's settings to switch it on.
+- **Alerts for new posts** in the feeds I choose (right-click a feed → Tell Me About New Posts), every five minutes, as Mac notifications; a click opens the post.
+- **With no connection** the lists, articles and books I've opened, the Inbox's and Later's articles and the nightstand's books open from what this Mac kept, and what I change (highlights, notes, places, reading time, archiving) waits on the Mac and goes to Daf when it answers, each change once. The sidebar says when it's offline and how many changes are waiting.
 
 ## What's still the page
 
@@ -32,7 +36,7 @@ Videos and podcast episodes open as Daf's own pages (without the page's sidebar)
 
 ## Not yet
 
-Offline, Save to Daf in the share menu, the Safari extension and new-post notifications (the regular app still has all of those), photos of paper pages, reading a book aloud, search inside a book, Ask about a book, and the rest of Daf's preferences, which open as the page from Settings.
+Photos of paper pages, reading a book aloud, search inside a book, Ask about a book, and the rest of Daf's preferences, which open as the page from Settings.
 
 ## Building it
 
@@ -40,4 +44,8 @@ On the Mac:
 
     cd mac-native && ./build.sh
 
-That makes `build/Daf Native.app`, signed ad hoc. `./selftest.sh BASE COOKIE` runs the app against a sandbox Daf (never the real one) and writes `build/selftest/log.txt` with a picture of each step. A tailnet sandbox needs macOS's local-network permission for the app; an SSH tunnel to the Mac's own 127.0.0.1 avoids that. Reading aloud plays silently in the self-test.
+That makes `build/Daf.app` with Save to Daf and Daf for Safari inside (both from `mac/DafShare` and `mac/DafSafari`, unchanged), signed with my Apple Development identity when the keychain is open (over SSH it isn't; then it's signed ad hoc, and Safari won't load its extension). Copy it to /Applications.
+
+`./selftest.sh BASE COOKIE TOKEN` builds "Daf Test" (`xyz.tiresia.daf.selftest`, its own settings, sign-in and files, so Daf's are never touched) and runs it against a sandbox Daf, never the real one. It writes `build/selftest/log.txt` with a picture of each step, then clears what the test app kept. A tailnet sandbox needs macOS's local-network permission for the app; an SSH tunnel to the Mac's own 127.0.0.1 avoids that. Reading aloud plays silently in the test, and no question goes to the model.
+
+The web-view Daf 0.2.1 is kept, zipped, in case I want it back.

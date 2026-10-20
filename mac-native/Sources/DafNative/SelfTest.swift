@@ -88,6 +88,22 @@ enum SelfTest {
         check(!m.continueItems.isEmpty, "and what to keep reading", "\(m.continueItems.count)")
         capture("01-today")
 
+        // daf:// links (this build's are daf-selftest://): a place for Shortcuts, a link from the share menu
+        Links.handle(URL(string: "daf-selftest://go/review")!)
+        await pause(1)
+        check(m.place == .review, "daf://go/review opens Review", String(describing: m.place))
+        Links.handle(URL(string: "daf-selftest://save?url=https%3A%2F%2Fexample.com%2Fdaf-selftest&title=A%20link%20from%20the%20share%20menu")!)
+        let savedLink = await until(20) { Links.saved.contains("https://example.com/daf-selftest") }
+        check(savedLink && m.error == nil, "daf://save (Save to Daf in the share menu) saves the link to the Library", m.error ?? "")
+        m.error = nil
+
+        // the new-post alerts ask Daf with the Mac's own device token; Safari needs the signed build
+        await FeedNews.shared.check(force: true)
+        check(FeedNews.shared.last?.i("cursor") != nil, "the new-post alerts ask Daf with this Mac's device token", "\(FeedNews.shared.last?.i("feeds") ?? -1) feeds to tell me about")
+        let safari = await Safari.connect(again: false) ?? ""
+        check(safari.contains("isn't signed"), "and Daf for Safari says when the build isn't signed for it", safari)
+        await go(m, .today)
+
         // the Library
         await go(m, .library("inbox"))
         check(!m.items.isEmpty, "the Library's Inbox lists its articles", "\(m.items.count)")
@@ -221,6 +237,27 @@ enum SelfTest {
         check(onward && sp.index == i0 + 1, "the next-paragraph button goes on to the next one", "\(i0 + 1) → \(sp.index + 1)")
         sp.stop()
         check(!sp.on, "and Stop ends it")
+
+        // no connection: what was seen opens from this Mac, and a change waits until Daf answers
+        Connection.shared.forced = true
+        await go(m, .library("inbox"))
+        check(Connection.shared.offline && !m.items.isEmpty && m.error == nil, "with no connection, the Inbox opens from what this Mac kept", "\(m.items.count) \(m.error ?? "")")
+        m.reader = nil
+        m.selection = article.id
+        let again = await until(15) { m.reader?.id == article.id && (m.reader?.storage.length ?? 0) > 500 }
+        check(again, "and so does an article read before")
+        let waiting = Outbox.shared.ops.count
+        try? await API.shared.send("PUT", "/api/docs/\(API.enc(article.id))/note", ["note": "Written with no connection"])
+        check(Outbox.shared.ops.count == waiting + 1, "a change made then waits on this Mac", "\(Outbox.shared.ops.count) waiting")
+        await pause(1)
+        capture("32-offline")
+        Connection.shared.forced = false
+        _ = try? await API.shared.get("/api/health")
+        let sent = await until(15) { Outbox.shared.ops.isEmpty }
+        let note = (try? await API.shared.json("/api/docs/\(API.enc(article.id))"))?.s("note")
+        check(sent && note == "Written with no connection", "and goes to Daf when it answers again", note ?? "-")
+        try? await API.shared.send("PUT", "/api/docs/\(API.enc(article.id))/note", ["note": ""])
+        await go(m, .library("inbox"))
 
         // the Feed, its folders and their feeds
         await go(m, .feed(nil))

@@ -148,6 +148,7 @@ final class AppModel {
     var focusTags = 0
     /// Article › Ask…: the inspector's question field takes the keys.
     var focusAsk = 0
+    @ObservationIgnored private var keptBooks = false
     /// The Feed's folders and feeds with their counts (/api/feed/sources).
     var sources: J?
     /// A feed to unfollow, once that's confirmed.
@@ -221,6 +222,7 @@ final class AppModel {
                 items = []
             case .library(let tab):
                 items = try await docs("library", tab: tab, arg: kind, sort: sortLibrary, filter: listFilter.dict)
+                if tab != "archive" { keepForLater(items) }
             case .shortlist:
                 items = try await docs("library", tab: "inbox", arg: "starred", sort: sortLibrary, filter: listFilter.dict)
             case .view(let id):
@@ -290,6 +292,7 @@ final class AppModel {
             counts = try await c
             today = try await t
             needsSignIn = false
+            if !keptBooks { keptBooks = true; keepNightstand() }
         } catch is CancellationError {
         } catch let e as APIError where e.status == 401 {
             needsSignIn = true

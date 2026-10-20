@@ -206,7 +206,9 @@ struct FeedMenu: View {
             Button("No Folder") { Task { await model.editFeed(id, ["folder": ""]) } }
         }
         Toggle("Always Load the Full Article", isOn: Binding(get: { feed.b("full") }, set: { on in Task { await model.editFeed(id, ["full": on]) } }))
-        Toggle("Tell Me About New Posts", isOn: Binding(get: { feed.b("notify") }, set: { on in Task { await model.editFeed(id, ["notify": on]) } }))
+        Toggle("Tell Me About New Posts", isOn: Binding(get: { feed.b("notify") }, set: { on in
+            Task { if await model.editFeed(id, ["notify": on]), on, !FeedNews.shared.on { await FeedNews.shared.enable() } }
+        }))
         Divider()
         if let site = feed.s("site"), let url = URL(string: site) { Link("Open the Site", destination: url) }
         if let u = feed.s("url") {

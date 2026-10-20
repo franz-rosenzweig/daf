@@ -37,6 +37,12 @@ struct MenuBarPanel: View {
     }
 }
 
+/// Today's minutes in the menu bar: on for Daf itself, as the web-view Daf had them; off for the test build.
+enum MenuBarSetting {
+    static var byDefault: Bool { Bundle.main.bundleIdentifier == "xyz.tiresia.daf" }
+    static var on: Bool { UserDefaults.standard.object(forKey: "menuBar") as? Bool ?? byDefault }
+}
+
 extension AppModel {
     /// Today's numbers, for the menu bar: every five minutes while the app runs.
     func refreshToday() async {
@@ -45,7 +51,14 @@ extension AppModel {
 
     func startClock() {
         Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { guard let self else { return }; Task { await self.refreshToday() } }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task {
+                    await self.refreshToday()
+                    await FeedNews.shared.check()
+                    await Outbox.shared.flush()
+                }
+            }
         }
     }
 }
@@ -54,11 +67,13 @@ extension AppModel {
 struct PrefsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
-    @AppStorage("menuBar") private var menuBar = false
+    @AppStorage("menuBar") private var menuBar = MenuBarSetting.byDefault
     @State private var address = API.shared.base.absoluteString
     @State private var s: J?
     @State private var voices: [String] = []
     @AppStorage("prefsTab") private var tab = "general"
+    @AppStorage("keepOffline") private var keepOffline = true
+    @State private var alerts = FeedNews.shared.on
 
     var body: some View {
         TabView(selection: $tab) {
@@ -70,7 +85,20 @@ struct PrefsView: View {
                 }
                 Section {
                     Toggle("Show today's minutes in the menu bar", isOn: $menuBar)
-                } footer: { Text("Daf's other Mac app shows them too; turn this on when you use this one instead.").foregroundStyle(.secondary) }
+                    Toggle("Tell me about new posts in the feeds I choose", isOn: Binding(get: { alerts }, set: { on in
+                        alerts = on
+                        if on { Task { await FeedNews.shared.enable() } } else { FeedNews.shared.disable() }
+                    }))
+                } footer: { Text("Choose the feeds by right-clicking one in the sidebar: Tell Me About New Posts.").foregroundStyle(.secondary) }
+                Section("With no connection") {
+                    Toggle("Keep the Inbox, Later and the nightstand's books on this Mac", isOn: $keepOffline)
+                    if !Outbox.shared.ops.isEmpty {
+                        LabeledContent("Waiting to go to Daf", value: plural(Outbox.shared.ops.count, "change"))
+                    }
+                }
+                Section("Daf for Safari") {
+                    Button("Set Up Daf for Safari…") { Task { await Safari.setUp() } }
+                }
             }
             .formStyle(.grouped)
             .tabItem { Label("General", systemImage: "gearshape") }
@@ -114,7 +142,7 @@ struct PrefsView: View {
                     .sorted { (Self.kinds.firstIndex(of: String($0.prefix(2))) ?? 9, $0) < (Self.kinds.firstIndex(of: String($1.prefix(2))) ?? 9, $1) }
             }
         }
-        .frame(width: 480, height: 430)
+        .frame(width: 500, height: 520)
     }
 
     /// Kokoro's voices as the page names them: "Heart · American woman".

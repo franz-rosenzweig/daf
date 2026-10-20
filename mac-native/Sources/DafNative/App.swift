@@ -5,7 +5,7 @@ import SwiftUI
 struct DafNativeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel.shared
-    @AppStorage("menuBar") private var menuBar = false
+    @AppStorage("menuBar") private var menuBar = MenuBarSetting.byDefault
 
     var body: some Scene {
         WindowGroup("Daf", id: "main") {
@@ -17,6 +17,9 @@ struct DafNativeApp: App {
         .commands {
             SidebarCommands()
             InspectorCommands()
+            CommandGroup(after: .appSettings) {
+                Button("Daf for Safari…") { Task { await Safari.setUp() } }
+            }
             CommandGroup(after: .newItem) {
                 Button("Add a Link…") { model.sheet = .addLink }.keyboardShortcut("l", modifiers: .command)
                 Button("Log Paper Minutes…") { model.sheet = .paper }.keyboardShortcut("p", modifiers: [.command, .shift])
@@ -108,8 +111,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSWindow.allowsAutomaticWindowTabbing = false
-        MainActor.assumeIsolated { SelfTest.startIfAsked() }
+        MainActor.assumeIsolated {
+            FeedNews.shared.install()
+            Cache.prune()
+            Task {
+                await Migration.run()
+                await Outbox.shared.flush()
+                await FeedNews.shared.check()
+            }
+            SelfTest.startIfAsked()
+        }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// daf://save from the share menu, daf://connect-safari from the Safari extension, daf://go/… from Shortcuts.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated { urls.forEach(Links.handle) }
+    }
+
+    /// With today's minutes in the menu bar, closing the last window leaves Daf there.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { !MenuBarSetting.on }
 }

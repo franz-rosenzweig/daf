@@ -44,7 +44,7 @@ struct APIError: LocalizedError {
 @MainActor
 final class API {
     static let shared = API()
-    static let baseKey = "base"
+    static let baseKey = "base"   // the web-view Daf kept it as "baseURL": Migration carries it over
     static let defaultBase = "https://daf.tiresia.xyz"
 
     var base: URL {
@@ -56,7 +56,8 @@ final class API {
         let c = URLSessionConfiguration.default
         c.httpCookieStorage = .shared
         c.httpShouldSetCookies = true
-        c.requestCachePolicy = .reloadIgnoringLocalCacheData
+        c.requestCachePolicy = .useProtocolCachePolicy       // pictures by their headers; Daf's answers ask afresh (send)
+        c.urlCache = URLCache(memoryCapacity: 48 << 20, diskCapacity: 600 << 20, directory: Store.folder("Pictures"))
         c.timeoutIntervalForRequest = 30
         c.httpAdditionalHeaders = ["User-Agent": "Daf/\(Version.short) (macOS native)"]
         return URLSession(configuration: c)
@@ -96,30 +97,80 @@ final class API {
         return j
     }
 
+    /// A call to Daf. An answer is kept on this Mac (Cache); with no connection the kept one comes
+    /// back instead, and a change waits in the Outbox (with its X-Daf-Op, so it's done once).
     @discardableResult
-    func send(_ method: String, _ path: String, _ body: [String: Any]?) async throws -> Any {
+    func send(_ method: String, _ path: String, _ body: [String: Any]?, op: String? = nil) async throws -> Any {
         var r = URLRequest(url: url(path))
         r.httpMethod = method
+        r.cachePolicy = .reloadIgnoringLocalCacheData
+        var bodyData: Data?
         if let body {
             r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            r.httpBody = try JSONSerialization.data(withJSONObject: body)
+            bodyData = try JSONSerialization.data(withJSONObject: body)
+            r.httpBody = bodyData
         }
-        let (data, response) = try await session.data(for: r)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        let parsed = (try? JSONSerialization.jsonObject(with: data)) ?? [:]
-        guard (200..<300).contains(status) else {
-            let detail = (parsed as? [String: Any])?["detail"] as? String
-            if status == 401 { NotificationCenter.default.post(name: .dafSignedOut, object: nil) }
-            throw APIError(status: status, message: detail ?? "Daf answered \(status).")
+        let write = method != "GET"
+        let opID = op ?? (write ? Outbox.newID() : nil)
+        if let opID { r.setValue(opID, forHTTPHeaderField: "X-Daf-Op") }
+        do {
+            if Connection.shared.forced { throw URLError(.notConnectedToInternet) }
+            let (data, response) = try await session.data(for: r)
+            Connection.shared.reached()
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let parsed = (try? JSONSerialization.jsonObject(with: data)) ?? [:]
+            guard (200..<300).contains(status) else {
+                let detail = (parsed as? [String: Any])?["detail"] as? String
+                if status == 401 { NotificationCenter.default.post(name: .dafSignedOut, object: nil) }
+                throw APIError(status: status, message: detail ?? "Daf answered \(status).")
+            }
+            if !write && path.hasPrefix("/api/") && path != "/api/health" { Cache.put(path, data) }
+            return parsed
+        } catch where Connection.isOffline(error) {
+            Connection.shared.lost()
+            if !write, let d = Cache.get(path), let parsed = try? JSONSerialization.jsonObject(with: d) { return parsed }
+            if write, op == nil, let opID, Outbox.canWait(method, path) {
+                Outbox.shared.add(.init(id: opID, method: method, path: path, body: bodyData))
+                return ["queued": true]
+            }
+            throw error
         }
-        return parsed
+    }
+
+    /// An answer fetched now and kept under another path (an article kept for later under the
+    /// path the reader asks for).
+    func keep(_ path: String, as key: String) async {
+        var r = URLRequest(url: url(path))
+        r.cachePolicy = .reloadIgnoringLocalCacheData
+        guard !Connection.shared.forced, let (data, response) = try? await session.data(for: r),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return }
+        Cache.put(key, data)
     }
 
     func data(_ path: String) async throws -> Data {
+        if Connection.shared.forced { throw URLError(.notConnectedToInternet) }
         let (data, response) = try await session.data(from: url(path))
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else { throw APIError(status: status, message: "Daf answered \(status).") }
         return data
+    }
+
+    /// A picture: from the network, or the copy kept on this Mac when there's no connection.
+    func picture(_ u: URL) async -> Data? {
+        if !Connection.shared.forced, let (d, r) = try? await session.data(from: u), ((r as? HTTPURLResponse)?.statusCode ?? 200) < 400 { return d }
+        let kept = URLRequest(url: u, cachePolicy: .returnCacheDataDontLoad)
+        return session.configuration.urlCache?.cachedResponse(for: kept)?.data
+    }
+
+    /// A call with a device's token instead of the sign-in (the new-post alerts, as the phone asks).
+    func device(_ path: String, token: String) async throws -> J {
+        var r = URLRequest(url: url(path))
+        r.cachePolicy = .reloadIgnoringLocalCacheData
+        r.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: r)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200, let j = J(try? JSONSerialization.jsonObject(with: data)) else { throw APIError(status: status, message: "Daf answered \(status).") }
+        return j
     }
 
     nonisolated static func enc(_ s: String) -> String {
