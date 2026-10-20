@@ -13,7 +13,7 @@ struct SeriesView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(s.s("name") ?? "").font(.system(.title, design: .serif).weight(.semibold))
-                        Text("\(s.i("count") ?? 0) volumes · \(s.i("read") ?? 0) read").foregroundStyle(.secondary)
+                        Text(plural(s.i("count") ?? 0, "volume") + " · \(s.i("read") ?? 0) read").foregroundStyle(.secondary)
                         if let sum = s.s("summary") { Text(sum).font(.callout).foregroundStyle(.secondary).lineLimit(4).padding(.top, 4) }
                     }
                     if let next = s.o("next"), let nid = next.s("id") {

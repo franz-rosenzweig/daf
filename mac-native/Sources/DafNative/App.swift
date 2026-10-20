@@ -52,6 +52,15 @@ struct DafNativeApp: App {
                 Divider()
                 Button("Tags…") { model.showInspector = true; model.focusTags += 1 }
                     .keyboardShortcut("t", modifiers: [.command, .option])
+                Button("Ask…") { model.showInspector = true; model.focusAsk += 1 }
+                    .keyboardShortcut("a", modifiers: [.command, .option])
+                Divider()
+                Button("Send to Kindle") {
+                    let ids = model.chosen.filter(\.isDoc).map(\.id)
+                    Task { await model.sendToKindle(ids.isEmpty ? (model.selected.map { [$0.id] } ?? []) : ids) }
+                }
+                Button("Open in a New Window") { if let i = model.selected, let r = model.route(for: i) { model.openRoute = r } }
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
             }
             CommandMenu("Feed") {
                 Button("Mark All Seen") { if let p = model.place { Task { await model.markSeen(p) } } }

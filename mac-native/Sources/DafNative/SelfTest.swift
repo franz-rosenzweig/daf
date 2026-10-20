@@ -94,6 +94,20 @@ enum SelfTest {
         check(m.count(.library("inbox")) != nil, "with the counts beside the sidebar")
         capture("02-library")
 
+        // its order and filters
+        let sort0 = m.sortLibrary
+        m.sortLibrary = "short"
+        await m.load()
+        let lens = m.items.compactMap(\.mins)
+        check(!lens.isEmpty && lens == lens.sorted(), "Shortest First puts the short ones at the top", "\(lens.prefix(6))")
+        m.sortLibrary = sort0
+        m.listFilter.length = "0-10"
+        await m.load()
+        let short = m.items.compactMap(\.mins)
+        check(!short.isEmpty && short.allSatisfy { $0 <= 10 }, "the Under 10 Minutes filter keeps only those", "\(m.items.count): \(short.prefix(6))")
+        m.listFilter = ListFilter()
+        await m.load()
+
         // an article, natively
         guard let article = m.items.first(where: { $0.kind == "article" && ($0.j.i("words") ?? 0) > 300 }) else { return finish("no article to read") }
         m.selection = article.id
@@ -153,6 +167,15 @@ enum SelfTest {
         let clean = try? await API.shared.json("/api/docs/\(API.enc(r.id))")
         check(clean?.s("note") == nil && clean?.strings("tags") == oldTags, "and both go again", "\(clean?.s("note") ?? "-") / \(clean?.strings("tags") ?? [])")
 
+        // Ask (the sandbox's stand-in answers; the model is never asked)
+        let asked = r.asks.count
+        await r.ask("What is this about?")
+        check(r.asks.count == asked + 1 && (r.asks.last?.s("a") ?? "").contains("stand-in"), "Ask answers a question about the article", String((r.asks.last?.s("a") ?? r.error ?? "").prefix(60)))
+        m.showInspector = true
+        await pause(1.5)
+        capture("27-ask")
+        m.showInspector = false
+
         // the place
         let scroll = tv.enclosingScrollView!
         tv.layoutManager?.ensureLayout(for: tv.textContainer!)
@@ -208,6 +231,28 @@ enum SelfTest {
         if let first = m.folderNames.first(where: { !$0.isEmpty }) { UserDefaults.standard.set(first, forKey: "openFolders") }
         await pause(1)
         capture("05-feed")
+
+        // several chosen at once: marked seen together, then Undo
+        let some = Array(m.items.filter { $0.id.hasPrefix("fr:") }.prefix(3))
+        if some.count >= 2 {
+            m.multi = Set(some.map(\.id))
+            await pause(1)
+            check(m.selection == nil && m.chosen.count == some.count, "several can be chosen at once", "\(m.chosen.count)")
+            capture("25-bulk")
+            await m.bulk(some, "seen")
+            var seenNow = 0
+            for p in some { if (try? await API.shared.json("/api/docs/\(API.enc(p.id))"))?.s("status") == "seen" { seenNow += 1 } }
+            m.undoLast()
+            var unseenAgain = 0
+            for _ in 0..<30 {
+                await pause(0.3)
+                unseenAgain = 0
+                for p in some { if (try? await API.shared.json("/api/docs/\(API.enc(p.id))"))?.s("status") == "unseen" { unseenAgain += 1 } }
+                if unseenAgain == some.count { break }
+            }
+            check(seenNow == some.count && unseenAgain == some.count, "and marked seen together, and Undo puts them back", "\(seenNow) seen, then \(unseenAgain) unseen")
+        } else { check(false, "several can be chosen at once", "only \(some.count) posts in the Feed") }
+
         if let small = feeds.filter({ ($0.i("count") ?? 0) > 0 }).min(by: { ($0.i("count") ?? 0) < ($1.i("count") ?? 0) }), let fid = small.s("id") {
             await go(m, .feedSource(fid))
             check(!m.items.isEmpty && m.items.allSatisfy { $0.j.s("feed") == fid }, "a feed lists only its own posts", "\(small.s("title") ?? ""): \(m.items.count)")
@@ -224,6 +269,17 @@ enum SelfTest {
             let back = await until(10) { (m.count(.feedSource(fid)) ?? 0) == n0 }
             check(back && viaMenu, "and Edit › Undo puts it all back", "\(m.count(.feedSource(fid)) ?? -1) of \(n0); the window's undo \(viaMenu)")
 
+            // the list kept as a view in the sidebar, then removed
+            if await m.saveCurrentView(named: "Self-test view"), case .view(let vid)? = m.place {
+                await m.load()
+                check(m.view(vid) != nil && !m.items.isEmpty, "Save as View keeps the list in the sidebar", "\(m.views.count) views, \(m.items.count) in it")
+                await pause(0.8)
+                capture("28-view")
+                await m.removeView(vid)
+                check(m.view(vid) == nil, "and Remove the View takes it away")
+                await go(m, .feedSource(fid))
+            } else { check(false, "Save as View keeps the list in the sidebar", m.error ?? "") }
+
             // renamed, moved, switched: in the FreshRSS stand-in, and back again
             let oldTitle = small.s("title") ?? "", oldFolder = small.s("folder") ?? ""
             await m.editFeed(fid, ["title": "Renamed by the self-test"])
@@ -238,6 +294,12 @@ enum SelfTest {
             await m.editFeed(fid, ["full": !full0])
             check(m.feed(fid)?.b("full") == !full0, "and its full-article switch turned")
             await m.editFeed(fid, ["full": full0])
+
+            // a post to the Kindle (the sandbox's own folder)
+            if let post = m.items.first {
+                await m.sendToKindle([post.id])
+                check(m.error == nil && (m.toast ?? "").hasPrefix("Sent to the Kindle"), "Send to Kindle makes it a book for the Kindle", m.toast ?? m.error ?? "")
+            }
 
             // a post deleted, then Undo
             if let post = m.items.first {
@@ -286,6 +348,12 @@ enum SelfTest {
             log("INFO  " + trace.joined(separator: " | "))
             capture("06-pdf")
             check(shown && pages() > 0, "a PDF opens in Apple's PDF view, and stays open", "\(pdf.title): \(first) pages, then \(pages())")
+            if let route = m.route(for: pdf) {
+                m.openRoute = route
+                let own = await until(30) { NSApp.windows.contains { $0.isVisible && $0 != main && ($0.contentView.flatMap(findPDF)?.document?.pageCount ?? 0) > 0 } }
+                check(own, "and Open in a New Window opens it in a window of its own", route)
+                closeOthers()
+            }
         } else { log("SKIP  no PDF in the Inbox") }
 
         // books: the book's page natively; Read opens Daf's own reader in a window of its own
@@ -295,6 +363,18 @@ enum SelfTest {
             m.selection = b.id
             await pause(3)
             capture("07-bookpage")
+
+            // a shelf made with the book on it, shown, then deleted
+            if await m.newShelf("Self-test shelf", with: b.id), let sid = m.shelves.first(where: { $0.s("name") == "Self-test shelf" })?.s("id") {
+                await go(m, .shelf(sid))
+                check(m.items.contains { $0.id == b.id }, "a new shelf holds the book it was made with", "\(m.shelves.count) shelves")
+                capture("26-shelf")
+                await m.deleteShelf(sid)
+                check(!m.shelves.contains { $0.s("id") == sid }, "and Delete the Shelf takes it away")
+                await go(m, .books)
+                m.selection = b.id
+                await pause(1)
+            } else { check(false, "a new shelf holds the book it was made with", m.error ?? "") }
             m.openRoute = "#ebook/" + API.enc(b.id)
             let opened = await until(35) { bookOpen() }
             var seen = "windows: " + NSApp.windows.filter(\.isVisible).map { "'\($0.title)'" }.joined(separator: ", ")

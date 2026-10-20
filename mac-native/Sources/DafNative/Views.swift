@@ -87,6 +87,9 @@ struct MainView: View {
             case .paper: PaperSheet().environment(model)
             case .follow: FollowSheet().environment(model)
             case .renameFeed(let id): RenameFeedSheet(id: id).environment(model)
+            case .saveView: SaveViewSheet().environment(model)
+            case .newShelf(let book): ShelfSheet(book: book).environment(model)
+            case .renameShelf(let id): ShelfSheet(shelf: id).environment(model)
             }
         }
         .searchable(text: $model.query, placement: .sidebar, prompt: "Search Daf")
@@ -94,11 +97,12 @@ struct MainView: View {
             model.place = .search
             model.reload()
         }
-        .onChange(of: model.place) { _, _ in
-            model.selection = nil
+        .onChange(of: model.place) { _, _ in model.placeChanged() }
+        .task {
             model.reload()
+            await model.loadViews()
+            await model.loadShelves()
         }
-        .task { model.reload() }
         .sheet(isPresented: $model.needsSignIn) { SignInView().environment(model) }
         .alert("Daf", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
@@ -123,8 +127,9 @@ struct Sidebar: View {
                 row(.library("archive"), "Archive", "archivebox")
             }
             FeedSection()
+            ViewsSection()
             Section("Reading") {
-                row(.books, "Books", "books.vertical")
+                BooksRow()
                 row(.manga, "Manga", "book.pages")
                 row(.torah, "Torah", "scroll")
                 row(.podcasts, "Podcasts", "headphones")
@@ -155,16 +160,20 @@ struct ItemList: View {
 
     var body: some View {
         @Bindable var model = model
-        List(model.items, selection: $model.selection) { item in
-            ItemRow(item: item)
-                .tag(item.id)
-                .contextMenu { ItemActions(item: item) }
+        List(model.shown, selection: $model.multi) { item in
+            ItemRow(item: item).tag(item.id)
+        }
+        .contextMenu(forSelectionType: Item.ID.self) { ids in
+            let chosen = model.items.filter { ids.contains($0.id) }
+            if chosen.count > 1 { BulkActions(items: chosen) } else if let one = chosen.first { ItemActions(item: one) }
+        } primaryAction: { ids in
+            if ids.count == 1, let item = model.items.first(where: { ids.contains($0.id) }), let r = model.route(for: item) { model.openRoute = r }
         }
         .listStyle(.inset)
         .navigationTitle(model.title(model.place))
-        .navigationSubtitle(model.items.isEmpty ? "" : "\(model.items.count)")
+        .navigationSubtitle(model.shown.isEmpty ? "" : model.multi.count > 1 ? "\(model.multi.count) of \(model.shown.count) chosen" : "\(model.shown.count)")
         .overlay {
-            if model.items.isEmpty && !model.loading {
+            if model.shown.isEmpty && !model.loading {
                 ContentUnavailableView(model.place == .search ? "Nothing found" : "Nothing here", systemImage: "tray")
             }
         }
@@ -185,9 +194,21 @@ struct ItemList: View {
             }
             if let p = model.place, isFeed(p) {
                 ToolbarItem {
+                    Picker("Show", selection: $model.feedTab) {
+                        Text("Unseen").tag("unseen")
+                        Text("Seen").tag("seen")
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
+                ToolbarItem {
                     Button { Task { await model.markSeen(p) } } label: { Label("Mark All Seen", systemImage: "checkmark.circle.badge.questionmark") }
                         .help("Mark everything here seen")
+                        .disabled(model.feedTab == "seen")
                 }
+            }
+            if model.place.map(hasDocs) == true {
+                ToolbarItem { ListOptionsMenu() }
             }
             ToolbarItem {
                 Button { model.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
@@ -195,12 +216,20 @@ struct ItemList: View {
             }
         }
         .onChange(of: model.kind) { _, _ in model.reload() }
+        .onChange(of: model.listFilter) { _, _ in model.reload() }
+        .onChange(of: model.sortLibrary) { _, _ in model.reload() }
+        .onChange(of: model.sortFeed) { _, _ in model.reload() }
+        .onChange(of: model.feedTab) { _, _ in model.reload() }
         .onKeyPress("e") {
+            let chosen = model.chosen.filter(\.isDoc)
+            if chosen.count > 1 { Task { await model.bulk(chosen, chosen.allSatisfy { $0.whereIn == "feed" } ? "seen" : "archive") }; return .handled }
             guard let item = model.selected, !item.isBook else { return .ignored }
             Task { await model.done(item) }
             return .handled
         }
         .onDeleteCommand {
+            let chosen = model.chosen.filter(\.isDoc)
+            if chosen.count > 1 { Task { await model.bulk(chosen, "deleted") }; return }
             guard let item = model.selected, item.isDoc else { return }
             Task { await model.delete(item) }
         }
@@ -210,6 +239,14 @@ struct ItemList: View {
 private func isFeed(_ p: Place) -> Bool {
     switch p {
     case .feed, .feedSource: return true
+    default: return false
+    }
+}
+
+/// A list of articles and the like, which has an order and filters (not books, manga or search).
+private func hasDocs(_ p: Place) -> Bool {
+    switch p {
+    case .library, .shortlist, .feed, .feedSource, .view: return true
     default: return false
     }
 }
@@ -272,6 +309,9 @@ struct ItemActions: View {
                 Link("Open the Original", destination: url)
                 Button("Copy the Link") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string) }
             }
+            Divider()
+            if let r = model.route(for: item) { Button("Open in a New Window") { model.openRoute = r } }
+            Button("Send to Kindle") { Task { await model.sendToKindle([item.id]) } }
             Divider()
             Button("Delete", role: .destructive) { Task { await model.delete(item) } }
         }
@@ -400,7 +440,9 @@ struct Detail: View {
     var body: some View {
         @Bindable var model = model
         Group {
-            if let item = model.selected {
+            if model.multi.count > 1 {
+                BulkPane(items: model.chosen)
+            } else if let item = model.selected {
                 Opened(item: item).id(item.id)
             } else {
                 ContentUnavailableView("Nothing open", systemImage: "book", description: Text("Pick something from the list."))
@@ -478,6 +520,8 @@ struct Inspector: View {
     @State private var newTag = ""
     @State private var known: [String] = []
     @FocusState private var tagField: Bool
+    @State private var question = ""
+    @FocusState private var askField: Bool
 
     private var doc: ReaderModel? { reader ?? meta }
 
@@ -538,6 +582,7 @@ struct Inspector: View {
             if let sum = d.s("ai_summary") ?? d.s("summary") {
                 Section("Summary") { Text(sum).font(.callout) }
             }
+            if let doc, doc.doc != nil { ask(doc) }
             if let reader, !reader.highlights.isEmpty {
                 Section("Highlights") {
                     ForEach(Array(reader.highlights.enumerated()), id: \.offset) { _, h in
@@ -567,7 +612,45 @@ struct Inspector: View {
             known = (try? await API.shared.json("/api/docs/tags"))?.strings("tags") ?? []
         }
         .onChange(of: model.focusTags) { _, _ in tagField = true }
+        .onChange(of: model.focusAsk) { _, _ in askField = true }
         .onDisappear { meta?.stop() }
+    }
+
+    /// Ask: the answers so far, the question field, and Daf's suggested questions before the first.
+    @ViewBuilder
+    private func ask(_ doc: ReaderModel) -> some View {
+        Section("Ask") {
+            ForEach(Array(doc.asks.enumerated()), id: \.offset) { _, a in
+                VStack(alignment: .leading, spacing: 5) {
+                    if let q = a.s("quote") {
+                        Text("“\(q)”").font(.system(.caption, design: .serif)).foregroundStyle(.secondary).lineLimit(3)
+                    }
+                    Text(a.s("q") ?? "").font(.callout.weight(.semibold))
+                    Text(Self.markdown(a.s("a") ?? "")).font(.callout).textSelection(.enabled)
+                }
+                .padding(.vertical, 3)
+            }
+            if doc.asking {
+                HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking it over…").foregroundStyle(.secondary) }
+            }
+            TextField("Ask about this", text: $question, axis: .vertical)
+                .focused($askField)
+                .onSubmit { let q = question; question = ""; Task { await doc.ask(q) } }
+                .disabled(doc.asking)
+            if doc.asks.isEmpty && !doc.asking && !doc.questions.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(doc.questions.prefix(4), id: \.self) { q in
+                        Button(q) { Task { await doc.ask(q) } }
+                            .buttonStyle(.link)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+            }
+        }
+    }
+
+    static func markdown(_ s: String) -> AttributedString {
+        (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
     }
 
     private func suggestions(_ doc: ReaderModel) -> [String] {

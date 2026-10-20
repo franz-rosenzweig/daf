@@ -8,15 +8,17 @@ It talks to Daf the same way the page does, through Daf's own API, so nothing ch
 
 - **The window.** The sidebar has Today and Review; the Library's Inbox, Later, Shortlist and Archive; the Feed, with its folders opening onto their feeds, each with what's unseen in it; Books, Manga, Torah, Podcasts, Highlights and Stats; and Sources. Search sits at the top of the sidebar. The Go menu has them all (⌘1 to ⌘8 for the main ones).
 - **Today.** The minutes ring with the main goal, Year 30 so far, the week as a chart against the goal, today's reading, and what to keep reading.
-- **Lists.** The Library and the Feed, with pictures, minutes and progress. Right-click (or the toolbar) for Archive, Read Later, Mark Seen, Save to Library, Open the Original and Delete. Delete has Undo, in the little note at the bottom and in Edit › Undo (⌘Z).
+- **Lists.** The Library and the Feed, with pictures, minutes and progress. Right-click (or the toolbar) for Archive, Read Later, Mark Seen, Save to Library, Open the Original, Send to Kindle and Delete. Delete has Undo, in the little note at the bottom and in Edit › Undo (⌘Z). ⌘-click or Shift-click to choose several and archive, move, mark, send or delete them all at once, with Undo putting each back where it was. A double-click opens something in a window of its own.
+- **Order and filters.** The toolbar's filter button has the page's orders (newest, oldest, published, shortest, longest, started first) and filters (length, when it came, highlighted, not started, and a tag in the Library). Save as View… keeps the list, with its order and filters, under Views in the sidebar, here and in the page.
 - **The Feed's sources.** Right-click a feed to rename it, move it to another folder, turn on "Always load the full article" or "Tell me about new posts", copy its address or unfollow it. Mark All Seen (⌥⌘K) works on the whole Feed, a folder or one feed, with Undo. Check for New Posts (⇧⌘R) asks FreshRSS now, and Feed › Follow a Site… adds one.
 - **The article reader.** Native text in a column, the way Apple Books lays it out: headings, lists, quotes, pictures and captions, my highlights in their colours. Select and press **H** (or right-click → Highlight) to highlight. Right-click a highlight to give it a note or another colour, or to remove it; a highlight with a note is underlined with dots, and the note shows when I hold the pointer over it. It keeps my place in Daf and counts my reading time exactly as the page does (15 seconds at a time, while I'm actually reading).
-- **The inspector** (⌥⌘I) has the article's details, my note on it, its tags (Article › Tags…, ⌥⌘T, with the tags Daf already knows as suggestions), the summary and the highlights. PDFs and videos have the note and the tags too.
+- **The inspector** (⌥⌘I) has the article's details, my note on it, its tags (Article › Tags…, ⌥⌘T, with the tags Daf already knows as suggestions), the summary, Ask and the highlights. PDFs and videos have the note and the tags too.
+- **Ask** (⌥⌘A) answers a question about the article, with Daf's suggested questions to start; select a passage and right-click → Ask About This Passage to ask what it means there. The answers stay with the article.
 - **Read aloud.** **P** listens or pauses (⌥⌘P from the menu), **L** or right-click → Read Aloud from Here starts at a paragraph. It's Kokoro on Daf, a paragraph at a time, the next one made while this one plays; the paragraph being read is marked and kept in view, and the player at the bottom has the paragraph before and after, the speed and Stop. The keyboard's play and skip keys work too. Listening counts as reading. The voice is in Settings.
 - **Review.** Today's highlights one at a time, with Keep, Less, Never, a note and Favorite, and the flashcards that are due, as in the page (K, L, N and F, the arrow keys, Space, and 1 to 4 for a card).
 - **Highlights.** Every book and article with highlights; each one's highlights with their notes, colours and tags. Open at Its Spot opens the article in a window of its own at that highlight.
 - **Stats.** The numbers, the last two weeks against the goal, where the minutes come from, highlights a week, the hours and the days of the week, in Apple's charts.
-- **Books.** A book's own page: its cover, where I am, the nightstand, my reading of it (time, sittings, pace, when I'd finish) and its highlights. Read opens it in a window of its own.
+- **Books.** A book's own page: its cover, where I am, the nightstand, its shelves, my reading of it (time, sittings, pace, when I'd finish) and its highlights. Read opens it in a window of its own. Books opens onto my shelves in the sidebar; right-click for New Shelf…, Rename… and Delete the Shelf (a Hardcover list stays, as on the page).
 - **Manga.** A series' volumes as covers. A volume opens in a native reader: one page or two side by side when the window is wide enough, right to left unless the series says otherwise, ←/→, Space or a click on either side to turn. It keeps my place and my reading time as the page does, and offers the next volume at the end.
 - **Torah, Podcasts and Sources.** This week's parasha and haftarah with the readings, which open in the reader; what I've listened to lately and what I follow; whether each place Daf reads from is answering, with Sync Now.
 - **PDFs** open in Apple's own PDF view.
@@ -29,7 +31,7 @@ The book reader, videos and podcast episodes open as Daf's own pages (without th
 
 ## Not yet
 
-Offline, Save to Daf in the share menu, the Safari extension and new-post notifications (the regular app still has all of those), shelves, and the rest of Daf's preferences, which open as the page from Settings.
+Offline, Save to Daf in the share menu, the Safari extension and new-post notifications (the regular app still has all of those), photos of paper pages, and the rest of Daf's preferences, which open as the page from Settings.
 
 ## Building it
 

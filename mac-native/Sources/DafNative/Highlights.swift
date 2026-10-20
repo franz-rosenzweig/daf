@@ -63,7 +63,7 @@ struct HighlightGroups: View {
                     Thumb(path: g.b("has_cover") ? "/api/cover/" + API.enc(g.s("book_id") ?? "") : nil, book: true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(g.s("title") ?? "").font(.system(.body, design: .serif).weight(.semibold)).lineLimit(2)
-                        Text([g.s("author"), "\(g.a("items").count) highlights", (g.i("notes") ?? 0) > 0 ? "\(g.i("notes")!) notes" : nil].compactMap { $0 }.joined(separator: " · "))
+                        Text([g.s("author"), plural(g.a("items").count, "highlight"), (g.i("notes") ?? 0) > 0 ? plural(g.i("notes")!, "note") : nil].compactMap { $0 }.joined(separator: " · "))
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }

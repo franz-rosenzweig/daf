@@ -81,7 +81,7 @@ struct PaperSheet: View {
         }
         do {
             try await API.shared.send("POST", "/api/paper", body)
-            model.say("Logged \(minutes) minutes")
+            model.say("Logged " + plural(minutes, "minute"))
             dismiss()
             model.reload()
         } catch { model.error = error.localizedDescription }
@@ -99,6 +99,10 @@ struct RouteView: View {
         Group {
             if parts.first == "mread", parts.count > 1 {
                 MangaReader(id: parts[1])
+            } else if parts.first == "pdf", parts.count > 1 {
+                PDFPane(id: parts[1])
+            } else if parts.first == "page", parts.count > 1 {
+                WebPane(route: "#" + parts.dropFirst().map { API.enc($0) }.joined(separator: "/"))
             } else if parts.first == "read", parts.count > 1 {
                 if let reader, reader.doc != nil { ArticleReader(model: reader) }
                 else if let e = reader?.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }

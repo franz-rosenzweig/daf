@@ -131,6 +131,9 @@ extension Notification.Name {
     static let dafSignedOut = Notification.Name("dafSignedOut")
 }
 
+/// "1 highlight", "3 highlights".
+func plural(_ n: Int, _ one: String, _ many: String? = nil) -> String { "\(n) " + (n == 1 ? one : many ?? one + "s") }
+
 enum Version {
     static var short: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1" }
 }

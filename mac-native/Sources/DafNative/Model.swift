@@ -9,6 +9,8 @@ enum Place: Hashable {
     case shortlist
     case feed(String?)                // nil: everything unseen; else a category
     case feedSource(String)           // one feed ("feed/12")
+    case view(String)                 // a saved view, by its id
+    case shelf(String)                // a shelf of books
     case books
     case manga
     case torah
@@ -35,6 +37,8 @@ enum Place: Hashable {
         case .library(let tab): return ["inbox": "Inbox", "later": "Later", "archive": "Archive"][tab] ?? tab.capitalized
         case .feed(let cat): return cat ?? "All Feeds"
         case .feedSource: return "Feed"
+        case .view: return "View"
+        case .shelf: return "Shelf"
         case .books: return "Books"
         case .search: return "Search"
         }
@@ -47,7 +51,7 @@ struct Item: Identifiable, Hashable {
     let j: J
     var type: String { j.s("type") ?? (id.hasPrefix("cal:") ? "book" : "doc") }
     var kind: String { j.s("kind") ?? (type == "book" ? "book" : "article") }
-    var title: String { j.s("title") ?? j.s("url") ?? "Untitled" }
+    var title: String { j.b("private") ? "Private reading" : (j.s("title") ?? j.s("url") ?? "Untitled") }
     var source: String? { j.s("source") ?? j.s("author") }
     var mins: Int? { j.i("mins") }
     var progress: Double { j.d("progress") ?? 0 }
@@ -72,7 +76,32 @@ struct Item: Identifiable, Hashable {
 final class AppModel {
     var place: Place? = .today
     var items: [Item] = []
-    var selection: Item.ID?
+    /// The one item open; several chosen at once are `chosen`, and then nothing is open.
+    var selection: Item.ID? {
+        didSet {
+            if let s = selection { if multi != [s] { multi = [s] } } else if multi.count == 1 { multi = [] }
+        }
+    }
+    var multi: Set<Item.ID> = [] {
+        didSet {
+            let one = multi.count == 1 ? multi.first : nil
+            if selection != one { selection = one }
+        }
+    }
+    var chosen: [Item] { items.filter { multi.contains($0.id) } }
+    /// The list as shown: a Library tag picked in the filters keeps only what has it.
+    var shown: [Item] { tag.map { t in items.filter { $0.j.strings("tags").contains(t) } } ?? items }
+
+    // the list's order and filters, as the page has them
+    var sortLibrary = UserDefaults.standard.string(forKey: "sort.library") ?? "new" { didSet { UserDefaults.standard.set(sortLibrary, forKey: "sort.library") } }
+    var sortFeed = UserDefaults.standard.string(forKey: "sort.feed") ?? "new" { didSet { UserDefaults.standard.set(sortFeed, forKey: "sort.feed") } }
+    var listFilter = ListFilter()
+    var tag: String?
+    var feedTab = "unseen"
+    static let sorts = [("new", "Newest"), ("old", "Oldest"), ("published", "Published"), ("short", "Shortest"), ("long", "Longest"), ("progress", "Started First")]
+    /// Saved views and shelves, for the sidebar.
+    var views: [J] = []
+    var shelves: [J] = []
     var counts: J?
     var today: J?
     var home: J?
@@ -117,6 +146,8 @@ final class AppModel {
 
     /// Article › Tags…: the inspector's tag field takes the keys.
     var focusTags = 0
+    /// Article › Ask…: the inspector's question field takes the keys.
+    var focusAsk = 0
     /// The Feed's folders and feeds with their counts (/api/feed/sources).
     var sources: J?
     /// A feed to unfollow, once that's confirmed.
@@ -133,21 +164,28 @@ final class AppModel {
     var showSettings = false
 
     enum Sheet: Identifiable, Hashable {
-        case addLink, paper, follow, renameFeed(String)
+        case addLink, paper, follow, renameFeed(String), saveView, newShelf(String?), renameShelf(String)
         var id: String {
             switch self {
             case .addLink: return "addLink"
             case .paper: return "paper"
             case .follow: return "follow"
             case .renameFeed(let f): return "rename " + f
+            case .saveView: return "saveView"
+            case .newShelf(let b): return "newShelf " + (b ?? "")
+            case .renameShelf(let s): return "renameShelf " + s
             }
         }
     }
 
     /// The list's title: a feed by its name.
     func title(_ p: Place?) -> String {
-        if case .feedSource(let id)? = p { return feed(id)?.s("title") ?? "Feed" }
-        return p?.title ?? "Daf"
+        switch p {
+        case .feedSource(let id)?: return feed(id)?.s("title") ?? "Feed"
+        case .view(let id)?: return view(id)?.s("name") ?? "View"
+        case .shelf(let id)?: return shelves.first { $0.s("id") == id }?.s("name") ?? "Shelf"
+        default: return p?.title ?? "Daf"
+        }
     }
 
     var selected: Item? { items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } }
@@ -182,11 +220,23 @@ final class AppModel {
                 home = try await h
                 items = []
             case .library(let tab):
-                let j = try await API.shared.json("/api/docs?where=library&tab=\(tab)&limit=200" + (kind.isEmpty ? "" : "&kind=\(kind)"))
-                items = j.a("items").map(Item.init)
+                items = try await docs("library", tab: tab, arg: kind, sort: sortLibrary, filter: listFilter.dict)
             case .shortlist:
-                let j = try await API.shared.json("/api/docs?where=library&tab=inbox&kind=starred&limit=200")
-                items = j.a("items").map(Item.init)
+                items = try await docs("library", tab: "inbox", arg: "starred", sort: sortLibrary, filter: listFilter.dict)
+            case .view(let id):
+                if views.isEmpty { await loadViews() }
+                guard let v = view(id) else { items = []; break }
+                let w = v.s("where") == "feed" ? "feed" : "library"
+                items = try await docs(w, tab: v.s("tab") ?? (w == "feed" ? "unseen" : "inbox"), arg: v.s("arg") ?? "", sort: v.s("sort") ?? "new", filter: v.o("filter")?.raw ?? [:])
+            case .shelf(let id):
+                let j = try await API.shared.json("/api/shelves/" + API.enc(id))
+                items = j.a("books").map { b in
+                    var raw = b.raw
+                    raw["type"] = "book"
+                    raw["kind"] = "book"
+                    raw["source"] = b.s("author") ?? b.s("progress_note")
+                    return Item(J(raw))
+                }
             case .review, .highlights, .stats, .podcasts, .sources:
                 items = []
             case .manga:
@@ -198,7 +248,7 @@ final class AppModel {
                     raw["type"] = "series"
                     raw["kind"] = "series"
                     raw["title"] = s.s("name")
-                    raw["source"] = "\(s.i("count") ?? 0) volumes" + ((s.i("read") ?? 0) > 0 ? " · \(s.i("read")!) read" : "")
+                    raw["source"] = plural(s.i("count") ?? 0, "volume") + ((s.i("read") ?? 0) > 0 ? " · \(s.i("read")!) read" : "")
                     raw["thumb"] = s.s("cover").map { "/api/manga/thumb/b/" + API.enc($0) }
                     out.append(Item(J(raw)))
                 }
@@ -209,11 +259,9 @@ final class AppModel {
                 items = (t.a("week") + t.a("ruach") + t.a("earlier")).map(Item.init)
             case .feed(let cat):
                 if sources == nil { await loadSources() }
-                let j = try await API.shared.json("/api/docs?where=feed&tab=unseen&limit=200" + (cat.map { "&cat=" + API.enc($0) } ?? ""))
-                items = j.a("items").map(Item.init)
+                items = try await docs("feed", tab: feedTab, arg: cat, sort: sortFeed, filter: listFilter.dict)
             case .feedSource(let f):
-                let j = try await API.shared.json("/api/docs?where=feed&tab=unseen&limit=200&feed=" + API.enc(f))
-                items = j.a("items").map(Item.init)
+                items = try await docs("feed", tab: feedTab, arg: f, sort: sortFeed, filter: listFilter.dict)
             case .books:
                 let j = try await API.shared.json("/api/books")
                 var seen = Set<String>(), out: [Item] = []
@@ -250,6 +298,143 @@ final class AppModel {
         }
     }
 
+    /// A list from Daf as the page asks for it: the Library by kind ("starred" for the Shortlist), the
+    /// Feed by folder or by feed, in an order, with the filters.
+    private func docs(_ w: String, tab: String, arg: String?, sort: String, filter: [String: Any]) async throws -> [Item] {
+        var q = "/api/docs?where=\(w)&tab=\(API.enc(tab))&sort=\(API.enc(sort))&limit=200"
+        if let arg, !arg.isEmpty {
+            q += w == "feed" ? (arg.hasPrefix("feed/") ? "&feed=" : "&cat=") + API.enc(arg) : "&kind=" + API.enc(arg)
+        }
+        for (k, v) in filter.sorted(by: { $0.key < $1.key }) { q += "&\(k)=" + API.enc((v as? Bool).map { $0 ? "1" : "0" } ?? "\(v)") }
+        return try await API.shared.json(q).a("items").map(Item.init)
+    }
+
+    /// A new place: nothing chosen, a saved view's tag (or none), the list again.
+    func placeChanged() {
+        multi = []
+        if case .view(let id)? = place { tag = view(id)?.s("tag") } else { tag = nil }
+        reload()
+    }
+
+    // MARK: saved views and shelves
+
+    func view(_ id: String) -> J? { views.first { $0.s("id") == id } }
+
+    func loadViews() async { if let v = try? await API.shared.json("/api/views") { views = v.a("views") } }
+    func loadShelves() async { if let s = try? await API.shared.json("/api/shelves") { shelves = s.a("shelves") } }
+
+    /// The list as it is now, as a view (nil where there's no list to keep: Today, Books, …).
+    func currentView(named name: String) -> [String: Any]? {
+        var v: [String: Any] = ["name": name, "tag": tag ?? "", "filter": listFilter.dict]
+        switch place {
+        case .library(let tab)?: v["where"] = "library"; v["arg"] = kind; v["tab"] = tab; v["sort"] = sortLibrary
+        case .shortlist?: v["where"] = "library"; v["arg"] = "starred"; v["tab"] = "inbox"; v["sort"] = sortLibrary
+        case .feed(let cat)?: v["where"] = "feed"; v["arg"] = cat ?? ""; v["tab"] = feedTab; v["sort"] = sortFeed
+        case .feedSource(let f)?: v["where"] = "feed"; v["arg"] = f; v["tab"] = feedTab; v["sort"] = sortFeed
+        default: return nil
+        }
+        return v
+    }
+
+    func saveViews(_ list: [[String: Any]]) async -> Bool {
+        do {
+            let r = J(try await API.shared.send("PUT", "/api/views", ["views": list]))
+            views = r?.a("views") ?? views
+            return true
+        } catch { self.error = error.localizedDescription; return false }
+    }
+
+    func saveCurrentView(named name: String) async -> Bool {
+        guard let v = currentView(named: name) else { return false }
+        let before = Set(views.compactMap { $0.s("id") })
+        guard await saveViews(views.map(\.raw) + [v]) else { return false }
+        if let new = views.first(where: { !before.contains($0.s("id") ?? "") })?.s("id") { place = .view(new) }
+        say("Saved in the sidebar")
+        return true
+    }
+
+    func removeView(_ id: String) async {
+        guard await saveViews(views.filter { $0.s("id") != id }.map(\.raw)) else { return }
+        if place == .view(id) { place = .library("inbox") }
+        say("View removed")
+    }
+
+    @discardableResult
+    func newShelf(_ name: String, with book: String? = nil) async -> Bool {
+        var body: [String: Any] = ["name": name]
+        if let book { body["book"] = book }
+        do {
+            let r = J(try await API.shared.send("POST", "/api/shelves", body))
+            shelves = r?.a("shelves") ?? shelves
+            say(book == nil ? "Shelf made" : "On the new shelf")
+            return true
+        } catch { self.error = error.localizedDescription; return false }
+    }
+
+    @discardableResult
+    func renameShelf(_ id: String, to name: String) async -> Bool {
+        do {
+            let r = J(try await API.shared.send("PUT", "/api/shelves/" + API.enc(id), ["name": name]))
+            shelves = r?.a("shelves") ?? shelves
+            return true
+        } catch { self.error = error.localizedDescription; return false }
+    }
+
+    func deleteShelf(_ id: String) async {
+        do {
+            let r = J(try await API.shared.send("DELETE", "/api/shelves/" + API.enc(id), nil))
+            shelves = r?.a("shelves") ?? shelves
+            if place == .shelf(id) { place = .books }
+            say("Shelf deleted")
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// A book on a shelf, or off it.
+    func shelve(_ book: String, on shelf: String, _ on: Bool) async -> Bool {
+        do {
+            try await API.shared.send(on ? "PUT" : "DELETE", "/api/shelves/\(API.enc(shelf))/books/\(API.enc(book))", nil)
+            await loadShelves()
+            if place == .shelf(shelf) { await load() }
+            return true
+        } catch { self.error = error.localizedDescription; return false }
+    }
+
+    // MARK: several at once
+
+    /// Several chosen, all moved at once (/api/docs/bulk), with Undo putting each back where it was.
+    func bulk(_ chosen: [Item], _ status: String) async {
+        let docs = chosen.filter(\.isDoc)
+        guard !docs.isEmpty else { return }
+        let back = Dictionary(grouping: docs, by: { $0.status ?? ($0.whereIn == "feed" ? "unseen" : "inbox") }).mapValues { $0.map(\.id) }
+        do {
+            let r = J(try await API.shared.send("POST", "/api/docs/bulk", ["ids": docs.map(\.id), "status": status]))
+            let done = Set((r?.list("done") ?? []).compactMap { $0 as? String })
+            let failed = (r?.list("failed") ?? []).count
+            items.removeAll { done.contains($0.id) && $0.status != status }
+            multi = []
+            counts = try? await API.shared.json("/api/docs/counts")
+            let verb = ["archive": "archived", "later": "moved to Later", "inbox": "back in the Inbox", "seen": "marked seen",
+                        "unseen": "marked unseen", "deleted": "deleted"][status] ?? status
+            let action = ["archive": "Archive", "later": "Read Later", "inbox": "Back to Inbox", "seen": "Mark Seen", "unseen": "Mark Unseen", "deleted": "Delete"][status]
+            say("\(done.count) \(verb)" + (failed > 0 ? "; \(failed) didn't move" : ""), undo: action) { [weak self] in
+                guard let self else { return }
+                for (st, ids) in back { _ = try? await API.shared.send("POST", "/api/docs/bulk", ["ids": ids, "status": st]) }
+                self.say("Put back")
+                await self.load()
+            }
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// Articles to the Kindle: one book of them, by way of the folder it shares (/api/kindle/send).
+    func sendToKindle(_ ids: [String]) async {
+        guard !ids.isEmpty else { return }
+        do {
+            let r = J(try await API.shared.send("POST", "/api/kindle/send", ["ids": ids]))
+            let n = r?.i("count") ?? 0, skipped = (r?.list("skipped") ?? []).count
+            say((n <= 1 ? "Sent to the Kindle" : "\(n) sent to the Kindle, as one book") + (skipped > 0 ? "; \(skipped) had no text to send" : ""))
+        } catch { self.error = error.localizedDescription }
+    }
+
     // MARK: acting on an item
 
     /// Done in the Library (archive), seen in the Feed.
@@ -268,6 +453,19 @@ final class AppModel {
             counts = try? await API.shared.json("/api/docs/counts")
             return true
         } catch { self.error = error.localizedDescription; return false }
+    }
+
+    /// Where an item opens in a window of its own (a double-click, Open in a New Window).
+    func route(for item: Item) -> String? {
+        let id = API.enc(item.id)
+        if item.isSeries { return nil }
+        if item.isBook { return item.j.b("readable") ? "#ebook/" + id : nil }
+        switch item.kind {
+        case "pdf": return "#pdf/" + id
+        case "video", "podcast": return "#page/read/" + id
+        case "manga": return "#mread/" + id
+        default: return "#read/" + id
+        }
     }
 
     /// Delete, with Undo putting it back where it was.

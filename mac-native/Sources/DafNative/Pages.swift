@@ -33,6 +33,7 @@ struct BookPage: View {
                                         .buttonStyle(.borderedProminent)
                                 }
                                 Button(b.b("on_nightstand") ? "Off the Nightstand" : "On the Nightstand") { Task { await nightstand(!b.b("on_nightstand")) } }
+                                ShelvesMenu(book: id)
                             }
                             .padding(.top, 6)
                         }
@@ -40,7 +41,7 @@ struct BookPage: View {
                     if let st = b.o("stats"), (st.i("minutes") ?? 0) > 0 { stats(st) }
                     let hls = b.a("highlights")
                     if !hls.isEmpty {
-                        Text("\(hls.count) highlights").font(.headline)
+                        Text(plural(hls.count, "highlight")).font(.headline)
                         LazyVStack(alignment: .leading, spacing: 12) {
                             ForEach(hls, id: \.self) { h in
                                 HighlightCard(h: h, edit: {}, open: { if let o = h.s("open") { openWindow(id: "route", value: o) } })
@@ -63,7 +64,7 @@ struct BookPage: View {
             Grid(horizontalSpacing: 12, verticalSpacing: 12) {
                 GridRow {
                     Number(value: "\(Int(Double(st.i("minutes") ?? 0) / 60)) h \((st.i("minutes") ?? 0) % 60)′", label: "Read so far")
-                    Number(value: "\(st.i("sittings") ?? 0)", label: "Sittings, over \(st.i("days") ?? 0) days")
+                    Number(value: "\(st.i("sittings") ?? 0)", label: "Sittings, over " + plural(st.i("days") ?? 0, "day"))
                     Number(value: st.i("pages_per_hour").map { "\($0)" } ?? "—", label: "Pages an hour")
                     Number(value: st.s("finish").map(StatsView.day) ?? "—", label: "Done by, at this pace")
                 }

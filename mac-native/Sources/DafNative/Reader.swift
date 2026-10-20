@@ -16,6 +16,10 @@ final class ReaderModel {
     /// My note on the article, and its tags.
     var note = ""
     var tags: [String] = []
+    /// Ask: what's been asked about it, the questions Daf suggests, and an answer on its way.
+    var asks: [J] = []
+    var questions: [String] = []
+    var asking = false
     /// A highlight whose note is being written.
     var editing: Editing?
     struct Editing: Identifiable { let h: J; var id: String { h.s("id") ?? "" } }
@@ -48,6 +52,8 @@ final class ReaderModel {
             highlights = d.a("highlights")
             note = d.s("note") ?? ""
             tags = d.strings("tags")
+            asks = d.a("asks")
+            questions = d.strings("questions")
             sentPct = d.d("progress") ?? 0
             compose()
             startBeats()
@@ -60,6 +66,24 @@ final class ReaderModel {
         doc = d
         note = d.s("note") ?? ""
         tags = d.strings("tags")
+        asks = d.a("asks")
+        questions = d.strings("questions")
+    }
+
+    /// A question about the article, or about a passage of it (/api/docs/{id}/ask); the answer joins the others.
+    func ask(_ q: String, quote: String? = nil) async {
+        let q = q.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, !asking else { return }
+        asking = true
+        defer { asking = false }
+        var body: [String: Any] = ["q": q]
+        if let quote { body["quote"] = quote }
+        do {
+            let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/ask", body))
+            var a: [String: Any] = ["q": q, "a": r?.s("a") ?? "", "at": Int(Date().timeIntervalSince1970)]
+            if let quote { a["quote"] = quote }
+            asks.append(J(a))
+        } catch { self.error = error.localizedDescription }
     }
 
     func stop() {
@@ -455,6 +479,9 @@ final class ReaderTextView: NSTextView {
             item.representedObject = hid
             extra.append(item)
         }
+        if selectedRange().length > 0 {
+            extra.append(NSMenuItem(title: "Ask About This Passage", action: #selector(askAboutSelection), keyEquivalent: ""))
+        }
         let aloud = NSMenuItem(title: "Read Aloud from Here", action: #selector(readFromHere(_:)), keyEquivalent: "")
         aloud.representedObject = at
         extra.append(aloud)
@@ -472,6 +499,12 @@ final class ReaderTextView: NSTextView {
         guard let v = sender.representedObject as? [String], v.count == 2 else { return }
         let m = model
         Task { @MainActor in await m?.set(color: v[1], of: v[0]) }
+    }
+    @objc func askAboutSelection() {
+        let quote = (string as NSString).substring(with: selectedRange()).trimmingCharacters(in: .whitespacesAndNewlines)
+        let m = model
+        MainActor.assumeIsolated { AppModel.shared.showInspector = true }
+        Task { @MainActor in await m?.ask("What does this passage mean here?", quote: quote) }
     }
     @objc func readFromHere(_ sender: NSMenuItem) {
         guard let at = sender.representedObject as? Int else { return }
