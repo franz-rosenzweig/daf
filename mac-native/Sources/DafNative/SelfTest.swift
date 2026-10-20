@@ -375,16 +375,7 @@ enum SelfTest {
                 m.selection = b.id
                 await pause(1)
             } else { check(false, "a new shelf holds the book it was made with", m.error ?? "") }
-            m.openRoute = "#ebook/" + API.enc(b.id)
-            let opened = await until(35) { bookOpen() }
-            var seen = "windows: " + NSApp.windows.filter(\.isVisible).map { "'\($0.title)'" }.joined(separator: ", ")
-            func find(_ v: NSView) -> WKWebView? { (v as? WKWebView) ?? v.subviews.lazy.compactMap(find).first }
-            if let web = NSApp.windows.lazy.compactMap({ $0.contentView.flatMap(find) }).first {
-                seen += " | web at \(web.url?.absoluteString ?? "-")"
-                let r = try? await web.evaluateJavaScript("[document.body && document.body.dataset.view, location.hash, !!document.querySelector('foliate-view'), document.title].join(' / ')")
-                seen += " | page: \(r as? String ?? "?")"
-            }
-            check(opened, "Read opens the book in Daf's own reader, in a window of its own", b.title + "; " + seen)
+            await readBook(m, fallback: b)
             closeOthers()
         }
 
@@ -482,6 +473,116 @@ enum SelfTest {
         check(!m.items.isEmpty, "search finds things in Daf", "\(m.items.count)")
 
         finish(nil)
+    }
+
+    /// The native book reader, on a book with a highlight made in the page's reader when there is one.
+    static func readBook(_ m: AppModel, fallback: Item) async {
+        var bookID = fallback.id
+        for candidate in ["cal:45"] + m.items.prefix(8).map(\.id) {
+            if let d = try? await API.shared.json("/api/ebooks/" + API.enc(candidate)), ["EPUB", "KEPUB"].contains((d.s("format") ?? "").uppercased()), !d.b("private") {
+                bookID = candidate
+                if !d.a("highlights").isEmpty { break }
+            }
+        }
+        let det = try? await API.shared.json("/api/ebooks/" + API.enc(bookID))
+        m.openRoute = "#ebook/" + API.enc(bookID)
+        let opened = await until(45) { BookModel.last?.id == bookID && BookModel.last?.text != nil && (BookModel.last?.pages?.pageCount ?? 0) > 0 }
+        guard opened, let bm = BookModel.last, let pages = bm.pages, let epub = bm.epub, let t0 = bm.text else {
+            return check(false, "a book opens in the native reader, set as pages", "\(bookID): \(BookModel.last?.error ?? "nothing")")
+        }
+        await pause(1.5)
+        let win = pages.window
+        check(true, "a book opens in the native reader, set as pages",
+              "\(det?.s("title") ?? bookID): \(epub.sections.count) chapters, \(epub.toc.flatMap(\.flat).count) in the contents, \(pages.pageCount) pages in this one, \(pages.perSpread) side by side")
+        capture("29-book", win)
+
+        // at the place Daf kept, read from the page's own CFI; and the same CFI written back
+        if let pos = det?.o("position")?.s("cfi") {
+            let parsed = CFI.parse(pos)
+            let k = epub.section(ofCFI: parsed), at = t0.range(of: parsed)?.location ?? -1, vis = pages.visible
+            check(k == bm.section && at >= vis.location && at <= NSMaxRange(vis), "it opens at the place Daf kept", "\(pos) → chapter \(k ?? -1), character \(at); showing \(vis.location)–\(NSMaxRange(vis))")
+            let mine = t0.cfi(at).map { CFI.join(epub.sections[bm.section].cfi, $0) } ?? ""
+            let theirs = CFI.wrap(CFI.string(parsed.collapse()))
+            check(mine == theirs, "a place written here is the very CFI the page writes", "page \(theirs), here \(mine)")
+        }
+
+        // every highlight made in the page's reader lands on its own words
+        func norm(_ s: String) -> String { s.split(whereSeparator: { $0.isWhitespace || $0 == "\u{2028}" }).joined(separator: " ") }
+        for h in bm.highlights {
+            guard let c = h.o("pos")?.s("cfi") else { continue }
+            bm.go(cfi: c)
+            let p = CFI.parse(c)
+            let words = bm.text.flatMap { t in t.range(of: p).map { norm((t.string.string as NSString).substring(with: $0)) } } ?? ""
+            check(words == norm(h.s("text") ?? ""), "a highlight made in the page lands on the same words here", "\(c): “\(words.prefix(60))”")
+        }
+
+        // places written as CFIs read back to the same characters
+        if let t = bm.text {
+            let sec = epub.sections[bm.section].cfi
+            var same = 0, tried = 0, miss = ""
+            for run in t.runs.enumerated().filter({ $0.offset % max(1, t.runs.count / 40) == 0 }).map(\.element) where run.raw.count > 2 {
+                let i = run.start + run.raw.count / 2
+                tried += 1
+                if let c = t.cfi(i), let back = t.range(of: CFI.parse(CFI.join(sec, c)))?.location, back == i { same += 1 } else if miss.isEmpty { miss = "\(i): \(t.cfi(i) ?? "-")" }
+            }
+            check(tried >= 5 && same == tried, "places written as CFIs read back to the same characters", "\(same) of \(tried) \(miss)")
+        }
+
+        // pages turn, and Daf keeps the new place
+        let f0 = pages.first, s0 = bm.section
+        pages.turn(true)
+        await pause(0.6)
+        check(pages.first > f0 || bm.section > s0, "→ turns the page", "page \(f0 + 1) → \(pages.first + 1), chapter \(s0) → \(bm.section)")
+        await bm.savePosition()
+        let kept = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position")?.s("cfi") ?? ""
+        let keptAt = bm.text?.range(of: CFI.parse(kept))?.location ?? -1
+        check(epub.section(ofCFI: CFI.parse(kept)) == bm.section && keptAt >= pages.visible.location && keptAt <= NSMaxRange(pages.visible),
+              "and Daf keeps the new place", kept)
+
+        // a highlight made here, kept by Daf, then taken away
+        if let t = bm.text, let run = t.runs.first(where: { $0.start >= pages.visible.location && $0.start + $0.raw.count <= NSMaxRange(pages.visible) && $0.raw.count > 40 }) {
+            let sel = NSRange(location: run.start + 3, length: 30)
+            let before = bm.highlights.count
+            await bm.highlight(sel)
+            let hid = bm.highlights.last?.s("id") ?? ""
+            let back = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.a("highlights").first { $0.s("id") == hid }
+            let painted = pages.storage.attribute(.dafHighlight, at: sel.location + 5, effectiveRange: nil) as? String
+            check(bm.highlights.count == before + 1 && back != nil && painted == hid, "H highlights the selection, and Daf keeps it as a CFI", back?.o("pos")?.s("cfi") ?? m.error ?? "")
+            capture("30-book-highlight", win)
+            await bm.remove(highlight: hid)
+            check(bm.highlights.count == before, "and Remove Highlight takes it away")
+        } else { check(false, "H highlights the selection", "no text on this page to select") }
+
+        // a bookmark on and off
+        await bm.toggleBookmark()
+        let on = bm.marked
+        await bm.toggleBookmark()
+        check(on && !bm.marked, "B bookmarks the page, and takes the bookmark off again")
+
+        // bigger type: the same place
+        let at0 = pages.visible.location
+        var look = bm.look
+        let size0 = look.size
+        look.size += 4
+        bm.restyle(look)
+        await pause(0.8)
+        check(at0 >= pages.visible.location && at0 <= NSMaxRange(pages.visible), "bigger type keeps the place", "\(pages.pageCount) pages now")
+        look.size = size0
+        bm.restyle(look)
+
+        // the reading time
+        let m0 = (try? await API.shared.json("/api/today"))?.d("counted") ?? 0
+        bm.beat()
+        await pause(2)
+        let m1 = (try? await API.shared.json("/api/today"))?.d("counted") ?? 0
+        check(m1 > m0, "15 seconds with the book count toward today's minutes", "\(m0) → \(m1)")
+
+        bm.showContents = true
+        await pause(1)
+        capture("31-book-contents", win)
+        bm.showContents = false
+        closeOthers()
+        await pause(0.5)
     }
 
     static func finish(_ why: String?) {

@@ -18,6 +18,7 @@ It talks to Daf the same way the page does, through Daf's own API, so nothing ch
 - **Review.** Today's highlights one at a time, with Keep, Less, Never, a note and Favorite, and the flashcards that are due, as in the page (K, L, N and F, the arrow keys, Space, and 1 to 4 for a card).
 - **Highlights.** Every book and article with highlights; each one's highlights with their notes, colours and tags. Open at Its Spot opens the article in a window of its own at that highlight.
 - **Stats.** The numbers, the last two weeks against the goal, where the minutes come from, highlights a week, the hours and the days of the week, in Apple's charts.
+- **The book reader.** EPUBs open natively, the way Apple Books sets a book on the Mac: a chapter at a time as pages, two side by side when the window is wide, turned with the arrow keys, Space, a swipe or a click at either edge, right to left for a Hebrew book. The contents, my highlights and my bookmarks sit in the sidebar (⌥⌘T); the Aa button has the theme (Original, Paper, Quiet, Night, or with the Mac), the typeface, the size, the line spacing and justified text. **H** highlights the selection, **B** bookmarks the page, and right-click a highlight for its note, its colour or to remove it. A footnote opens where its number is. My place, highlights and bookmarks are kept exactly as the page keeps them (the same CFIs), so the page's reader, this one and the Kindle agree; when the Kindle is further on, it says so and offers to go there. Reading time and pages count as on the page. Other formats (MOBI, AZW3, FB2, comics) open in Daf's own reader.
 - **Books.** A book's own page: its cover, where I am, the nightstand, its shelves, my reading of it (time, sittings, pace, when I'd finish) and its highlights. Read opens it in a window of its own. Books opens onto my shelves in the sidebar; right-click for New Shelf…, Rename… and Delete the Shelf (a Hardcover list stays, as on the page).
 - **Manga.** A series' volumes as covers. A volume opens in a native reader: one page or two side by side when the window is wide enough, right to left unless the series says otherwise, ←/→, Space or a click on either side to turn. It keeps my place and my reading time as the page does, and offers the next volume at the end.
 - **Torah, Podcasts and Sources.** This week's parasha and haftarah with the readings, which open in the reader; what I've listened to lately and what I follow; whether each place Daf reads from is answering, with Sync Now.
@@ -27,11 +28,11 @@ It talks to Daf the same way the page does, through Daf's own API, so nothing ch
 
 ## What's still the page
 
-The book reader, videos and podcast episodes open as Daf's own pages (without the page's sidebar). They count reading time and keep their place themselves, as in a browser.
+Videos and podcast episodes open as Daf's own pages (without the page's sidebar), and so do books that aren't EPUBs. They count reading time and keep their place themselves, as in a browser.
 
 ## Not yet
 
-Offline, Save to Daf in the share menu, the Safari extension and new-post notifications (the regular app still has all of those), photos of paper pages, and the rest of Daf's preferences, which open as the page from Settings.
+Offline, Save to Daf in the share menu, the Safari extension and new-post notifications (the regular app still has all of those), photos of paper pages, reading a book aloud, search inside a book, Ask about a book, and the rest of Daf's preferences, which open as the page from Settings.
 
 ## Building it
 
