@@ -467,6 +467,50 @@ enum SelfTest {
         await pause(2)
         if let w = NSApp.windows.first(where: { $0.isVisible && !shownBefore.contains(ObjectIdentifier($0)) }) { capture("17-settings", w); w.close() }
         UserDefaults.standard.removeObject(forKey: "prefsTab")
+
+        // Settings › Goals: the goals as the page's Preferences has them
+        let goals = (try? await API.shared.json("/api/goals"))?.a("goals") ?? []
+        UserDefaults.standard.set("goals", forKey: "prefsTab")
+        let beforeGoals = Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
+        m.showSettings = true
+        let goalsShown = await until(6) { NSApp.windows.contains { $0.isVisible && !beforeGoals.contains(ObjectIdentifier($0)) } }
+        await pause(2.5)
+        if let w = NSApp.windows.first(where: { $0.isVisible && !beforeGoals.contains(ObjectIdentifier($0)) }) { capture("38-goals", w); w.close() }
+        UserDefaults.standard.removeObject(forKey: "prefsTab")
+        let target0 = goals.first { $0.s("id") == "minutes" }?.i("target") ?? 60
+        _ = try? await API.shared.send("PUT", "/api/goals", ["goals": [["id": "minutes", "target": target0 + 5]]])
+        let changed = (try? await API.shared.json("/api/goals"))?.a("goals").first { $0.s("id") == "minutes" }?.i("target")
+        _ = try? await API.shared.send("PUT", "/api/goals", ["goals": [["id": "minutes", "target": target0]]])
+        check(goalsShown && goals.count == 7 && changed == target0 + 5, "Settings › Goals has the seven goals, and a target changes", "\(goals.count) goals; \(target0) → \(changed ?? -1) → \(target0)")
+
+        // a photo of a paper page: read (by the sandbox's stand-in), its lines, a book, kept as highlights
+        let photo = NSImage(size: NSSize(width: 900, height: 1200), flipped: false) { r in
+            NSColor.white.setFill(); r.fill()
+            let a: [NSAttributedString.Key: Any] = [.font: NSFont(name: "Times New Roman", size: 34) ?? NSFont.systemFont(ofSize: 34), .foregroundColor: NSColor.black]
+            for (k, line) in ["A page from a paper book,", "photographed for the self-test.", "The pencil marked this line."].enumerated() {
+                (line as NSString).draw(at: NSPoint(x: 80, y: r.height - 200 - CGFloat(k) * 60), withAttributes: a)
+            }
+            return true
+        }
+        let png = photo.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) } ?? Data()
+        await PaperPages.add([png])
+        let pid = m.selection ?? ""
+        var pageJ: J?
+        for _ in 0..<40 {
+            pageJ = try? await API.shared.json("/api/paper/pages/" + API.enc(pid))
+            if let p = pageJ, !PaperPages.reading(p) { break }
+            await pause(0.5)
+        }
+        check(m.place == .paper && !(pageJ?.a("lines").isEmpty ?? true), "a photo of a page is sent to Daf and read, line by line", "\(pageJ?.a("lines").count ?? 0) lines, \(pageJ?.list("chosen").count ?? 0) marked")
+        await pause(5)
+        capture("37-paper")
+        var kept: J?, why = ""
+        do { kept = J(try await API.shared.send("POST", "/api/paper/pages/" + API.enc(pid), ["chosen": [1, 2], "book_id": "cal:45", "page": "12"])) }
+        catch { why = error.localizedDescription }
+        check((kept?.i("highlights") ?? 0) == 1, "its chosen lines become one highlight in the book", "\(kept?.i("highlights") ?? -1) \(pid) \(why)")
+        _ = try? await API.shared.send("DELETE", "/api/paper/pages/" + API.enc(pid), nil)
+        await go(m, .today)
+
         check(prefs, "Settings opens", NSApp.windows.map { "'\($0.title)' \($0.isVisible)" }.joined(separator: ", "))
 
         // Review

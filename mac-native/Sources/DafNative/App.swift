@@ -23,7 +23,9 @@ struct DafNativeApp: App {
             CommandGroup(after: .newItem) {
                 Button("Add a Link…") { model.sheet = .addLink }.keyboardShortcut("l", modifiers: .command)
                 Button("Log Paper Minutes…") { model.sheet = .paper }.keyboardShortcut("p", modifiers: [.command, .shift])
+                Button("Add a Photo of a Page…") { PaperPages.choose() }
             }
+            ImportFromDevicesCommands()
             CommandMenu("Go") {
                 Button("Today") { model.place = .today }.keyboardShortcut("1")
                 Button("Review") { model.place = .review }.keyboardShortcut("2")
@@ -34,6 +36,7 @@ struct DafNativeApp: App {
                 Button("Manga") { model.place = .manga }.keyboardShortcut("7")
                 Button("Stats") { model.place = .stats }.keyboardShortcut("8")
                 Divider()
+                Button("Paper Pages") { model.place = .paper }
                 Button("Torah") { model.place = .torah }
                 Button("Podcasts") { model.place = .podcasts }
                 Button("Sources") { model.place = .sources }

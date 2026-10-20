@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The window: the sidebar, the list, and what's open, with the inspector beside it.
 struct MainView: View {
@@ -92,6 +93,7 @@ struct MainView: View {
             case .renameShelf(let id): ShelfSheet(shelf: id).environment(model)
             }
         }
+        .importsItemProviders([.image]) { PaperPages.take($0) }        // Continuity Camera: File › Import from iPhone
         .searchable(text: $model.query, placement: .sidebar, prompt: "Search Daf")
         .onSubmit(of: .search) {
             model.place = .search
@@ -134,6 +136,7 @@ struct Sidebar: View {
                 row(.torah, "Torah", "scroll")
                 row(.podcasts, "Podcasts", "headphones")
                 row(.highlights, "Highlights", "highlighter")
+                row(.paper, "Paper Pages", "camera.viewfinder")
                 row(.stats, "Stats", "chart.bar")
             }
             Section {
@@ -180,6 +183,7 @@ struct ItemList: View {
             if ids.count == 1, let item = model.items.first(where: { ids.contains($0.id) }), let r = model.route(for: item) { model.openRoute = r }
         }
         .listStyle(.inset)
+        .onDrop(of: [.image], isTargeted: nil) { model.place == .paper ? PaperPages.take($0) : false }
         .navigationTitle(model.title(model.place))
         .navigationSubtitle(model.shown.isEmpty ? "" : model.multi.count > 1 ? "\(model.multi.count) of \(model.shown.count) chosen" : "\(model.shown.count)")
         .overlay {
@@ -219,6 +223,12 @@ struct ItemList: View {
             }
             if model.place.map(hasDocs) == true {
                 ToolbarItem { ListOptionsMenu() }
+            }
+            if model.place == .paper {
+                ToolbarItem {
+                    Button { PaperPages.choose() } label: { Label("Add a Photo of a Page", systemImage: "camera.badge.ellipsis") }
+                        .help("Add a photo of a page you marked (or use File › Import from iPhone)")
+                }
             }
             ToolbarItem {
                 Button { model.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
@@ -489,6 +499,7 @@ struct Opened: View {
         Group {
             switch (item.isBook, item.kind) {
             case (_, "series"): SeriesView(id: item.id)
+            case (_, "paper"): PaperPageView(id: item.id)
             case (true, _): BookPage(id: item.id)
             case (_, "pdf") where item.j.b("has_pdf") || item.kind == "pdf": PDFPane(id: item.id)
             case (_, "video"), (_, "podcast"): WebPane(route: "#read/" + API.enc(item.id))

@@ -46,7 +46,7 @@ enum Links {
         let places: [String: Place] = ["today": .today, "review": .review, "inbox": .library("inbox"), "library": .library("inbox"),
                                        "later": .library("later"), "archive": .library("archive"), "shortlist": .shortlist, "feed": .feed(nil),
                                        "books": .books, "manga": .manga, "torah": .torah, "podcasts": .podcasts, "highlights": .highlights,
-                                       "stats": .stats, "sources": .sources]
+                                       "stats": .stats, "sources": .sources, "paper": .paper]
         if let p = places[route] { m.place = p } else { m.openRoute = "#" + route }
         NSApp.activate()
     }
@@ -227,6 +227,10 @@ enum Migration {
         if !d.bool(forKey: "migrated.native") {            // once: the web-view Daf's menu bar choice (shown unless turned off)
             d.set(true, forKey: "migrated.native")
             d.set(d.object(forKey: "menuBarShown") as? Bool ?? true, forKey: "menuBar")
+        }
+        if !d.bool(forKey: "migrated.copy") {              // once: the web-view Daf's offline copy of the page, unused now
+            d.set(true, forKey: "migrated.copy")
+            for name in ["app", "data", "kept.json", "localStorage.json"] { try? FileManager.default.removeItem(at: Store.dir.appendingPathComponent(name)) }
         }
         guard API.shared.cookie == nil, let host = API.shared.base.host else { return }
         let old = await WKWebsiteDataStore.default().httpCookieStore.allCookies()

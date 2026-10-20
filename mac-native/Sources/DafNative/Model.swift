@@ -11,6 +11,7 @@ enum Place: Hashable {
     case feedSource(String)           // one feed ("feed/12")
     case view(String)                 // a saved view, by its id
     case shelf(String)                // a shelf of books
+    case paper                        // photos of paper pages
     case books
     case manga
     case torah
@@ -39,6 +40,7 @@ enum Place: Hashable {
         case .feedSource: return "Feed"
         case .view: return "View"
         case .shelf: return "Shelf"
+        case .paper: return "Paper Pages"
         case .books: return "Books"
         case .search: return "Search"
         }
@@ -63,7 +65,8 @@ struct Item: Identifiable, Hashable {
     var status: String? { j.s("status") }
     var isBook: Bool { type == "book" || kind == "book" }
     var isSeries: Bool { type == "series" }
-    var isDoc: Bool { !isBook && !isSeries }
+    var isPaper: Bool { type == "paper" }
+    var isDoc: Bool { !isBook && !isSeries && !isPaper }
 
     init(_ j: J) {
         self.j = j
@@ -230,6 +233,8 @@ final class AppModel {
                 guard let v = view(id) else { items = []; break }
                 let w = v.s("where") == "feed" ? "feed" : "library"
                 items = try await docs(w, tab: v.s("tab") ?? (w == "feed" ? "unseen" : "inbox"), arg: v.s("arg") ?? "", sort: v.s("sort") ?? "new", filter: v.o("filter")?.raw ?? [:])
+            case .paper:
+                items = try await API.shared.json("/api/paper/pages").a("pages").map(PaperPages.item)
             case .shelf(let id):
                 let j = try await API.shared.json("/api/shelves/" + API.enc(id))
                 items = j.a("books").map { b in
@@ -461,7 +466,7 @@ final class AppModel {
     /// Where an item opens in a window of its own (a double-click, Open in a New Window).
     func route(for item: Item) -> String? {
         let id = API.enc(item.id)
-        if item.isSeries { return nil }
+        if item.isSeries || item.isPaper { return nil }
         if item.isBook { return item.j.b("readable") ? "#ebook/" + id : nil }
         switch item.kind {
         case "pdf": return "#pdf/" + id

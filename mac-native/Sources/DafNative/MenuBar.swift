@@ -135,6 +135,10 @@ struct PrefsView: View {
             .formStyle(.grouped)
             .tabItem { Label("Reading", systemImage: "book") }
             .tag("reading")
+
+            GoalsPrefs()
+                .tabItem { Label("Goals", systemImage: "target") }
+                .tag("goals")
             .task {
                 s = try? await API.shared.json("/api/settings")
                 let all = (try? await API.shared.json("/api/voices"))?.strings("voices") ?? []
@@ -142,7 +146,7 @@ struct PrefsView: View {
                     .sorted { (Self.kinds.firstIndex(of: String($0.prefix(2))) ?? 9, $0) < (Self.kinds.firstIndex(of: String($1.prefix(2))) ?? 9, $1) }
             }
         }
-        .frame(width: 500, height: 520)
+        .frame(width: 520, height: 600)
     }
 
     /// Kokoro's voices as the page names them: "Heart · American woman".
