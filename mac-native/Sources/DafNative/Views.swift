@@ -6,6 +6,7 @@ struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         @Bindable var model = model
@@ -45,14 +46,31 @@ struct MainView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if let t = model.toast {
-                Text(t).font(.callout.weight(.medium)).padding(.horizontal, 16).padding(.vertical, 9)
+            VStack(spacing: 10) {
+                if let t = model.toast {
+                    HStack(spacing: 12) {
+                        Text(t).font(.callout.weight(.medium))
+                        if model.toastUndo { Button("Undo") { model.undoLast() }.buttonStyle(.borderless).font(.callout.weight(.semibold)) }
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 9)
                     .glassEffect(.regular, in: Capsule())
-                    .padding(.bottom, 22)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                if Speaker.shared.on { SpeakerBar().transition(.move(edge: .bottom).combined(with: .opacity)) }
             }
+            .padding(.bottom, 22)
         }
         .animation(.snappy, value: model.toast)
+        .animation(.snappy, value: Speaker.shared.on)
+        .onAppear { model.undoManager = undoManager }
+        .onChange(of: undoManager) { _, u in model.undoManager = u }
+        .confirmationDialog("Unfollow \(model.confirmUnfollow.flatMap { model.feed($0)?.s("title") } ?? "the feed")?",
+                            isPresented: Binding(get: { model.confirmUnfollow != nil }, set: { if !$0 { model.confirmUnfollow = nil } })) {
+            Button("Unfollow", role: .destructive) {
+                if let id = model.confirmUnfollow { Task { await model.unfollow(id) } }
+                model.confirmUnfollow = nil
+            }
+        } message: { Text("What's unseen from it leaves the Feed. Highlighted items stay.") }
         .onChange(of: model.showSettings) { _, on in
             guard on else { return }
             openSettings()
@@ -67,6 +85,8 @@ struct MainView: View {
             switch s {
             case .addLink: AddLinkSheet().environment(model)
             case .paper: PaperSheet().environment(model)
+            case .follow: FollowSheet().environment(model)
+            case .renameFeed(let id): RenameFeedSheet(id: id).environment(model)
             }
         }
         .searchable(text: $model.query, placement: .sidebar, prompt: "Search Daf")
@@ -102,12 +122,7 @@ struct Sidebar: View {
                 row(.shortlist, "Shortlist", "star")
                 row(.library("archive"), "Archive", "archivebox")
             }
-            Section("Feed") {
-                row(.feed(nil), "All Feeds", "dot.radiowaves.up.forward")
-                ForEach(model.feedCategories, id: \.self) { cat in
-                    row(.feed(cat), cat, "folder")
-                }
-            }
+            FeedSection()
             Section("Reading") {
                 row(.books, "Books", "books.vertical")
                 row(.manga, "Manga", "book.pages")
@@ -146,7 +161,7 @@ struct ItemList: View {
                 .contextMenu { ItemActions(item: item) }
         }
         .listStyle(.inset)
-        .navigationTitle(model.place?.title ?? "Daf")
+        .navigationTitle(model.title(model.place))
         .navigationSubtitle(model.items.isEmpty ? "" : "\(model.items.count)")
         .overlay {
             if model.items.isEmpty && !model.loading {
@@ -168,8 +183,14 @@ struct ItemList: View {
                     .fixedSize()
                 }
             }
+            if let p = model.place, isFeed(p) {
+                ToolbarItem {
+                    Button { Task { await model.markSeen(p) } } label: { Label("Mark All Seen", systemImage: "checkmark.circle.badge.questionmark") }
+                        .help("Mark everything here seen")
+                }
+            }
             ToolbarItem {
-                Button { model.reload() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                Button { model.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                     .keyboardShortcut("r", modifiers: .command)
             }
         }
@@ -179,6 +200,17 @@ struct ItemList: View {
             Task { await model.done(item) }
             return .handled
         }
+        .onDeleteCommand {
+            guard let item = model.selected, item.isDoc else { return }
+            Task { await model.delete(item) }
+        }
+    }
+}
+
+private func isFeed(_ p: Place) -> Bool {
+    switch p {
+    case .feed, .feedSource: return true
+    default: return false
     }
 }
 
@@ -240,6 +272,8 @@ struct ItemActions: View {
                 Link("Open the Original", destination: url)
                 Button("Copy the Link") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string) }
             }
+            Divider()
+            Button("Delete", role: .destructive) { Task { await model.delete(item) } }
         }
     }
 }
@@ -419,6 +453,9 @@ struct Opened: View {
         .inspector(isPresented: $model.showInspector) {
             Inspector(item: item, reader: reader).inspectorColumnWidth(min: 240, ideal: 280, max: 380)
         }
+        .sheet(item: Binding(get: { reader?.editing }, set: { reader?.editing = $0 })) { e in
+            NoteSheet(h: e.h, saved: { n in reader?.changed(e.id) { $0["user_note"] = n } }).environment(model)
+        }
         .task(id: item.id) {
             guard item.isDoc, !["pdf", "video", "podcast", "manga"].contains(item.kind) else { return }
             // the same article made again by SwiftUI (a list refreshing beside it): the one already open
@@ -433,11 +470,19 @@ struct Opened: View {
 }
 
 struct Inspector: View {
+    @Environment(AppModel.self) private var model
     let item: Item
     let reader: ReaderModel?
+    /// For a PDF or a video, which have no reader: the doc's note and tags all the same.
+    @State private var meta: ReaderModel?
+    @State private var newTag = ""
+    @State private var known: [String] = []
+    @FocusState private var tagField: Bool
+
+    private var doc: ReaderModel? { reader ?? meta }
 
     var body: some View {
-        let d = reader?.doc ?? item.j
+        let d = doc?.doc ?? item.j
         List {
             Section {
                 Text(d.s("title") ?? item.title).font(.headline)
@@ -446,25 +491,127 @@ struct Inspector: View {
                 if let m = d.i("mins") { LabeledContent("Length", value: "\(m) min") }
                 if let u = d.s("url"), let url = URL(string: u) { Link("Open the original", destination: url) }
             }
+            if let doc, doc.doc != nil {
+                Section("Note") {
+                    TextEditor(text: Binding(get: { doc.note }, set: { doc.write(note: $0) }))
+                        .font(.callout)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 64)
+                }
+                Section("Tags") {
+                    if !doc.tags.isEmpty {
+                        Flow {
+                            ForEach(doc.tags, id: \.self) { t in
+                                HStack(spacing: 4) {
+                                    Text(t)
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(Color.secondary)
+                                        .contentShape(Circle())
+                                        .onTapGesture { Task { await doc.set(tags: doc.tags.filter { $0 != t }) } }
+                                        .help("Take the tag off")
+                                }
+                                .font(.caption)
+                                .padding(.leading, 9)
+                                .padding(.trailing, 5)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(Color.accentColor.opacity(0.14)))
+                                .contextMenu { Button("Take the Tag Off") { Task { await doc.set(tags: doc.tags.filter { $0 != t }) } } }
+                            }
+                        }
+                    }
+                    TextField("Add a tag", text: $newTag)
+                        .focused($tagField)
+                        .onSubmit { add(newTag) }
+                    let hints = suggestions(doc)
+                    if !hints.isEmpty {
+                        Flow {
+                            ForEach(hints, id: \.self) { t in
+                                Button(t) { add(t) }.buttonStyle(.bordered).controlSize(.small)
+                            }
+                        }
+                    }
+                }
+            } else {
+                let tags = d.strings("tags")
+                if !tags.isEmpty { Section("Tags") { Text(tags.joined(separator: ", ")).font(.callout) } }
+            }
             if let sum = d.s("ai_summary") ?? d.s("summary") {
                 Section("Summary") { Text(sum).font(.callout) }
-            }
-            let tags = (d.list("tags") as? [String]) ?? []
-            if !tags.isEmpty {
-                Section("Tags") { Text(tags.map { "#" + $0 }.joined(separator: "  ")).font(.callout) }
             }
             if let reader, !reader.highlights.isEmpty {
                 Section("Highlights") {
                     ForEach(Array(reader.highlights.enumerated()), id: \.offset) { _, h in
                         Button { reader.reveal(highlight: h.s("id") ?? "") } label: {
-                            Text(h.s("text") ?? "").font(.system(.callout, design: .serif)).lineLimit(4)
-                                .padding(.leading, 6)
-                                .overlay(alignment: .leading) { Rectangle().fill(Color(ReaderModel.colour(h.s("color")).withAlphaComponent(1))).frame(width: 3) }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(h.s("text") ?? "").font(.system(.callout, design: .serif)).lineLimit(4)
+                                if let n = h.s("user_note") { Text(n).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
+                            }
+                            .padding(.leading, 6)
+                            .overlay(alignment: .leading) { Rectangle().fill(Color(ReaderModel.colour(h.s("color")).withAlphaComponent(1))).frame(width: 3) }
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button((h.s("user_note") ?? "").isEmpty ? "Add a Note…" : "Edit the Note…") { reader.editing = .init(h: h) }
+                            Button("Remove Highlight", role: .destructive) { Task { await reader.remove(highlight: h.s("id") ?? "") } }
+                        }
                     }
                 }
             }
+        }
+        .task(id: item.id) {
+            if reader == nil, item.isDoc {
+                let m = ReaderModel(id: item.id)
+                await m.loadMeta()
+                meta = m
+            }
+            known = (try? await API.shared.json("/api/docs/tags"))?.strings("tags") ?? []
+        }
+        .onChange(of: model.focusTags) { _, _ in tagField = true }
+        .onDisappear { meta?.stop() }
+    }
+
+    private func suggestions(_ doc: ReaderModel) -> [String] {
+        let q = newTag.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return [] }
+        return Array(known.filter { $0.lowercased().hasPrefix(q) && !doc.tags.contains($0) }.prefix(6))
+    }
+
+    private func add(_ tag: String) {
+        let t = tag.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, let doc, !doc.tags.contains(where: { $0.lowercased() == t.lowercased() }) else { newTag = ""; return }
+        newTag = ""
+        Task {
+            let all = await doc.set(tags: doc.tags + [t])
+            if !all.isEmpty { known = all }
+        }
+    }
+}
+
+/// Little things in rows that wrap, as tags do.
+struct Flow: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 260
+        var x: CGFloat = 0, y: CGFloat = 0, row: CGFloat = 0, widest: CGFloat = 0
+        for v in subviews {
+            let z = v.sizeThatFits(.unspecified)
+            if x > 0 && x + z.width > width { x = 0; y += row + spacing; row = 0 }
+            x += z.width + spacing
+            row = max(row, z.height)
+            widest = max(widest, x - spacing)
+        }
+        return CGSize(width: min(width, widest), height: y + row)
+    }
+
+    func placeSubviews(in b: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = b.minX, y = b.minY, row: CGFloat = 0
+        for v in subviews {
+            let z = v.sizeThatFits(.unspecified)
+            if x > b.minX && x + z.width > b.maxX { x = b.minX; y += row + spacing; row = 0 }
+            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(z))
+            x += z.width + spacing
+            row = max(row, z.height)
         }
     }
 }

@@ -8,6 +8,7 @@ enum Place: Hashable {
     case library(String)              // inbox, later, archive
     case shortlist
     case feed(String?)                // nil: everything unseen; else a category
+    case feedSource(String)           // one feed ("feed/12")
     case books
     case manga
     case torah
@@ -33,6 +34,7 @@ enum Place: Hashable {
         case .sources: return "Sources"
         case .library(let tab): return ["inbox": "Inbox", "later": "Later", "archive": "Archive"][tab] ?? tab.capitalized
         case .feed(let cat): return cat ?? "All Feeds"
+        case .feedSource: return "Feed"
         case .books: return "Books"
         case .search: return "Search"
         }
@@ -81,15 +83,44 @@ final class AppModel {
     var query = ""
     /// The Library's kind: "" for everything, else article, video, tweet, pdf, email.
     var kind = ""
-    /// A short word at the bottom of the window ("Saved to the Library").
+    /// A short word at the bottom of the window ("Saved to the Library"), with Undo when it can be undone.
     var toast: String?
+    var toastUndo = false
     @ObservationIgnored private var toastTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingUndo: (id: UUID, run: () async -> Void)?
+    /// The window's, so Edit › Undo (⌘Z) undoes what the toast offers.
+    @ObservationIgnored weak var undoManager: UndoManager?
 
-    func say(_ s: String) {
+    func say(_ s: String, undo name: String? = nil, _ action: (() async -> Void)? = nil) {
         toast = s
+        toastUndo = action != nil
+        if let action {
+            let id = UUID()
+            pendingUndo = (id, action)
+            undoManager?.removeAllActions(withTarget: self)
+            undoManager?.registerUndo(withTarget: self) { m in MainActor.assumeIsolated { if m.pendingUndo?.id == id { m.undoLast() } } }
+            if let name { undoManager?.setActionName(name) }
+        }
         toastTask?.cancel()
-        toastTask = Task { try? await Task.sleep(nanoseconds: 2_600_000_000); if !Task.isCancelled { toast = nil } }
+        let wait: UInt64 = action != nil ? 6_000_000_000 : 2_600_000_000
+        toastTask = Task { try? await Task.sleep(nanoseconds: wait); if !Task.isCancelled { toast = nil; toastUndo = false } }
     }
+
+    func undoLast() {
+        guard let p = pendingUndo else { return }
+        pendingUndo = nil
+        undoManager?.removeAllActions(withTarget: self)
+        toast = nil
+        toastUndo = false
+        Task { await p.run() }
+    }
+
+    /// Article › Tags…: the inspector's tag field takes the keys.
+    var focusTags = 0
+    /// The Feed's folders and feeds with their counts (/api/feed/sources).
+    var sources: J?
+    /// A feed to unfollow, once that's confirmed.
+    var confirmUnfollow: String?
     var showInspector = false
     /// The article open in the reader, kept so the inspector and the toolbar can act on it.
     var reader: ReaderModel?
@@ -101,7 +132,23 @@ final class AppModel {
     /// Settings, opened from code (the self-test; ⌘, opens it by hand).
     var showSettings = false
 
-    enum Sheet: String, Identifiable { case addLink, paper; var id: String { rawValue } }
+    enum Sheet: Identifiable, Hashable {
+        case addLink, paper, follow, renameFeed(String)
+        var id: String {
+            switch self {
+            case .addLink: return "addLink"
+            case .paper: return "paper"
+            case .follow: return "follow"
+            case .renameFeed(let f): return "rename " + f
+            }
+        }
+    }
+
+    /// The list's title: a feed by its name.
+    func title(_ p: Place?) -> String {
+        if case .feedSource(let id)? = p { return feed(id)?.s("title") ?? "Feed" }
+        return p?.title ?? "Daf"
+    }
 
     var selected: Item? { items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } }
     var continueItems: [Item] { (home?.a("continue") ?? []).map(Item.init) }
@@ -161,7 +208,11 @@ final class AppModel {
                 torah = t
                 items = (t.a("week") + t.a("ruach") + t.a("earlier")).map(Item.init)
             case .feed(let cat):
+                if sources == nil { await loadSources() }
                 let j = try await API.shared.json("/api/docs?where=feed&tab=unseen&limit=200" + (cat.map { "&cat=" + API.enc($0) } ?? ""))
+                items = j.a("items").map(Item.init)
+            case .feedSource(let f):
+                let j = try await API.shared.json("/api/docs?where=feed&tab=unseen&limit=200&feed=" + API.enc(f))
                 items = j.a("items").map(Item.init)
             case .books:
                 let j = try await API.shared.json("/api/books")
@@ -205,7 +256,8 @@ final class AppModel {
     func done(_ item: Item) async { await setStatus(item, item.whereIn == "feed" ? (item.status == "seen" ? "unseen" : "seen") : (item.status == "archive" ? "inbox" : "archive")) }
     func later(_ item: Item) async { await setStatus(item, item.status == "later" ? "inbox" : "later") }
 
-    func setStatus(_ item: Item, _ status: String) async {
+    @discardableResult
+    func setStatus(_ item: Item, _ status: String) async -> Bool {
         do {
             try await API.shared.send("POST", "/api/docs/\(API.enc(item.id))/status", ["status": status])
             if let i = items.firstIndex(where: { $0.id == item.id }) {
@@ -214,7 +266,24 @@ final class AppModel {
                 if selection == item.id { selection = next }
             }
             counts = try? await API.shared.json("/api/docs/counts")
-        } catch { self.error = error.localizedDescription }
+            return true
+        } catch { self.error = error.localizedDescription; return false }
+    }
+
+    /// Delete, with Undo putting it back where it was.
+    func delete(_ item: Item) async {
+        let was = item.status ?? (item.whereIn == "feed" ? "unseen" : "inbox")
+        guard await setStatus(item, "deleted") else { return }
+        if reader?.id == item.id { reader?.stop() }
+        say("Deleted", undo: "Delete") { [weak self] in
+            guard let self else { return }
+            do {
+                try await API.shared.send("POST", "/api/docs/\(API.enc(item.id))/status", ["status": was])
+                self.say("Back in \(["later": "Later", "archive": "the Archive", "unseen": "the Feed", "seen": "the Feed"][was] ?? "the Inbox")")
+                await self.load()
+                self.selection = item.id
+            } catch { self.error = error.localizedDescription }
+        }
     }
 
     func saveToLibrary(_ item: Item) async {
@@ -240,6 +309,8 @@ final class AppModel {
         case .feed(let cat):
             if let cat { return counts.o("feed")?.i(cat) }
             return counts.i("feed_total")
+        case .feedSource(let id):
+            return feed(id)?.i("count")
         default: return nil
         }
     }

@@ -117,5 +117,8 @@ struct RouteView: View {
             await r.load()
         }
         .onDisappear { reader?.stop() }
+        .sheet(item: Binding(get: { reader?.editing }, set: { reader?.editing = $0 })) { e in
+            NoteSheet(h: e.h, saved: { n in reader?.changed(e.id) { $0["user_note"] = n } })
+        }
     }
 }

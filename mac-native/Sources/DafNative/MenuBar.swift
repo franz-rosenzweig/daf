@@ -57,9 +57,11 @@ struct PrefsView: View {
     @AppStorage("menuBar") private var menuBar = false
     @State private var address = API.shared.base.absoluteString
     @State private var s: J?
+    @State private var voices: [String] = []
+    @AppStorage("prefsTab") private var tab = "general"
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             Form {
                 Section("Daf") {
                     TextField("Address", text: $address).onSubmit { UserDefaults.standard.set(address, forKey: API.baseKey); model.reload() }
@@ -72,6 +74,7 @@ struct PrefsView: View {
             }
             .formStyle(.grouped)
             .tabItem { Label("General", systemImage: "gearshape") }
+            .tag("general")
 
             Form {
                 if let s {
@@ -83,6 +86,11 @@ struct PrefsView: View {
                         Stepper("Unseen items go after \(s.i("feed_expire_days") ?? 30) days", value: binding("feed_expire_days", s.i("feed_expire_days") ?? 30), in: 3...3650, step: 1)
                     }
                     Section("Read aloud") {
+                        if !voices.isEmpty {
+                            Picker("Voice", selection: Binding(get: { s.s("tts_voice") ?? "af_heart" }, set: { put(["tts_voice": $0]) })) {
+                                ForEach(voices, id: \.self) { v in Text(Self.voiceName(v)).tag(v) }
+                            }
+                        }
                         LabeledContent("Speed") {
                             Slider(value: Binding(get: { s.d("tts_speed") ?? 1 }, set: { v in put(["tts_speed": (v * 20).rounded() / 20]) }), in: 0.5...2, step: 0.05)
                                 .frame(width: 200)
@@ -98,9 +106,23 @@ struct PrefsView: View {
             }
             .formStyle(.grouped)
             .tabItem { Label("Reading", systemImage: "book") }
-            .task { s = try? await API.shared.json("/api/settings") }
+            .tag("reading")
+            .task {
+                s = try? await API.shared.json("/api/settings")
+                let all = (try? await API.shared.json("/api/voices"))?.strings("voices") ?? []
+                voices = all.filter { $0.range(of: "^[ab][fm]_[a-z]+$", options: .regularExpression) != nil }
+                    .sorted { (Self.kinds.firstIndex(of: String($0.prefix(2))) ?? 9, $0) < (Self.kinds.firstIndex(of: String($1.prefix(2))) ?? 9, $1) }
+            }
         }
-        .frame(width: 480, height: 380)
+        .frame(width: 480, height: 430)
+    }
+
+    /// Kokoro's voices as the page names them: "Heart · American woman".
+    static let kinds = ["af", "am", "bf", "bm"]
+    static func voiceName(_ id: String) -> String {
+        let kind = ["af": "American woman", "am": "American man", "bf": "British woman", "bm": "British man"][String(id.prefix(2))]
+        let name = id.split(separator: "_").last.map { $0.prefix(1).uppercased() + $0.dropFirst() } ?? id
+        return kind.map { name + " · " + $0 } ?? name
     }
 
     private func binding(_ key: String, _ value: Int) -> Binding<Int> {

@@ -43,6 +43,23 @@ struct DafNativeApp: App {
                     .keyboardShortcut("l", modifiers: [.command, .shift])
                 Button("Archive or Mark Seen") { if let i = model.selected { Task { await model.done(i) } } }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
+                Button("Delete") { deleteSelected() }
+                    .keyboardShortcut(.delete, modifiers: .command)
+                Divider()
+                Button("Listen or Pause") { model.reader.map { $0.listen() } ?? Speaker.shared.toggle() }
+                    .keyboardShortcut("p", modifiers: [.command, .option])
+                Button("Read Aloud from the Top") { if let r = model.reader { Speaker.shared.start(r, at: 0) } }
+                Divider()
+                Button("Tags…") { model.showInspector = true; model.focusTags += 1 }
+                    .keyboardShortcut("t", modifiers: [.command, .option])
+            }
+            CommandMenu("Feed") {
+                Button("Mark All Seen") { if let p = model.place { Task { await model.markSeen(p) } } }
+                    .keyboardShortcut("k", modifiers: [.command, .option])
+                Button("Check for New Posts") { Task { await model.refreshFeed() } }
+                    .keyboardShortcut("r", modifiers: [.command, .shift])
+                Divider()
+                Button("Follow a Site…") { model.sheet = .follow }
             }
         }
 
@@ -66,6 +83,16 @@ struct DafNativeApp: App {
 
 extension AppModel {
     static let shared = AppModel()
+}
+
+extension DafNativeApp {
+    /// ⌘⌫ deletes what's open; in a text field it's the field's own (delete to the start of the line).
+    @MainActor
+    private func deleteSelected() {
+        if let tv = NSApp.keyWindow?.firstResponder as? NSTextView, tv.isEditable { tv.deleteToBeginningOfLine(nil); return }
+        guard let item = model.selected, item.isDoc else { return }
+        Task { await model.delete(item) }
+    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {

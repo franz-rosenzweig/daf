@@ -54,6 +54,7 @@ enum SelfTest {
         guard let w = which ?? window, let v = w.contentView?.superview ?? w.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
         v.cacheDisplay(in: v.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: out.appendingPathComponent(name + ".png"))
+        if let sheet = w.attachedSheet { capture(name + "-sheet", sheet) }        // a sheet is a window of its own
     }
 
     /// Daf's book reader in the window's web view has laid out a page.
@@ -116,6 +117,42 @@ enum SelfTest {
         check(!(painted ?? "").isEmpty, "and it's painted in the text")
         capture("04-highlight")
 
+        // the highlight's colour and note
+        if let hid = r.highlights.last?.s("id") {
+            await r.set(color: "green", of: hid)
+            try? await API.shared.send("PUT", "/api/highlights/\(API.enc(hid))/note", ["note": "A note from the self-test"])
+            r.changed(hid) { $0["user_note"] = "A note from the self-test" }
+            let back = (try? await API.shared.json("/api/docs/\(API.enc(r.id))"))?.a("highlights").first { $0.s("id") == hid }
+            let tip = r.storage.attribute(.toolTip, at: blk.range.location + 10, effectiveRange: nil) as? String
+            check(back?.s("color") == "green" && back?.s("user_note") == "A note from the self-test" && tip != nil,
+                  "a highlight takes a colour and a note, the note shown on hover", "\(back?.s("color") ?? "-") / \(back?.s("user_note") ?? "-") / \(tip ?? "no tip")")
+            if let h = r.highlights.first(where: { $0.s("id") == hid }) {
+                r.editing = .init(h: h)
+                await pause(1.2)
+                capture("18-hlnote")
+                r.editing = nil
+                await pause(0.5)
+            }
+        }
+
+        // the article's note and tags, in the inspector
+        let oldTags = r.tags
+        r.write(note: "A note from the self-test")
+        await r.flushNote()
+        await r.set(tags: oldTags + ["Self Test"])
+        let meta = try? await API.shared.json("/api/docs/\(API.enc(r.id))")
+        check(meta?.s("note") == "A note from the self-test" && meta?.strings("tags").contains("Self Test") == true,
+              "the article keeps a note and a new tag", "\(meta?.s("note") ?? "-") / \(meta?.strings("tags") ?? [])")
+        m.showInspector = true
+        await pause(1.5)
+        capture("19-inspector")
+        m.showInspector = false
+        r.write(note: "")
+        await r.flushNote()
+        await r.set(tags: oldTags)
+        let clean = try? await API.shared.json("/api/docs/\(API.enc(r.id))")
+        check(clean?.s("note") == nil && clean?.strings("tags") == oldTags, "and both go again", "\(clean?.s("note") ?? "-") / \(clean?.strings("tags") ?? [])")
+
         // the place
         let scroll = tv.enclosingScrollView!
         tv.layoutManager?.ensureLayout(for: tv.textContainer!)
@@ -142,11 +179,93 @@ enum SelfTest {
             check((after?.a("highlights").count ?? -1) == before, "Remove Highlight takes it back", "\(after?.a("highlights").count ?? -1)")
         }
 
-        // the Feed
+        // read aloud: Daf's speech for each paragraph, the paragraph marked (with the sound off)
+        let sp = Speaker.shared
+        sp.volume = 0
+        sp.start(r)
+        let spoke = await until(90) { sp.started >= 1 }
+        check(spoke && sp.playing, "Listen reads the article aloud in Daf's voice", "paragraph \(sp.index + 1) of \(sp.blocks.count)")
+        var marked = false
+        if sp.blocks.indices.contains(sp.index), let rg = r.blocks.first(where: { $0.i == sp.blocks[sp.index] })?.range, let lm = tv.layoutManager {
+            marked = stride(from: rg.location, to: rg.location + rg.length, by: 3).contains { lm.temporaryAttribute(.backgroundColor, atCharacterIndex: $0, effectiveRange: nil) != nil }
+        }
+        check(marked, "and marks the paragraph it's reading")
+        await pause(0.5)
+        capture("20-listen")
+        let i0 = sp.index
+        sp.skip(1)
+        let onward = await until(60) { sp.started >= 2 }
+        check(onward && sp.index == i0 + 1, "the next-paragraph button goes on to the next one", "\(i0 + 1) → \(sp.index + 1)")
+        sp.stop()
+        check(!sp.on, "and Stop ends it")
+
+        // the Feed, its folders and their feeds
         await go(m, .feed(nil))
         check(!m.items.isEmpty, "the Feed lists what's unseen", "\(m.items.count)")
-        check(!m.feedCategories.isEmpty, "with its folders in the sidebar", m.feedCategories.joined(separator: ", "))
+        await m.loadSources()
+        let feeds = m.feedFolders.flatMap { $0.a("feeds") }
+        check(!feeds.isEmpty, "with its folders and their feeds in the sidebar", "\(m.feedFolders.count) folders, \(feeds.count) feeds")
+        if let first = m.folderNames.first(where: { !$0.isEmpty }) { UserDefaults.standard.set(first, forKey: "openFolders") }
+        await pause(1)
         capture("05-feed")
+        if let small = feeds.filter({ ($0.i("count") ?? 0) > 0 }).min(by: { ($0.i("count") ?? 0) < ($1.i("count") ?? 0) }), let fid = small.s("id") {
+            await go(m, .feedSource(fid))
+            check(!m.items.isEmpty && m.items.allSatisfy { $0.j.s("feed") == fid }, "a feed lists only its own posts", "\(small.s("title") ?? ""): \(m.items.count)")
+            capture("21-onefeed")
+
+            // all of it seen, then Edit › Undo
+            let n0 = m.count(.feedSource(fid)) ?? 0
+            await m.markSeen(.feedSource(fid))
+            let n1 = m.count(.feedSource(fid)) ?? 0
+            check(n0 > 0 && n1 == 0 && m.toastUndo, "Mark All Seen empties it, with Undo offered", "\(n0) → \(n1)")
+            capture("22-markseen")
+            let viaMenu = m.undoManager?.canUndo == true
+            if viaMenu { m.undoManager?.undo() } else { m.undoLast() }
+            let back = await until(10) { (m.count(.feedSource(fid)) ?? 0) == n0 }
+            check(back && viaMenu, "and Edit › Undo puts it all back", "\(m.count(.feedSource(fid)) ?? -1) of \(n0); the window's undo \(viaMenu)")
+
+            // renamed, moved, switched: in the FreshRSS stand-in, and back again
+            let oldTitle = small.s("title") ?? "", oldFolder = small.s("folder") ?? ""
+            await m.editFeed(fid, ["title": "Renamed by the self-test"])
+            check(m.feed(fid)?.s("title") == "Renamed by the self-test", "a feed can be renamed", m.feed(fid)?.s("title") ?? m.error ?? "")
+            await m.editFeed(fid, ["title": oldTitle])
+            if let other = m.folderNames.first(where: { !$0.isEmpty && $0 != oldFolder }) {
+                await m.editFeed(fid, ["folder": other])
+                check(m.feed(fid)?.s("folder") == other, "and moved to another folder", other)
+                await m.editFeed(fid, ["folder": oldFolder])
+            }
+            let full0 = small.b("full")
+            await m.editFeed(fid, ["full": !full0])
+            check(m.feed(fid)?.b("full") == !full0, "and its full-article switch turned")
+            await m.editFeed(fid, ["full": full0])
+
+            // a post deleted, then Undo
+            if let post = m.items.first {
+                await m.delete(post)
+                let gone = (try? await API.shared.json("/api/docs/\(API.enc(post.id))"))?.s("status")
+                m.undoLast()
+                var again: String?
+                for _ in 0..<30 {
+                    await pause(0.3)
+                    again = (try? await API.shared.json("/api/docs/\(API.enc(post.id))"))?.s("status")
+                    if again == "unseen" { break }
+                }
+                check(gone == "deleted" && again == "unseen", "Delete takes a post out, and Undo puts it back", "\(gone ?? "-") → \(again ?? "-")")
+            }
+            m.confirmUnfollow = fid
+            await pause(1.2)
+            capture("23-unfollow")
+            m.confirmUnfollow = nil
+            await pause(0.5)
+        }
+        await m.refreshFeed()
+        check(m.error == nil && m.toast == "Nothing new", "Check for New Posts asks FreshRSS", m.toast ?? m.error ?? "")
+        m.sheet = .follow
+        await pause(1.2)
+        capture("24-follow")
+        check(m.sheet == .follow, "Follow a Site… opens its sheet")
+        m.sheet = nil
+        await pause(0.5)
 
         // a PDF, in Apple's PDF view
         let lib = (try? await API.shared.json("/api/docs?where=library&tab=inbox&kind=pdf&limit=10"))?.a("items").map(Item.init) ?? []
@@ -234,10 +353,12 @@ enum SelfTest {
 
         // Settings
         let shownBefore = Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
+        UserDefaults.standard.set("reading", forKey: "prefsTab")
         m.showSettings = true
         let prefs = await until(6) { NSApp.windows.contains { $0.isVisible && !shownBefore.contains(ObjectIdentifier($0)) } }
         await pause(2)
         if let w = NSApp.windows.first(where: { $0.isVisible && !shownBefore.contains(ObjectIdentifier($0)) }) { capture("17-settings", w); w.close() }
+        UserDefaults.standard.removeObject(forKey: "prefsTab")
         check(prefs, "Settings opens", NSApp.windows.map { "'\($0.title)' \($0.isVisible)" }.joined(separator: ", "))
 
         // Review

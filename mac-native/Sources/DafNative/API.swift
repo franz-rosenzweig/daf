@@ -22,6 +22,12 @@ struct J: Hashable {
     func o(_ k: String) -> J? { J(raw[k]) }
     func a(_ k: String) -> [J] { (raw[k] as? [Any] ?? []).compactMap { J($0) } }
     func list(_ k: String) -> [Any] { raw[k] as? [Any] ?? [] }
+    /// A list of words, sent as a list or as JSON in a string (a doc's tags).
+    func strings(_ k: String) -> [String] {
+        if let a = raw[k] as? [Any] { return a.compactMap { $0 as? String } }
+        if let s = raw[k] as? String, let d = s.data(using: .utf8), let a = try? JSONSerialization.jsonObject(with: d) as? [Any] { return a.compactMap { $0 as? String } }
+        return []
+    }
 
     static func == (l: J, r: J) -> Bool { NSDictionary(dictionary: l.raw).isEqual(to: r.raw) }
     func hash(into h: inout Hasher) { h.combine(s("id") ?? "") }

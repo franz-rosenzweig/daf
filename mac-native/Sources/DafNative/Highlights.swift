@@ -192,6 +192,8 @@ struct NoteSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let h: J
+    /// The reader's own copy to update too, when it's written there.
+    var saved: ((String) -> Void)? = nil
     @State private var text = ""
 
     var body: some View {
@@ -215,6 +217,7 @@ struct NoteSheet: View {
         do {
             try await API.shared.send("PUT", "/api/highlights/\(API.enc(id))/note", ["note": text])
             model.highlights.update(id) { $0["user_note"] = text }
+            saved?(text)
             model.say("Note saved")
             dismiss()
         } catch { model.error = error.localizedDescription }

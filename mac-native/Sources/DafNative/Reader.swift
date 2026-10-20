@@ -13,6 +13,14 @@ final class ReaderModel {
     var highlights: [J] = []
     var error: String?
     var movedToLibrary = false
+    /// My note on the article, and its tags.
+    var note = ""
+    var tags: [String] = []
+    /// A highlight whose note is being written.
+    var editing: Editing?
+    struct Editing: Identifiable { let h: J; var id: String { h.s("id") ?? "" } }
+    @ObservationIgnored private var noteTask: Task<Void, Never>?
+    @ObservationIgnored private var noteDirty = false
     @ObservationIgnored let storage = NSTextStorage()
     /// Each block's text in the storage, by its index in the doc's blocks.
     @ObservationIgnored private(set) var blocks: [(i: Int, range: NSRange)] = []
@@ -38,15 +46,85 @@ final class ReaderModel {
             let d = try await API.shared.json("/api/docs/\(API.enc(id))")
             doc = d
             highlights = d.a("highlights")
+            note = d.s("note") ?? ""
+            tags = d.strings("tags")
             sentPct = d.d("progress") ?? 0
             compose()
             startBeats()
         } catch { self.error = error.localizedDescription }
     }
 
+    /// Only the doc's own fields (the note, the tags), for a PDF or a video in the inspector.
+    func loadMeta() async {
+        guard let d = try? await API.shared.json("/api/docs/\(API.enc(id))") else { return }
+        doc = d
+        note = d.s("note") ?? ""
+        tags = d.strings("tags")
+    }
+
     func stop() {
         beatTimer?.invalidate()
         beatTimer = nil
+        noteTask?.cancel()
+        noteTask = nil
+        if noteDirty {                           // a note still being typed: kept now
+            noteDirty = false
+            let id = self.id, text = note
+            Task { try? await API.shared.send("PUT", "/api/docs/\(API.enc(id))/note", ["note": text]) }
+        }
+    }
+
+    // MARK: the note and the tags
+
+    /// The note as it's typed: kept a moment after the last key (/api/docs/{id}/note).
+    func write(note text: String) {
+        note = text
+        noteDirty = true
+        noteTask?.cancel()
+        let id = self.id
+        noteTask = Task {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            self.noteDirty = false
+            try? await API.shared.send("PUT", "/api/docs/\(API.enc(id))/note", ["note": text])
+        }
+    }
+
+    /// Writes the note now (the self-test, a window closing).
+    func flushNote() async {
+        noteTask?.cancel()
+        noteTask = nil
+        noteDirty = false
+        try? await API.shared.send("PUT", "/api/docs/\(API.enc(id))/note", ["note": note])
+    }
+
+    /// The tags, as Daf cleans them; and every tag Daf knows, for suggestions.
+    @discardableResult
+    func set(tags new: [String]) async -> [String] {
+        do {
+            let r = J(try await API.shared.send("PUT", "/api/docs/\(API.enc(id))/tags", ["tags": new]))
+            tags = r?.strings("tags") ?? new
+            return r?.strings("all") ?? []
+        } catch {
+            self.error = error.localizedDescription
+            return []
+        }
+    }
+
+    func set(color: String, of hid: String) async {
+        do {
+            try await API.shared.send("PUT", "/api/highlights/\(API.enc(hid))/color", ["color": color])
+            changed(hid) { $0["color"] = color }
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// A highlight's fields after a change (its colour, its note), drawn again.
+    func changed(_ hid: String, _ f: (inout [String: Any]) -> Void) {
+        guard let k = highlights.firstIndex(where: { $0.s("id") == hid }) else { return }
+        var raw = highlights[k].raw
+        f(&raw)
+        highlights[k] = J(raw)
+        applyHighlights()
     }
 
     // MARK: laying it out
@@ -168,10 +246,16 @@ final class ReaderModel {
         storage.beginEditing()
         storage.removeAttribute(.backgroundColor, range: all)
         storage.removeAttribute(.dafHighlight, range: all)
+        storage.removeAttribute(.toolTip, range: all)
+        storage.removeAttribute(.underlineStyle, range: all)
         for h in highlights {
             guard let r = range(of: h) else { continue }
             storage.addAttribute(.backgroundColor, value: Self.colour(h.s("color")), range: r)
             storage.addAttribute(.dafHighlight, value: h.s("id") ?? "", range: r)
+            if let n = h.s("user_note"), !n.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {      // a note: dotted, and shown on hover
+                storage.addAttributes([.toolTip: n, .underlineStyle: NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue,
+                                       .underlineColor: NSColor.secondaryLabelColor], range: r)
+            }
         }
         storage.endEditing()
     }
@@ -227,6 +311,48 @@ final class ReaderModel {
         } catch { self.error = error.localizedDescription }
     }
 
+    // MARK: read aloud
+
+    /// The paragraph read aloud, marked (around the highlights in it) and, while playing, kept in view.
+    func markSpeaking(_ b: Int?, follow: Bool = false) {
+        guard let tv = textView, let lm = tv.layoutManager else { return }
+        lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSRange(location: 0, length: storage.length))
+        guard let b, let r = blocks.first(where: { $0.i == b })?.range else { return }
+        storage.enumerateAttribute(.dafHighlight, in: r) { v, sub, _ in
+            if (v as? String)?.isEmpty ?? true { lm.addTemporaryAttribute(.backgroundColor, value: NSColor.controlAccentColor.withAlphaComponent(0.13), forCharacterRange: sub) }
+        }
+        guard follow, let container = tv.textContainer else { return }
+        let glyphs = lm.glyphRange(forCharacterRange: r, actualCharacterRange: nil)
+        var rect = lm.boundingRect(forGlyphRange: glyphs, in: container)
+        rect.origin.y += tv.textContainerOrigin.y
+        let seen = tv.visibleRect
+        if rect.minY < seen.minY + 60 || rect.maxY > seen.maxY - 110 {
+            tv.scroll(NSPoint(x: 0, y: max(0, rect.minY - seen.height / 3)))
+        }
+    }
+
+    /// The first paragraph at the top of the window, where reading aloud starts.
+    func firstVisibleBlock() -> Int? {
+        guard let tv = textView, let lm = tv.layoutManager, let container = tv.textContainer else { return nil }
+        let top = NSPoint(x: tv.visibleRect.midX - tv.textContainerOrigin.x, y: tv.visibleRect.minY + 30 - tv.textContainerOrigin.y)
+        let at = lm.characterIndex(for: top, in: container, fractionOfDistanceBetweenInsertionPoints: nil)
+        return block(at: at)
+    }
+
+    /// p: listen, or pause; from the top of the window when it isn't this article that's being read.
+    func listen() {
+        let s = Speaker.shared
+        if s.docID == id { s.toggle() } else { s.start(self) }
+    }
+
+    /// L, or Read Aloud from Here: from the paragraph a character is in.
+    func listen(from loc: Int) { Speaker.shared.start(self, at: block(at: loc)) }
+
+    /// The block a character of the storage is in, or the next one.
+    func block(at loc: Int) -> Int? {
+        blocks.first { loc < $0.range.location + $0.range.length }?.i
+    }
+
     func reveal(highlight hid: String) {
         guard let h = highlights.first(where: { $0.s("id") == hid }), let r = range(of: h), let tv = textView else { return }
         tv.scrollRangeToVisible(r)
@@ -258,6 +384,7 @@ final class ReaderModel {
     func beatIfReading() {
         guard let w = textView?.window, w.occlusionState.contains(.visible), NSApp.isActive,
               Date().timeIntervalSince(lastActive) < 90 else { return }
+        if Speaker.shared.playing && Speaker.shared.docID == id { return }      // the listening counts it already
         beat()
     }
 
@@ -285,10 +412,13 @@ final class ReaderTextView: NSTextView {
     override func keyDown(with event: NSEvent) {
         let m = model
         MainActor.assumeIsolated { m?.lastActive = Date() }
-        if event.charactersIgnoringModifiers == "h", event.modifierFlags.intersection([.command, .control, .option]).isEmpty, selectedRange().length > 0 {
+        let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        if event.charactersIgnoringModifiers == "h", plain, selectedRange().length > 0 {
             Task { @MainActor in await m?.highlightSelection() }
             return
         }
+        if plain, event.characters == "p" { MainActor.assumeIsolated { m?.listen() }; return }               // the page's keys: p listens or pauses,
+        if plain, event.characters == "L" { MainActor.assumeIsolated { m?.listen(from: selectedRange().location) }; return }  // L reads aloud from here
         super.keyDown(with: event)
     }
 
@@ -306,16 +436,47 @@ final class ReaderTextView: NSTextView {
             extra.append(NSMenuItem(title: "Highlight", action: #selector(highlightNow), keyEquivalent: ""))
         }
         if at < textStorage?.length ?? 0, let hid = textStorage?.attribute(.dafHighlight, at: at, effectiveRange: nil) as? String, !hid.isEmpty {
+            let h = MainActor.assumeIsolated { model?.highlights.first { $0.s("id") == hid } }
+            let note = NSMenuItem(title: (h?.s("user_note") ?? "").isEmpty ? "Add a Note…" : "Edit the Note…", action: #selector(editNote(_:)), keyEquivalent: "")
+            note.representedObject = hid
+            extra.append(note)
+            let colours = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            for c in ["yellow", "green", "blue", "pink", "purple"] {
+                let item = NSMenuItem(title: c.capitalized, action: #selector(recolor(_:)), keyEquivalent: "")
+                item.representedObject = [hid, c]
+                item.target = self
+                item.state = (h?.s("color") ?? "yellow") == c ? .on : .off
+                sub.addItem(item)
+            }
+            colours.submenu = sub
+            extra.append(colours)
             let item = NSMenuItem(title: "Remove Highlight", action: #selector(removeHighlight(_:)), keyEquivalent: "")
             item.representedObject = hid
             extra.append(item)
         }
+        let aloud = NSMenuItem(title: "Read Aloud from Here", action: #selector(readFromHere(_:)), keyEquivalent: "")
+        aloud.representedObject = at
+        extra.append(aloud)
         for (k, item) in extra.enumerated() { item.target = self; menu.insertItem(item, at: k) }
         if !extra.isEmpty { menu.insertItem(.separator(), at: extra.count) }
         return menu
     }
 
     @objc func highlightNow() { let m = model; Task { @MainActor in await m?.highlightSelection() } }
+    @objc func editNote(_ sender: NSMenuItem) {
+        guard let hid = sender.representedObject as? String else { return }
+        MainActor.assumeIsolated { if let m = model, let h = m.highlights.first(where: { $0.s("id") == hid }) { m.editing = .init(h: h) } }
+    }
+    @objc func recolor(_ sender: NSMenuItem) {
+        guard let v = sender.representedObject as? [String], v.count == 2 else { return }
+        let m = model
+        Task { @MainActor in await m?.set(color: v[1], of: v[0]) }
+    }
+    @objc func readFromHere(_ sender: NSMenuItem) {
+        guard let at = sender.representedObject as? Int else { return }
+        MainActor.assumeIsolated { model?.listen(from: at) }
+    }
     @objc func removeHighlight(_ sender: NSMenuItem) {
         guard let hid = sender.representedObject as? String else { return }
         let m = model
@@ -366,6 +527,7 @@ struct ArticleReader: NSViewRepresentable {
         scroll.backgroundColor = .textBackgroundColor
         context.coordinator.watch(scroll, model)
         model.textView = tv
+        Speaker.shared.attach(model)
         return scroll
     }
 
