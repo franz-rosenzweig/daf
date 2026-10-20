@@ -30,12 +30,16 @@ Three actions are also in KOReader's gestures, under **Gestures → pick a gestu
 Home is what the Kindle opens to: when KOReader starts and whenever I close a book. It's drawn for e-ink in black and white, and in night mode it's white on black like the rest of KOReader, with the book covers keeping their own look.
 
 - **The top line:** the time, the date with the Hebrew date (like "9 Cheshvan"), and the battery.
-- **Today:** a ring for today's minutes toward the Daf goal, how many are left, and Year 30 so far. Tap it for the Daf tab. On the right, "Shabbat: Lech-Lecha ›" opens the Torah shelf.
+- **Today:** today's minutes toward my goal in Daf ("2 of 90 minutes") with a bar under it, how many are left, and Year 30 so far. The goal is whatever the main minutes goal is in Daf's Goals, and the Kindle picks up a change the next time it's on Wi-Fi. Tap it for the Daf tab. On the right, "Shabbat: Lech-Lecha ›" opens the Torah shelf.
 - **Continue reading:** the book I was in last, big, with how far I am, when I last read it, and **Resume**.
 - **Lately:** the next five books from KOReader's history, with how far I am in each, and **History ›**.
 - **The bar at the bottom:** Home, **Shelves**, **History**, **Daf** (the review and the nightstand) and **Search**.
 
 That's all on purpose: the review lives on the Daf tab and the shelves on Shelves. The house icon at the top of KOReader's file browser opens Home too, so it's always one tap away.
+
+### Gestures
+
+KOReader's gestures work on Home, Shelves and the Daf tab the way they do in the file browser: the edge swipes for the frontlight and its warmth, two-finger swipes, multiswipes, holding a corner, and tapping a corner. The one exception is a tap on the bar at the bottom: the Home and Search buttons sit in the bottom corners, so a tap there is the button. Over a book, the book's own gestures apply.
 
 ### KOReader's menu, with everything in it
 
