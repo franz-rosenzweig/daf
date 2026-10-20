@@ -2,19 +2,35 @@ import AVFoundation
 import MediaPlayer
 import SwiftUI
 
-/// Read aloud, as the page does it: each paragraph's speech from Daf (/api/tts?doc=&b=, Kokoro in
-/// the chosen voice), one after another, the next one fetched while this one plays; the paragraph
-/// marked in the reader and kept in view; the play/pause and skip keys on the keyboard work; and
-/// the listening counts as reading, in beats of 15 seconds.
+/// Something that can be read aloud a paragraph at a time: an article (ReaderModel) or a book
+/// (BookModel). Paragraphs are numbers of its own choosing, in reading order.
+@MainActor
+protocol Listenable: AnyObject {
+    /// What's being read ("fr:…" for an article, "book:cal:45" for a book).
+    var listenKey: String { get }
+    var listenTitle: String { get }
+    func paragraphs() -> [Int]
+    /// The paragraph a place is in, or the one at the top of the window.
+    func paragraph(at place: Int?) -> Int?
+    func speech(_ p: Int) async -> Data?
+    func mark(_ p: Int?, follow: Bool)
+    /// Fifteen seconds of listening, counted as reading.
+    func listened()
+    /// At the end: on to what comes next (a book's next chapter). False when there's nothing more.
+    func advance() -> Bool
+}
+
+/// Read aloud, as the page does it: each paragraph's speech from Daf (Kokoro, in the voice in
+/// Settings), one after another, the next ones fetched while this one plays; the paragraph marked
+/// and kept in view; the keyboard's play/pause and skip keys work; the listening counts as reading.
 @MainActor
 @Observable
 final class Speaker {
     static let shared = Speaker()
 
-    private(set) var docID: String?
+    private(set) var key: String?
     private(set) var title = ""
-    /// The doc's blocks that are read (not pictures or page marks), by their index.
-    private(set) var blocks: [Int] = []
+    private(set) var paragraphs: [Int] = []
     private(set) var index = 0
     private(set) var playing = false
     /// Daf is still making this paragraph's speech.
@@ -27,45 +43,51 @@ final class Speaker {
     /// For the self-test: paragraphs that started.
     @ObservationIgnored private(set) var started = 0
 
-    var on: Bool { docID != nil }
+    var on: Bool { key != nil }
+    /// Kept for the reader that shows the article: the doc's id (or nil for a book).
+    var docID: String? { key.flatMap { $0.hasPrefix("book:") ? nil : $0 } }
 
     @ObservationIgnored private var player: AVAudioPlayer?
     @ObservationIgnored private let ended = Ended()
     @ObservationIgnored private var cache: [Int: Data] = [:]
     @ObservationIgnored private var fetching: [Int: Task<Data?, Never>] = [:]
-    @ObservationIgnored private weak var reader: ReaderModel?
+    @ObservationIgnored private weak var source: Listenable?
     @ObservationIgnored private var beatTimer: Timer?
     @ObservationIgnored private var remoteReady = false
     @ObservationIgnored private var failures = 0
+    @ObservationIgnored private var generation = 0
 
     private init() {
         ended.done = { [weak self] p in MainActor.assumeIsolated { if p === self?.player { self?.skip(1) } } }
     }
 
-    /// Starts reading an article: from a paragraph, or from the one at the top of the window.
-    func start(_ r: ReaderModel, at block: Int? = nil) {
-        guard let d = r.doc else { return }
+    /// Starts reading: from a place in it, or from the top of the window.
+    func start(_ s: Listenable, at place: Int? = nil) {
         stop()
-        reader = r
-        docID = r.id
-        title = r.title
-        blocks = d.list("blocks").enumerated().compactMap { i, any in
-            guard let b = J(any) else { return nil }
-            let t = b.s("t") ?? "p"
-            return t != "img" && t != "pg" && !(b.s("x") ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? i : nil
-        }
-        let from = block ?? r.firstVisibleBlock() ?? 0
-        index = blocks.firstIndex { $0 >= from } ?? 0
+        source = s
+        key = s.listenKey
+        title = s.listenTitle
+        load(from: s.paragraph(at: place))
         remote()
         startBeats()
         playing = true
         Task { await playCurrent() }
     }
 
-    /// The reader for the article again (a new window, the same article opened again).
-    func attach(_ r: ReaderModel) {
-        guard r.id == docID else { return }
-        reader = r
+    private func load(from p: Int?) {
+        guard let s = source else { return }
+        paragraphs = s.paragraphs()
+        cache = [:]
+        fetching.values.forEach { $0.cancel() }
+        fetching = [:]
+        generation += 1
+        index = p.flatMap { p in paragraphs.firstIndex { $0 >= p } } ?? 0
+    }
+
+    /// The reader for the same thing again (a new window): marks and follows from there.
+    func attach(_ s: Listenable) {
+        guard s.listenKey == key else { return }
+        source = s
         mark()
     }
 
@@ -89,7 +111,10 @@ final class Speaker {
         player?.stop()
         player = nil
         index = max(0, index + by)
-        if index >= blocks.count { finished(); return }
+        if index >= paragraphs.count {
+            guard let s = source, s.advance() else { return finished() }
+            load(from: nil)                       // a book's next chapter
+        }
         if playing { Task { await playCurrent() } } else { mark() }
     }
 
@@ -98,10 +123,10 @@ final class Speaker {
         player = nil
         playing = false
         waiting = false
-        reader?.markSpeaking(nil)
-        reader = nil
-        docID = nil
-        blocks = []
+        source?.mark(nil, follow: false)
+        source = nil
+        key = nil
+        paragraphs = []
         cache = [:]
         fetching.values.forEach { $0.cancel() }
         fetching = [:]
@@ -117,56 +142,57 @@ final class Speaker {
     }
 
     private func playCurrent() async {
-        guard let doc = docID, blocks.indices.contains(index) else { return finished() }
-        let b = blocks[index]
+        guard on, paragraphs.indices.contains(index) else { return finished() }
+        let p = paragraphs[index], gen = generation
         waiting = true
         mark()
-        let data = await speech(b)
-        guard docID == doc, blocks.indices.contains(index), blocks[index] == b, playing, player == nil else { return }  // moved on meanwhile
+        let data = await speech(p)
+        guard gen == generation, paragraphs.indices.contains(index), paragraphs[index] == p, playing, player == nil else { return }  // moved on meanwhile
         waiting = false
-        guard let data, let p = try? AVAudioPlayer(data: data) else {
+        guard let data, let a = try? AVAudioPlayer(data: data) else {
             failures += 1
             if failures >= 2 { stop(); AppModel.shared.say("Kokoro isn't answering, so reading aloud stopped"); return }
             AppModel.shared.say("Kokoro didn't answer for that paragraph; skipping")
             return skip(1)
         }
         failures = 0
-        p.delegate = ended
-        p.enableRate = true
-        p.rate = rate
-        p.volume = volume
-        p.prepareToPlay()
-        player = p
-        p.play()
+        a.delegate = ended
+        a.enableRate = true
+        a.rate = rate
+        a.volume = volume
+        a.prepareToPlay()
+        player = a
+        a.play()
         started += 1
         nowPlaying()
-        for k in 1...2 where blocks.indices.contains(index + k) { _ = fetch(blocks[index + k]) }
+        for k in 1...2 where paragraphs.indices.contains(index + k) { _ = fetch(paragraphs[index + k]) }
     }
 
-    private func speech(_ b: Int) async -> Data? {
-        if let d = cache[b] { return d }
-        return await fetch(b).value
+    private func speech(_ p: Int) async -> Data? {
+        if let d = cache[p] { return d }
+        return await fetch(p).value
     }
 
     @discardableResult
-    private func fetch(_ b: Int) -> Task<Data?, Never> {
-        if let t = fetching[b] { return t }
-        let doc = docID ?? ""
+    private func fetch(_ p: Int) -> Task<Data?, Never> {
+        if let t = fetching[p] { return t }
+        let gen = generation
         let t = Task { [weak self] () -> Data? in
-            let d = try? await API.shared.data("/api/tts?doc=\(API.enc(doc))&b=\(b)")
-            if let self, self.docID == doc {
-                self.fetching[b] = nil
-                if let d { self.cache[b] = d }
-                if self.cache.count > 8 { for k in self.cache.keys where abs(k - b) > 6 { self.cache[k] = nil } }
+            guard let s = self?.source else { return nil }
+            let d = await s.speech(p)
+            if let self, self.generation == gen {
+                self.fetching[p] = nil
+                if let d { self.cache[p] = d }
+                if self.cache.count > 8 { for k in self.cache.keys where abs(k - p) > 20_000 || self.cache.count > 12 { self.cache[k] = nil; break } }
             }
             return d
         }
-        fetching[b] = t
+        fetching[p] = t
         return t
     }
 
     private func mark() {
-        reader?.markSpeaking(blocks.indices.contains(index) ? blocks[index] : nil, follow: playing)
+        source?.mark(paragraphs.indices.contains(index) ? paragraphs[index] : nil, follow: playing)
     }
 
     // MARK: the reading time
@@ -175,8 +201,8 @@ final class Speaker {
         beatTimer?.invalidate()
         beatTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.playing, !self.waiting, let id = self.docID else { return }
-                Task { try? await API.shared.send("POST", "/api/read/beat", ["doc_id": id, "seconds": 15, "at": Int(Date().timeIntervalSince1970)]) }
+                guard let self, self.playing, !self.waiting else { return }
+                self.source?.listened()
             }
         }
     }
@@ -205,7 +231,7 @@ final class Speaker {
     private func nowPlaying() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
             MPMediaItemPropertyTitle: title,
-            MPMediaItemPropertyArtist: "Paragraph \(min(index + 1, blocks.count)) of \(blocks.count)",
+            MPMediaItemPropertyArtist: "Paragraph \(min(index + 1, paragraphs.count)) of \(paragraphs.count)",
             MPNowPlayingInfoPropertyPlaybackRate: playing ? Double(rate) : 0,
         ]
         MPNowPlayingInfoCenter.default().playbackState = playing ? .playing : .paused
@@ -218,16 +244,40 @@ final class Speaker {
     }
 }
 
-/// The player at the bottom of the window while an article is read aloud.
+// MARK: an article read aloud
+
+extension ReaderModel: Listenable {
+    var listenKey: String { id }
+    var listenTitle: String { title }
+
+    func paragraphs() -> [Int] {
+        (doc?.list("blocks") ?? []).enumerated().compactMap { i, any in
+            guard let b = J(any) else { return nil }
+            let t = b.s("t") ?? "p"
+            return t != "img" && t != "pg" && !(b.s("x") ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? i : nil
+        }
+    }
+
+    func paragraph(at place: Int?) -> Int? { place.flatMap { block(at: $0) } ?? firstVisibleBlock() }
+
+    func speech(_ p: Int) async -> Data? { try? await API.shared.data("/api/tts?doc=\(API.enc(id))&b=\(p)") }
+
+    func mark(_ p: Int?, follow: Bool) { markSpeaking(p, follow: follow) }
+
+    func listened() { beat() }
+
+    func advance() -> Bool { false }
+}
+
+/// The player at the bottom of a window while something is read aloud.
 struct SpeakerBar: View {
-    @Environment(AppModel.self) private var model
     private let s = Speaker.shared
 
     var body: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.title).font(.callout.weight(.semibold)).lineLimit(1)
-                Text(s.waiting ? "Getting the paragraph ready…" : "Paragraph \(min(s.index + 1, s.blocks.count)) of \(s.blocks.count)")
+                Text(s.waiting ? "Getting the paragraph ready…" : "Paragraph \(min(s.index + 1, s.paragraphs.count)) of \(s.paragraphs.count)")
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             .frame(maxWidth: 240, alignment: .leading)

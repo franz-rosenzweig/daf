@@ -223,9 +223,9 @@ enum SelfTest {
         sp.volume = 0
         sp.start(r)
         let spoke = await until(90) { sp.started >= 1 }
-        check(spoke && sp.playing, "Listen reads the article aloud in Daf's voice", "paragraph \(sp.index + 1) of \(sp.blocks.count)")
+        check(spoke && sp.playing, "Listen reads the article aloud in Daf's voice", "paragraph \(sp.index + 1) of \(sp.paragraphs.count)")
         var marked = false
-        if sp.blocks.indices.contains(sp.index), let rg = r.blocks.first(where: { $0.i == sp.blocks[sp.index] })?.range, let lm = tv.layoutManager {
+        if sp.paragraphs.indices.contains(sp.index), let rg = r.blocks.first(where: { $0.i == sp.paragraphs[sp.index] })?.range, let lm = tv.layoutManager {
             marked = stride(from: rg.location, to: rg.location + rg.length, by: 3).contains { lm.temporaryAttribute(.backgroundColor, atCharacterIndex: $0, effectiveRange: nil) != nil }
         }
         check(marked, "and marks the paragraph it's reading")
@@ -595,6 +595,67 @@ enum SelfTest {
         let on = bm.marked
         await bm.toggleBookmark()
         check(on && !bm.marked, "B bookmarks the page, and takes the bookmark off again")
+
+        // the Kindle's highlights, found in this edition by their words, and drawn like Daf's own
+        if !bm.kindle.isEmpty {
+            var found = 0, tried = 0
+            for h in bm.kindle.prefix(60) {
+                guard let k = BookModel.kindleSection(h) else { continue }
+                tried += 1
+                if bm.kindleRanges(k).contains(where: { $0.id == h.s("id") }) { found += 1 }
+            }
+            check(tried > 0 && Double(found) >= Double(tried) * 0.8, "the Kindle's highlights are found in this edition by their words", "\(found) of \(tried)")
+            if let h = bm.kindle.first(where: { h in BookModel.kindleSection(h).map { k in bm.kindleRanges(k).contains { $0.id == h.s("id") } } ?? false }) {
+                await bm.go(kindle: h)
+                await pause(0.6)
+                let r = bm.kindleRanges(bm.section).first { $0.id == h.s("id") }?.range
+                let painted = r.flatMap { pages.storage.attribute(.dafHighlight, at: $0.location + 1, effectiveRange: nil) as? String }
+                check(painted == h.s("id") && r.map { NSLocationInRange($0.location, pages.visible) } == true, "and one is drawn on its page", String((h.s("text") ?? "").prefix(50)))
+                capture("33-book-kindle", win)
+            }
+        } else { log("SKIP  no Kindle highlights in this book") }
+
+        // searching the book
+        await bm.search("the")
+        check(!bm.results.isEmpty, "Search finds the words all through the book", "\(bm.results.count) places")
+        if let hit = bm.results.dropFirst(min(5, bm.results.count - 1)).first {
+            bm.go(hit)
+            await pause(0.6)
+            check(bm.section == hit.section && NSLocationInRange(hit.range.location, pages.visible), "and a place found opens at its page", "chapter \(hit.section)")
+        }
+        bm.sidebar = "search"
+        bm.showContents = true
+        await pause(1)
+        capture("34-book-search", win)
+
+        // Ask (the sandbox's stand-in answers; the model is never asked)
+        await bm.ask("What is this chapter about?")
+        check((bm.asks.last?.s("a") ?? "").contains("stand-in"), "Ask answers a question about the book", String((bm.asks.last?.s("a") ?? bm.error ?? "").prefix(50)))
+        await pause(0.8)
+        capture("35-book-ask", win)
+        bm.showContents = false
+
+        // read aloud, silently: a paragraph at a time, marked, then the next
+        let sp = Speaker.shared
+        sp.volume = 0
+        let before = sp.started
+        sp.start(bm)
+        let spoke = await until(90) { sp.started > before }
+        let at = sp.paragraphs.indices.contains(sp.index) ? sp.paragraphs[sp.index] : -1
+        let ends = (pages.storage.string as NSString).range(of: "\n", range: NSRange(location: max(0, at), length: max(0, pages.storage.length - max(0, at)))).location
+        let markedSome = at >= 0 && stride(from: at, to: ends == NSNotFound ? pages.storage.length : ends, by: 2).contains { pages.speaking(at: $0) }
+        let anywhere = stride(from: 0, to: pages.storage.length, by: 7).filter { pages.speaking(at: $0) }.count
+        let para = at >= 0 && ends != NSNotFound ? (pages.storage.string as NSString).substring(with: NSRange(location: at, length: ends - at)) : ""
+        let hl = at >= 0 ? (pages.storage.attribute(.dafHighlight, at: at, effectiveRange: nil) as? String ?? "none") : "-"
+        log("INFO  listen: “\(para.prefix(40))” highlight \(hl) last marked \(String(describing: pages.lastMarked)) spoke \(spoke) from \(before)")
+        log("INFO  listen: key \(sp.key ?? "-") section \(bm.section) listening \(bm.listenSection) at \(at) ends \(ends) visible \(pages.visible) marked anywhere \(anywhere) playing \(sp.playing) waiting \(sp.waiting) started \(sp.started)")
+        check(spoke && sp.key == bm.listenKey && markedSome, "Listen reads the book aloud, the paragraph marked", "paragraph \(sp.index + 1) of \(sp.paragraphs.count) in this chapter")
+        await pause(0.5)
+        capture("36-book-listen", win)
+        sp.skip(1)
+        let onward = await until(60) { sp.started > before + 1 }
+        check(onward, "and goes on to the next paragraph", "\(sp.index + 1)")
+        sp.stop()
 
         // bigger type: the same place
         let at0 = pages.visible.location

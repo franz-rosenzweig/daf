@@ -155,6 +155,20 @@ final class API {
         return data
     }
 
+    /// A POST whose answer is bytes, not JSON (a paragraph's speech).
+    func post(_ path: String, _ body: [String: Any]) async throws -> Data {
+        if Connection.shared.forced { throw URLError(.notConnectedToInternet) }
+        var r = URLRequest(url: url(path))
+        r.httpMethod = "POST"
+        r.cachePolicy = .reloadIgnoringLocalCacheData
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await session.data(for: r)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else { throw APIError(status: status, message: "Daf answered \(status).") }
+        return data
+    }
+
     /// A picture: from the network, or the copy kept on this Mac when there's no connection.
     func picture(_ u: URL) async -> Data? {
         if !Connection.shared.forced, let (d, r) = try? await session.data(from: u), ((r as? HTTPURLResponse)?.statusCode ?? 200) < 400 { return d }

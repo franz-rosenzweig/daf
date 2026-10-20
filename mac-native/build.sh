@@ -9,8 +9,8 @@
 #                               so a test never touches Daf's settings, sign-in or keychain
 set -euo pipefail
 cd "${0:A:h}"
-VERSION=0.3.0
-BUILD=13
+VERSION=0.3.1
+BUILD=14
 if [[ -n ${DAF_TEST:-} ]]; then
     NAME="Daf Test"; ID=xyz.tiresia.daf.selftest; SCHEME=daf-selftest; OUT=build/test; EXTENSIONS=
 else
@@ -21,9 +21,13 @@ MACOS=26.0
 SDK=$(xcrun --show-sdk-path)
 TARGET="$(uname -m)-apple-macos$MACOS"
 
-swift build -c release --product DafNative 2>&1 | grep -v '^\[' || true
+mkdir -p $OUT
+if ! swift build -c release --product DafNative > $OUT/swift-build.log 2>&1; then     # a failed build stops here, never an old binary
+    grep -E 'error' -A3 $OUT/swift-build.log >&2; exit 1
+fi
 BIN=$(swift build -c release --product DafNative --show-bin-path)/DafNative
 [[ -x $BIN ]] || { echo "the build didn't make $BIN" >&2; exit 1; }
+rm -f $OUT/swift-build.log
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Daf"
 [[ -d ../mac/AppIcon.iconset ]] && iconutil -c icns ../mac/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"

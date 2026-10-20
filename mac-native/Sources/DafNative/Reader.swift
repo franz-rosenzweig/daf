@@ -370,7 +370,7 @@ final class ReaderModel {
     }
 
     /// L, or Read Aloud from Here: from the paragraph a character is in.
-    func listen(from loc: Int) { Speaker.shared.start(self, at: block(at: loc)) }
+    func listen(from loc: Int) { Speaker.shared.start(self, at: loc) }
 
     /// The block a character of the storage is in, or the next one.
     func block(at loc: Int) -> Int? {

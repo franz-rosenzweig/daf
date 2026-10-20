@@ -638,6 +638,7 @@ struct Inspector: View {
                     Text(a.s("q") ?? "").font(.callout.weight(.semibold))
                     Text(Self.markdown(a.s("a") ?? "")).font(.callout).textSelection(.enabled)
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, 3)
             }
             if doc.asking {

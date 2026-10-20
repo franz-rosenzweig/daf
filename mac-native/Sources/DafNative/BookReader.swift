@@ -27,6 +27,19 @@ final class BookModel {
     var editing: ReaderModel.Editing?
     /// The Kindle is further on than this place: offered as a jump.
     var kindleAhead: Double?
+    /// The Kindle's highlights (KOReader's, with its words), found in this edition by their words.
+    var kindle: [J] = []
+    var results: [BookHit] = []
+    var searching = false
+    var query = ""
+    var asks: [J] = []
+    var asking = false
+    /// ⌘F: the sidebar's search field takes the keys.
+    var focusSearch = 0
+    @ObservationIgnored var texts: [Int: String] = [:]
+    @ObservationIgnored var placedKindle: [Int: [(id: String, range: NSRange)]] = [:]
+    /// The chapter being read aloud (it goes on into the next one).
+    @ObservationIgnored var listenSection = 0
 
     @ObservationIgnored weak var pages: BookPagesView?
     @ObservationIgnored private var pending: Int?
@@ -58,6 +71,7 @@ final class BookModel {
             guard ["EPUB", "KEPUB"].contains((d.s("format") ?? "").uppercased()) else { otherFormat = true; return }
             highlights = d.a("highlights")
             bookmarks = d.a("bookmarks")
+            kindle = d.a("other_highlights").filter { $0.s("source") == "kindle" && ($0.s("text") ?? "").count > 3 }
             let data = try await file(size: d.i("size"))
             let book = try EPUB(data)
             epub = book
@@ -271,6 +285,7 @@ final class BookModel {
             MainActor.assumeIsolated {
                 guard let self, let w = self.pages?.window, w.occlusionState.contains(.visible), NSApp.isActive,
                       Date().timeIntervalSince(self.lastActive) < 90 else { return }
+                if Speaker.shared.playing && Speaker.shared.key == self.listenKey { return }    // the listening counts it already
                 self.beat()
             }
         }
@@ -303,6 +318,13 @@ final class BookModel {
                                  .underlineColor: look.quiet], range: r)
             }
         }
+        for (kid, r) in kindleRanges(section) where NSMaxRange(r) <= s.length {        // the Kindle's, drawn like Daf's own
+            guard let h = kindle.first(where: { $0.s("id") == kid }) else { continue }
+            s.addAttribute(.backgroundColor, value: ReaderModel.colour(h.s("color")), range: r)
+            s.addAttribute(.dafHighlight, value: kid, range: r)
+            let n = h.s("user_note") ?? h.s("note")
+            s.addAttribute(.toolTip, value: "From the Kindle" + (n.map { ": " + $0 } ?? ""), range: r)
+        }
         s.endEditing()
     }
 
@@ -331,6 +353,8 @@ final class BookModel {
         do {
             try await API.shared.send("DELETE", "/api/highlights/\(API.enc(hid))", nil)
             highlights.removeAll { $0.s("id") == hid }
+            kindle.removeAll { $0.s("id") == hid }
+            placedKindle = placedKindle.mapValues { $0.filter { $0.id != hid } }
             paint()
         } catch { self.error = error.localizedDescription }
     }
@@ -343,12 +367,20 @@ final class BookModel {
     }
 
     func changed(_ hid: String, _ f: (inout [String: Any]) -> Void) {
-        guard let k = highlights.firstIndex(where: { $0.s("id") == hid }) else { return }
-        var raw = highlights[k].raw
-        f(&raw)
-        highlights[k] = J(raw)
+        if let k = highlights.firstIndex(where: { $0.s("id") == hid }) {
+            var raw = highlights[k].raw
+            f(&raw)
+            highlights[k] = J(raw)
+        } else if let k = kindle.firstIndex(where: { $0.s("id") == hid }) {
+            var raw = kindle[k].raw
+            f(&raw)
+            kindle[k] = J(raw)
+        }
         paint()
     }
+
+    /// A highlight of either kind, by its id.
+    func highlight(withID hid: String) -> J? { highlights.first { $0.s("id") == hid } ?? kindle.first { $0.s("id") == hid } }
 
     // MARK: bookmarks
 
@@ -534,6 +566,24 @@ final class BookPagesView: NSView, NSTextViewDelegate {
     }
 
     func deselect() { views.first?.setSelectedRange(NSRange(location: visible.location, length: 0)) }
+
+    /// For the self-test: the paragraph read aloud is marked here.
+    func speaking(at i: Int) -> Bool { i < storage.length && layoutManager.temporaryAttribute(.backgroundColor, atCharacterIndex: i, effectiveRange: nil) != nil }
+
+    /// The paragraph read aloud, marked around the highlights in it.
+    /// For the self-test: what was marked last.
+    var lastMarked: NSRange?
+
+    func markSpeaking(_ r: NSRange?) {
+        lastMarked = r
+        layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSRange(location: 0, length: storage.length))
+        guard let r, NSMaxRange(r) <= storage.length else { return }
+        storage.enumerateAttribute(.dafHighlight, in: r) { v, sub, _ in
+            if (v as? String)?.isEmpty ?? true {
+                layoutManager.addTemporaryAttribute(.backgroundColor, value: NSColor.controlAccentColor.withAlphaComponent(look.dark ? 0.28 : 0.14), forCharacterRange: sub)
+            }
+        }
+    }
     var selection: NSRange { views.first?.selectedRange() ?? NSRange(location: 0, length: 0) }
 
     /// A highlight's words flashed on its page (Open at Its Spot).
@@ -624,6 +674,15 @@ final class BookPagesView: NSView, NSTextViewDelegate {
             Task { @MainActor in await model?.highlight(sel) }
             return true
         case "b": Task { @MainActor in await model?.toggleBookmark() }; return true
+        default: break
+        }
+        switch event.characters {
+        case "p":                                               // the page's keys: p listens or pauses,
+            if let m = model { if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) } }
+            return true
+        case "L":                                               // L reads aloud from here
+            if let m = model { Speaker.shared.start(m, at: selection.length > 0 ? selection.location : nil) }
+            return true
         default: return false
         }
     }
@@ -678,7 +737,7 @@ final class BookTextView: NSTextView {
         var extra: [NSMenuItem] = []
         if selectedRange().length > 0 { extra.append(item("Highlight", #selector(highlightNow))) }
         if at < textStorage?.length ?? 0, let hid = textStorage?.attribute(.dafHighlight, at: at, effectiveRange: nil) as? String, !hid.isEmpty {
-            let h = MainActor.assumeIsolated { pages?.model?.highlights.first { $0.s("id") == hid } }
+            let h = MainActor.assumeIsolated { pages?.model?.highlight(withID: hid) }
             extra.append(item((h?.s("user_note") ?? "").isEmpty ? "Add a Note…" : "Edit the Note…", #selector(editNote(_:)), hid))
             let colours = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
             let sub = NSMenu()
@@ -691,6 +750,8 @@ final class BookTextView: NSTextView {
             extra.append(colours)
             extra.append(item("Remove Highlight", #selector(removeHighlight(_:)), hid))
         }
+        if selectedRange().length > 0 { extra.append(item("Ask About This Passage", #selector(askAbout))) }
+        extra.append(item("Read Aloud from Here", #selector(readFromHere(_:)), at))
         let marked = MainActor.assumeIsolated { pages?.model?.marked ?? false }
         extra.append(item(marked ? "Remove the Bookmark" : "Bookmark This Page", #selector(bookmark)))
         for (k, i) in extra.enumerated() { menu.insertItem(i, at: k) }
@@ -707,9 +768,18 @@ final class BookTextView: NSTextView {
 
     @objc func highlightNow() { let sel = selectedRange(), m = pages?.model; Task { @MainActor in await m?.highlight(sel) } }
     @objc func bookmark() { let m = pages?.model; Task { @MainActor in await m?.toggleBookmark() } }
+    @objc func readFromHere(_ sender: NSMenuItem) {
+        guard let at = sender.representedObject as? Int else { return }
+        MainActor.assumeIsolated { if let m = pages?.model { Speaker.shared.start(m, at: at) } }
+    }
+    @objc func askAbout() {
+        let quote = (string as NSString).substring(with: selectedRange()).trimmingCharacters(in: .whitespacesAndNewlines)
+        let m = pages?.model
+        Task { @MainActor in await m?.ask("What does this passage mean here?", quote: quote) }
+    }
     @objc func editNote(_ sender: NSMenuItem) {
         guard let hid = sender.representedObject as? String else { return }
-        MainActor.assumeIsolated { if let m = pages?.model, let h = m.highlights.first(where: { $0.s("id") == hid }) { m.editing = .init(h: h) } }
+        MainActor.assumeIsolated { if let m = pages?.model, let h = m.highlight(withID: hid) { m.editing = .init(h: h) } }
     }
     @objc func recolor(_ sender: NSMenuItem) {
         guard let v = sender.representedObject as? [String], v.count == 2 else { return }
@@ -758,7 +828,10 @@ struct BookReaderView: View {
                         .overlay(alignment: .bottom) {
                             Text(m.footer).font(.caption).foregroundStyle(Color(nsColor: m.look.quiet)).monospacedDigit().padding(.bottom, 12)
                         }
-                        .overlay(alignment: .top) { kindle }
+                        .overlay(alignment: .top) { kindleBanner }
+                        .overlay(alignment: .bottom) {
+                            if Speaker.shared.key == m.listenKey { SpeakerBar().padding(.bottom, 72) }
+                        }
                         .overlay { if m.epub == nil { ProgressView("Opening the book…").padding(40) } }
                 }
             }
@@ -775,6 +848,13 @@ struct BookReaderView: View {
                 .keyboardShortcut("t", modifiers: [.command, .option])
             }
             ToolbarItemGroup {
+                Button { m.sidebar = "search"; m.showContents = true; m.focusSearch += 1 } label: { Label("Search the Book", systemImage: "magnifyingglass") }
+                    .help("Search the book (⌘F)")
+                    .keyboardShortcut("f", modifiers: .command)
+                Button { if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) } } label: {
+                    Label("Listen", systemImage: Speaker.shared.key == m.listenKey && Speaker.shared.playing ? "pause.circle" : "play.circle")
+                }
+                .help("Read aloud from this page (P)")
                 Button { showLook.toggle() } label: { Label("Appearance", systemImage: "textformat.size") }
                     .help("Typeface, size and theme")
                     .popover(isPresented: $showLook, arrowEdge: .bottom) { LookPanel(m: m) }
@@ -783,7 +863,7 @@ struct BookReaderView: View {
             }
         }
         .task { await m.load() }
-        .onDisappear { m.close() }
+        .onDisappear { m.close(); if Speaker.shared.key == m.listenKey { Speaker.shared.stop() } }
         .sheet(item: $m.editing) { e in
             NoteSheet(h: e.h, saved: { n in m.changed(e.id) { $0["user_note"] = n } }).environment(app)
         }
@@ -794,7 +874,7 @@ struct BookReaderView: View {
     }
 
     @ViewBuilder
-    private var kindle: some View {
+    private var kindleBanner: some View {
         if let k = m.kindleAhead {
             HStack(spacing: 12) {
                 Text("The Kindle is further on, at \(Int((k * 100).rounded()))%").font(.callout)
@@ -808,48 +888,41 @@ struct BookReaderView: View {
     }
 }
 
-/// Contents, highlights and bookmarks, beside the pages.
+/// Contents, highlights, bookmarks, search and Ask, beside the pages.
 struct BookSidebar: View {
     let m: BookModel
+    @State private var q = ""
+    @State private var question = ""
+    @FocusState private var searchField: Bool
 
     var body: some View {
         @Bindable var m = m
         VStack(spacing: 0) {
             Picker("Show", selection: $m.sidebar) {
-                Text("Contents").tag("contents")
-                Text("Highlights").tag("highlights")
-                Text("Bookmarks").tag("bookmarks")
+                Image(systemName: "list.bullet").help("Contents").tag("contents")
+                Image(systemName: "highlighter").help("Highlights").tag("highlights")
+                Image(systemName: "bookmark").help("Bookmarks").tag("bookmarks")
+                Image(systemName: "magnifyingglass").help("Search the book").tag("search")
+                Image(systemName: "bubble.left.and.text.bubble.right").help("Ask").tag("ask")
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             .padding(10)
+            if m.sidebar == "search" {
+                TextField("Search the book", text: $q)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($searchField)
+                    .onSubmit { Task { await m.search(q) } }
+                    .padding(.horizontal, 10).padding(.bottom, 6)
+                    .onAppear { searchField = true }
+                    .onChange(of: m.focusSearch) { _, _ in searchField = true }
+            }
             List {
                 switch m.sidebar {
-                case "highlights":
-                    ForEach(m.highlights, id: \.self) { h in
-                        Button { if let c = h.o("pos")?.s("cfi") { m.go(cfi: c, flash: true) } } label: {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(h.s("text") ?? "").font(.system(.callout, design: .serif)).lineLimit(4)
-                                if let n = h.s("user_note") { Text(n).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-                                if let c = h.s("chapter") { Text(c).font(.caption2).foregroundStyle(.tertiary).lineLimit(1) }
-                            }
-                            .padding(.leading, 6)
-                            .overlay(alignment: .leading) { Rectangle().fill(Color(ReaderModel.colour(h.s("color")).withAlphaComponent(1))).frame(width: 3) }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if m.highlights.isEmpty { Text("Select words and press H to highlight them.").foregroundStyle(.secondary) }
-                case "bookmarks":
-                    ForEach(m.bookmarks, id: \.self) { b in
-                        Button { if let c = b.s("cfi") { m.go(cfi: c) } } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(b.s("chapter") ?? "Bookmark").font(.callout.weight(.medium)).lineLimit(1)
-                                if let e = b.s("excerpt") { Text(e).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if m.bookmarks.isEmpty { Text("Press B to bookmark a page.").foregroundStyle(.secondary) }
+                case "highlights": highlights
+                case "bookmarks": bookmarks
+                case "search": search
+                case "ask": ask
                 default:
                     if let epub = m.epub {
                         OutlineGroup(epub.toc, children: \.kids) { item in
@@ -862,6 +935,80 @@ struct BookSidebar: View {
                 }
             }
             .listStyle(.sidebar)
+        }
+    }
+
+    @ViewBuilder private var highlights: some View {
+        ForEach(m.highlights, id: \.self) { h in
+            Button { if let c = h.o("pos")?.s("cfi") { m.go(cfi: c, flash: true) } } label: { card(h, place: h.s("chapter")) }
+                .buttonStyle(.plain)
+        }
+        if !m.kindle.isEmpty {
+            Section("From the Kindle") {
+                ForEach(m.kindle, id: \.self) { h in
+                    Button { Task { await m.go(kindle: h) } } label: { card(h, place: h.s("page").map { "p. " + $0 } ?? h.s("chapter")) }
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+        if m.highlights.isEmpty && m.kindle.isEmpty { Text("Select words and press H to highlight them.").foregroundStyle(.secondary) }
+    }
+
+    private func card(_ h: J, place: String?) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(h.s("text") ?? "").font(.system(.callout, design: .serif)).lineLimit(4)
+            if let n = h.s("user_note") ?? h.s("note") { Text(n).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+            if let place { Text(place).font(.caption2).foregroundStyle(.tertiary).lineLimit(1) }
+        }
+        .padding(.leading, 6)
+        .overlay(alignment: .leading) { Rectangle().fill(Color(ReaderModel.colour(h.s("color")).withAlphaComponent(1))).frame(width: 3) }
+    }
+
+    @ViewBuilder private var bookmarks: some View {
+        ForEach(m.bookmarks, id: \.self) { b in
+            Button { if let c = b.s("cfi") { m.go(cfi: c) } } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(b.s("chapter") ?? "Bookmark").font(.callout.weight(.medium)).lineLimit(1)
+                    if let e = b.s("excerpt") { Text(e).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        if m.bookmarks.isEmpty { Text("Press B to bookmark a page.").foregroundStyle(.secondary) }
+    }
+
+    @ViewBuilder private var search: some View {
+        if m.searching { HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Searching…").foregroundStyle(.secondary) } }
+        if !m.query.isEmpty && !m.searching { Text(m.results.isEmpty ? "Not in this book" : (m.results.count >= 500 ? "500 or more" : plural(m.results.count, "place"))).font(.caption).foregroundStyle(.secondary) }
+        ForEach(m.results) { hit in
+            Button { m.go(hit) } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    (Text(hit.before) + Text(hit.match).bold() + Text(hit.after)).font(.system(.callout, design: .serif)).lineLimit(3)
+                    Text(m.chapterTitle(of: hit.section)).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder private var ask: some View {
+        ForEach(Array(m.asks.enumerated()), id: \.offset) { _, a in
+            VStack(alignment: .leading, spacing: 5) {
+                if let qt = a.s("quote") { Text("“\(qt)”").font(.system(.caption, design: .serif)).foregroundStyle(.secondary).lineLimit(3) }
+                Text(a.s("q") ?? "").font(.callout.weight(.semibold))
+                Text(Inspector.markdown(a.s("a") ?? "")).font(.callout).textSelection(.enabled)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, 3)
+        }
+        if m.asking { HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Thinking it over…").foregroundStyle(.secondary) } }
+        TextField("Ask about the book", text: $question, axis: .vertical)
+            .onSubmit { let q = question; question = ""; Task { await m.ask(q) } }
+            .disabled(m.asking)
+        if m.asks.isEmpty && !m.asking {
+            ForEach((m.details?.strings("questions") ?? []).prefix(4), id: \.self) { q in
+                Button(q) { Task { await m.ask(q) } }.buttonStyle(.link).multilineTextAlignment(.leading)
+            }
         }
     }
 }
