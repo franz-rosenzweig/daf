@@ -1,0 +1,140 @@
+# XcodeGen spec. Generates Daf.xcodeproj from this file plus the Swift sources, so the
+# project is reviewable text in git instead of an opaque bundle.
+#   brew install xcodegen && xcodegen generate && open Daf.xcodeproj
+# build.sh reads the same settings and builds without Xcode.
+name: Daf
+options:
+  bundleIdPrefix: xyz.tiresia
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+targets:
+  Daf:
+    type: application
+    platform: macOS
+    # a shared scheme, so `xcodebuild -scheme Daf` and the Run button agree
+    scheme:
+      configVariants: []
+    sources:
+      - path: Daf
+    dependencies:
+      - target: DafShare
+      - target: DafSafari
+    settings:
+      base:
+        PRODUCT_NAME: Daf
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.tiresia.daf
+        MARKETING_VERSION: "0.2.1"
+        CURRENT_PROJECT_VERSION: "12"
+        SWIFT_VERSION: "5.9"
+        ENABLE_HARDENED_RUNTIME: YES
+        # Local-only app: signing to run on this Mac is enough.
+        CODE_SIGN_STYLE: Automatic
+        COMBINE_HIDPI_IMAGES: YES
+    info:
+      path: Daf/Info.plist
+      properties:
+        CFBundleName: Daf
+        CFBundleDisplayName: Daf
+        # XcodeGen otherwise writes 1.0 and 1, whatever the settings above say
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: "13.0"
+        LSApplicationCategoryType: public.app-category.books
+        NSHumanReadableCopyright: ""
+        NSPrincipalClass: NSApplication
+        # daf://save?url=… is how Save to Daf (the share extension) hands a link over;
+        # daf://go/review opens a page, for Shortcuts.
+        CFBundleURLTypes:
+          - CFBundleURLName: xyz.tiresia.daf
+            CFBundleURLSchemes: [daf]
+        # The tailnet address is plain HTTP. With only https://daf.tiresia.xyz this can go.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        # The app group it shares with the Safari extension (the extension's token); build.sh
+        # fills in the team, and leaves it empty in an ad hoc build.
+        DafAppGroup: $(TeamIdentifierPrefix)xyz.tiresia.daf
+    entitlements:
+      path: Daf/Daf.entitlements
+      properties:
+        # Sandbox off: a personal app, and the menu bar's token lives in the login keychain.
+        com.apple.security.app-sandbox: false
+        com.apple.security.application-groups: [$(TeamIdentifierPrefix)xyz.tiresia.daf]
+
+  DafShare:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: DafShare
+    settings:
+      base:
+        PRODUCT_NAME: DafShare
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.tiresia.daf.share
+        MARKETING_VERSION: "0.2.1"
+        CURRENT_PROJECT_VERSION: "12"
+        SWIFT_VERSION: "5.9"
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: DafShare/Info.plist
+      properties:
+        CFBundleName: DafShare
+        CFBundleDisplayName: Save to Daf
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: "13.0"
+        NSHumanReadableCopyright: ""
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    entitlements:
+      path: DafShare/DafShare.entitlements
+      properties:
+        # An extension must be sandboxed. It only hands the link to Daf (daf://save).
+        com.apple.security.app-sandbox: true
+
+  # Daf in Safari: the web extension (extension/, built by extension/build.sh into dist/safari)
+  # with a native half that hands it the token the app made (DafSafari/, Daf/SafariExtension.swift).
+  DafSafari:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: DafSafari
+      - path: ../extension/dist/safari
+        type: folder
+        buildPhase: resources
+        optional: true          # made by extension/build.sh, which the pre-build script runs
+    preBuildScripts:
+      - script: ../extension/build.sh
+        name: The web extension for Safari
+    settings:
+      base:
+        PRODUCT_NAME: DafSafari
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.tiresia.daf.safari
+        MARKETING_VERSION: "0.2.1"
+        CURRENT_PROJECT_VERSION: "12"
+        SWIFT_VERSION: "5.9"
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: DafSafari/Info.plist
+      properties:
+        CFBundleName: DafSafari
+        CFBundleDisplayName: Daf
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: "13.0"
+        NSHumanReadableCopyright: ""
+        DafAppGroup: $(TeamIdentifierPrefix)xyz.tiresia.daf
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.Safari.web-extension
+          NSExtensionPrincipalClass: SafariWebExtensionHandler
+    entitlements:
+      path: DafSafari/DafSafari.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups: [$(TeamIdentifierPrefix)xyz.tiresia.daf]

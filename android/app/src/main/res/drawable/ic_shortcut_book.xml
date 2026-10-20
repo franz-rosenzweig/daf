@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Continue reading: an open book, on Daf's blue. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/dafBlue" />
+    <foreground>
+        <vector android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+            <path android:strokeColor="#FFFFFF" android:strokeWidth="4" android:fillColor="#00000000"
+                android:strokeLineJoin="round"
+                android:pathData="M54,42c-5,-4 -11,-5 -18,-5v31c7,0 13,1 18,5c5,-4 11,-5 18,-5v-31c-7,0 -13,1 -18,5zM54,42v31" />
+        </vector>
+    </foreground>
+</adaptive-icon>

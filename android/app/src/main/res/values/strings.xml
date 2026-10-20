@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widgetDescription">Today\'s minutes toward the hour, and the day\'s highlight</string>
+    <string name="shortcutReview">Review</string>
+    <string name="shortcutPaper">Log paper</string>
+    <string name="shortcutPaperLong">Log paper minutes</string>
+    <string name="shortcutContinue">Continue reading</string>
+</resources>

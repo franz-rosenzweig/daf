@@ -1,0 +1,2 @@
+pdf.js 4.10.38 (pdfjs-dist from npm), Apache 2.0. Vendored as-is for the PDF page view (web/pdfview.js):
+build/pdf.min.mjs, build/pdf.worker.min.mjs, standard_fonts/, cmaps/.

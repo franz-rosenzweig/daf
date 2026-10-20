@@ -1,0 +1,482 @@
+[
+ {
+  "file": "mac/AppIcon.iconset/icon_16x16.png",
+  "size": "16x16",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   199,
+   159,
+   106,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_16x16@2x.png",
+  "size": "32x32",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   197,
+   150,
+   86,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_32x32.png",
+  "size": "32x32",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   197,
+   150,
+   86,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_32x32@2x.png",
+  "size": "64x64",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   129,
+   97,
+   64,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_128x128.png",
+  "size": "128x128",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   115,
+   78,
+   45,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_128x128@2x.png",
+  "size": "256x256",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   115,
+   80,
+   46,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_256x256.png",
+  "size": "256x256",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   115,
+   80,
+   46,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_256x256@2x.png",
+  "size": "512x512",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   119,
+   84,
+   50,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_512x512.png",
+  "size": "512x512",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   119,
+   84,
+   50,
+   255
+  ]
+ },
+ {
+  "file": "mac/AppIcon.iconset/icon_512x512@2x.png",
+  "size": "1024x1024",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   119,
+   83,
+   50,
+   255
+  ]
+ },
+ {
+  "file": "web/favicon-32.png",
+  "size": "32x32",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   197,
+   150,
+   86,
+   255
+  ]
+ },
+ {
+  "file": "web/icon-192.png",
+  "size": "192x192",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   115,
+   79,
+   44,
+   255
+  ]
+ },
+ {
+  "file": "web/icon-512.png",
+  "size": "512x512",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   119,
+   84,
+   50,
+   255
+  ]
+ },
+ {
+  "file": "web/icon-maskable-512.png",
+  "size": "512x512",
+  "corner": [
+   255,
+   255,
+   255,
+   255
+  ],
+  "middle": [
+   117,
+   81,
+   49,
+   255
+  ]
+ },
+ {
+  "file": "web/apple-touch-icon.png",
+  "size": "180x180",
+  "corner": [
+   254,
+   254,
+   254,
+   255
+  ],
+  "middle": [
+   109,
+   70,
+   37,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-mdpi/ic_launcher_foreground.png",
+  "size": "108x108",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   199,
+   154,
+   90,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-mdpi/ic_launcher_monochrome.png",
+  "size": "108x108",
+  "corner": [
+   255,
+   255,
+   255,
+   0
+  ],
+  "middle": [
+   255,
+   255,
+   255,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-mdpi/ic_launcher.png",
+  "size": "48x48",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   197,
+   152,
+   89,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-hdpi/ic_launcher_foreground.png",
+  "size": "162x162",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   199,
+   153,
+   90,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-hdpi/ic_launcher_monochrome.png",
+  "size": "162x162",
+  "corner": [
+   255,
+   255,
+   255,
+   0
+  ],
+  "middle": [
+   255,
+   255,
+   255,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-hdpi/ic_launcher.png",
+  "size": "72x72",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   114,
+   76,
+   43,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xhdpi/ic_launcher_foreground.png",
+  "size": "216x216",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   131,
+   96,
+   63,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xhdpi/ic_launcher_monochrome.png",
+  "size": "216x216",
+  "corner": [
+   255,
+   255,
+   255,
+   0
+  ],
+  "middle": [
+   255,
+   255,
+   255,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xhdpi/ic_launcher.png",
+  "size": "96x96",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   105,
+   65,
+   30,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xxhdpi/ic_launcher_foreground.png",
+  "size": "324x324",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   135,
+   103,
+   72,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xxhdpi/ic_launcher_monochrome.png",
+  "size": "324x324",
+  "corner": [
+   255,
+   255,
+   255,
+   0
+  ],
+  "middle": [
+   255,
+   255,
+   255,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xxhdpi/ic_launcher.png",
+  "size": "144x144",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   116,
+   80,
+   47,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xxxhdpi/ic_launcher_foreground.png",
+  "size": "432x432",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   131,
+   97,
+   66,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xxxhdpi/ic_launcher_monochrome.png",
+  "size": "432x432",
+  "corner": [
+   255,
+   255,
+   255,
+   0
+  ],
+  "middle": [
+   255,
+   255,
+   255,
+   255
+  ]
+ },
+ {
+  "file": "android/mipmap-xxxhdpi/ic_launcher.png",
+  "size": "192x192",
+  "corner": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "middle": [
+   115,
+   79,
+   44,
+   255
+  ]
+ }
+]

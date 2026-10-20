@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daf options</title>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body class="opts">
+<div class="wrap">
+  <h1><img src="icons/48.png" width="32" height="32" alt="">Daf</h1>
+  <p class="lead">Highlight on any web page, and the page goes to your Daf Library with your highlights and notes.</p>
+
+  <form class="card" id="f" autocomplete="off">
+    <h2>Connect to Daf</h2>
+    <label for="url">Daf address</label>
+    <input class="field" id="url" type="url" placeholder="https://daf.tiresia.xyz" spellcheck="false" required>
+    <label for="token">Device token</label>
+    <input class="field" id="token" type="password" placeholder="Paste the token from Daf" spellcheck="false">
+    <p class="hint">Make one in Daf: Preferences, Account, Browser extension, Make a token. Daf shows it only once.</p>
+    <div class="row"><button class="btn primary" type="submit">Save and connect</button><span class="status" id="status" role="status"></span></div>
+  </form>
+
+  <section class="card">
+    <h2>Highlighting</h2>
+    <label class="check"><input type="checkbox" id="auto"> Highlight as soon as I select text</label>
+    <p class="hint">As in Daf’s reader. Hold <kbd>Alt</kbd> while you select to select without highlighting; a single word, or a touch screen, gets the Highlight button instead.</p>
+  </section>
+
+  <section class="card">
+    <h2>Using it</h2>
+    <ul class="how">
+      <li>Select text on a page and it’s highlighted, or choose <span class="sw">Highlight</span> or press <kbd id="key">Alt+H</kbd> when that’s off. The note button highlights and opens a note.</li>
+      <li>Click a highlight to change its color, add a note and tags, or remove it.</li>
+      <li><kbd>Alt+Shift+H</kbd>, or the list button on a highlight, opens the panel of all your highlights on the page, in the order they come, with their notes and tags.</li>
+      <li>The first highlight saves the page to your Library. The toolbar button saves a page without one and opens it in Daf.</li>
+    </ul>
+  </section>
+</div>
+<script src="options.js"></script>
+</body>
+</html>

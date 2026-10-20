@@ -1,0 +1,14 @@
+[Unit]
+Description=Daf: reading time, highlights and review (web app and sync loop, :8440 on localhost and Tailscale)
+After=network-online.target
+
+[Service]
+WorkingDirectory=/srv/dev/daf
+ExecStart=/srv/dev/daf/.venv/bin/python -m daf.server
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

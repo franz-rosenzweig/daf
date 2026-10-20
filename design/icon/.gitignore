@@ -1,0 +1,19 @@
+# Working renders; the round sheets (round*.png) are kept.
+r1/**/*.png
+r2/**/*.png
+!r1/round1.png
+!r2/round2-*.png
+r1/*/explore/
+r2/*/explore/
+# The rejected spiral-scroll round (A1–A8) and its Hebrew glyph outlines.
+a/
+scroll_a.py
+glyphs.py
+glyphs.json
+r3/**/*.png
+!r3/round3.png
+!r3/tree/small.png
+!r3/tree/final-1024.png
+r3/*/explore/
+final/.src/
+final/daf-icons.zip

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget, tinted to the wallpaper (Material You), as Dvarim's is. The app itself is
+     the page, and takes its colours from style.css. -->
+<resources>
+    <color name="widgetBg">@android:color/system_accent2_50</color>
+    <color name="widgetText">@android:color/system_neutral1_900</color>
+    <color name="widgetText2">@android:color/system_neutral2_700</color>
+    <color name="widgetRing">@android:color/system_accent1_600</color>
+    <color name="widgetTrack">@android:color/system_accent1_100</color>
+    <!-- the app's icon and the window before the page paints: Daf's blue, and the page's white -->
+    <color name="dafBlue">#1A7DA4</color>
+    <color name="page">#FFFFFF</color>
+</resources>

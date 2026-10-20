@@ -1,0 +1,68 @@
+// Daf for Android: a WebView on the live site (docs/SHELL.md), its home-screen
+// widget, Share into Daf, and the evening nudge. No page is bundled: Daf is
+// server-first, and the window is https://daf.tiresia.xyz (a setting).
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'xyz.tiresia.daf'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'xyz.tiresia.daf'
+        // 31: the widget's wallpaper colours and its two sizes from one provider
+        minSdk 31
+        targetSdk 36
+        versionCode 17
+        versionName '0.2.5'
+        resValue 'string', 'app_name', 'Daf'
+        manifestPlaceholders = [shareAuthority: 'xyz.tiresia.daf.share']
+    }
+
+    // The signing key's properties: android/keystore.properties (never in git), or the
+    // file -PsigningProperties names (release.sh uses Dvarim's, whose key signs Moshe
+    // and Daf too). storeFile is found beside the properties file. Without one the
+    // release build is unsigned.
+    def secrets = project.hasProperty('signingProperties')
+            ? file(project.property('signingProperties')) : rootProject.file('keystore.properties')
+    signingConfigs {
+        release {
+            if (secrets.exists()) {
+                def props = new Properties()
+                secrets.withInputStream { props.load(it) }
+                def store = new File(props.getProperty('storeFile', 'android.keystore'))
+                storeFile store.isAbsolute() ? store : new File(secrets.parentFile, store.path)
+                storePassword props.getProperty('storePassword')
+                keyAlias props.getProperty('keyAlias', 'daf')
+                keyPassword props.getProperty('keyPassword', props.getProperty('storePassword'))
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (secrets.exists()) signingConfig signingConfigs.release
+        }
+        debug {
+            // beside the real app, with its WebView open to DevTools (check.sh)
+            applicationIdSuffix '.debug'
+            resValue 'string', 'app_name', 'Daf dev'
+            manifestPlaceholders = [shareAuthority: 'xyz.tiresia.daf.debug.share']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+    }
+}
+
+// say which deprecated call it is, rather than "uses or overrides a deprecated API"
+tasks.withType(JavaCompile).configureEach { options.compilerArgs << '-Xlint:deprecation' }

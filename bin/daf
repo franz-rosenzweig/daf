@@ -1,0 +1,4 @@
+#!/bin/sh
+# The Daf command line, run with the project's own Python environment.
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$DIR" && exec "$DIR/.venv/bin/python" -m daf.cli "$@"

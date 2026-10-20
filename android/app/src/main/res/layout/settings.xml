@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Daf settings"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+
+        <!-- the address -->
+        <TextView style="@style/Settings.Heading" android:text="Daf's address" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <EditText
+                android:id="@+id/base"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="https://daf.tiresia.xyz"
+                android:importantForAutofill="no"
+                android:inputType="textUri" />
+            <Button
+                android:id="@+id/useBase"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Use" />
+        </LinearLayout>
+        <TextView
+            android:id="@+id/baseNote"
+            style="@style/Settings.Note"
+            android:text="https://daf.tiresia.xyz, or http://100.91.202.11:8440 on the tailnet." />
+
+        <!-- the token -->
+        <TextView style="@style/Settings.Heading" android:text="This phone" />
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/connect"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Connect this phone" />
+            <Button
+                android:id="@+id/forget"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Forget the token" />
+        </LinearLayout>
+        <TextView
+            style="@style/Settings.Note"
+            android:text="The widget, Save to Daf and the nudge use a device token, kept encrypted on this phone. Connect makes one with your sign-in in the app, and Daf's Preferences → Account lists it as Daf for Android." />
+
+        <!-- the goals -->
+        <TextView style="@style/Settings.Heading" android:text="Goals" />
+        <Button
+            android:id="@+id/goals"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Open Reading Goals" />
+        <TextView
+            style="@style/Settings.Note"
+            android:text="Minutes, pages, books, days a week, a streak. They live in Daf, and the widget follows the main one." />
+
+        <!-- books on the phone -->
+        <TextView style="@style/Settings.Heading" android:text="Books and manga on this device" />
+        <Switch
+            android:id="@+id/offReading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Keep the books I'm reading here" />
+        <Switch
+            android:id="@+id/offWifi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Download them only on Wi-Fi" />
+        <TextView
+            android:id="@+id/offStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/offSync"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Update now" />
+            <Button
+                android:id="@+id/offClear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remove them" />
+        </LinearLayout>
+        <TextView
+            style="@style/Settings.Note"
+            android:text="The books on your nightstand and the last few you read, and any book you open in the app, stay on the phone, so they open at once and with no signal. Your place, highlights and notes go to Daf when the network is back. Keep a book here for good from its … menu." />
+
+        <!-- the nudge -->
+        <TextView style="@style/Settings.Heading" android:text="Evening nudge" />
+        <Switch
+            android:id="@+id/nudge"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Nudge me when a feed app opens in the evening" />
+        <TextView
+            style="@style/Settings.Note"
+            android:text="Between 9 pm and 3 am, when Instagram, Reddit, X or Discord is in front, Daf may offer one highlight and the minutes left. Daf decides: one every 25 minutes at most, and none once the hour is done. The phone checks every 15 minutes." />
+        <TextView
+            android:id="@+id/access"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/grant"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Allow Usage Access" />
+            <Button
+                android:id="@+id/tryNudge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Show one now" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
