@@ -1,0 +1,509 @@
+import Charts
+import SwiftUI
+
+/// The window: the sidebar, the list, and what's open, with the inspector beside it.
+struct MainView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Group {
+            if model.place?.isPage == true {
+                NavigationSplitView {
+                    Sidebar().navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
+                } detail: {
+                    if model.place == .review { ReviewView() } else { StatsView() }
+                }
+            } else {
+                NavigationSplitView {
+                    Sidebar().navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
+                } content: {
+                    Group {
+                        switch model.place {
+                        case .today: TodayView()
+                        case .highlights: HighlightGroups()
+                        default: ItemList()
+                        }
+                    }
+                    .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 520)
+                } detail: {
+                    if model.place == .highlights {
+                        if let g = model.highlights.group { HighlightGroupView(group: g).id(HighlightsModel.key(g)) }
+                        else { ContentUnavailableView("No highlights", systemImage: "highlighter") }
+                    } else {
+                        Detail()
+                    }
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let t = model.toast {
+                Text(t).font(.callout.weight(.medium)).padding(.horizontal, 16).padding(.vertical, 9)
+                    .glassEffect(.regular, in: Capsule())
+                    .padding(.bottom, 22)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: model.toast)
+        .sheet(item: $model.sheet) { s in
+            switch s {
+            case .addLink: AddLinkSheet().environment(model)
+            case .paper: PaperSheet().environment(model)
+            }
+        }
+        .searchable(text: $model.query, placement: .sidebar, prompt: "Search Daf")
+        .onSubmit(of: .search) {
+            model.place = .search
+            model.reload()
+        }
+        .onChange(of: model.place) { _, _ in
+            model.selection = nil
+            model.reload()
+        }
+        .task { model.reload() }
+        .sheet(isPresented: $model.needsSignIn) { SignInView().environment(model) }
+        .alert("Daf", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
+            Button("OK") { model.error = nil }
+        } message: { Text(model.error ?? "") }
+    }
+}
+
+// MARK: the sidebar
+
+struct Sidebar: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        List(selection: $model.place) {
+            Label("Today", systemImage: "sun.max").tag(Place.today)
+            row(.review, "Review", "rectangle.stack")
+            Section("Library") {
+                row(.library("inbox"), "Inbox", "tray")
+                row(.library("later"), "Later", "clock")
+                row(.shortlist, "Shortlist", "star")
+                row(.library("archive"), "Archive", "archivebox")
+            }
+            Section("Feed") {
+                row(.feed(nil), "All Feeds", "dot.radiowaves.up.forward")
+                ForEach(model.feedCategories, id: \.self) { cat in
+                    row(.feed(cat), cat, "folder")
+                }
+            }
+            Section("Reading") {
+                row(.books, "Books", "books.vertical")
+                row(.highlights, "Highlights", "highlighter")
+                row(.stats, "Stats", "chart.bar")
+            }
+            if model.place == .search {
+                Section("Search") { Label("“\(model.query)”", systemImage: "magnifyingglass").tag(Place.search) }
+            }
+        }
+        .listStyle(.sidebar)
+    }
+
+    private func row(_ p: Place, _ title: String, _ icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .badge(model.count(p) ?? 0)
+            .tag(p)
+    }
+}
+
+// MARK: lists
+
+struct ItemList: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        List(model.items, selection: $model.selection) { item in
+            ItemRow(item: item)
+                .tag(item.id)
+                .contextMenu { ItemActions(item: item) }
+        }
+        .listStyle(.inset)
+        .navigationTitle(model.place?.title ?? "Daf")
+        .navigationSubtitle(model.items.isEmpty ? "" : "\(model.items.count)")
+        .overlay {
+            if model.items.isEmpty && !model.loading {
+                ContentUnavailableView(model.place == .search ? "Nothing found" : "Nothing here", systemImage: "tray")
+            }
+        }
+        .toolbar {
+            if case .library = model.place {
+                ToolbarItem {
+                    Picker("Kind", selection: $model.kind) {
+                        Text("Everything").tag("")
+                        Text("Articles").tag("article")
+                        Text("Videos").tag("video")
+                        Text("Tweets").tag("tweet")
+                        Text("PDFs").tag("pdf")
+                        Text("Emails").tag("email")
+                    }
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                }
+            }
+            ToolbarItem {
+                Button { model.reload() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                    .keyboardShortcut("r", modifiers: .command)
+            }
+        }
+        .onChange(of: model.kind) { _, _ in model.reload() }
+        .onKeyPress("e") {
+            guard let item = model.selected, !item.isBook else { return .ignored }
+            Task { await model.done(item) }
+            return .handled
+        }
+    }
+}
+
+struct ItemRow: View {
+    let item: Item
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title)
+                    .font(.system(.body, design: .serif).weight(.semibold))
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    if let s = item.source { Text(s).lineLimit(1) }
+                    if let m = item.mins { Text("· \(m) min") }
+                    if item.progress > 1 { Text("· \(Int(item.progress))%") }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Thumb(path: item.thumb, book: item.isBook)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct Thumb: View {
+    let path: String?
+    var book = false
+
+    var body: some View {
+        if let path {
+            AsyncImage(url: API.shared.url(path)) { phase in
+                if let image = phase.image { image.resizable().aspectRatio(contentMode: .fill) }
+                else { Color.secondary.opacity(0.08) }
+            }
+            .frame(width: book ? 40 : 54, height: book ? 60 : 54)
+            .clipShape(RoundedRectangle(cornerRadius: book ? 3 : 6))
+        }
+    }
+}
+
+struct ItemActions: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+
+    var body: some View {
+        if !item.isBook {
+            if item.whereIn == "feed" {
+                Button("Save to Library") { Task { await model.saveToLibrary(item) } }
+                Button(item.status == "seen" ? "Back to Unseen" : "Mark Seen") { Task { await model.done(item) } }
+            } else {
+                Button(item.status == "later" ? "Back to Inbox" : "Read Later") { Task { await model.later(item) } }
+                Button(item.status == "archive" ? "Back to Inbox" : "Archive") { Task { await model.done(item) } }
+            }
+            if let u = item.j.s("url"), let url = URL(string: u) {
+                Divider()
+                Link("Open the Original", destination: url)
+                Button("Copy the Link") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string) }
+            }
+        }
+    }
+}
+
+// MARK: Today
+
+struct TodayView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                if let t = model.today {
+                    Ring(today: t)
+                    if !t.a("week").isEmpty {
+                        Heading("This week")
+                        Week(days: t.a("week"))
+                    }
+                    if !t.a("sessions").isEmpty {
+                        Heading("Today's reading")
+                        VStack(spacing: 0) {
+                            ForEach(Array(t.a("sessions").enumerated()), id: \.offset) { k, s in
+                                if k > 0 { Divider() }
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(s.b("private") ? "Private reading" : (s.s("title") ?? "")).lineLimit(1)
+                                        Text([s.s("label"), s.s("start"), s.s("note")].compactMap { $0 }.joined(separator: " · "))
+                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    }
+                                    Spacer()
+                                    Text("\(Int((s.d("minutes") ?? 0).rounded()))′").monospacedDigit().foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 7)
+                            }
+                        }
+                    }
+                }
+                if !model.continueItems.isEmpty {
+                    Heading("Keep reading")
+                    VStack(spacing: 2) {
+                        ForEach(model.continueItems) { item in
+                            Button { model.selection = item.id } label: {
+                                ItemRow(item: item)
+                                    .padding(.horizontal, 8)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(model.selection == item.id ? Color.accentColor.opacity(0.18) : .clear))
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(20)
+        }
+        .navigationTitle("Today")
+        .toolbar {
+            ToolbarItem {
+                Button { model.reload() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                    .keyboardShortcut("r", modifiers: .command)
+            }
+        }
+    }
+}
+
+struct Heading: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View { Text(text).font(.headline).foregroundStyle(.secondary) }
+}
+
+struct Ring: View {
+    let today: J
+
+    var body: some View {
+        let main = today.o("main")
+        let done = main?.d("done") ?? today.d("counted") ?? 0
+        let target = max(1, main?.d("target") ?? today.d("goal") ?? 60)
+        HStack(spacing: 18) {
+            ZStack {
+                Circle().stroke(.quaternary, lineWidth: 10)
+                Circle().trim(from: 0, to: min(1, done / target))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text("\(Int(done))").font(.system(.title, design: .rounded).weight(.semibold)).monospacedDigit()
+            }
+            .frame(width: 84, height: 84)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(main?.s("text") ?? "\(Int(done)) of \(Int(target)) minutes today").font(.headline)
+                if let y = today.o("year30") {
+                    Text("Year 30, day \((y.i("today_index") ?? 0) + 1) · \(String(format: "%.1f", y.d("total_hours") ?? 0)) hours so far")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                if let r = today.o("review"), let total = r.i("total"), total > 0 {
+                    Text("Review: \(r.i("done") ?? 0) of \(total)").font(.subheadline).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+struct Week: View {
+    let days: [J]
+
+    var body: some View {
+        Chart(Array(days.enumerated()), id: \.offset) { _, d in
+            BarMark(x: .value("Day", String((d.s("date") ?? "").suffix(2))), y: .value("Minutes", d.d("minutes") ?? 0))
+                .foregroundStyle((d.d("minutes") ?? 0) >= (d.d("target") ?? 60) ? Color.accentColor : Color.accentColor.opacity(0.45))
+            if let t = days.last?.d("target") {
+                RuleMark(y: .value("Goal", t)).lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3])).foregroundStyle(.secondary)
+            }
+        }
+        .chartYAxis { AxisMarks(position: .leading) }
+        .frame(height: 120)
+        .padding(.vertical, 6)
+    }
+}
+
+// MARK: what's open
+
+struct Detail: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Group {
+            if let item = model.selected {
+                Opened(item: item).id(item.id)
+            } else {
+                ContentUnavailableView("Nothing open", systemImage: "book", description: Text("Pick something from the list."))
+            }
+        }
+        .toolbar {
+            if let item = model.selected, !item.isBook {
+                ToolbarItemGroup {
+                    if item.whereIn == "feed" {
+                        Button { Task { await model.saveToLibrary(item) } } label: { Label("Save to Library", systemImage: "tray.and.arrow.down") }
+                    } else {
+                        Button { Task { await model.later(item) } } label: { Label(item.status == "later" ? "Back to Inbox" : "Read Later", systemImage: "clock") }
+                    }
+                    Button { Task { await model.done(item) } } label: {
+                        Label(item.whereIn == "feed" ? "Mark Seen" : "Archive", systemImage: item.whereIn == "feed" ? "checkmark.circle" : "archivebox")
+                    }
+                }
+                ToolbarItem {
+                    Button { model.showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.right") }
+                        .keyboardShortcut("i", modifiers: [.command, .option])
+                }
+            }
+        }
+    }
+}
+
+struct Opened: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+    @State private var reader: ReaderModel?
+
+    var body: some View {
+        @Bindable var model = model
+        Group {
+            switch (item.isBook, item.kind) {
+            case (true, _): WebPane(route: "#ebook/" + API.enc(item.id))
+            case (_, "pdf") where item.j.b("has_pdf") || item.kind == "pdf": PDFPane(id: item.id)
+            case (_, "video"), (_, "podcast"): WebPane(route: "#read/" + API.enc(item.id))
+            case (_, "manga"): WebPane(route: "#mread/" + API.enc(item.id))
+            default:
+                if let reader {
+                    if let e = reader.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }
+                    else if reader.doc == nil { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+                    else { ArticleReader(model: reader) }
+                } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+            }
+        }
+        .navigationTitle(item.title)
+        .inspector(isPresented: $model.showInspector) {
+            Inspector(item: item, reader: reader).inspectorColumnWidth(min: 240, ideal: 280, max: 380)
+        }
+        .task(id: item.id) {
+            guard !item.isBook, !["pdf", "video", "podcast", "manga"].contains(item.kind) else { return }
+            // the same article made again by SwiftUI (a list refreshing beside it): the one already open
+            if let r = model.reader, r.id == item.id, r.doc != nil { reader = r; return }
+            let r = ReaderModel(id: item.id)
+            reader = r
+            model.reader = r
+            await r.load()
+        }
+        .onDisappear { if model.selection != item.id { reader?.stop() } }
+    }
+}
+
+struct Inspector: View {
+    let item: Item
+    let reader: ReaderModel?
+
+    var body: some View {
+        let d = reader?.doc ?? item.j
+        List {
+            Section {
+                Text(d.s("title") ?? item.title).font(.headline)
+                if let s = d.s("source") { LabeledContent("From", value: s) }
+                if let a = d.s("author") { LabeledContent("By", value: a) }
+                if let m = d.i("mins") { LabeledContent("Length", value: "\(m) min") }
+                if let u = d.s("url"), let url = URL(string: u) { Link("Open the original", destination: url) }
+            }
+            if let sum = d.s("ai_summary") ?? d.s("summary") {
+                Section("Summary") { Text(sum).font(.callout) }
+            }
+            let tags = (d.list("tags") as? [String]) ?? []
+            if !tags.isEmpty {
+                Section("Tags") { Text(tags.map { "#" + $0 }.joined(separator: "  ")).font(.callout) }
+            }
+            if let reader, !reader.highlights.isEmpty {
+                Section("Highlights") {
+                    ForEach(Array(reader.highlights.enumerated()), id: \.offset) { _, h in
+                        Button { reader.reveal(highlight: h.s("id") ?? "") } label: {
+                            Text(h.s("text") ?? "").font(.system(.callout, design: .serif)).lineLimit(4)
+                                .padding(.leading, 6)
+                                .overlay(alignment: .leading) { Rectangle().fill(Color(ReaderModel.colour(h.s("color")).withAlphaComponent(1))).frame(width: 3) }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: signing in, and Settings
+
+struct SignInView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var user = ""
+    @State private var password = ""
+    @State private var address = API.shared.base.absoluteString
+    @State private var said: String?
+    @State private var busy = false
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Daf's address", text: $address)
+                TextField("Username", text: $user)
+                SecureField("Password", text: $password)
+            } header: { Text("Sign in to Daf") } footer: {
+                if let said { Text(said).foregroundStyle(.red) }
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 400)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Sign In") { Task { await signIn() } }.disabled(busy || user.isEmpty || password.isEmpty)
+            }
+        }
+    }
+
+    private func signIn() async {
+        busy = true
+        defer { busy = false }
+        UserDefaults.standard.set(address, forKey: API.baseKey)
+        do {
+            try await API.shared.signIn(user: user, password: password)
+            model.needsSignIn = false
+            dismiss()
+            model.reload()
+        } catch { said = error.localizedDescription }
+    }
+}
+
+struct SettingsView: View {
+    @Environment(AppModel.self) private var model
+    @State private var address = API.shared.base.absoluteString
+
+    var body: some View {
+        Form {
+            Section("Daf") {
+                TextField("Address", text: $address).onSubmit { UserDefaults.standard.set(address, forKey: API.baseKey); model.reload() }
+                LabeledContent("Signed in", value: API.shared.cookie == nil ? "No" : "Yes")
+                Button("Sign Out") { API.shared.signOut(); model.needsSignIn = true }
+            }
+            Section {
+                Text("This is the native trial of Daf for the Mac. Books, manga and videos open as Daf's own pages inside the window; everything else is native.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 440)
+    }
+}
