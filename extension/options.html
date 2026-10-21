@@ -22,15 +22,17 @@
   </form>
 
   <section class="card">
-    <h2>Highlighting</h2>
-    <label class="check"><input type="checkbox" id="auto"> Highlight as soon as I select text</label>
-    <p class="hint">As in Daf’s reader. Hold <kbd>Alt</kbd> while you select to select without highlighting; a single word, or a touch screen, gets the Highlight button instead.</p>
+    <h2>When I select text</h2>
+    <label class="check"><input type="radio" name="select" value="ask"> Ask: show a Highlight button next to it</label>
+    <label class="check"><input type="radio" name="select" value="shortcut"> Nothing, until I press <kbd class="key">Alt+H</kbd> or right-click it and choose Highlight in Daf</label>
+    <label class="check"><input type="radio" name="select" value="auto"> Highlight it right away, as in Daf’s reader</label>
+    <p class="hint">Only a highlight saves a page to Daf, so selecting text to copy it never does, unless you choose “right away”. Then hold <kbd>Alt</kbd> while you select to only select.</p>
   </section>
 
   <section class="card">
     <h2>Using it</h2>
     <ul class="how">
-      <li>Select text on a page and it’s highlighted, or choose <span class="sw">Highlight</span> or press <kbd id="key">Alt+H</kbd> when that’s off. The note button highlights and opens a note.</li>
+      <li>Select text on a page and choose <span class="sw">Highlight</span>, or press <kbd class="key">Alt+H</kbd>. The note button next to it highlights and opens a note.</li>
       <li>Click a highlight to change its color, add a note and tags, or remove it.</li>
       <li><kbd>Alt+Shift+H</kbd>, or the list button on a highlight, opens the panel of all your highlights on the page, in the order they come, with their notes and tags.</li>
       <li>The first highlight saves the page to your Library. The toolbar button saves a page without one and opens it in Daf.</li>

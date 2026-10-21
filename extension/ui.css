@@ -62,4 +62,5 @@ label{font-weight:600;font-size:13.5px;margin-top:6px}
 kbd{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;padding:2px 5px;color:var(--fg)}
 .check{display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:500;margin:0;cursor:pointer}
 .check input{width:17px;height:17px;margin:0;accent-color:var(--accent)}
+.check + .check{margin-top:12px}
 #panel{align-self:flex-start}

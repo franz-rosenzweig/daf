@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-10-21-ext-ask', date: 'Oct 21', title: 'The extension asks first', text: 'Selecting text on a page shows a Highlight button; nothing saves until you press it.' },
   { id: '2026-10-20-kindle-home', date: 'Oct 20', title: 'A Home for the Kindle', text: 'Home, Shelves you can move books between, and the review on the Daf tab.' },
   { id: '2026-10-20-feed-month', date: 'Oct 20', title: 'The Feed keeps a month', text: 'Unread items stay a month now, longer if you choose.', go: '#prefs' },
   { id: '2026-10-14-library', date: 'Oct 14', title: 'Daf keeps the Library', text: 'What you save, its text and its picture now live in Daf.', go: '#library/article' },
