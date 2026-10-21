@@ -20,14 +20,15 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 ## Books
 
 - here: EPUBs as pages, contents, highlights, bookmarks, search, Ask, read aloud, the Kindle's highlights and place, the Aa panel, footnotes
-- not yet: the Info tab (details, series and the next one, the Kindle's page, the vault path)
-- not yet: go to a percent, go to the beginning, forget my place, download the file, export the highlights
+- here: the Info tab (details, series and the next one, the Kindle's page, the vault path)
+- here: go to a percent, go to the beginning, go to the Kindle's page, forget my place, download the file, export the highlights
 - here: a highlight's tags, favorite, flashcards and share as an image; overlapping highlights merged; highlight when selecting; Define and Translate
-- not yet: selection snapped to whole words
-- not yet: line width, a scroll layout, settings just for this book
-- not yet: the player's voice menu and sleep timer
-- not yet: next in the series and the Hardcover "finished" prompt near the end
-- not yet: the time left in the chapter and the book
+- here: selection snapped to whole words
+- here: line width and settings just for this book
+- not yet: a scroll layout
+- here: the player's voice menu and sleep timer
+- here: next in the series and the Hardcover "finished" question near the end
+- here: the time left in the chapter and the book, the page and the percent
 - not yet: other formats (MOBI, AZW3, FB2) natively: they open in Daf's own reader
 
 ## Articles
@@ -53,24 +54,26 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 
 ## Pages
 
-- here: Today (the ring, the week, today's reading, keep reading), Review (highlights and flashcards), Highlights, Stats, Books, a book's page, shelves, Torah, Podcasts, Sources, Paper pages, Log paper minutes
-- not yet: Today's notices (Shabbat, the Kindle finished a book, the nightstand), the other goals' chips, minutes by source, On this day, Year 30's year, Year 29
-- not yet: Review by tag, favorites, colour, book, a search; a flashcard made from a highlight
-- not yet: Highlights: source and colour filters, sort, export (Markdown, CSV, JSON, Anki), Review these
-- not yet: a book's page: a note on the book, audiobook bookmarks, how often its highlights come back in review, export; Want to read and Opened lately on Books
-- not yet: Hardcover (link a book, its status and rating, finished)
+- here: Today (the ring, the week, the sittings, keep reading), Review (highlights and flashcards), Highlights, Stats, Books, a book's page, shelves, Torah, Podcasts, Sources, Paper pages, Log paper minutes
+- here: Today's notices (Shabbat, the Kindle finished a book, a book read off the nightstand), the other goals' chips, minutes by source, the day's review, On this day, the nightstand (or the suggested three), Year 30's year, how fresh the sources are, a goal met or a milestone said once
+- not yet: Year 29 on Today
+- here: Review by a book or by whatever the Highlights filters show (a tag, favorites, a colour, a search), Review more, another round; a flashcard, tags and share as an image from the review
+- here: Highlights: source, colour, tag, favorites and private filters, sort (newest, by book, oldest), export (Markdown, CSV, JSON, Anki), Review these
+- here: a book's page: a note on the book, audiobook bookmarks, how often its highlights come back in review, export, review these, a fourth book on the nightstand asks which one steps off
+- here: Books: the nightstand, Want to read (from Hardcover), Opened lately, the whole library, a search by title or author
+- here: Hardcover (link a book, its status and rating, finished)
 - not yet: Torah's essays from the vault
 
 ## Preferences
 
 - here: Goals, what counts, review size, flashcards a day, the voice and speed, how long the Feed keeps items, the menu bar, alerts, offline, Daf for Safari, sign out
-- not yet: after Done or Later, open the next one; the home time zone
-- not yet: Account (username, password, sign out other browsers, connected devices, the browser extension's token)
-- not yet: AI (summaries and tags of what I save, the model, the ready questions, the prompts)
-- not yet: Library tags (rename, merge, remove, the tidy-up)
-- not yet: Import (Instapaper, Readwise, Raindrop, Pocket, OPML…)
-- not yet: Morning email, Newsletters, Hardcover, Phone, Podcasts (AntennaPod)
-- not yet: Send Feedback
+- here: after Archive or Later, open the next one; the home time zone; how long the Feed keeps what's unseen
+- here: Account (username, password, sign out other browsers, connected devices, the browser extension's token)
+- here: AI (summaries and tags of what I save, the model, the ready questions, what Daf asks for each)
+- here: Library tags (rename, merge, remove, the tidy-up)
+- here: Import (Instapaper, Readwise, Raindrop, Pocket, OPML…), dropped or chosen, followed as it goes
+- here: Morning email, Newsletters, Hardcover, Phone, Podcasts (AntennaPod)
+- here: Send Feedback (Help menu)
 - not yet: appearance (Daf's themes): the Mac app follows the Mac, and books have their own themes
 
 ## Everywhere

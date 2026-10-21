@@ -7,13 +7,28 @@ struct BookLook: Equatable {
     var spacing: CGFloat = 1.45
     var justify = false
     var theme = "auto"          // auto, original, paper, quiet, night
+    var width = "medium"        // the line: narrow, medium, wide
 
     static let fonts = ["New York", "San Francisco", "Charter", "Iowan Old Style", "Palatino", "Georgia", "Athelas", "Seravek", "Baskerville"]
     static let themes = [("auto", "Automatic"), ("original", "Original"), ("paper", "Paper"), ("quiet", "Quiet"), ("night", "Night")]
 
-    static func load() -> BookLook {
+    static let widths = [("narrow", "Narrow"), ("medium", "Medium"), ("wide", "Wide")]
+
+    /// A book's own look when it has one ("Just for This Book"), else everyone's.
+    static func load(book: String? = nil) -> BookLook {
+        if let book, let d = UserDefaults.standard.dictionary(forKey: "book.look." + book) {
+            var l = BookLook()
+            l.font = d["font"] as? String ?? l.font
+            l.size = CGFloat((d["size"] as? NSNumber)?.doubleValue ?? Double(l.size))
+            l.spacing = CGFloat((d["spacing"] as? NSNumber)?.doubleValue ?? Double(l.spacing))
+            l.justify = d["justify"] as? Bool ?? l.justify
+            l.width = d["width"] as? String ?? l.width
+            l.theme = load().theme            // the theme stays everyone's, as on the page
+            return l
+        }
         let d = UserDefaults.standard
         var l = BookLook()
+        if let w = d.string(forKey: "book.width") { l.width = w }
         if let f = d.string(forKey: "book.font") { l.font = f }
         if let s = d.object(forKey: "book.size") as? NSNumber { l.size = CGFloat(s.doubleValue) }
         if let s = d.object(forKey: "book.spacing") as? NSNumber { l.spacing = CGFloat(s.doubleValue) }
@@ -22,8 +37,14 @@ struct BookLook: Equatable {
         return l
     }
 
-    func save() {
+    func save(book: String? = nil) {
+        if let book {
+            UserDefaults.standard.set(["font": font, "size": Double(size), "spacing": Double(spacing), "justify": justify, "width": width], forKey: "book.look." + book)
+            UserDefaults.standard.set(theme, forKey: "book.theme")
+            return
+        }
         let d = UserDefaults.standard
+        d.set(width, forKey: "book.width")
         d.set(font, forKey: "book.font"); d.set(Double(size), forKey: "book.size"); d.set(Double(spacing), forKey: "book.spacing")
         d.set(justify, forKey: "book.justify"); d.set(theme, forKey: "book.theme")
     }

@@ -38,6 +38,11 @@ final class Speaker {
     var rate: Float = (UserDefaults.standard.object(forKey: "ttsRate") as? NSNumber)?.floatValue ?? 1 {
         didSet { UserDefaults.standard.set(rate, forKey: "ttsRate"); player?.rate = rate }
     }
+    /// The sleep timer: reading stops at this time.
+    private(set) var sleepAt: Date?
+    /// The voices Daf's Kokoro has, and the one in Settings.
+    private(set) var voices: [String] = []
+    private(set) var voice = ""
     /// The self-test listens with the sound off (the app's own player, never the Mac's volume).
     @ObservationIgnored var volume: Float = 1
     /// For the self-test: paragraphs that started.
@@ -92,6 +97,32 @@ final class Speaker {
     }
 
     func toggle() { playing ? pause() : resume() }
+
+    /// Stops reading after so many minutes (nil: never).
+    func sleep(after minutes: Int?) {
+        sleepAt = minutes.map { Date().addingTimeInterval(TimeInterval($0 * 60)) }
+        AppModel.shared.say(minutes.map { "Reading stops in \($0) minutes" } ?? "No sleep timer")
+    }
+
+    func loadVoices() async {
+        guard voices.isEmpty else { return }
+        voice = (try? await API.shared.json("/api/settings"))?.s("tts_voice") ?? "af_heart"
+        voices = ((try? await API.shared.json("/api/voices"))?.strings("voices") ?? []).filter { $0.range(of: "^[ab][fm]_[a-z]+$", options: .regularExpression) != nil }
+            .sorted { (PrefsView.kinds.firstIndex(of: String($0.prefix(2))) ?? 9, $0) < (PrefsView.kinds.firstIndex(of: String($1.prefix(2))) ?? 9, $1) }
+    }
+
+    /// Another voice: the paragraph starts again in it.
+    func use(voice v: String) async {
+        try? await API.shared.send("PUT", "/api/settings", ["tts_voice": v])
+        voice = v
+        cache = [:]
+        fetching.values.forEach { $0.cancel() }
+        fetching = [:]
+        generation += 1
+        player?.stop()
+        player = nil
+        if playing { Task { await playCurrent() } }
+    }
 
     func pause() {
         playing = false
@@ -201,7 +232,9 @@ final class Speaker {
         beatTimer?.invalidate()
         beatTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.playing, !self.waiting else { return }
+                guard let self else { return }
+                if let at = self.sleepAt, Date() >= at { self.sleepAt = nil; self.pause(); AppModel.shared.say("Paused by the sleep timer"); return }
+                guard self.playing, !self.waiting else { return }
                 self.source?.listened()
             }
         }
@@ -294,6 +327,23 @@ struct SpeakerBar: View {
             } label: { Text(speed(Double(s.rate))).monospacedDigit() }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            Menu {
+                ForEach(s.voices, id: \.self) { v in
+                    Button { Task { await s.use(voice: v) } } label: {
+                        if v == s.voice { Label(PrefsView.voiceName(v), systemImage: "checkmark") } else { Text(PrefsView.voiceName(v)) }
+                    }
+                }
+            } label: { Text(s.voice.isEmpty ? "Voice" : PrefsView.voiceName(s.voice).components(separatedBy: " · ").first ?? "Voice") }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .task { await s.loadVoices() }
+            Menu {
+                Button("No Sleep Timer") { s.sleep(after: nil) }
+                ForEach([15, 30, 45, 60], id: \.self) { n in Button("In \(n) Minutes") { s.sleep(after: n) } }
+            } label: { Image(systemName: s.sleepAt == nil ? "moon.zzz" : "moon.zzz.fill") }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help(s.sleepAt.map { "Reading stops at " + $0.formatted(date: .omitted, time: .shortened) } ?? "The sleep timer")
             Button { s.stop() } label: { Image(systemName: "xmark") }.help("Stop reading aloud")
         }
         .buttonStyle(.borderless)

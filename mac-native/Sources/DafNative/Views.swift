@@ -19,6 +19,7 @@ struct MainView: View {
                     switch model.place {
                     case .review: ReviewView()
                     case .home: HomeView()
+                    case .recovery: RecoveryView()
                     case .podcasts: PodcastsView()
                     case .sources: SourcesView()
                     default: StatsView()
@@ -87,6 +88,7 @@ struct MainView: View {
             switch s {
             case .addLink: AddLinkSheet().environment(model)
             case .paper: PaperSheet().environment(model)
+            case .feedback: FeedbackSheet().environment(model)
             case .follow: FollowSheet().environment(model)
             case .renameFeed(let id): RenameFeedSheet(id: id).environment(model)
             case .saveView: SaveViewSheet().environment(model)
@@ -136,6 +138,7 @@ struct Sidebar: View {
                 BooksRow()
                 row(.manga, "Manga", "book.pages")
                 row(.torah, "Torah", "scroll")
+                row(.recovery, "Recovery", "sunrise")
                 row(.podcasts, "Podcasts", "headphones")
                 row(.highlights, "Highlights", "highlighter")
                 row(.paper, "Paper Pages", "camera.viewfinder")
@@ -175,8 +178,14 @@ struct ItemList: View {
 
     var body: some View {
         @Bindable var model = model
-        List(model.shown, selection: $model.multi) { item in
-            ItemRow(item: item).tag(item.id)
+        List(selection: $model.multi) {
+            if model.place == .books {
+                ForEach(model.bookSections, id: \.0) { title, list in
+                    Section(title) { ForEach(list) { item in ItemRow(item: item).tag(item.id) } }
+                }
+            } else {
+                ForEach(model.shown) { item in ItemRow(item: item).tag(item.id) }
+            }
         }
         .contextMenu(forSelectionType: Item.ID.self) { ids in
             let chosen = model.items.filter { ids.contains($0.id) }
@@ -244,6 +253,11 @@ struct ItemList: View {
         .onChange(of: model.feedTab) { _, _ in model.reload() }
         .onKeyPress(characters: CharacterSet(charactersIn: "lsftdzjk"), phases: .down) { press in listKey(press.characters) }
         .safeAreaInset(edge: .top) {
+            if model.place == .books {
+                TextField("Search by title or author", text: $model.booksQuery)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+            }
             if let p = model.place, isFeed(p), let n = model.counts?.i("expired_in_daf"), n > 0, model.feedTab == "unseen" {
                 HStack(spacing: 10) {
                     Text("FreshRSS still counts " + plural(n, "post") + " as unread that Daf has let go.").font(.caption).foregroundStyle(.secondary)
@@ -373,64 +387,6 @@ struct ItemActions: View {
 }
 
 // MARK: Today
-
-struct TodayView: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                if let t = model.today {
-                    Ring(today: t)
-                    if !t.a("week").isEmpty {
-                        Heading("This week")
-                        Week(days: t.a("week"))
-                    }
-                    if !t.a("sessions").isEmpty {
-                        Heading("Today's reading")
-                        VStack(spacing: 0) {
-                            ForEach(Array(t.a("sessions").enumerated()), id: \.offset) { k, s in
-                                if k > 0 { Divider() }
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(s.b("private") ? "Private reading" : (s.s("title") ?? "")).lineLimit(1)
-                                        Text([s.s("label"), s.s("start"), s.s("note")].compactMap { $0 }.joined(separator: " · "))
-                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                    }
-                                    Spacer()
-                                    Text("\(Int((s.d("minutes") ?? 0).rounded()))′").monospacedDigit().foregroundStyle(.secondary)
-                                }
-                                .padding(.vertical, 7)
-                            }
-                        }
-                    }
-                }
-                if !model.continueItems.isEmpty {
-                    Heading("Keep reading")
-                    VStack(spacing: 2) {
-                        ForEach(model.continueItems) { item in
-                            Button { model.selection = item.id } label: {
-                                ItemRow(item: item)
-                                    .padding(.horizontal, 8)
-                                    .background(RoundedRectangle(cornerRadius: 8).fill(model.selection == item.id ? Color.accentColor.opacity(0.18) : .clear))
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            .padding(20)
-        }
-        .navigationTitle("Today")
-        .toolbar {
-            ToolbarItem {
-                Button { model.reload() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                    .keyboardShortcut("r", modifiers: .command)
-            }
-        }
-    }
-}
 
 struct Heading: View {
     let text: String

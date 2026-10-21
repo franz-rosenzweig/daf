@@ -13,6 +13,7 @@ enum Place: Hashable {
     case view(String)                 // a saved view, by its id
     case shelf(String)                // a shelf of books
     case paper                        // photos of paper pages
+    case recovery
     case books
     case manga
     case torah
@@ -23,7 +24,7 @@ enum Place: Hashable {
     case search
 
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
-    var isPage: Bool { self == .review || self == .stats || self == .podcasts || self == .sources || self == .home }
+    var isPage: Bool { self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
 
     var title: String {
         switch self {
@@ -43,6 +44,7 @@ enum Place: Hashable {
         case .view: return "View"
         case .shelf: return "Shelf"
         case .paper: return "Paper Pages"
+        case .recovery: return "Recovery"
         case .books: return "Books"
         case .search: return "Search"
         }
@@ -95,7 +97,22 @@ final class AppModel {
     }
     var chosen: [Item] { items.filter { multi.contains($0.id) } }
     /// The list as shown: a Library tag picked in the filters keeps only what has it.
-    var shown: [Item] { tag.map { t in items.filter { $0.j.strings("tags").contains(t) } } ?? items }
+    var shown: [Item] {
+        let list = tag.map { t in items.filter { $0.j.strings("tags").contains(t) } } ?? items
+        let q = booksQuery.trimmingCharacters(in: .whitespaces).lowercased()
+        guard place == .books, !q.isEmpty else { return list }
+        return list.filter { $0.title.lowercased().contains(q) || ($0.j.s("author") ?? "").lowercased().contains(q) }
+    }
+    /// Books by section, in the page's order: the nightstand, Want to Read, opened lately, the library.
+    var bookSections: [(String, [Item])] {
+        var out: [(String, [Item])] = []
+        for item in shown {
+            let s = item.j.s("section") ?? "Books"
+            if out.last?.0 == s { out[out.count - 1].1.append(item) } else { out.append((s, [item])) }
+        }
+        return out
+    }
+    var booksQuery = ""
 
     // the list's order and filters, as the page has them
     var sortLibrary = UserDefaults.standard.string(forKey: "sort.library") ?? "new" { didSet { UserDefaults.standard.set(sortLibrary, forKey: "sort.library") } }
@@ -112,7 +129,9 @@ final class AppModel {
     var home: J?
     var torah: J?
     var loading = false
-    var error: String?
+    var error: String? { didSet { if let error { recentErrors = Array((recentErrors + [error]).suffix(20)) } } }
+    /// What went wrong lately, for Send Feedback.
+    @ObservationIgnored var recentErrors: [String] = []
     var needsSignIn = false
     var query = ""
     /// The Library's kind: "" for everything, else article, video, tweet, pdf, email.
@@ -153,6 +172,15 @@ final class AppModel {
     var focusTags = 0
     /// Article › Ask…: the inspector's question field takes the keys.
     var focusAsk = 0
+    /// A themed review to start (the query /api/review/themed takes), when Review opens.
+    var reviewTheme: String?
+
+    /// Review some highlights by theme: Review These, Review More, a tag, favorites, a colour, a book.
+    func startReview(themed q: String) {
+        reviewTheme = q
+        if place != .review { place = .review }
+    }
+
     /// N: the inspector's note takes the keys.
     var focusNote = 0
     /// Article › Edit the Title and Author…
@@ -174,10 +202,11 @@ final class AppModel {
     var showSettings = false
 
     enum Sheet: Identifiable, Hashable {
-        case addLink, paper, follow, renameFeed(String), saveView, newShelf(String?), renameShelf(String)
+        case addLink, paper, follow, renameFeed(String), saveView, newShelf(String?), renameShelf(String), feedback
         var id: String {
             switch self {
             case .addLink: return "addLink"
+            case .feedback: return "feedback"
             case .paper: return "paper"
             case .follow: return "follow"
             case .renameFeed(let f): return "rename " + f
@@ -198,7 +227,16 @@ final class AppModel {
         }
     }
 
-    var selected: Item? { items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } }
+    var selected: Item? { items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } ?? standItems.first { $0.id == selection } }
+    /// Today's nightstand (or the suggested three), which open beside it.
+    var standItems: [Item] {
+        ((today?.a("nightstand") ?? []) + (today?.a("nightstand_suggested") ?? [])).map { b in
+            var raw = b.raw
+            raw["type"] = "book"
+            raw["kind"] = "book"
+            return Item(J(raw))
+        }
+    }
     var continueItems: [Item] { (home?.a("continue") ?? []).map(Item.init) }
 
     private var loadTask: Task<Void, Never>?
@@ -253,6 +291,8 @@ final class AppModel {
             case .home:
                 home = try await API.shared.json("/api/home")
                 items = []
+            case .recovery:
+                items = []
             case .review, .highlights, .stats, .podcasts, .sources:
                 items = []
             case .manga:
@@ -279,18 +319,26 @@ final class AppModel {
             case .feedSource(let f):
                 items = try await docs("feed", tab: feedTab, arg: f, sort: sortFeed, filter: listFilter.dict)
             case .books:
+                // Each book once, in the first section it's in. Hardcover's Want to Read: the ones Daf has.
+                async let hc = try? API.shared.json("/api/hardcover/shelf?status=1")
+                async let lib = try? API.shared.json("/api/ebooks")
                 let j = try await API.shared.json("/api/books")
                 var seen = Set<String>(), out: [Item] = []
-                for key in ["nightstand", "suggested", "others"] {
-                    for b in j.a(key) where b.b("readable") || key != "others" {
-                        guard let id = b.s("id"), seen.insert(id).inserted else { continue }
-                        var raw = b.raw
-                        raw["type"] = "book"
-                        raw["kind"] = "book"
-                        raw["source"] = b.s("author") ?? b.s("progress_note")
-                        out.append(Item(J(raw)))
-                    }
+                func add(_ b: J, _ section: String, id: String? = nil) {
+                    guard let id = id ?? b.s("id"), seen.insert(id).inserted else { return }
+                    var raw = b.raw
+                    raw["id"] = id
+                    raw["type"] = "book"
+                    raw["kind"] = "book"
+                    raw["source"] = b.s("author") ?? b.s("progress_note")
+                    raw["section"] = section
+                    out.append(Item(J(raw)))
                 }
+                let stand = j.a("nightstand")
+                for b in stand.isEmpty ? j.a("suggested") : stand { add(b, stand.isEmpty ? "Suggested for the nightstand" : "Nightstand") }
+                for b in await hc?.a("books") ?? [] { if let d = b.s("daf_id") { add(b, "Want to Read", id: d) } }
+                for b in j.a("others") { add(b, "Opened lately") }
+                for b in await lib?.a("books") ?? [] { add(b, "Your library") }
                 items = out
             case .search:
                 let q = query.trimmingCharacters(in: .whitespaces)
@@ -517,7 +565,8 @@ final class AppModel {
             if let i = items.firstIndex(where: { $0.id == item.id }) {
                 let next = items.indices.contains(i + 1) ? items[i + 1].id : (i > 0 ? items[i - 1].id : nil)
                 items.remove(at: i)
-                if selection == item.id { selection = next }
+                // as Mail does: the next one opens (Settings › Reading turns it off)
+                if selection == item.id { selection = (UserDefaults.standard.object(forKey: "autoAdvance") as? Bool ?? true) ? next : nil }
             }
             counts = try? await API.shared.json("/api/docs/counts")
             return true

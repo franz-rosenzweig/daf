@@ -73,6 +73,7 @@ struct PrefsView: View {
     @State private var voices: [String] = []
     @AppStorage("prefsTab") private var tab = "general"
     @AppStorage("keepOffline") private var keepOffline = true
+    @AppStorage("autoAdvance") private var autoAdvance = true
     @State private var alerts = FeedNews.shared.on
 
     var body: some View {
@@ -110,8 +111,24 @@ struct PrefsView: View {
                         Stepper("Highlights a day: \(s.i("review_size") ?? 5)", value: binding("review_size", s.i("review_size") ?? 5), in: 1...20)
                         Stepper("New flashcards a day: \(s.i("cards_per_day") ?? 5)", value: binding("cards_per_day", s.i("cards_per_day") ?? 5), in: 0...30)
                     }
-                    Section("The Feed") {
-                        Stepper("Unseen items go after \(s.i("feed_expire_days") ?? 30) days", value: binding("feed_expire_days", s.i("feed_expire_days") ?? 30), in: 3...3650, step: 1)
+                    Section {
+                        Picker("The Feed lets go after", selection: binding("feed_expire_days", s.i("feed_expire_days") ?? 30)) {
+                            ForEach(Self.windows(s.i("feed_expire_days") ?? 30), id: \.0) { w in Text(w.1).tag(w.0) }
+                        }
+                    } header: { Text("The Feed") } footer: {
+                        Text("Unseen items older than this move to Seen, so the Feed never becomes a pile. A longer time brings back the unread ones FreshRSS still has.").foregroundStyle(.secondary)
+                    }
+                    Section {
+                        Toggle("After Archive or Later, open the next one", isOn: $autoAdvance)
+                    } header: { Text("Articles") } footer: {
+                        Text("Off, archiving the open article or moving it to Later goes back to the list. On this Mac.").foregroundStyle(.secondary)
+                    }
+                    Section {
+                        Picker("Home time zone", selection: Binding(get: { s.s("home_tz") ?? TimeZone.current.identifier }, set: { z in put(["home_tz": z]); model.say("Days now follow " + z); model.reload() })) {
+                            ForEach(Self.zones(s.s("home_tz")), id: \.self) { Text($0).tag($0) }
+                        }
+                    } header: { Text("Days") } footer: {
+                        Text("Decides when a day starts and ends. Switch it when you travel.").foregroundStyle(.secondary)
                     }
                     Section("Read aloud") {
                         if !voices.isEmpty {
@@ -139,6 +156,21 @@ struct PrefsView: View {
             GoalsPrefs()
                 .tabItem { Label("Goals", systemImage: "target") }
                 .tag("goals")
+            AccountPrefs()
+                .tabItem { Label("Account", systemImage: "person.crop.circle") }
+                .tag("account")
+            ConnectionsPrefs()
+                .tabItem { Label("Connections", systemImage: "point.3.connected.trianglepath.dotted") }
+                .tag("connections")
+            AIPrefs()
+                .tabItem { Label("AI", systemImage: "sparkles") }
+                .tag("ai")
+            TagsPrefs()
+                .tabItem { Label("Tags", systemImage: "tag") }
+                .tag("tags")
+            ImportPrefs()
+                .tabItem { Label("Import", systemImage: "square.and.arrow.down") }
+                .tag("import")
             .task {
                 s = try? await API.shared.json("/api/settings")
                 let all = (try? await API.shared.json("/api/voices"))?.strings("voices") ?? []
@@ -146,7 +178,19 @@ struct PrefsView: View {
                     .sorted { (Self.kinds.firstIndex(of: String($0.prefix(2))) ?? 9, $0) < (Self.kinds.firstIndex(of: String($1.prefix(2))) ?? 9, $1) }
             }
         }
-        .frame(width: 520, height: 600)
+        .frame(width: 600, height: 640)
+    }
+
+    /// How long the Feed keeps what's unseen, as the page offers it (and whatever's set now).
+    static func windows(_ now: Int) -> [(Int, String)] {
+        let w = [(7, "a week"), (14, "2 weeks"), (21, "3 weeks"), (30, "a month"), (60, "2 months"), (90, "3 months"), (180, "6 months"), (365, "a year"), (3650, "never")]
+        return w.contains { $0.0 == now } ? w : (w + [(now, "\(now) days")]).sorted { $0.0 < $1.0 }
+    }
+
+    static func zones(_ now: String?) -> [String] {
+        var z = ["America/Phoenix", "Asia/Jerusalem"]
+        for x in [now, TimeZone.current.identifier].compactMap({ $0 }) where !z.contains(x) { z.append(x) }
+        return z
     }
 
     /// Kokoro's voices as the page names them: "Heart · American woman".

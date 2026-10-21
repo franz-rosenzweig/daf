@@ -46,7 +46,7 @@ enum Links {
         let places: [String: Place] = ["today": .today, "review": .review, "inbox": .library("inbox"), "library": .library("inbox"),
                                        "later": .library("later"), "archive": .library("archive"), "shortlist": .shortlist, "feed": .feed(nil),
                                        "books": .books, "manga": .manga, "torah": .torah, "podcasts": .podcasts, "highlights": .highlights,
-                                       "stats": .stats, "sources": .sources, "paper": .paper]
+                                       "stats": .stats, "sources": .sources, "paper": .paper, "recovery": .recovery]
         if let p = places[route] { m.place = p } else { m.openRoute = "#" + route }
         NSApp.activate()
     }

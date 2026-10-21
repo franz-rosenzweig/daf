@@ -6,12 +6,13 @@
 set -euo pipefail
 cd "${0:A:h}"
 (( $# >= 2 )) || { sed -n 2,5p $0 >&2; exit 2; }
-DAF_TEST=1 ./build.sh >/dev/null || { echo "SELFTEST: the build failed" >&2; exit 1; }
+mkdir -p build
+DAF_TEST=1 ./build.sh > build/test-build.log 2>&1 || { echo "SELFTEST: the build failed" >&2; grep -E "error:" -A3 build/test-build.log | head -60 >&2; exit 1; }
 APP="build/test/Daf Test.app"
 OUT=$PWD/build/selftest; rm -rf $OUT; mkdir -p $OUT
 ARGS=(-SelfTestBase "$1" -SelfTestCookie "c:$2")
 (( $# >= 3 )) && ARGS+=(-SelfTestToken "t:$3")
-( sleep 480; pkill -f "Daf Test.app/Contents/MacOS/Daf" ) 2>/dev/null & watchdog=$!
+( sleep 900; pkill -f "Daf Test.app/Contents/MacOS/Daf" ) 2>/dev/null & watchdog=$!
 open -W -n "$APP" --args -SelfTestOut "$OUT" -ApplePersistenceIgnoreState YES "${ARGS[@]}"
 kill $watchdog 2>/dev/null || true
 # what the test build kept: its sign-in, its settings, its files

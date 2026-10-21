@@ -27,6 +27,9 @@ struct DafNativeApp: App {
                 Button("Add a Photo of a Page…") { PaperPages.choose() }
             }
             ImportFromDevicesCommands()
+            CommandGroup(after: .help) {
+                Button("Send Feedback…") { model.sheet = .feedback }
+            }
             CommandMenu("Go") {
                 Button("Today") { model.place = .today }.keyboardShortcut("1")
                 Button("Review") { model.place = .review }.keyboardShortcut("2")
@@ -39,6 +42,7 @@ struct DafNativeApp: App {
                 Divider()
                 Button("Paper Pages") { model.place = .paper }
                 Button("Torah") { model.place = .torah }
+                Button("Recovery") { model.place = .recovery }
                 Button("Podcasts") { model.place = .podcasts }
                 Button("Sources") { model.place = .sources }
             }

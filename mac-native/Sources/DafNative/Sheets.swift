@@ -100,7 +100,7 @@ struct RouteView: View {
             if parts.first == "mread", parts.count > 1 {
                 MangaReader(id: parts[1])
             } else if parts.first == "ebook", parts.count > 1 {
-                BookReaderView(id: parts[1])
+                BookReaderView(id: parts[1], at: parts.count > 2 ? parts.dropFirst(2).joined(separator: "/") : nil)
             } else if parts.first == "pdf", parts.count > 1 {
                 PDFPane(id: parts[1])
             } else if parts.first == "page", parts.count > 1 {

@@ -8,6 +8,8 @@ struct BookPage: View {
     @Environment(\.openWindow) private var openWindow
     let id: String
     @State private var b: J?
+    @State private var note = ""
+    @State private var swapOut: [J]?
 
     var body: some View {
         ScrollView {
@@ -27,6 +29,9 @@ struct BookPage: View {
                                 Text(p).font(.callout).foregroundStyle(.secondary)
                             }
                             if let a = b.s("audio_note") { Label(a, systemImage: "headphones").font(.callout).foregroundStyle(.secondary) }
+                            let k = [b.i("minutes_kindle").flatMap { $0 > 0 ? "\($0 / 60) h \($0 % 60)′ on the Kindle" : nil },
+                                     b.d("last_read").map { "last opened " + Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .omitted) }].compactMap { $0 }
+                            if !k.isEmpty { Text(k.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary) }
                             HStack {
                                 if b.b("readable") {
                                     Button { openWindow(id: "route", value: "#ebook/" + API.enc(id)) } label: { Label("Read", systemImage: "book") }
@@ -39,9 +44,46 @@ struct BookPage: View {
                         }
                     }
                     if let st = b.o("stats"), (st.i("minutes") ?? 0) > 0 { stats(st) }
+                    if !b.b("private") {
+                        Panel("A note on this book") {
+                            TextField("A thought, a quote, where you were…", text: $note, axis: .vertical).textFieldStyle(.roundedBorder)
+                            HStack { Spacer(); Button("Save the Note") { Task { await saveNote() } }.disabled(note.trimmingCharacters(in: .whitespaces).isEmpty) }
+                            ForEach(b.a("notes"), id: \.self) { n in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(n.s("text") ?? "").font(.callout)
+                                    Text([n.d("at").map { Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .shortened) }, n.b("voice") ? "a voice note" : nil].compactMap { $0 }.joined(separator: " · "))
+                                        .font(.caption2).foregroundStyle(.tertiary)
+                                }
+                            }
+                        }
+                    }
+                    if !b.a("bookmarks").isEmpty {
+                        Panel("Audiobook bookmarks") {
+                            ForEach(b.a("bookmarks"), id: \.self) { m in
+                                Text([m.s("time") ?? m.s("title"), m.s("text") ?? m.s("note")].compactMap { $0 }.joined(separator: " · ")).font(.callout)
+                            }
+                        }
+                    }
+                    if !b.b("private") && !b.a("highlights").isEmpty {
+                        Panel("In the daily review") {
+                            Picker("", selection: Binding(get: { b.s("review_freq") ?? "normal" }, set: { f in Task { await freq(f) } })) {
+                                Text("More").tag("more"); Text("As Usual").tag("normal"); Text("Less").tag("less"); Text("Never").tag("never")
+                            }
+                            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 360)
+                            Text(["more": "This book comes up more often.", "less": "This book comes up less often.",
+                                  "never": "This book stays out of the daily review. Its highlights are still here.", "normal": "Like any other book."][b.s("review_freq") ?? "normal"] ?? "")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    if !b.b("private") { HardcoverSection(bookID: id, title: b.s("title") ?? "") }
                     let hls = b.a("highlights")
                     if !hls.isEmpty {
-                        Text(plural(hls.count, "highlight")).font(.headline)
+                        HStack {
+                            Text(plural(hls.count, "highlight")).font(.headline)
+                            Spacer()
+                            if !b.b("private") { Button("Review These") { model.startReview(themed: "n=30&book=" + API.enc(id)) } }
+                            Button("Export…") { Task { await export() } }.help("The highlights as Markdown")
+                        }
                         LazyVStack(alignment: .leading, spacing: 12) {
                             ForEach(hls, id: \.self) { h in
                                 HighlightCard(h: h, edit: {}, open: { if let o = h.s("open") { openWindow(id: "route", value: o) } })
@@ -57,6 +99,12 @@ struct BookPage: View {
             }
         }
         .task(id: id) { b = try? await API.shared.json("/api/books/" + API.enc(id)) }
+        .confirmationDialog("Which one steps off?", isPresented: Binding(get: { swapOut != nil }, set: { if !$0 { swapOut = nil } })) {
+            ForEach(swapOut ?? [], id: \.self) { x in
+                Button(PaperPages.short(x.s("title"))) { Task { await swap(x.s("id")) } }
+            }
+            Button("Cancel", role: .cancel) { swapOut = nil }
+        } message: { Text("The nightstand holds three. The one you take off stays in your library and your vault.") }
     }
 
     private func stats(_ st: J) -> some View {
@@ -80,14 +128,50 @@ struct BookPage: View {
         }
     }
 
+    private func saveNote() async {
+        do {
+            let r = J(try await API.shared.send("POST", "/api/notes", ["text": note.trimmingCharacters(in: .whitespacesAndNewlines), "book_id": id]))
+            model.say(["written", "unchanged"].contains(r?.s("vault") ?? "") ? "Saved to the vault note" : "Saved in Daf")
+            note = ""
+            b = try? await API.shared.json("/api/books/" + API.enc(id))
+        } catch { model.error = error.localizedDescription }
+    }
+
+    private func freq(_ f: String) async {
+        do {
+            try await API.shared.send("PUT", "/api/books/\(API.enc(id))/review", ["freq": f])
+            model.say(["more": "More often in the daily review", "normal": "As usual in the daily review", "less": "Less often in the daily review", "never": "Out of the daily review"][f] ?? "")
+            b = try? await API.shared.json("/api/books/" + API.enc(id))
+        } catch { model.error = error.localizedDescription }
+    }
+
+    private func export() async {
+        guard let data = try? await API.shared.data("/api/highlights/export?fmt=md&book=" + API.enc(id)) else { model.error = "The export didn't come."; return }
+        let p = NSSavePanel()
+        p.nameFieldStringValue = PaperPages.short(b?.s("title")) + " highlights.md"
+        if p.runModal() == .OK, let u = p.url { try? data.write(to: u) }
+    }
+
     private func nightstand(_ on: Bool) async {
         do {
             let t = try await API.shared.json("/api/today")
             var ids = t.a("nightstand").compactMap { $0.s("id") }.filter { $0 != id }
+            if on && ids.count >= 3 { swapOut = t.a("nightstand"); return }
             if on { ids.append(id) }
             try await API.shared.send("PUT", "/api/nightstand", ["ids": ids])
             b = try? await API.shared.json("/api/books/" + API.enc(id))
             model.say(on ? "On the nightstand" : "Off the nightstand")
+        } catch { model.error = error.localizedDescription }
+    }
+
+    /// The nightstand holds three: a fourth asks which one steps off.
+    private func swap(_ out: String?) async {
+        guard let out, let stand = swapOut else { return }
+        swapOut = nil
+        do {
+            try await API.shared.send("PUT", "/api/nightstand", ["ids": stand.compactMap { $0.s("id") }.map { $0 == out ? id : $0 }])
+            b = try? await API.shared.json("/api/books/" + API.enc(id))
+            model.say("Swapped")
         } catch { model.error = error.localizedDescription }
     }
 }

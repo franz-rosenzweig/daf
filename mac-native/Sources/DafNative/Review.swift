@@ -14,6 +14,9 @@ final class ReviewModel {
     var streak: J?
     var loaded = false
     var error: String?
+    /// A themed review ("#tag", "Favorites", a colour, a book): the highlights asked for, apart from the day's.
+    var theme: String?
+    @ObservationIgnored var themedQuery: String?
 
     var current: J? { items.indices.contains(index) ? items[index] : nil }
     var isCard: Bool { current?.b("card") == true }
@@ -30,6 +33,19 @@ final class ReviewModel {
             }
             items = all
             index = 0
+            loaded = true
+        } catch { self.error = error.localizedDescription; loaded = true }
+    }
+
+    /// A review by theme, as the page's #review/tag/…, /fav, /color/…, /book/…, /filter/… (/api/review/themed).
+    func load(themed q: String) async {
+        do {
+            let r = try await API.shared.json("/api/review/themed?" + q)
+            items = r.a("items")
+            theme = r.s("theme")
+            themedQuery = q
+            index = 0
+            actions = [:]
             loaded = true
         } catch { self.error = error.localizedDescription; loaded = true }
     }
@@ -87,6 +103,7 @@ struct ReviewView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @FocusState private var noteFocused: Bool
+    @State private var sheet: HLSheet?
     private var review: ReviewModel { model.review }
 
     var body: some View {
@@ -111,11 +128,10 @@ struct ReviewView: View {
                 done
             }
         }
-        .navigationTitle("Review")
-        .task {
-            model.review = ReviewModel()
-            await model.review.load(day: model.today?.s("today"))
-        }
+        .navigationTitle(review.theme.map { "Review: " + $0 } ?? "Daily Review")
+        .task { await start() }
+        .onChange(of: model.reviewTheme) { _, q in if q != nil { Task { await start() } } }
+        .sheet(item: $sheet) { s in HLSheetView(sheet: s) }
         .onKeyPress(phases: .down) { press in keys(press) }
         .focusable()
         .focusEffectDisabled()
@@ -209,6 +225,14 @@ struct ReviewView: View {
                 if let open = x.s("open") {
                     Button { openWindow(id: "route", value: open) } label: { Label("Open at Its Spot", systemImage: "book") }
                 }
+                Menu {
+                    Button("Tags…") { sheet = .tags(x) }
+                    Button("Make a Flashcard…") { sheet = .cards(x) }
+                    Button("Share as Image…") { sheet = .share(x, title: x.s("title") ?? "", author: x.s("author")) }
+                    Button("Copy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(x.s("text") ?? "", forType: .string) }
+                } label: { Label("More", systemImage: "ellipsis.circle") }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
                 Spacer()
                 if review.writing {
                     Button("Save the Note") { Task { await review.act("note", model: model) } }.buttonStyle(.borderedProminent)
@@ -222,12 +246,33 @@ struct ReviewView: View {
         .padding(14)
     }
 
+    /// The day's review, or a themed one asked for (Review These, Review More).
+    private func start() async {
+        model.review = ReviewModel()
+        if let q = model.reviewTheme {
+            model.reviewTheme = nil
+            await model.review.load(themed: q)
+        } else {
+            await model.review.load(day: model.today?.s("today"))
+        }
+    }
+
     private var done: some View {
         ContentUnavailableView {
-            Label(review.items.isEmpty ? "Nothing to review today" : "That's today's review", systemImage: "checkmark.circle")
+            Label(review.items.isEmpty ? (review.theme == nil ? "Nothing to review today" : "Nothing to review here") : review.theme == nil ? "That's today's review" : "That's the round", systemImage: "checkmark.circle")
         } description: {
             let kept = review.actions.values.filter { $0 == "keep" || $0 == "note" }.count
-            Text(review.items.isEmpty ? "New highlights come back here." : "\(kept) kept · \(review.items.count) seen" + (review.streak?.i("days").map { " · \($0)-day streak" } ?? ""))
+            let less = review.actions.values.filter { $0 == "less" }.count
+            Text(review.items.isEmpty ? "New highlights come back here." : "\(kept) kept · \(less) less often · \(review.items.count) seen" + (review.streak?.i("days").map { " · \($0)-day streak" } ?? ""))
+            if let week = review.streak?.a("week"), !week.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(week, id: \.self) { d in Circle().fill(d.b("done") ? Color.accentColor : Color.secondary.opacity(0.25)).frame(width: 9, height: 9) }
+                }
+                .padding(.top, 4)
+            }
+        } actions: {
+            if let q = review.themedQuery { Button("Another Round") { model.startReview(themed: q) } }
+            Button("Review More Highlights") { model.startReview(themed: "n=10") }
         }
     }
 

@@ -15,7 +15,21 @@ final class BookModel {
     var error: String?
     /// Not an EPUB (MOBI, AZW3, FB2, comics): Daf's own reader opens it.
     var otherFormat = false
-    var look = BookLook.load()
+    var look: BookLook
+    /// The look is this book's own, not everyone's.
+    var ownLook: Bool
+    /// Where to open instead of the place: "q:" and words, "hl:" and a highlight, a CFI, or a path in the book.
+    @ObservationIgnored var target: String?
+    var toast: String?
+    @ObservationIgnored private var toastTask: Task<Void, Never>?
+    /// Forget My Place: nothing is kept until I read on.
+    @ObservationIgnored private var forget = false
+    @ObservationIgnored private var forgotAt = Date.distantPast
+    /// Near the end: the next in the series, and Hardcover's Finished.
+    var nextInSeries: J?
+    var hardcoverEnd = false
+    var finishing = false
+    @ObservationIgnored private var offeredEnd = false
     var fraction = 0.0
     var chapter = ""
     var footer = ""
@@ -56,9 +70,18 @@ final class BookModel {
     @ObservationIgnored var beats = 0
     @ObservationIgnored static weak var last: BookModel?
 
-    init(id: String) {
+    init(id: String, at target: String? = nil) {
         self.id = id
+        self.target = target
+        look = BookLook.load(book: id)
+        ownLook = UserDefaults.standard.dictionary(forKey: "book.look." + id) != nil
         Self.last = self
+    }
+
+    func say(_ s: String) {
+        toast = s
+        toastTask?.cancel()
+        toastTask = Task { try? await Task.sleep(nanoseconds: 2_600_000_000); if !Task.isCancelled { toast = nil } }
     }
 
     var title: String { details.map { $0.b("private") ? "Private reading" : ($0.s("title") ?? "") } ?? "" }
@@ -86,6 +109,10 @@ final class BookModel {
                 }
             }
             open(section, at: at)
+            if let t = target { target = nil; await go(target: t) }
+            else if let f = d.o("position")?.d("fraction"), f > 0.005 {
+                say("Picked up at \(Int((f * 100).rounded()))%" + (chapter.isEmpty ? "" : " · " + chapter))
+            }
             if let k = d.o("kindle"), let kf = k.d("fraction"), kf > (d.o("position")?.d("fraction") ?? 0) + 0.02,
                (k.d("at") ?? 0) > (d.o("position")?.d("updated") ?? 0) { kindleAhead = kf }
             startBeats()
@@ -158,7 +185,7 @@ final class BookModel {
     /// attributes change, so the place's character stays the same).
     func restyle(_ l: BookLook) {
         look = l
-        l.save()
+        l.save(book: ownLook ? id : nil)
         rendered = [:]
         let at = pages?.visible.location ?? 0
         open(section, at: at)
@@ -218,7 +245,16 @@ final class BookModel {
         fraction = bytes / Double(total)
         chapter = currentChapter(at: vis.location)
         let left = pages.pagesLeft
-        footer = (left > 1 ? plural(left, "page") + " left in the chapter" : left == 1 ? "The chapter's last page" : "The end of the chapter") + " · \(Int((fraction * 100).rounded()))%"
+        _ = left
+        // the time left, as the page reckons it (a minute is 1,600 bytes of the book)
+        let inChapter = (1 - inside) * Double(sizes[section]) / 1600, inBook = (Double(total) - bytes) / 1600
+        func time(_ m: Double) -> String { let n = Int(m.rounded()); return n >= 60 ? "\(n / 60) h \(n % 60) min" : "\(max(1, n)) min" }
+        var bits = [inChapter >= 0.5 ? time(inChapter) + " left in the chapter" : "The end of the chapter", time(inBook) + " left in the book"]
+        if let p = printed(at: vis.location) { bits.append("p. " + p.dropFirst()) }
+        bits.append("\(Int((fraction * 100).rounded()))%")
+        footer = bits.joined(separator: " · ")
+        if forget && Date().timeIntervalSince(forgotAt) > 2 { forget = false }          // reading on after Forget: the place counts again
+        if fraction > 0.985 && !offeredEnd { offeredEnd = true; Task { await nearTheEnd() } }
         marked = bookmarkHere() != nil
         notePage(printed(at: vis.location) ?? "l\(Int(bytes / 1500))")
         if let k = kindleAhead, fraction >= k - 0.005 { kindleAhead = nil }
@@ -260,7 +296,7 @@ final class BookModel {
 
     /// The place as the page keeps it: the range shown, as a CFI, with the fraction and the chapter.
     func savePosition(closing: Bool = false) async {
-        guard let epub, let text, let pages else { return }
+        guard !forget, let epub, let text, let pages else { return }
         let vis = pages.visible
         guard let local = text.cfi(vis.location, NSMaxRange(vis) > vis.location ? NSMaxRange(vis) : nil) else { return }
         var body: [String: Any] = ["cfi": CFI.join(epub.sections[section].cfi, local), "fraction": fraction, "chapter": chapter,
@@ -268,7 +304,74 @@ final class BookModel {
         if closing, let k = pageKey, Date().timeIntervalSince(pageAt) >= 5 { pagesSeen.insert(k) }
         if !pagesSeen.isEmpty { body["pages"] = Array(pagesSeen); pagesSeen = [] }
         saves += 1
-        try? await API.shared.send("PUT", "/api/ebooks/\(API.enc(id))/position", body)
+        _ = try? await API.shared.send("PUT", "/api/ebooks/\(API.enc(id))/position", body)
+    }
+
+    /// Near the end: the next book in the series, and (on Hardcover's shelves, not Read yet) Finished.
+    private func nearTheEnd() async {
+        if let next = details?.o("series")?.o("next") { nextInSeries = next }
+        guard details?.b("private") == false, let s = try? await API.shared.json("/api/hardcover/book/" + API.enc(id)) else { return }
+        if s.b("on_shelf") && s.i("status_id") != 3 { hardcoverEnd = true }
+    }
+
+    // MARK: the More menu
+
+    func goToBeginning() { open(epub?.sections.firstIndex { $0.linear } ?? 0, at: 0) }
+
+    func goToKindle() { if let f = details?.o("kindle")?.d("fraction") { go(fraction: f) } }
+
+    /// Forget my place in Daf: the book opens at its start (or where the Kindle is) next time.
+    func forgetPlace() async {
+        do {
+            try await API.shared.send("DELETE", "/api/ebooks/\(API.enc(id))/position", nil)
+            forget = true
+            forgotAt = Date()
+            say("Daf forgot your place in this book")
+        } catch { self.error = error.localizedDescription }
+    }
+
+    func exportHighlights() async {
+        guard let data = try? await API.shared.data("/api/highlights/export?fmt=md&book=" + API.enc(id)) else { say("The export didn't come"); return }
+        let p = NSSavePanel()
+        p.nameFieldStringValue = PaperPages.short(title) + " highlights.md"
+        if p.runModal() == .OK, let u = p.url { try? data.write(to: u) }
+    }
+
+    func downloadFile() async {
+        guard let data = try? await Self.file(for: id, size: details?.i("size")) else { say("The file didn't come"); return }
+        let p = NSSavePanel()
+        p.nameFieldStringValue = PaperPages.short(title) + "." + ((details?.s("format") ?? "EPUB") == "KEPUB" ? "kepub.epub" : "epub")
+        if p.runModal() == .OK, let u = p.url { try? data.write(to: u) }
+    }
+
+    // MARK: opening at a place
+
+    /// "q:" and words (found in the book), "hl:" and a highlight, a CFI, or a path in the book with its anchor.
+    func go(target t: String) async {
+        if t.hasPrefix("q:") { await find(words: String(t.dropFirst(2))); return }
+        if t.hasPrefix("hl:") {
+            let hid = String(t.dropFirst(3))
+            if let c = highlights.first(where: { $0.s("id") == hid })?.o("pos")?.s("cfi") { go(cfi: c, flash: true) }
+            else if let k = kindle.first(where: { $0.s("id") == hid }) { await go(kindle: k) }
+            return
+        }
+        if t.hasPrefix("epubcfi(") { go(cfi: t, flash: false); return }
+        let bits = t.split(separator: "#", maxSplits: 1).map(String.init)
+        go(EPUB.Target(label: "", path: bits[0], fragment: bits.count > 1 ? bits[1] : nil))
+    }
+
+    /// Words found in the book, and their page shown.
+    func find(words: String) async {
+        guard let epub else { return }
+        for k in epub.sections.indices {
+            if let r = Self.find(words, in: Self.normal(plain(k))) {
+                open(k, at: r.location)
+                pages?.flash(r)
+                return
+            }
+            if k % 6 == 5 { await Task.yield() }
+        }
+        say("That passage isn't in this copy")
     }
 
     func close() {
@@ -345,6 +448,13 @@ final class BookModel {
             return
         }
         var r = sel
+        let letters = s.string as NSString                             // a selection snaps to whole words, as the page's
+        func isWord(_ i: Int) -> Bool {
+            guard i >= 0, i < letters.length, let u = Unicode.Scalar(letters.character(at: i)) else { return false }
+            return CharacterSet.alphanumerics.contains(u) || u == "'" || u == "’"
+        }
+        while r.location > 0 && isWord(r.location - 1) && isWord(r.location) { r.location -= 1; r.length += 1 }
+        while NSMaxRange(r) < letters.length && isWord(NSMaxRange(r) - 1) && isWord(NSMaxRange(r)) { r.length += 1 }
         for (_, o) in over { r = NSUnionRange(r, o) }
         let color = color ?? over.first?.0.s("color") ?? HLTools.lastColour
         let ns = s.string as NSString
@@ -499,7 +609,9 @@ final class BookPagesView: NSView, NSTextViewDelegate {
         perSpread = b.width >= 860 && b.width > b.height * 1.08 ? 2 : 1
         let top: CGFloat = 46, bottom: CGFloat = 58
         gutter = perSpread == 2 ? max(56, b.width * 0.065) : 0
-        let side: CGFloat = perSpread == 2 ? max(44, b.width * 0.055) : max(40, (b.width - 680) / 2)
+        let column: CGFloat = ["narrow": 560, "wide": 820][look.width] ?? 680             // the line width, as the Aa panel has it
+        let margin: CGFloat = ["narrow": 1.7, "wide": 0.6][look.width] ?? 1
+        let side: CGFloat = perSpread == 2 ? max(36, b.width * 0.055 * margin) : max(40, (b.width - column) / 2)
         let w = perSpread == 2 ? (b.width - side * 2 - gutter) / 2 : b.width - side * 2
         pageSize = NSSize(width: floor(w), height: floor(b.height - top - bottom))
         origin = NSPoint(x: side, y: top)
@@ -842,8 +954,10 @@ struct BookReaderView: View {
     @Environment(AppModel.self) private var app
     @State private var m: BookModel
     @State private var showLook = false
+    @State private var showPercent = false
+    @State private var percent = ""
 
-    init(id: String) { _m = State(initialValue: BookModel(id: id)) }
+    init(id: String, at: String? = nil) { _m = State(initialValue: BookModel(id: id, at: at)) }
 
     var body: some View {
         Group {
@@ -861,7 +975,15 @@ struct BookReaderView: View {
                         .overlay(alignment: .bottom) {
                             Text(m.footer).font(.caption).foregroundStyle(Color(nsColor: m.look.quiet)).monospacedDigit().padding(.bottom, 12)
                         }
-                        .overlay(alignment: .top) { kindleBanner }
+                        .overlay(alignment: .top) {
+                            VStack(spacing: 8) {
+                                kindleBanner
+                                endNotices
+                                if let t = m.toast { Text(t).font(.callout).padding(.horizontal, 14).padding(.vertical, 7).glassEffect(.regular, in: Capsule()) }
+                            }
+                            .padding(.top, 8)
+                            .animation(.snappy, value: m.toast)
+                        }
                         .overlay(alignment: .bottom) {
                             if Speaker.shared.key == m.listenKey { SpeakerBar().padding(.bottom, 72) }
                         }
@@ -893,8 +1015,30 @@ struct BookReaderView: View {
                     .popover(isPresented: $showLook, arrowEdge: .bottom) { LookPanel(m: m) }
                 Button { Task { await m.toggleBookmark() } } label: { Label(m.marked ? "Remove the Bookmark" : "Bookmark", systemImage: m.marked ? "bookmark.fill" : "bookmark") }
                     .help(m.marked ? "Remove the bookmark (B)" : "Bookmark this page (B)")
+                Menu {
+                    Button("Go to the Beginning") { m.goToBeginning() }
+                    Button("Go to the Kindle's Page") { m.goToKindle() }.disabled(m.details?.o("kindle") == nil)
+                    Button("Go to a Percent…") { percent = "\(Int((m.fraction * 100).rounded()))"; showPercent = true }
+                    Divider()
+                    Button("The Book's Page") { app.place = .books; let id = m.id; Task { try? await Task.sleep(nanoseconds: 300_000_000); app.selection = id }; NSApp.activate() }
+                    Button("Export the Highlights…") { Task { await m.exportHighlights() } }
+                    Button("Download the File…") { Task { await m.downloadFile() } }
+                    Divider()
+                    Toggle("Highlight When Selecting", isOn: Binding(get: { HLTools.autoHighlight }, set: { UserDefaults.standard.set($0, forKey: "autoHighlight") }))
+                    Button("Forget My Place in Daf") { Task { await m.forgetPlace() } }
+                } label: { Label("More", systemImage: "ellipsis.circle") }
+                .popover(isPresented: $showPercent, arrowEdge: .bottom) {
+                    HStack {
+                        TextField("Percent", text: $percent).frame(width: 70).textFieldStyle(.roundedBorder)
+                            .onSubmit { if let v = Double(percent) { m.go(fraction: max(0, min(100, v)) / 100) }; showPercent = false }
+                        Text("%")
+                        Button("Go") { if let v = Double(percent) { m.go(fraction: max(0, min(100, v)) / 100) }; showPercent = false }
+                    }
+                    .padding(14)
+                }
             }
         }
+        .sheet(isPresented: $m.finishing) { FinishSheet(bookID: m.id, title: m.title) { m.hardcoverEnd = false }.environment(app) }
         .task { await m.load() }
         .onDisappear { m.close(); if Speaker.shared.key == m.listenKey { Speaker.shared.stop() } }
         .sheet(item: $m.editing) { e in
@@ -907,6 +1051,29 @@ struct BookReaderView: View {
             Button("OK") { m.error = nil }
         } message: { Text(m.error ?? "") }
         .frame(minWidth: 640, minHeight: 520)
+    }
+
+    /// Near the end: the next in the series; Finished on Hardcover.
+    @ViewBuilder
+    private var endNotices: some View {
+        if let next = m.nextInSeries, let nid = next.s("id") {
+            HStack(spacing: 12) {
+                Text("Next in \(m.details?.o("series")?.s("name") ?? "the series"): \(next.s("title") ?? "")").font(.callout).lineLimit(1)
+                Button("Start It") { m.nextInSeries = nil; app.openRoute = "#ebook/" + API.enc(nid) }
+                Button("Not Now") { m.nextInSeries = nil }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .glassEffect(.regular, in: Capsule())
+        }
+        if m.hardcoverEnd {
+            HStack(spacing: 12) {
+                Text("The end. Mark it read on Hardcover?").font(.callout)
+                Button("Finished") { m.finishing = true }
+                Button("Not Now") { m.hardcoverEnd = false }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .glassEffect(.regular, in: Capsule())
+        }
     }
 
     @ViewBuilder
@@ -935,6 +1102,7 @@ struct BookSidebar: View {
         @Bindable var m = m
         VStack(spacing: 0) {
             Picker("Show", selection: $m.sidebar) {
+                Image(systemName: "info.circle").help("About the book").tag("info")
                 Image(systemName: "list.bullet").help("Contents").tag("contents")
                 Image(systemName: "highlighter").help("Highlights").tag("highlights")
                 Image(systemName: "bookmark").help("Bookmarks").tag("bookmarks")
@@ -959,6 +1127,7 @@ struct BookSidebar: View {
                 case "bookmarks": bookmarks
                 case "search": search
                 case "ask": ask
+                case "info": info
                 default:
                     if let epub = m.epub {
                         OutlineGroup(epub.toc, children: \.kids) { item in
@@ -971,6 +1140,47 @@ struct BookSidebar: View {
                 }
             }
             .listStyle(.sidebar)
+        }
+    }
+
+    /// About the book: its details, its series, the Kindle's page, its note in the vault.
+    @ViewBuilder private var info: some View {
+        if let d = m.details {
+            VStack(alignment: .leading, spacing: 8) {
+                if d.b("has_cover") {
+                    AsyncImage(url: API.shared.url("/api/cover/" + API.enc(m.id))) { p in
+                        if let i = p.image { i.resizable().aspectRatio(contentMode: .fit) } else { Color.secondary.opacity(0.08) }
+                    }
+                    .frame(height: 160)
+                }
+                Text(m.title).font(.system(.headline, design: .serif))
+                if let a = d.s("author") { Text(a).font(.callout).foregroundStyle(.secondary) }
+                if let desc = d.s("description") {
+                    Text(String(desc.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression).prefix(700))).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 4)
+            LabeledContent("Type", value: d.s("format") ?? "")
+            if let y = d.s("year") { LabeledContent("Published", value: y) }
+            if let l = d.s("language") { LabeledContent("Language", value: Locale.current.localizedString(forLanguageCode: l) ?? l) }
+            LabeledContent("Progress", value: "\(Int((m.fraction * 100).rounded()))%")
+            LabeledContent("Read here", value: plural(d.i("minutes_here") ?? 0, "minute"))
+            LabeledContent("Highlights", value: "\(m.highlights.count + m.kindle.count)")
+            if let s = d.o("series") {
+                LabeledContent("Series", value: (s.s("name") ?? "") + (s.d("index").map { " #" + $0.formatted() } ?? ""))
+                if let n = s.o("next"), let nid = n.s("id") {
+                    Button("Next: " + (n.s("title") ?? "")) { AppModel.shared.openRoute = "#ebook/" + API.enc(nid) }.buttonStyle(.link)
+                }
+            }
+            if let k = d.o("kindle"), let p = k.i("page"), let t = k.i("total") {
+                LabeledContent("On the Kindle") {
+                    HStack {
+                        Text("p. \(p) of \(t)" + (k.d("at").map { " · " + Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .omitted) } ?? ""))
+                        Button("Go There") { m.goToKindle() }.buttonStyle(.link)
+                    }
+                }
+            }
+            if let v = d.s("vault_path") { Text("In the vault: " + v).font(.caption).foregroundStyle(.tertiary).textSelection(.enabled) }
         }
     }
 
@@ -1090,6 +1300,16 @@ struct LookPanel: View {
                 .frame(width: 150)
             }
             Toggle("Justify the text", isOn: Binding(get: { look.justify }, set: { look.justify = $0; m.restyle(look) }))
+            Picker("Line width", selection: Binding(get: { look.width }, set: { look.width = $0; m.restyle(look) })) {
+                ForEach(BookLook.widths, id: \.0) { Text($0.1).tag($0.0) }
+            }
+            .pickerStyle(.segmented)
+            Toggle("Just for this book", isOn: Binding(get: { m.ownLook }, set: { on in
+                m.ownLook = on
+                if !on { UserDefaults.standard.removeObject(forKey: "book.look." + m.id); look = BookLook.load(); m.restyle(look) }
+                else { m.restyle(look) }
+            }))
+            .help("This book keeps its own typeface, size, spacing and width")
         }
         .padding(18)
         .frame(width: 300)

@@ -86,7 +86,16 @@ enum SelfTest {
         await go(m, .today)
         check(m.today?.d("counted") != nil, "Today opens: the minutes and the goal", m.today?.o("main")?.s("text") ?? m.error ?? "")
         check(!m.continueItems.isEmpty, "and what to keep reading", "\(m.continueItems.count)")
+        check(m.today?.o("year30")?.list("days").count == 365 && m.today?.o("review") != nil, "with Year 30's days and the day's review", "\(m.today?.o("year30")?.list("days").count ?? -1)")
+        await pause(1)
         capture("01-today")
+        if let b = m.standItems.first {
+            m.selection = b.id
+            check(m.selected?.id == b.id, "the nightstand's books open beside Today", b.title)
+            await pause(1.5)
+            capture("50-today-nightstand")
+            m.selection = nil
+        }
 
         // daf:// links (this build's are daf-selftest://): a place for Shortcuts, a link from the share menu
         Links.handle(URL(string: "daf-selftest://go/review")!)
@@ -507,6 +516,22 @@ enum SelfTest {
             closeOthers()
         }
 
+        await recovery(m)
+
+        // a book's page: a note on it, how often it comes up in review, Hardcover
+        let note0 = (try? await API.shared.json("/api/books/cal:45"))?.a("notes").count ?? 0
+        _ = try? await API.shared.send("POST", "/api/notes", ["text": "A note from the self-test", "book_id": "cal:45"])
+        let note1 = (try? await API.shared.json("/api/books/cal:45"))?.a("notes").count ?? 0
+        _ = try? await API.shared.send("PUT", "/api/books/cal:45/review", ["freq": "more"])
+        let freq = (try? await API.shared.json("/api/books/cal:45"))?.s("review_freq")
+        _ = try? await API.shared.send("PUT", "/api/books/cal:45/review", ["freq": "normal"])
+        let hc = try? await API.shared.json("/api/hardcover/book/cal:45")
+        check(note1 == note0 + 1 && freq == "more" && hc != nil, "a book's page keeps a note, its review frequency and its Hardcover status", "\(note0) → \(note1) notes, \(freq ?? "-"), Hardcover \(hc?.s("status") ?? "-")")
+        await go(m, .books)
+        m.selection = "cal:45"
+        await pause(4)
+        capture("47-bookpage")
+
         // manga: the series, its volumes, a volume read natively
         await go(m, .manga)
         check(!m.items.isEmpty, "Manga lists the series", "\(m.items.count)")
@@ -653,6 +678,30 @@ enum SelfTest {
 
         check(prefs, "Settings opens", NSApp.windows.map { "'\($0.title)' \($0.isVisible)" }.joined(separator: ", "))
 
+        // the rest of Daf's preferences, each a tab: Account, Connections, AI, Tags, Import
+        for (k, (tab, shot)) in [("account", "52-account"), ("connections", "53-connections"), ("ai", "54-ai"), ("tags", "55-tags"), ("import", "56-import")].enumerated() {
+            UserDefaults.standard.set(tab, forKey: "prefsTab")
+            let before = Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
+            m.showSettings = true
+            let shown = await until(6) { NSApp.windows.contains { $0.isVisible && !before.contains(ObjectIdentifier($0)) } }
+            await pause(k == 1 ? 4 : 2.5)
+            if let w = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) { capture(shot, w); w.close() }
+            check(shown, "Settings › \(tab.capitalized) opens (see \(shot))")
+        }
+        UserDefaults.standard.removeObject(forKey: "prefsTab")
+        let tagList = (try? await API.shared.json("/api/doc-tags"))?.a("tags") ?? []
+        if let t = tagList.first?.s("name") {
+            let renamed = J(try? await API.shared.send("POST", "/api/doc-tags/rename", ["from": t, "to": t + "-selftest"]))
+            _ = try? await API.shared.send("POST", "/api/doc-tags/rename", ["from": t + "-selftest", "to": t])
+            check((renamed?.i("changed") ?? 0) > 0, "a Library tag renames (and back)", t)
+        }
+        m.sheet = .feedback
+        await pause(1.5)
+        capture("57-feedback")
+        check(m.sheet == .feedback, "Help › Send Feedback… opens its sheet")
+        m.sheet = nil
+        await pause(0.5)
+
         // Review
         await go(m, .review)
         let reviewed = await until(10) { m.review.loaded }
@@ -671,6 +720,47 @@ enum SelfTest {
         check(!m.highlights.groups.isEmpty, "Highlights lists the books and articles", "\(m.highlights.groups.count) of \(m.highlights.count) highlights")
         await pause(1.5)
         capture("09-highlights")
+
+        // Highlights' filters, as the page's: a colour, the order, export what they show, Review These
+        let allCount = m.highlights.count
+        if let c = m.highlights.groups.flatMap({ $0.a("items") }).compactMap({ $0.s("color") }).first {
+            m.highlights.color = c
+            await m.highlights.load()
+            let colours = Set(m.highlights.groups.flatMap { $0.a("items") }.compactMap { $0.s("color") })
+            check(colours == [c] && m.highlights.count <= allCount && m.highlights.filtered, "Highlights filters by colour", "\(c): \(m.highlights.count) of \(allCount)")
+            let csv = (try? await API.shared.data("/api/highlights/export?fmt=csv&" + m.highlights.filter)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            check(csv.split(separator: "\n").count >= 2, "and exports what the filters show (CSV)", "\(csv.split(separator: "\n").count) lines")
+            m.startReview(themed: "n=30&" + m.highlights.filter)
+            let themed = await until(10) { m.place == .review && m.review.loaded && m.review.theme != nil }
+            let reviewColours = Set(m.review.items.compactMap { $0.s("color") })
+            check(themed && !m.review.items.isEmpty && reviewColours.isSubset(of: [c]), "Review These reviews them", "\(m.review.theme ?? "no theme"): \(m.review.items.count)")
+            await pause(1)
+            capture("49-review-themed")
+            await go(m, .highlights)
+            m.highlights.color = ""
+        }
+        m.highlights.sort = "oldest"
+        await m.highlights.load()
+        let firstAt = m.highlights.groups.first.flatMap { g in g.a("items").compactMap { $0.d("created") }.min() } ?? 0
+        let laterAt = m.highlights.groups.dropFirst().compactMap { g in g.a("items").compactMap { $0.d("created") }.min() }.min() ?? .infinity
+        check(m.highlights.count == allCount && firstAt <= laterAt, "and puts the oldest first", "\(firstAt) ≤ \(laterAt)")
+        m.highlights.sort = "recent"
+        await m.highlights.load()
+
+        // Books, as the page has them: the nightstand, Want to Read, opened lately, the library, and a search
+        await go(m, .books)
+        let sections = m.bookSections.map(\.0)
+        check(sections.contains("Your library") && (sections.contains("Nightstand") || sections.contains("Suggested for the nightstand")), "Books has the nightstand, opened lately and the library", sections.joined(separator: ", "))
+        check(Set(m.items.map(\.id)).count == m.items.count, "each book once")
+        await pause(1)
+        capture("51-books")
+        let everyBook = m.shown.count
+        if let word = m.items.last?.title.split(separator: " ").first.map(String.init), word.count > 2 {
+            m.booksQuery = word
+            check(!m.shown.isEmpty && m.shown.count <= everyBook && m.shown.allSatisfy { $0.title.lowercased().contains(word.lowercased()) || ($0.j.s("author") ?? "").lowercased().contains(word.lowercased()) },
+                  "and finds a book by title or author", "\(word): \(m.shown.count) of \(everyBook)")
+            m.booksQuery = ""
+        }
 
         // Stats
         await go(m, .stats)
@@ -862,7 +952,69 @@ enum SelfTest {
         bm.showContents = true
         await pause(1)
         capture("31-book-contents", win)
+
+        // the book's own tools: the time left, a percent, the line width, a look just for this book, Forget My Place
+        check(bm.footer.contains("left in the book"), "the footer has the time left in the chapter and the book", bm.footer)
+        bm.go(fraction: 0.5)
+        await pause(0.8)
+        check(abs(bm.fraction - 0.5) < 0.06, "Go to a Percent goes there", String(format: "%.2f", bm.fraction))
+        bm.sidebar = "info"
+        await pause(0.8)
+        capture("48-book-info", win)
         bm.showContents = false
+        await pause(0.6)
+        let pagesWide = pages.pageCount
+        var narrow = bm.look
+        let width0 = narrow.width
+        narrow.width = "narrow"
+        bm.ownLook = true
+        bm.restyle(narrow)
+        await pause(0.8)
+        let own = UserDefaults.standard.dictionary(forKey: "book.look." + bookID) != nil
+        check(own && pages.pageCount != pagesWide, "a narrower line, kept just for this book", "\(pagesWide) → \(pages.pageCount) pages")
+        narrow.width = width0
+        bm.ownLook = false
+        UserDefaults.standard.removeObject(forKey: "book.look." + bookID)
+        bm.restyle(narrow)
+        await bm.forgetPlace()
+        let forgot = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position") == nil
+        check(forgot, "Forget My Place in Daf forgets it")
+        Speaker.shared.sleep(after: 15)
+        let sleeping = Speaker.shared.sleepAt != nil
+        Speaker.shared.sleep(after: nil)
+        check(sleeping, "the player's sleep timer sets and clears")
+        closeOthers()
+        await pause(0.5)
+
+        // opened at a highlight (the page's #ebook/<id>/hl:<id>)
+        if let h = bm.highlights.first, let hid = h.s("id") {
+            m.openRoute = "#ebook/" + API.enc(bookID) + "/hl:" + API.enc(hid)
+            let there = await until(30) { BookModel.last !== bm && BookModel.last?.id == bookID && BookModel.last?.text != nil }
+            await pause(1)
+            let b2 = BookModel.last
+            let r = b2.flatMap { b in h.o("pos")?.s("cfi").flatMap { b.text?.range(of: CFI.parse($0)) } }
+            check(there && r.map { r in b2?.pages.map { NSLocationInRange(r.location, $0.visible) } ?? false } == true, "a book opens at a highlight, as the page's addresses do")
+            closeOthers()
+            await pause(0.5)
+        }
+    }
+
+    /// Recovery: its readings open at their words in the Big Book.
+    static func recovery(_ m: AppModel) async {
+        await go(m, .recovery)
+        await pause(2)
+        capture("45-recovery")
+        guard let r = try? await API.shared.json("/api/recovery"), let bid = r.o("book")?.s("id"), let reading = r.a("readings").first, let find = reading.s("find") else {
+            return check(false, "Recovery has its readings and the Big Book")
+        }
+        check(!r.a("first").isEmpty && !r.a("prayers").isEmpty, "Recovery has the readings, the chapters and the prayers", "\(r.a("readings").count) readings, \(r.a("first").count) chapters")
+        m.openRoute = "#ebook/" + API.enc(bid) + "/q:" + API.enc(find)
+        let opened = await until(40) { BookModel.last?.id == bid && BookModel.last?.text != nil }
+        await pause(1.5)
+        let words = BookModel.normal(find).text.lowercased.prefix(30)
+        let shown = BookModel.last.flatMap { b in b.pages.map { p in BookModel.normal((p.storage.string as NSString).substring(with: p.visible)).text.lowercased } } ?? ""
+        check(opened && shown.contains(words), "a reading opens at its words in the Big Book", String(reading.s("title") ?? ""))
+        if let w = BookModel.last?.pages?.window { capture("46-recovery-reading", w) }
         closeOthers()
         await pause(0.5)
     }

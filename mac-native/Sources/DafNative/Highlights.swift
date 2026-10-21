@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Every highlight, by book or article: the list in the middle (search, a source, favorites only),
-/// the one chosen on the right with its highlights, their notes, tags and colours.
+/// Every highlight, by book or article: the list in the middle (search, a source, a colour, a tag,
+/// favorites only, private books too; newest, by book or oldest first), the one chosen on the right
+/// with its highlights, their notes, tags and colours. Export what the filters show, or review it.
 @MainActor
 @Observable
 final class HighlightsModel {
@@ -10,6 +11,11 @@ final class HighlightsModel {
     var query = ""
     var source = ""
     var favorites = false
+    var color = ""
+    var tag = ""
+    var sort = "recent"            // recent, book (in reading order), oldest
+    var showPrivate = false
+    var tags: [String] = []
     var groupID: String?
     var loading = false
 
@@ -19,14 +25,34 @@ final class HighlightsModel {
     func load() async {
         loading = true
         defer { loading = false }
-        var q = ["sort=recent"]
-        if !query.isEmpty { q.append("q=" + API.enc(query)) }
-        if !source.isEmpty { q.append("source=" + source) }
-        if favorites { q.append("fav=1") }
-        guard let r = try? await API.shared.json("/api/highlights?" + q.joined(separator: "&")) else { return }
+        guard let r = try? await API.shared.json("/api/highlights?" + filter + "&sort=" + sort) else { return }
+        tags = r.strings("tags")
         groups = r.a("groups")
         count = r.i("count") ?? 0
         if group == nil { groupID = groups.first.map(Self.key) }
+    }
+
+    /// The filters as the page's (and its export's and Review These') query.
+    var filter: String {
+        var q: [String] = []
+        if !query.isEmpty { q.append("q=" + API.enc(query)) }
+        if showPrivate { q.append("private=1") }
+        if !source.isEmpty { q.append("source=" + source) }
+        if !color.isEmpty { q.append("color=" + color) }
+        if !tag.isEmpty { q.append("tag=" + API.enc(tag)) }
+        if favorites { q.append("fav=1") }
+        return q.joined(separator: "&")
+    }
+
+    var filtered: Bool { !source.isEmpty || favorites || !color.isEmpty || !tag.isEmpty || showPrivate }
+
+    /// Export: Markdown by book, CSV or JSON (what the filters show), or every flashcard for Anki.
+    func export(_ fmt: String) async {
+        let path = fmt == "anki" ? "/api/cards/export" : "/api/highlights/export?fmt=\(fmt)" + (filter.isEmpty ? "" : "&" + filter)
+        guard let data = try? await API.shared.data(path) else { AppModel.shared.error = "The export didn't come."; return }
+        let p = NSSavePanel()
+        p.nameFieldStringValue = fmt == "anki" ? "Daf flashcards.txt" : "Daf highlights." + (fmt == "md" ? "md" : fmt)
+        if p.runModal() == .OK, let u = p.url { try? data.write(to: u) }
     }
 
     func update(_ id: String, _ change: (inout [String: Any]) -> Void) {
@@ -88,12 +114,52 @@ struct HighlightGroups: View {
                         Text("Paper").tag("paper")
                         Text("Readwise").tag("readwise")
                     }
+                    Picker("Color", selection: $hl.color) {
+                        Text("Any Color").tag("")
+                        ForEach(["yellow", "green", "blue", "pink", "purple"], id: \.self) { Text($0.capitalized).tag($0) }
+                    }
+                    if !hl.tags.isEmpty {
+                        Picker("Tag", selection: $hl.tag) {
+                            Text("Any Tag").tag("")
+                            ForEach(hl.tags, id: \.self) { Text("#" + $0).tag($0) }
+                        }
+                    }
                     Toggle("Favorites Only", isOn: $hl.favorites)
-                } label: { Label("Filter", systemImage: "line.3.horizontal.decrease.circle") }
+                    Toggle("Show Private Books", isOn: $hl.showPrivate)
+                    Divider()
+                    Picker("Order", selection: $hl.sort) {
+                        Text("Newest").tag("recent")
+                        Text("By Book").tag("book")
+                        Text("Oldest").tag("oldest")
+                    }
+                    .pickerStyle(.inline)
+                } label: { Label("Filter", systemImage: hl.filtered ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle") }
+            }
+            ToolbarItem {
+                Button { // Private books stay out of every review.
+                    let q = hl.filter.split(separator: "&").filter { $0 != "private=1" }
+                    model.startReview(themed: (["n=30"] + q).joined(separator: "&"))
+                } label: {
+                    Label("Review These", systemImage: "rectangle.stack")
+                }
+                .help("A review of what the filters show")
+            }
+            ToolbarItem {
+                Menu {
+                    Button("Markdown, by Book…") { Task { await hl.export("md") } }
+                    Button("CSV…") { Task { await hl.export("csv") } }
+                    Button("JSON…") { Task { await hl.export("json") } }
+                    Divider()
+                    Button("Flashcards for Anki…") { Task { await hl.export("anki") } }
+                } label: { Label("Export", systemImage: "square.and.arrow.up") }
             }
         }
         .onChange(of: hl.source) { _, _ in Task { await hl.load() } }
         .onChange(of: hl.favorites) { _, _ in Task { await hl.load() } }
+        .onChange(of: hl.color) { _, _ in Task { await hl.load() } }
+        .onChange(of: hl.tag) { _, _ in Task { await hl.load() } }
+        .onChange(of: hl.sort) { _, _ in Task { await hl.load() } }
+        .onChange(of: hl.showPrivate) { _, _ in Task { await hl.load() } }
         .task { await hl.load() }
     }
 }
