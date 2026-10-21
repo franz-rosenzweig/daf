@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-10-21-kindle-covers', date: 'Oct 21', title: 'Covers come fast on the Kindle', text: 'Shelves open with every cover at once, and the next page is ready before you swipe.' },
   { id: '2026-10-21-ext-updates', date: 'Oct 21', title: 'The extension updates itself', text: 'In Firefox and Zen, from 0.5.1: install it once more from Preferences, then never again.', go: '#prefs' },
   { id: '2026-10-21-ext-ask', date: 'Oct 21', title: 'The extension asks first', text: 'Selecting text on a page shows a Highlight button; nothing saves until you press it.' },
   { id: '2026-10-20-kindle-home', date: 'Oct 20', title: 'A Home for the Kindle', text: 'Home, Shelves you can move books between, and the review on the Daf tab.' },

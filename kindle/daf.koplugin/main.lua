@@ -14,7 +14,8 @@ Daf for KOReader.
   * The Daf tab (dafscreen.lua): today, the day's review with Keep and Less often, the
     nightstand, and opening a book from it. From the bar, Tools → Daf → Open Daf, or a
     gesture. Works offline from the last answer; taps are queued.
-  * Home (home.lua) and the shelves (shelf.lua), drawn with canvas.lua; and outside a book,
+  * Home (home.lua) and the shelves (shelf.lua), drawn with canvas.lua, with book covers from
+    covers.lua (made ahead for the whole library after Home appears); and outside a book,
     the book's global settings in KOReader's menu too (readerprefs.lua).
 
 Settings live in settings/daf.lua (url, token, sleep_screen, last_start, cache, home,
@@ -22,6 +23,7 @@ pending_review, paths, show_on_wake).
 Nothing here edits settings.reader.lua directly; the screensaver message is set
 through G_reader_settings in memory, which KOReader saves itself.
 ]]
+local Covers = require("covers")
 local DataStorage = require("datastorage")
 local DafScreen = require("dafscreen") -- must load here, while the plugin folder is on package.path
 local Home = require("home")
@@ -617,11 +619,24 @@ function Daf:showHome()
     self.home_screen = home
     self.canvases = { home }
     UIManager:show(home)
+    self:coversAhead()
     local fetched = self:home().fetched or 0
     if online() and (not self:homeIsToday() or os.time() - fetched > 1800) then
         UIManager:scheduleIn(0.5, function() self:refreshHome(home, false) end)
     end
     return home
+end
+
+-- Every book's shelf-size cover, made ahead a few at a time once Home is up (covers.lua).
+function Daf:coversAhead()
+    pcall(function()
+        local C = require("canvas").C
+        local set = {}
+        for _i, m in ipairs(self:home().private_md5s or {}) do set[m] = true end
+        Covers.private = set
+        local w, h = Shelf.usualCoverSize()
+        Covers.sweep(C.allBooks(C.homeDir()), { { w, h } }, 3)
+    end)
 end
 
 function Daf:showShelf(path)

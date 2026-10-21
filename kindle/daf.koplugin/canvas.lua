@@ -2,14 +2,14 @@
 What Home (home.lua) and a shelf (shelf.lua) share: a full screen that draws itself at fixed
 places, designed at the Paperwhite's 1236 px wide and scaled to the screen, with a list of tap
 areas; the type (Literata and Atkinson Hyperlegible, with Noto in reserve); the status line and
-the bar of Home, Shelves, History, Daf and Search; book covers, read once from the books and
-kept small in cache/daf-home; and what a book's notes file says about it.
+the bar of Home, Shelves, History, Daf and Search; book covers (covers.lua says where they come
+from); and what a book's notes file says about it.
 
 Night mode inverts it like the rest of KOReader: covers keep their look (ImageWidget's
 original_in_nightmode), the shelf drawings and icons turn white on black.
 ]]
 local Blitbuffer = require("ffi/blitbuffer")
-local DataStorage = require("datastorage")
+local Covers = require("covers")
 local Device = require("device")
 local DocSettings = require("docsettings")
 local Font = require("ui/font")
@@ -32,7 +32,6 @@ C.SERIF = { "Literata-Regular.ttf", "NotoSerif-Regular.ttf" }
 C.SANS = { "AtkinsonHyperlegibleNext-Regular.ttf", "NotoSans-Regular.ttf" }
 C.BOOK_EXT = { epub = true, pdf = true, mobi = true, azw3 = true, azw = true, fb2 = true, cbz = true, cbr = true, djvu = true, txt = true, docx = true }
 C.PLUGIN_DIR = (debug.getinfo(1, "S").source:match("^@(.*/)[^/]*$")) or "./"
-local CACHE = DataStorage:getDataDir() .. "/cache/daf-home"
 local BLACK, WHITE, MID, SOFT, SERIF, SANS = C.BLACK, C.WHITE, C.MID, C.SOFT, C.SERIF, C.SANS
 
 local Canvas = InputContainer:extend{
@@ -95,6 +94,25 @@ function C.bookCount(dir, depth)
     return n
 end
 
+-- Every book under dir, six folders deep.
+function C.allBooks(dir, out, depth)
+    out, depth = out or {}, depth or 0
+    local ok, iter, obj = pcall(lfs.dir, dir)
+    if not ok then return out end
+    for f in iter, obj do
+        if f:sub(1, 1) ~= "." then
+            local p = dir .. "/" .. f
+            local mode = lfs.attributes(p, "mode")
+            if mode == "directory" and depth < 6 and not f:match("%.sdr$") then
+                C.allBooks(p, out, depth + 1)
+            elseif mode == "file" and C.BOOK_EXT[(f:match("%.([^.]+)$") or ""):lower()] then
+                table.insert(out, p)
+            end
+        end
+    end
+    return out
+end
+
 function C.folderIcon(path)
     for _i, c in ipairs({ ".cover.png", ".cover.jpg", "cover.png", "cover.jpg" }) do
         if lfs.attributes(path .. "/" .. c, "mode") == "file" then return path .. "/" .. c end
@@ -147,6 +165,13 @@ end
 -- browser itself, where choosing several books is.
 local shown = setmetatable({}, { __mode = "k" })
 C.quiet = 0
+
+-- Covers opened in the background came in: the screens waiting for them draw them.
+Covers.on_ready = function(keys)
+    for w in pairs(shown) do
+        if UIManager:isWidgetShown(w) and w.coverReady then w:coverReady(keys) end
+    end
+end
 
 local function refreshShown()
     C.expecting = nil
@@ -210,9 +235,10 @@ local function fromName(file)
     return title, author
 end
 
--- A book, from its notes file when it has one: {file, title, author, md5, pct, finished, mtime, read}.
+-- A book, from its notes file when it has one: {file, key, title, author, md5, pct, finished, mtime,
+-- read}. key is the file's partial md5 now (covers go by it); md5, the one in its notes.
 function C.bookInfo(file)
-    local b = { file = file, mtime = lfs.attributes(file, "modification") or 0 }
+    local b = { file = file, key = Covers.key(file), mtime = lfs.attributes(file, "modification") or 0 }
     local sidecar = DocSettings:findSidecarFile(file)
     if sidecar then
         local ok, ds = pcall(DocSettings.openSettingsFile, sidecar)
@@ -232,33 +258,15 @@ function C.bookInfo(file)
     return b
 end
 
--- A cover cut to fill w × h, kept as a PNG. With make false, only what's already kept.
+-- The book's cover at w × h (a file), or nil and why: "later" (make is false: only what's kept),
+-- "pending" (being opened in the background) or "none". See covers.lua.
 function C.cover(book, w, h, make)
-    local key = (book.md5 or book.file:gsub("[^%w]", "_"):sub(-60)) .. "_" .. w .. "x" .. h
-    local path = CACHE .. "/" .. key .. ".png"
-    if lfs.attributes(path, "mode") == "file" then return path end
-    if lfs.attributes(path .. ".none", "mode") == "file" or make == false then return nil end
-    lfs.mkdir(DataStorage:getDataDir() .. "/cache")
-    lfs.mkdir(CACHE)
-    local ok, bb = pcall(function()
-        return require("apps/filemanager/filemanagerbookinfo"):getCoverImage(nil, book.file)
-    end)
-    if not ok or not bb then
-        local f = io.open(path .. ".none", "w"); if f then f:close() end
-        return nil
-    end
-    local RenderImage = require("ui/renderimage")
-    local bw, bh = bb:getWidth(), bb:getHeight()
-    local s = math.max(w / bw, h / bh)
-    local sw, sh = math.max(w, math.floor(bw * s + 0.5)), math.max(h, math.floor(bh * s + 0.5))
-    local scaled = RenderImage:scaleBlitBuffer(bb, sw, sh)
-    if scaled ~= bb then bb:free() end
-    local out = Blitbuffer.new(w, h, Blitbuffer.TYPE_BB8)
-    out:blitFrom(scaled, 0, 0, math.floor((sw - w) / 2), math.floor((sh - h) / 2), w, h)
-    scaled:free()
-    local wrote = pcall(function() out:writePNG(path) end)
-    out:free()
-    return wrote and path or nil
+    return Covers.get(book, w, h, make == false)
+end
+
+-- Is a book on Daf's private list? It never shows a cover.
+function C.isPrivate(b, set)
+    return (b.md5 and set[b.md5]) or (b.key and set[b.key]) or false
 end
 
 -- The file browser's menu with everything in it. Project: Title lays the browser out again after
@@ -284,6 +292,7 @@ end
 function Canvas:privateMd5s()
     local set = {}
     for _i, m in ipairs(self.daf:home().private_md5s or {}) do set[m] = true end
+    Covers.private = set
     return set
 end
 
@@ -395,13 +404,19 @@ function Canvas:dot(cx, cy, r)
     self:put(function(bb, ox, oy) bb:paintCircle(ox + cx, oy + cy, r, BLACK) end)
 end
 
--- A cover, or the title set in type when there's none (or it isn't made yet).
+-- A cover, or the title set in type when there's none (or it isn't made yet: a cover being opened
+-- in the background is drawn when it comes, coverReady). Returns whether there was a cover, and
+-- C.cover's reason when not.
 function Canvas:coverOrTitle(book, x, y, w, h, make)
-    local path = C.cover(book, w, h, make)
+    local path, why = C.cover(book, w, h, make)
     if path then
         self:image(path, x, y, w, h, true)
         self:frame(x, y, w, h)
         return true
+    end
+    if why == "pending" and book.key then
+        self.wants = self.wants or {}
+        self.wants[book.key] = Geom:new{ x = x, y = y, w = w, h = h }
     end
     self:frame(x, y, w, h)
     local big = w > px(250)
@@ -416,7 +431,23 @@ function Canvas:coverOrTitle(book, x, y, w, h, make)
         local room = math.floor((y + h - pad - (ty + th + px(10))) / al)
         self:box(book.author, SANS, asize, x + pad, ty + th + px(10), w - 2 * pad, math.min(2, room), { align = "center", color = MID })
     end
-    return false
+    return false, why
+end
+
+-- Covers that were being opened came in: the places waiting for them are drawn again.
+function Canvas:coverReady(keys)
+    local wants = self.wants or {}
+    local regions = {}
+    for _i, k in ipairs(keys) do
+        if wants[k] then table.insert(regions, wants[k]) end
+    end
+    if #regions == 0 then return end
+    self.partial = true
+    self:layout()
+    self.partial = false
+    for _i, r in ipairs(regions) do
+        UIManager:setDirty(self, function() return "ui", r end)
+    end
 end
 
 -- The time, the date (with the Hebrew date once Daf has said it today), the battery; `title`
@@ -585,8 +616,12 @@ end
 function Canvas:onTap(_arg, ges) return self:hit(ges, false) end
 function Canvas:onHold(_arg, ges) return self:hit(ges, true) end
 
+-- partial: only part of the screen is drawn again, so layout makes no covers that would land
+-- outside it.
 function Canvas:update(region)
+    self.partial = region ~= nil
     self:layout()
+    self.partial = false
     UIManager:setDirty(self, function() return "ui", region or self.dimen end)
 end
 

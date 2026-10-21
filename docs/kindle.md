@@ -49,7 +49,9 @@ Some of KOReader's settings normally only show up while a book is open, even tho
 
 ### Shelves
 
-**Shelves** shows the folders in the home folder as big tiles with their drawings and how many books each has, the Nightstand first. A folder opens as its books, three across and two down, a page at a time: swipe, or tap ‹ and ›. A folder inside it shows first, as a tile, and opens the same way. Each book has its cover, its title, and either a dot for New, how far I am, or ✓ Finished. At the top are the order (Newest first, Title, Author, Last read; tap to change it), **All**, **Reading**, **New** and **Finished**. ‹ at the top goes back up, and from the top back to Home. Covers a folder hasn't shown before come in one at a time, so a folder opens at once.
+**Shelves** shows the folders in the home folder as big tiles with their drawings and how many books each has, the Nightstand first. A folder opens as its books, three across and two down, a page at a time: swipe, or tap ‹ and ›. A folder inside it shows first, as a tile, and opens the same way. Each book has its cover, its title, and either a dot for New, how far I am, or ✓ Finished. At the top are the order (Newest first, Title, Author, Last read; tap to change it), **All**, **Reading**, **New** and **Finished**. ‹ at the top goes back up, and from the top back to Home.
+
+The covers come up with the page, all at once. Most of them come from the ones Project: Title already saved on the Kindle, which means nothing has to open the books, and while I'm looking at a page the next one gets its covers ready, so swiping is instant too. A book nothing has a cover for yet (a new download, say) gets opened ONCE in the background to find it, and its cover shows up a moment later while I can keep tapping around. After that the Kindle keeps it, even if I move the book to another shelf.
 
 Everything KOReader's file browser does with files works here too:
 
@@ -58,7 +60,7 @@ Everything KOReader's file browser does with files works here too:
 - **After Cut or Copy**, every shelf you open shows a bar, "Moving: Meditations", with **Put it here** and **Cancel**.
 - **Files ▾** has **New shelf here…**, **Select several…** (KOReader's browser at that folder, ready to pick several books and move or delete them together) and **Open in the file browser**.
 
-A book on my private list never shows on Home, in Continue reading or in Lately. Covers are read from the books once and kept small on the Kindle, so Home opens quickly after the first time. It works with Wi-Fi off from the last answer Daf gave; the Hebrew date and the parasha show once Daf has answered that day.
+A book on my private list never shows on Home, in Continue reading or in Lately, and on a shelf it's just its file name with no cover. A few seconds after Home comes up, the Kindle quietly gets every book's shelf cover ready, a few at a time between taps, and it waits whenever I'm reading. Basically, after the first day, every shelf opens with its covers already there. It works with Wi-Fi off from the last answer Daf gave; the Hebrew date and the parasha show once Daf has answered that day.
 
 ## The sleep screen
 

@@ -27,7 +27,7 @@ function Home:books(limit)
         local file = item.file
         if file and lfs.attributes(file, "mode") == "file" then
             local b = C.bookInfo(file)
-            if not (b.md5 and private[b.md5]) then
+            if not C.isPrivate(b, private) then
                 b.time = item.time
                 table.insert(out, b)
                 if #out >= limit then break end
@@ -38,7 +38,7 @@ function Home:books(limit)
 end
 
 function Home:layout()
-    self.ops, self.taps = {}, {}
+    self.ops, self.taps, self.wants = {}, {}, {}
     local W = self.dimen.w
     local L, R = px(56), W - px(56)
     local inner = R - L

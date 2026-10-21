@@ -12,14 +12,20 @@ Daf's Move to shelf…, a list of every shelf to send it to. After Cut or Copy, 
 a bar to put it there. Files has New shelf here, Select several (in KOReader's browser, which
 has the tools for many at once) and the browser itself at this folder.
 
-A book on Daf's private list shows as its file name only, with no cover. Covers the screen
-doesn't have yet come in one at a time after it's drawn, so a new folder opens at once.
+A book on Daf's private list shows as its file name only, with no cover. Covers come from
+covers.lua: a page draws with the ones that are quick to make (up to about a third of a second's
+worth), the rest come in one at a time after it's up, and a book that has to be opened for its
+cover gets it when the background process is done with it. While a page is up, the next page's
+covers are made.
 ]]
 local ButtonDialog = require("ui/widget/buttondialog")
+local Covers = require("covers")
 local Device = require("device")
+local Geom = require("ui/geometry")
 local InfoMessage = require("ui/widget/infomessage")
 local InputDialog = require("ui/widget/inputdialog")
 local UIManager = require("ui/uimanager")
+local time = require("ui/time")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
@@ -55,7 +61,7 @@ function Shelf:load()
             local p = self.path .. "/" .. f
             if f:sub(1, 1) ~= "." and lfs.attributes(p, "mode") == "file" and C.BOOK_EXT[(f:match("%.([^.]+)$") or ""):lower()] then
                 local b = C.bookInfo(p)
-                if b.md5 and private[b.md5] then
+                if C.isPrivate(b, private) then
                     b.private, b.title, b.author = true, f:gsub("%.[^.]+$", ""), nil
                 end
                 table.insert(self.books, b)
@@ -95,12 +101,27 @@ function Shelf:entries()
     return list
 end
 
+-- The size of a book's cover in the grid of books (three across, two down) that starts at y.
+function Shelf.coverSize(W, H, y)
+    local colw = math.floor((W - 2 * px(56) - 2 * px(40)) / 3)
+    local cell_h = math.floor((H - px(116) - px(64) - px(10) - y - px(26)) / 2)
+    local cover_h = math.min(cell_h - px(96), math.floor(colw * 1.5))
+    return math.min(colw, math.floor(cover_h / 1.5)), cover_h
+end
+
+-- The usual one, on a shelf of books with nothing cut or copied: what the library's covers are
+-- made at ahead of time.
+function Shelf.usualCoverSize()
+    local Screen = Device.screen
+    return Shelf.coverSize(Screen:getWidth(), Screen:getHeight(), px(76) + px(26) + px(112) + px(80))
+end
+
 function Shelf:isRoot()
     return self.path == C.homeDir()
 end
 
 function Shelf:layout()
-    self.ops, self.taps, self.missing = {}, {}, {}
+    self.ops, self.taps, self.missing, self.wants = {}, {}, {}, {}
     local W = self.dimen.w
     local L, R = px(56), W - px(56)
     local inner = R - L
@@ -188,10 +209,9 @@ function Shelf:layout()
     local gap_x, gap_y = px(40), px(26)
     local colw = math.floor((inner - (cols - 1) * gap_x) / cols)
     local cell_h = math.floor((nav_top - pager_h - px(10) - y - (rows - 1) * gap_y) / rows)
-    local text_h = px(96)
-    local cover_h = math.min(cell_h - text_h, math.floor(colw * 1.5))
-    local cover_w = math.min(colw, math.floor(cover_h / 1.5))
+    local cover_w, cover_h = Shelf.coverSize(W, self.dimen.h, y)
     self.grid = { cover_w = cover_w, cover_h = cover_h }
+    local quick_until = not self.partial and time.now() + time.ms(300)
     for i = 1, per do
         local e = entries[(self.page - 1) * per + i]
         if not e then break end
@@ -209,14 +229,12 @@ function Shelf:layout()
             self:tap(cx, cy, colw, cell_h, function() self:openShelf(path) end, function() self:fileDialog(path, false) end)
         else
             local bx = cx + math.floor((colw - cover_w) / 2)
-            local made
             if e.private then
                 self:frame(bx, cy, cover_w, cover_h)
-                made = true
             else
-                made = self:coverOrTitle(e, bx, cy, cover_w, cover_h, false)
+                local _made, why = self:coverOrTitle(e, bx, cy, cover_w, cover_h, quick_until and time.now() < quick_until or false)
+                if why == "later" then table.insert(self.missing, { book = e, x = bx, y = cy }) end
             end
-            if not made then table.insert(self.missing, { book = e, x = bx, y = cy }) end
             local ty = cy + cover_h + px(10)
             local th = self:box(C.shortTitle(e.title), SERIF, 25, cx, ty, colw, 2, { bold = true })
             local st = self:status(e)
@@ -233,6 +251,12 @@ function Shelf:layout()
             local file = e.file
             self:tap(cx, cy, colw, cell_h, function() self:openBook(file) end, function() self:fileDialog(file, true) end)
         end
+    end
+    -- the next page's books, for making their covers ahead
+    self.next_files = {}
+    for i = 1, per do
+        local e = entries[self.page * per + i]
+        if e and not e.folder and not e.private then table.insert(self.next_files, e.file) end
     end
     if #entries == 0 then
         self:box(self.filter == "all" and _("Nothing on this shelf yet.") or _("Nothing here with that filter."), SERIF, 30, L, y + px(60), inner, 2, { align = "center", color = MID })
@@ -251,18 +275,30 @@ function Shelf:layout()
     self.pages = pages
 end
 
--- Covers the screen doesn't have yet, one after another once it's up.
+-- Covers the screen doesn't have yet, one after another once it's up; then the next page's.
 function Shelf:fillCovers()
     UIManager:unschedule(self.fill_fn)
     self.fill_fn = self.fill_fn or function()
         if not UIManager:isWidgetShown(self) then return end
         local m = table.remove(self.missing or {}, 1)
-        if not m then return end
-        C.cover(m.book, self.grid.cover_w, self.grid.cover_h, true)
-        self:update(require("ui/geometry"):new{ x = m.x, y = m.y, w = self.grid.cover_w, h = self.grid.cover_h })
-        if #self.missing > 0 then UIManager:scheduleIn(0.05, self.fill_fn) end
+        if m then
+            local w, h = self.grid.cover_w, self.grid.cover_h
+            local region = Geom:new{ x = m.x, y = m.y, w = w, h = h }
+            local path, why = C.cover(m.book, w, h, true)
+            if path then
+                self:update(region)
+            elseif why == "pending" and m.book.key then
+                self.wants[m.book.key] = region
+            end
+        end
+        if #self.missing > 0 then
+            UIManager:scheduleIn(0.05, self.fill_fn)
+        elseif self.next_files and #self.next_files > 0 then
+            Covers.ahead(self.next_files, { { self.grid.cover_w, self.grid.cover_h } }, true)
+            self.next_files = nil
+        end
     end
-    if self.missing and #self.missing > 0 then UIManager:scheduleIn(0.3, self.fill_fn) end
+    UIManager:scheduleIn(0.3, self.fill_fn)
 end
 
 function Shelf:update(region)
@@ -273,6 +309,7 @@ end
 function Shelf:onShow()
     Canvas.onShow(self)
     self:fillCovers()
+    Covers.resume(2)
 end
 
 function Shelf:onCloseWidget()
