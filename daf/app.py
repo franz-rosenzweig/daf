@@ -2809,6 +2809,43 @@ def get_extension(name: str):
                         headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
+# The extension updates itself in Firefox and Zen: its manifest names /extension/updates.json
+# (gecko.update_url), which they check about once a day, and a newer version there is installed
+# without asking. Only Mozilla's signed builds (extension/signed/, from extension/sign.sh) are
+# offered, since nothing else installs. Both routes are open, with no sign-in: they're signed builds
+# of the extension's code, which is public, and nothing of anyone's.
+def _signed_builds():
+    root = config.WEB_DIR.parent / "extension"
+    out = []
+    for f in (root / "signed").glob("*.xpi"):
+        m = re.search(r"-(\d+(?:\.\d+)+)\.xpi$", f.name)
+        if m:
+            out.append((tuple(int(x) for x in m.group(1).split(".")), m.group(1), f))
+    return sorted(out)
+
+
+@app.get("/extension/updates.json")
+def extension_updates():
+    root = config.WEB_DIR.parent / "extension"
+    addon = json.loads((root / "manifest.json").read_text())["browser_specific_settings"]["gecko"]["id"]
+    updates = []
+    builds = _signed_builds()
+    if builds:
+        _, version, f = builds[-1]
+        updates.append({"version": version,
+                        "update_link": f"{config.public_url()}/extension/daf-{version}.xpi",
+                        "update_hash": "sha256:" + hashlib.sha256(f.read_bytes()).hexdigest()})
+    return JSONResponse({"addons": {addon: {"updates": updates}}}, headers={"Cache-Control": "private, no-cache"})
+
+
+@app.get("/extension/daf-{version}.xpi")
+def extension_build(version: str):
+    for _, v, f in _signed_builds():
+        if v == version:
+            return FileResponse(f, media_type="application/x-xpinstall")
+    raise HTTPException(404, "No such version")
+
+
 # ---- the web app ----------------------------------------------------------------
 
 @app.get("/")

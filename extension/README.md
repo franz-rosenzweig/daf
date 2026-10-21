@@ -47,6 +47,12 @@ Firefox (and Zen, which is built on it) only keeps add-ons that Mozilla has sign
 
 Mozilla won't sign the same version twice, so for the next change bump `"version"` in `manifest.json` first.
 
+## Updates
+
+From 0.5.1 on, Zen updates the extension by itself. The manifest tells it to check `https://daf.tiresia.xyz/extension/updates.json`, which Daf answers with the newest signed file in `signed/`, and Zen looks about once a day and installs a newer one without asking. So a change goes out like this: bump `"version"`, run `extension/sign.sh`, and commit the new file in `signed/`. That's it; Daf reads it from disk. To get it right away, `about:addons` → the gear → **Check for Updates**.
+
+Chrome and Arc don't update an unpacked extension, so there it's still `build.sh` and the reload button on `chrome://extensions`. Safari's comes with the Mac app.
+
 ## Chrome or Arc
 
 Open `chrome://extensions` (Arc: `arc://extensions`), turn on "Developer mode" at the top right, click "Load unpacked" and pick the `dist/chromium` folder. That's it. Chrome may nag about developer extensions now and then; that's normal.

@@ -62,7 +62,7 @@ I install mine with `tools/install-kindle.sh`, which does the same thing over SS
 
 ## The browser extension
 
-- **Firefox or Zen:** in Daf, open **Preferences → Account**, and under "Browser extension" download the file for **Firefox or Zen**. Then `about:addons` → the gear → **Install Add-on From File…**.
+- **Firefox or Zen:** in Daf, open **Preferences → Account**, and under "Browser extension" download the file for **Firefox or Zen**. Then `about:addons` → the gear → **Install Add-on From File…**. From version 0.5.1 on, it updates itself after that, like any other add-on.
 - **Chrome or Arc:** download the file for **Chrome or Arc** from the same place and unzip it, then open `chrome://extensions`, turn on **Developer mode** and press **Load unpacked**.
 - **Safari:** it comes inside the Mac app. Tick **Daf** in Safari → Settings → Extensions and allow it on every website.
 
