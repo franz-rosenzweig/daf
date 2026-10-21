@@ -1,7 +1,7 @@
 --[[
 Home: the Kindle's front page, opened when KOReader starts, after a book closes, and from the
 file browser's house icon (Tools → Daf has the switches). From the top: the time, the date with
-the Hebrew date, and the battery; today's minutes toward the Daf goal (and this Shabbat's
+the Hebrew date, and the battery; today's minutes toward the Daf goal, with a bar (and this Shabbat's
 parasha, which opens the Torah shelf); the book in hand with Resume; the books read lately;
 and the bar of Home, Shelves, History, Daf and Search. The review is on the Daf tab and the
 shelves on Shelves.
@@ -13,7 +13,7 @@ local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
 local Canvas = require("canvas")
 local C = Canvas.C
-local px, SERIF, SANS, MID, SOFT, WHITE, BLACK = C.px, C.SERIF, C.SANS, C.MID, C.SOFT, C.WHITE, C.BLACK
+local px, SERIF, SANS, MID, SOFT, WHITE = C.px, C.SERIF, C.SANS, C.MID, C.SOFT, C.WHITE
 
 local Home = Canvas:extend{
     name = "daf_home",
@@ -37,20 +37,6 @@ function Home:books(limit)
     return out
 end
 
-function Home:ring(cx, cy, r, frac)
-    local track, thick = px(8), px(16)
-    self:put(function(bb, ox, oy)
-        bb:paintCircle(ox + cx, oy + cy, r + math.floor(track / 2), SOFT, track)
-        local steps = math.floor(720 * math.max(0, math.min(1, frac)))
-        for i = 0, steps do
-            local a = (i / 720) * 2 * math.pi - math.pi / 2
-            local x = ox + cx + math.floor(math.cos(a) * r + 0.5) - math.floor(thick / 2)
-            local y = oy + cy + math.floor(math.sin(a) * r + 0.5) - math.floor(thick / 2)
-            bb:paintRoundedRect(x, y, thick, thick, BLACK, math.floor(thick / 2))
-        end
-    end)
-end
-
 function Home:layout()
     self.ops, self.taps = {}, {}
     local W = self.dimen.w
@@ -61,29 +47,27 @@ function Home:layout()
     local y = self:statusLine()
     local nav_top = self:navBar("home")
 
-    -- today (200), with this Shabbat's parasha on the right
+    -- today (200): the minutes toward Daf's goal and a bar, with this Shabbat's parasha on the right
     local s = daf:summary()
     local goal = daf:goal()
     local total = math.floor(s.total)
-    local r = px(70)
-    local cx, cy = L + r + px(8), y + px(100)
-    self:ring(cx, cy, r, total / goal)
-    self:text(tostring(total), SERIF, 52, cx, cy - px(40), { align = "center", bold = true })
-    self:text(string.format(_("of %d"), goal), SANS, 19, cx, cy + px(16), { align = "center", color = MID })
-    local tx = L + 2 * r + px(56)
-    self:text(_("TODAY"), SANS, 21, tx, y + px(34), { bold = true })
+    local top = y
+    self:text(_("TODAY"), SANS, 21, L, y + px(30), { bold = true })
     if daf:homeIsToday() and home.parasha then
-        self:text(string.format(_("Shabbat: %s ›"), home.parasha), SANS, 22, R, y + px(33), { align = "right" })
-        self:tap(R - px(380), y + px(14), px(380), px(60), function() self:openFolderNamed("Torah") end)
+        self:text(string.format(_("Shabbat: %s ›"), home.parasha), SANS, 22, R, y + px(29), { align = "right" })
+        self:tap(R - px(380), y + px(10), px(380), px(60), function() self:openFolderNamed("Torah") end)
     end
-    self:text(string.format(_("%d of %d minutes"), total, goal), SERIF, 48, tx, y + px(64))
+    local nw = self:text(tostring(total), SERIF, 64, L, y + px(56), { bold = true })
+    self:text(string.format(_("of %d minutes"), goal), SERIF, 36, L + nw + px(16), y + px(84))
+    self:bar(L, y + px(166), inner, px(16), total / goal)
     local line = total >= goal and _("That's the goal.") or string.format(_("%d to go"), goal - total)
-    local lw = self:text(line, SANS, 24, tx, y + px(132), { bold = true })
+    local lw = self:text(line, SANS, 24, L, y + px(196), { bold = true })
     if s.year_day then
-        self:text(string.format(_(" · Year 30, day %d · %s hours so far"), s.year_day, tostring(s.year_hours or 0)), SANS, 24, tx + lw, y + px(132), { color = MID, max_w = R - tx - lw })
+        self:text(string.format(_(" · Year 30, day %d · %s hours so far"), s.year_day, tostring(s.year_hours or 0)), SANS, 24, L + lw, y + px(196), { color = MID, max_w = inner - lw })
     end
-    self:tap(L, y + px(60), inner, px(140), function() daf:showScreen() end)
-    y = y + px(200)
+    self:tap(L, top + px(60), inner - px(400), px(190), function() daf:showScreen() end)
+    self:tap(L, top + px(150), inner, px(100), function() daf:showScreen() end)
+    y = y + px(250)
     self:rect(L, y, inner, px(2))
 
     -- lately, at the bottom: five across

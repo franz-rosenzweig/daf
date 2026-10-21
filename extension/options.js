@@ -29,16 +29,19 @@ $('#f').addEventListener('submit', async e => {
   test();
 });
 
-$('#auto').addEventListener('change', e => P.storage.local.set({ auto: e.target.checked }));
+document.querySelectorAll('input[name="select"]').forEach(r => r.addEventListener('change', e => {
+  if (e.target.checked) P.storage.local.set({ select: e.target.value });
+}));
 
 (async () => {
-  const s = await P.storage.local.get({ url: DEFAULT_URL, token: '', auto: true });
-  $('#auto').checked = s.auto !== false;
+  const s = await P.storage.local.get({ url: DEFAULT_URL, token: '', select: 'ask' });
+  const pick = document.querySelector('input[name="select"][value="' + s.select + '"]') || document.querySelector('input[name="select"][value="ask"]');
+  pick.checked = true;
   $('#url').value = s.url || DEFAULT_URL;
   $('#token').value = s.token || '';
   try {
     const cmd = (await P.commands.getAll()).find(c => c.name === 'highlight-selection');
-    if (cmd && cmd.shortcut) $('#key').textContent = cmd.shortcut;
+    if (cmd && cmd.shortcut) document.querySelectorAll('.key').forEach(k => { k.textContent = cmd.shortcut; });
   } catch (err) { /* no shortcuts here */ }
   if (s.token) test();
 })();

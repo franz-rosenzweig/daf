@@ -17,7 +17,7 @@ Later in the morning I open **Review** and go through the other four. I press **
 
 I work at my desk on the Mac, and the menu bar shows today's minutes all day: "38′" until the hour is done, then "60′ ✓". It's a small thing, but having it in sight is half of what Year 30 needed.
 
-When I find an article worth reading, I don't read it right then. I select a line with the browser extension, which saves the page to the Library with the highlight already on it, or I use "Save to Daf" from the share menu, and it waits for me in the Library's **Inbox**. The next morning at seven, the morning email lists what I saved, each with a two- or three-line summary.
+When I find an article worth reading, I don't read it right then. I select a line and press Highlight in the browser extension, which saves the page to the Library with the highlight already on it, or I use "Save to Daf" from the share menu, and it waits for me in the Library's **Inbox**. The next morning at seven, the morning email lists what I saved, each with a two- or three-line summary.
 
 The Feed is where my RSS lives now, instead of Read You. I read it a folder at a time, and anything I don't get to moves to **Seen** after a month, so the Feed never turns into a pile I feel guilty about. When a post deserves more than a skim, I highlight it, which saves it to the Library on its own.
 

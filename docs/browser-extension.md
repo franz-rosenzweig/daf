@@ -2,15 +2,17 @@
 
 # The browser extension
 
-The Daf extension lets you highlight on any web page, the way the Readwise Reader extension does. Select some text, it's highlighted, and the page goes into your Daf Library with that highlight on it. From there it's in the reading view, the daily review and the vault like any other highlight. Basically, instead of saving a link and highlighting it again in Daf later, you highlight it where you're reading it.
+The Daf extension lets you highlight on any web page, the way the Readwise Reader extension does. Select some text, press **Highlight**, and the page goes into your Daf Library with that highlight on it. From there it's in the reading view, the daily review and the vault like any other highlight. Basically, instead of saving a link and highlighting it again in Daf later, you highlight it where you're reading it.
 
 It works in Firefox and Zen, in Chrome and Arc, and in Safari through the Mac app. To install it, see [Install](install.md#the-browser-extension).
 
 ## Highlighting
 
-- Select text with the mouse and it's highlighted right away. A small bar comes up for the new highlight, so you can change the color, add a note or take it back.
-- Hold **Alt** (Option on the Mac) while you select to just select, without highlighting.
-- A single word, or a selection on a touch screen, gets a **Highlight** pill instead of highlighting at once. If you turn off "Highlight as soon as I select text" in the extension's **Options**, every selection gets the pill, and **Alt+H** highlights it.
+- Select text and a **Highlight** button comes up next to it. Press it, or **Alt+H** (Option+H on the Mac), and it's highlighted; the button beside it highlights and opens a note. Nothing is kept until you do, so selecting text to copy it never saves the page. A small bar then comes up for the new highlight, so you can change the color, add a note or take it back.
+- What selecting does is up to you, in the extension's **Options** under "When I select text":
+  - **Ask** (the default): the Highlight button, as above.
+  - **Nothing, until I press Alt+H**: no button at all. Alt+H, or right-click the selection and choose **Highlight in Daf**. On a touch screen you still get the button, since there's no key to press.
+  - **Highlight it right away**: like Daf's own reader, a selection made with the mouse is highlighted as soon as you let go. Hold **Alt** while you select to only select; a single word still gets the button.
 - Click a highlight to change the color (the same five as Daf), add a note and tags, or remove it. Removing it gives you an Undo for a few seconds.
 - Tags are chips under the note, like in Daf: type one and press Enter, or pick one of your tags from the suggestions. ".tag" in the note works too.
 

@@ -548,8 +548,7 @@ function panelDraw(fresh){
     '<div class="pacts">' + (saved ? '<button class="btn line" data-a="popen">Open in Daf</button>' : '') +
     (inLib ? '' : '<button class="btn primary" data-a="psave">Save to your Library</button>') + '</div></div>' +
     '<div class="plist">' + (hls.length ? inOrder().map(itemHTML).join('') :
-      '<div class="empty">' + (opts.auto ? 'Select some text on the page and it’s highlighted.' : 'Select some text on the page and choose Highlight, or press ' + esc(KEY) + '.') +
-      ' Hold Alt' + (MAC ? ' (⌥)' : '') + ' while you select to select without highlighting.</div>') + '</div>';
+      '<div class="empty">' + emptyText() + '</div>') + '</div>';
   const list = panelEl.querySelector('.plist'); list.scrollTop = y;
   if (fresh) { const it = list.querySelector('[data-k="' + fresh.key + '"]'); if (it) { it.classList.add('new'); it.scrollIntoView({ block: 'nearest' }); } }
 }
@@ -725,13 +724,30 @@ function stop(){
 }
 
 /* ---------- settings ---------- */
-// auto: a selection made with the mouse is highlighted when the button comes up, as in Daf's reader
-// and Readwise. Alt while selecting, a single word, or a touch screen get the Highlight button instead.
-let opts = { auto: true };
+// select: what selecting text on a page does (Options).
+//   ask (the default)  the Highlight button comes up beside it; nothing is kept until it's pressed
+//                      (or Alt+H), so selecting to copy never saves a page.
+//   shortcut           nothing comes up: Alt+H, or right-click → Highlight in Daf. A touch screen,
+//                      which has neither, still gets the button.
+//   auto               a selection made with the mouse is highlighted at once, as in Daf's reader;
+//                      Alt while selecting, a single word, or a touch screen get the button instead.
+// Up to 0.4 there was only `auto`, on unless turned off. It isn't read any more: everyone starts on ask.
+const SELECT = ['ask', 'shortcut', 'auto'];
+let opts = { select: 'ask' };
 try {
-  X.storage.local.get({ auto: true }, s => { if (s) opts.auto = s.auto !== false; });
-  X.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.auto) { opts.auto = ch.auto.newValue !== false; panelDraw(); } });
+  X.storage.local.get({ select: 'ask' }, s => { if (s && SELECT.includes(s.select)) opts.select = s.select; });
+  X.storage.onChanged.addListener((ch, area) => {
+    if (area !== 'local' || !ch.select) return;
+    opts.select = SELECT.includes(ch.select.newValue) ? ch.select.newValue : 'ask';
+    if (mode === 'sel') hideBar();
+    panelDraw();
+  });
 } catch (e) { /* storage not here: the default stands */ }
+function emptyText(){
+  if (opts.select === 'auto') return 'Select some text on the page and it’s highlighted. Hold Alt' + (MAC ? ' (⌥)' : '') + ' while you select to only select.';
+  if (opts.select === 'shortcut') return 'Select some text on the page and press ' + esc(KEY) + ', or right-click it and choose Highlight in Daf.';
+  return 'Select some text on the page and choose Highlight, or press ' + esc(KEY) + '.';
+}
 
 /* ---------- events ---------- */
 let down = false, selT = 0, pointer = 'mouse';
@@ -739,8 +755,8 @@ const fromUi = e => host && e.composedPath && e.composedPath().includes(host);
 function checkSel(ev){
   if (stopped || mode === 'note' || (ed && ed.where === 'bar')) return;
   const r = selRange();
-  if (r && ev && opts.auto && page.connected && pointer === 'mouse' && !ev.altKey && /\S\s+\S/.test(r.toString().trim())) { highlight(false); return; }
-  if (r) showSelBar(r);
+  if (r && ev && opts.select === 'auto' && page.connected && pointer === 'mouse' && !ev.altKey && /\S\s+\S/.test(r.toString().trim())) { highlight(false); return; }
+  if (r && (opts.select !== 'shortcut' || pointer !== 'mouse')) showSelBar(r);
   else if (mode === 'sel') hideBar();
 }
 document.addEventListener('pointerdown', e => { pointer = e.pointerType || 'mouse'; }, true);

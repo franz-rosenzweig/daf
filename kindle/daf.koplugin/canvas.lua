@@ -504,9 +504,69 @@ end
 
 function Canvas:onPageSwipe(_ges) return true end
 
-function Canvas:hit(ges, hold)
+-- KOReader's gestures (Settings → Taps and gestures → Gesture manager): the corners, the edges,
+-- two fingers, multiswipes. They belong to the file browser (or the book) under this screen, which
+-- never sees a touch while this is up; so one that has an action set goes to it first, the way the
+-- file browser itself puts them before its own taps. The rest are this screen's.
+local function hasAction(set)
+    if type(set) ~= "table" then return false end
+    for k in pairs(set) do
+        if k ~= "settings" then return true end
+    end
+    return false
+end
+
+function Canvas:koGesture(ev)
+    local ui = self:ui()
+    local g = ui and ui.gestures
+    if not (g and type(g.gestures) == "table" and ui._ordered_touch_zones) then return false end
+    for _i, tz in ipairs(ui._ordered_touch_zones) do
+        local id = tz.def and tz.def.id
+        local has
+        if id == "multiswipe" then has = g.multiswipes_enabled == true else has = id and hasAction(g.gestures[id]) end
+        if has and tz.gs_range:match(ev) then
+            local ok, done = pcall(tz.handler, ev)
+            if ok and done then return true end
+        end
+    end
+    return false
+end
+
+-- A tap or hold on one of this screen's buttons is the button's (the bar at the bottom sits in
+-- KOReader's bottom corners); anything else goes to KOReader's gestures first. Every touch stops
+-- here, so none reaches the file list hidden underneath.
+function Canvas:onGesture(ev)
+    if (ev.ges == "tap" or ev.ges == "hold") and self:target(ev, ev.ges == "hold") then return true end
+    if self:koGesture(ev) then return true end
+    InputContainer.onGesture(self, ev)
+    return true
+end
+
+-- What a gesture does (night mode, the frontlight, Wi-Fi, a quick menu's choice…) is sent as an
+-- event to the screen on top, this one. KOReader's handlers for it are in the file browser (or the
+-- book) underneath, so while this is up that one is "always active", KOReader's own way of letting
+-- a screen below hear what the top one leaves (Dispatcher events).
+function Canvas:relayOn()
+    local ui = self:ui()
+    if ui and not ui.is_always_active then
+        ui.is_always_active, ui._daf_relay = true, true
+    end
+end
+
+function Canvas:relayOff()
+    for _i, win in ipairs(UIManager._window_stack) do
+        local w = win.widget
+        if w ~= self and w.relayOn == Canvas.relayOn then return end      -- another of these is still up
+    end
+    local uis = { self:fm() or false, require("apps/reader/readerui").instance or false }
+    for _i, ui in ipairs(uis) do
+        if ui and ui._daf_relay then ui.is_always_active, ui._daf_relay = nil, nil end
+    end
+end
+
+-- Runs the button under the touch, if there is one.
+function Canvas:target(ges, hold)
     local x, y = ges.pos.x - self.dimen.x, ges.pos.y - self.dimen.y
-    if not hold and y < px(76) then return self:showMenu(ges, false) or true end
     for i = #self.taps, 1, -1 do
         local t = self.taps[i]
         if x >= t.x and x < t.x + t.w and y >= t.y and y < t.y + t.h and (not hold or t.hold) then
@@ -514,7 +574,12 @@ function Canvas:hit(ges, hold)
             return true
         end
     end
-    return true
+    return false
+end
+
+function Canvas:hit(ges, hold)
+    if not hold and ges.pos.y - self.dimen.y < px(76) then return self:showMenu(ges, false) or true end
+    return self:target(ges, hold) or true
 end
 
 function Canvas:onTap(_arg, ges) return self:hit(ges, false) end
@@ -540,11 +605,13 @@ end
 
 function Canvas:onShow()
     shown[self] = true
+    self:relayOn()
     self:scheduleTick()
     UIManager:setDirty(self, function() return "full", self.dimen end)
 end
 
 function Canvas:onCloseWidget()
+    self:relayOff()
     shown[self] = nil
     if self.tick_fn then UIManager:unschedule(self.tick_fn) end
 end

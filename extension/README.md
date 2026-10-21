@@ -6,8 +6,8 @@ It works in Zen and Firefox, and in Chrome and Arc too.
 
 ## Using it
 
-- Select some text with the mouse and it's highlighted right away, like in Daf's reader and in Readwise. A little bar comes up for the new highlight, so I can change the color, add a note or take it back.
-- Holding **Alt** (Option on the Mac) while I select just selects, without highlighting. A single word, or selecting on a touch screen, gets a "Highlight" pill instead. With the option turned off (Options → "Highlight as soon as I select text"), every selection gets the pill: click it or press **Alt+H**.
+- Select some text and a "Highlight" button comes up next to it: click it or press **Alt+H**. Nothing is saved until I do, so selecting something to copy it doesn't put the page in Daf (it used to, which is why this changed in 0.5). A little bar comes up for the new highlight, so I can change the color, add a note or take it back.
+- Options → "When I select text" has three choices: **Ask** (the button, the default), **Nothing, until I press Alt+H** (no button; Alt+H or right-click → Highlight in Daf), and **Highlight it right away** (like Daf's reader; hold **Alt**/Option while selecting to only select).
 - Click a highlight to change the color (the same five as Daf), add a note and tags, or remove it. Removing it gives you an Undo for a few seconds.
 - Tags are chips under the note, like in Daf: type one and hit Enter, or pick one of my existing tags from the suggestions. ".tag" in the note still works too.
 - **Alt+Shift+H**, the list button on a highlight's bar, or "Show my highlights on the page" in the toolbar button opens a panel down the right side with every highlight on the page, in order, with notes and tags. Click one to jump to it; I can edit the note and tags or remove it right there. Esc closes it.
@@ -46,6 +46,12 @@ Firefox (and Zen, which is built on it) only keeps add-ons that Mozilla has sign
 4. In Zen: download it from Preferences → Account → Browser extension → Firefox or Zen, then `about:addons` → the gear → "Install Add-on From File…".
 
 Mozilla won't sign the same version twice, so for the next change bump `"version"` in `manifest.json` first.
+
+## Updates
+
+From 0.5.1 on, Zen updates the extension by itself. The manifest tells it to check `https://daf.tiresia.xyz/extension/updates.json`, which Daf answers with the newest signed file in `signed/`, and Zen looks about once a day and installs a newer one without asking. So a change goes out like this: bump `"version"`, run `extension/sign.sh`, and commit the new file in `signed/`. That's it; Daf reads it from disk. To get it right away, `about:addons` → the gear → **Check for Updates**.
+
+Chrome and Arc don't update an unpacked extension, so there it's still `build.sh` and the reload button on `chrome://extensions`. Safari's comes with the Mac app.
 
 ## Chrome or Arc
 

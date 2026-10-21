@@ -528,6 +528,13 @@ four I'd called not worth it.
   with fulltext.py) and keeps it when it has more words than Daf's copy, and clears `ai_summary` so the
   summary is made again from the whole thing. `/api/web/page` answers `where: "deleted"`.
   URL helpers moved from webapi.py to `daf/pages.py`.
+- **The extension updates itself** (0.5.1 on, Firefox and Zen): the Firefox manifest has
+  `gecko.update_url` = https://daf.tiresia.xyz/extension/updates.json, which they check about once a
+  day. `GET /extension/updates.json` offers the newest file in `extension/signed/` (with its sha256),
+  and `GET /extension/daf-<version>.xpi` serves it. Both are open, no sign-in: signed builds of the
+  public extension code. To ship a change: bump `version` in extension/manifest.json, run
+  `extension/sign.sh`, commit the new file in `extension/signed/`; no restart (read from disk). Chrome
+  and Arc (unpacked) don't update themselves; Safari's comes with the Mac app.
 - **Keys** (`web/keys.js`): one table of scope → action → default keys for lists, articles, books,
   the review and manga; settings `keys` holds his changes (`PUT /api/keys`), `/api/today` brings them,
   localStorage `daf.keys` keeps them for a cold start. Handlers call `DafCore.Keys.is(e, scope, action)`;
