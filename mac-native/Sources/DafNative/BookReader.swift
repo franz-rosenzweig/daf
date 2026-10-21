@@ -25,6 +25,7 @@ final class BookModel {
     var showContents = UserDefaults.standard.bool(forKey: "book.contents")
     var sidebar = "contents"            // contents, highlights, bookmarks
     var editing: ReaderModel.Editing?
+    var sheet: HLSheet?
     /// The Kindle is further on than this place: offered as a jump.
     var kindleAhead: Double?
     /// The Kindle's highlights (KOReader's, with its words), found in this edition by their words.
@@ -328,10 +329,24 @@ final class BookModel {
         s.endEditing()
     }
 
-    /// The selection highlighted (H, or the menu), kept by Daf as the page keeps it.
-    func highlight(_ sel: NSRange, color: String = "yellow") async {
+    /// The selection highlighted (H, or the menu), kept by Daf as the page keeps it: highlights it
+    /// overlaps merge into it (`replaces`), and a selection inside one is that one.
+    func highlight(_ sel: NSRange, color: String? = nil, thenNote: Bool = false) async {
         guard let epub, let text, let s = pages?.storage, sel.length > 0, NSMaxRange(sel) <= s.length else { return }
+        let over = highlights.compactMap { h -> (J, NSRange)? in
+            guard let c = h.o("pos")?.s("cfi") else { return nil }
+            let p = CFI.parse(c)
+            guard epub.section(ofCFI: p) == section, let r = text.range(of: p), NSIntersectionRange(r, sel).length > 0 else { return nil }
+            return (h, r)
+        }
+        if let inside = over.first(where: { $0.1.location <= sel.location && NSMaxRange(sel) <= NSMaxRange($0.1) }) {
+            if thenNote { editing = .init(h: inside.0) }
+            pages?.deselect()
+            return
+        }
         var r = sel
+        for (_, o) in over { r = NSUnionRange(r, o) }
+        let color = color ?? over.first?.0.s("color") ?? HLTools.lastColour
         let ns = s.string as NSString
         while r.length > 0, let u = Unicode.Scalar(ns.character(at: r.location)), CharacterSet.whitespacesAndNewlines.contains(u) { r.location += 1; r.length -= 1 }
         while r.length > 0, let u = Unicode.Scalar(ns.character(at: NSMaxRange(r) - 1)), CharacterSet.whitespacesAndNewlines.contains(u) { r.length -= 1 }
@@ -339,16 +354,23 @@ final class BookModel {
         let cfi = CFI.join(epub.sections[section].cfi, local)
         let words = ns.substring(with: r).split(whereSeparator: \.isWhitespace).joined(separator: " ")
         do {
-            let res = J(try await API.shared.send("POST", "/api/ebooks/\(API.enc(id))/highlights",
-                                                ["cfi": cfi, "text": words, "chapter": chapter, "fraction": fraction, "color": color]))
+            var body: [String: Any] = ["cfi": cfi, "text": words, "chapter": chapter, "fraction": fraction, "color": color]
+            if !over.isEmpty { body["replaces"] = over.compactMap { $0.0.s("id") } }
+            let res = J(try await API.shared.send("POST", "/api/ebooks/\(API.enc(id))/highlights", body))
             let hid = res?.s("id") ?? UUID().uuidString
-            highlights.removeAll { $0.s("id") == hid }
-            highlights.append(J(["id": hid, "text": words, "chapter": chapter, "pos": ["cfi": cfi, "fraction": fraction], "color": color, "source": "epub"]))
+            let gone = Set(over.compactMap { $0.0.s("id") })
+            let notes = over.compactMap { $0.0.s("user_note") }
+            highlights.removeAll { $0.s("id") == hid || gone.contains($0.s("id") ?? "") }
+            var made: [String: Any] = ["id": hid, "text": words, "chapter": chapter, "pos": ["cfi": cfi, "fraction": fraction], "color": color, "source": "epub"]
+            if !notes.isEmpty { made["user_note"] = notes.joined(separator: "\n\n") }
+            highlights.append(J(made))
             paint()
             pages?.deselect()
+            if thenNote { editing = .init(h: J(made)) }
         } catch { self.error = error.localizedDescription }
     }
 
+    /// Remove, with Undo bringing it back (/api/highlights/{id}/restore).
     func remove(highlight hid: String) async {
         do {
             try await API.shared.send("DELETE", "/api/highlights/\(API.enc(hid))", nil)
@@ -356,6 +378,11 @@ final class BookModel {
             kindle.removeAll { $0.s("id") == hid }
             placedKindle = placedKindle.mapValues { $0.filter { $0.id != hid } }
             paint()
+            let book = id
+            AppModel.shared.say("Highlight removed", undo: "Remove Highlight") { [weak self] in
+                _ = try? await API.shared.send("POST", "/api/highlights/\(API.enc(hid))/restore", [:])
+                if let self, let d = try? await API.shared.json("/api/ebooks/" + API.enc(book)) { self.highlights = d.a("highlights"); self.paint() }
+            }
         } catch { self.error = error.localizedDescription }
     }
 
@@ -719,6 +746,16 @@ final class BookPagesView: NSView, NSTextViewDelegate {
 final class BookTextView: NSTextView {
     weak var pages: BookPagesView?
 
+    /// Highlight on selecting (a selection of words, unless ⌥ is held), as the page does.
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        let sel = selectedRange()
+        guard HLTools.autoHighlight, sel.length > 1, !NSEvent.modifierFlags.contains(.option), event.clickCount == 1,
+              (string as NSString).substring(with: sel).trimmingCharacters(in: .whitespacesAndNewlines).contains(" ") else { return }
+        let m = pages?.model
+        Task { @MainActor in await m?.highlight(sel) }
+    }
+
     override func keyDown(with event: NSEvent) {
         if pages?.handle(event) != true { super.keyDown(with: event) }
     }
@@ -735,22 +772,18 @@ final class BookTextView: NSTextView {
         let menu = super.menu(for: event) ?? NSMenu()
         let at = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
         var extra: [NSMenuItem] = []
-        if selectedRange().length > 0 { extra.append(item("Highlight", #selector(highlightNow))) }
-        if at < textStorage?.length ?? 0, let hid = textStorage?.attribute(.dafHighlight, at: at, effectiveRange: nil) as? String, !hid.isEmpty {
-            let h = MainActor.assumeIsolated { pages?.model?.highlight(withID: hid) }
-            extra.append(item((h?.s("user_note") ?? "").isEmpty ? "Add a Note…" : "Edit the Note…", #selector(editNote(_:)), hid))
-            let colours = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            for c in ["yellow", "green", "blue", "pink", "purple"] {
-                let i = item(c.capitalized, #selector(recolor(_:)), [hid, c])
-                i.state = (h?.s("color") ?? "yellow") == c ? .on : .off
-                sub.addItem(i)
-            }
-            colours.submenu = sub
-            extra.append(colours)
-            extra.append(item("Remove Highlight", #selector(removeHighlight(_:)), hid))
+        let sel = selectedRange()
+        if sel.length > 0 {
+            extra.append(item("Highlight", #selector(highlightNow)))
+            extra.append(MenuAction.item("Highlight with a Note") { let m = self.pages?.model; Task { @MainActor in await m?.highlight(sel, thenNote: true) } })
         }
-        if selectedRange().length > 0 { extra.append(item("Ask About This Passage", #selector(askAbout))) }
+        if at < textStorage?.length ?? 0, let hid = textStorage?.attribute(.dafHighlight, at: at, effectiveRange: nil) as? String, !hid.isEmpty, let m = pages?.model {
+            extra += MainActor.assumeIsolated { HLMenu.items(for: hid, host: m, kindle: m.kindle.contains { $0.s("id") == hid }) }
+        }
+        if sel.length > 0 {
+            extra.append(item("Ask About This Passage", #selector(askAbout)))
+            if let m = pages?.model, let look = MainActor.assumeIsolated({ HLMenu.lookup((string as NSString).substring(with: sel), at: sel.location, host: m) }) { extra.append(look) }
+        }
         extra.append(item("Read Aloud from Here", #selector(readFromHere(_:)), at))
         let marked = MainActor.assumeIsolated { pages?.model?.marked ?? false }
         extra.append(item(marked ? "Remove the Bookmark" : "Bookmark This Page", #selector(bookmark)))
@@ -866,6 +899,9 @@ struct BookReaderView: View {
         .onDisappear { m.close(); if Speaker.shared.key == m.listenKey { Speaker.shared.stop() } }
         .sheet(item: $m.editing) { e in
             NoteSheet(h: e.h, saved: { n in m.changed(e.id) { $0["user_note"] = n } }).environment(app)
+        }
+        .sheet(item: $m.sheet) { s in
+            HLSheetView(sheet: s) { hid, fields in m.changed(hid) { raw in for (k, v) in fields { raw[k] = v } } }
         }
         .alert("Daf", isPresented: Binding(get: { m.error != nil && m.epub != nil }, set: { if !$0 { m.error = nil } })) {
             Button("OK") { m.error = nil }

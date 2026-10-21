@@ -22,6 +22,10 @@ final class ReaderModel {
     var asking = false
     /// A highlight whose note is being written.
     var editing: Editing?
+    /// A highlight's tags, flashcards or share card, or a word looked up.
+    var sheet: HLSheet?
+    /// The paragraph j and k move to (a block's index), where h and n highlight with no selection.
+    var focus: Int?
     struct Editing: Identifiable { let h: J; var id: String { h.s("id") ?? "" } }
     @ObservationIgnored private var noteTask: Task<Void, Never>?
     @ObservationIgnored private var noteDirty = false
@@ -171,7 +175,8 @@ final class ReaderModel {
         return p
     }
 
-    func compose() {
+    /// The article set as text; `keepPlace` when it's set again where it's already open (a new title).
+    func compose(keepPlace: Bool = false) {
         guard let d = doc else { return }
         let out = NSMutableAttributedString()
         let serif = Self.serif
@@ -221,7 +226,7 @@ final class ReaderModel {
         storage.setAttributedString(out)
         blocks = map
         applyHighlights()
-        restored = false
+        if !keepPlace { restored = false }
     }
 
     private func image(_ src: String, baseURL: URL) -> NSAttributedString {
@@ -312,27 +317,120 @@ final class ReaderModel {
         return (a.b, a.o, z.b, z.o, ns.substring(with: r))
     }
 
-    func highlightSelection(color: String = "yellow") async {
-        guard let tv = textView, let p = selectionPosition(tv.selectedRange()) else { return }
+    /// The selection (or a range: the focused paragraph) highlighted. Highlights it overlaps merge into
+    /// it, their notes and tags carried (`replaces`), as the page does; a selection inside a highlight
+    /// is that highlight. `thenNote` opens the note.
+    func highlightSelection(color: String? = nil, range given: NSRange? = nil, thenNote: Bool = false) async {
+        guard let tv = textView else { return }
+        var sel = given ?? tv.selectedRange()
+        guard sel.length > 0 else { return }
+        let over = highlights.compactMap { h -> (J, NSRange)? in
+            guard let r = range(of: h), NSIntersectionRange(r, sel).length > 0 else { return nil }
+            return (h, r)
+        }
+        if let inside = over.first(where: { $0.1.location <= sel.location && NSMaxRange(sel) <= NSMaxRange($0.1) }) {
+            if thenNote { editing = .init(h: inside.0) }
+            tv.setSelectedRange(NSRange(location: NSMaxRange(sel), length: 0))
+            return
+        }
+        for (_, r) in over { sel = NSUnionRange(sel, r) }
+        guard let p = selectionPosition(sel) else { return }
+        let colour = color ?? over.first?.0.s("color") ?? HLTools.lastColour
         do {
-            var body: [String: Any] = ["b": p.b, "s": p.s, "e": p.e, "text": p.text, "color": color]
+            var body: [String: Any] = ["b": p.b, "s": p.s, "e": p.e, "text": p.text, "color": colour]
             body["be"] = p.be != p.b ? p.be : NSNull()
+            if !over.isEmpty { body["replaces"] = over.compactMap { $0.0.s("id") } }
             let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/highlights", body))
             if let moved = r?.s("saved_as") { id = moved; movedToLibrary = true }   // a Feed item goes to the Library with its first highlight
             var pos: [String: Any] = ["b": p.b, "s": p.s, "e": p.e]
             if p.be != p.b { pos["be"] = p.be }
-            highlights.append(J(["id": r?.s("id") ?? UUID().uuidString, "text": p.text, "pos": pos, "color": color]))
+            let gone = Set(over.compactMap { $0.0.s("id") })
+            let notes = over.compactMap { $0.0.s("user_note") }
+            highlights.removeAll { gone.contains($0.s("id") ?? "") }
+            var made: [String: Any] = ["id": r?.s("id") ?? UUID().uuidString, "text": p.text, "pos": pos, "color": colour]
+            if !notes.isEmpty { made["user_note"] = notes.joined(separator: "\n\n") }
+            highlights.append(J(made))
             applyHighlights()
-            tv.setSelectedRange(NSRange(location: tv.selectedRange().location + tv.selectedRange().length, length: 0))
+            tv.setSelectedRange(NSRange(location: NSMaxRange(sel), length: 0))
+            if thenNote { editing = .init(h: J(made)) }
         } catch { self.error = error.localizedDescription }
     }
 
+    /// Remove, with Undo bringing it back (/api/highlights/{id}/restore).
     func remove(highlight hid: String) async {
         do {
             try await API.shared.send("DELETE", "/api/highlights/\(API.enc(hid))", nil)
             highlights.removeAll { $0.s("id") == hid }
             applyHighlights()
+            let doc = id
+            AppModel.shared.say("Highlight removed", undo: "Remove Highlight") { [weak self] in
+                _ = try? await API.shared.send("POST", "/api/highlights/\(API.enc(hid))/restore", [:])
+                if let self, let d = try? await API.shared.json("/api/docs/\(API.enc(doc))") { self.highlights = d.a("highlights"); self.applyHighlights() }
+            }
         } catch { self.error = error.localizedDescription }
+    }
+
+    // MARK: the article's own tools
+
+    /// Reset reading progress (/api/docs/{id}/progress), as the page's R.
+    func resetProgress() async {
+        do {
+            try await API.shared.send("DELETE", "/api/docs/\(API.enc(id))/progress", nil)
+            sentPct = 0
+            AppModel.shared.say("Reading progress reset")
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// The whole article from its page, for a feed that sends only a summary (/api/docs/{id}/full).
+    func loadFull() async {
+        do {
+            let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/full", [:]))
+            AppModel.shared.say("The full article: " + plural(r?.i("words") ?? 0, "word"))
+            await load()
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// Summarize it now (/api/docs/{id}/summary): the Feed's aren't summarized ahead of time.
+    func summarize() async {
+        do {
+            let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/summary", [:]))
+            if var raw = doc?.raw { raw["ai_summary"] = r?.s("ai_summary"); doc = J(raw) }
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// Edit the title and author (/api/docs/{id}/meta).
+    func editMeta(title: String, author: String) async -> Bool {
+        do {
+            let r = J(try await API.shared.send("PUT", "/api/docs/\(API.enc(id))/meta", ["title": title, "author": author]))
+            if var raw = doc?.raw { raw["title"] = r?.s("title"); raw["author"] = r?.s("author"); doc = J(raw); compose(keepPlace: true) }
+            AppModel.shared.reload()
+            return true
+        } catch { self.error = error.localizedDescription; return false }
+    }
+
+    /// Open the article's note in Obsidian, where the first highlight wrote it.
+    func openInObsidian() {
+        guard let p = doc?.s("vault_path") else { return }
+        let f = p.hasSuffix(".md") ? String(p.dropLast(3)) : p
+        if let u = URL(string: "obsidian://open?vault=Synergathan&file=" + API.enc(f)) { NSWorkspace.shared.open(u) }
+    }
+
+    // MARK: the focused paragraph (j, k)
+
+    func moveFocus(_ d: Int) {
+        guard !blocks.isEmpty, let tv = textView else { return }
+        let cur = focus.flatMap { f in blocks.firstIndex { $0.i == f } } ?? (d > 0 ? -1 : blocks.count)
+        let next = max(0, min(blocks.count - 1, cur + d))
+        focus = blocks[next].i
+        tv.focusRange = blocks[next].range
+        tv.scrollRangeToVisible(blocks[next].range)
+        lastActive = Date()
+    }
+
+    /// h or n with nothing selected: the focused paragraph.
+    func highlightFocus(thenNote: Bool) async {
+        guard let f = focus, let r = blocks.first(where: { $0.i == f })?.range else { return }
+        await highlightSelection(range: r, thenNote: thenNote)
     }
 
     // MARK: read aloud
@@ -423,9 +521,41 @@ extension NSAttributedString.Key {
     static let dafHighlight = NSAttributedString.Key("dafHighlight")
 }
 
-/// The text view: selectable, not editable, a column in the middle, H to highlight.
+extension ReaderModel: HighlightHost {
+    func highlight(withID hid: String) -> J? { highlights.first { $0.s("id") == hid } }
+    var shareTitle: String { title }
+    var shareAuthor: String? { doc?.s("author") ?? doc?.s("source") }
+    func paragraph(around loc: Int) -> String {
+        guard let r = blocks.first(where: { loc >= $0.range.location && loc <= NSMaxRange($0.range) })?.range else { return "" }
+        return (storage.string as NSString).substring(with: r)
+    }
+}
+
+/// The text view: selectable, not editable, a column in the middle, the page's reading keys.
 final class ReaderTextView: NSTextView {
     weak var model: ReaderModel?
+    /// The focused paragraph (j, k), marked with a bar in the margin.
+    var focusRange: NSRange? { didSet { needsDisplay = true } }
+
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard let r = focusRange, let lm = layoutManager, let tc = textContainer, NSMaxRange(r) <= (textStorage?.length ?? 0) else { return }
+        var box = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: r, actualCharacterRange: nil), in: tc)
+        box.origin.x += textContainerOrigin.x
+        box.origin.y += textContainerOrigin.y
+        NSColor.controlAccentColor.withAlphaComponent(0.7).setFill()
+        NSBezierPath(roundedRect: NSRect(x: box.minX - 16, y: box.minY + 2, width: 3, height: max(8, box.height - 4)), xRadius: 1.5, yRadius: 1.5).fill()
+    }
+
+    /// Highlight on selecting (a selection of words, unless ⌥ is held), as the page does.
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        let sel = selectedRange()
+        guard HLTools.autoHighlight, sel.length > 1, !NSEvent.modifierFlags.contains(.option), event.clickCount == 1,
+              (string as NSString).substring(with: sel).trimmingCharacters(in: .whitespacesAndNewlines).contains(" ") else { return }
+        let m = model
+        Task { @MainActor in await m?.highlightSelection() }
+    }
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
@@ -437,13 +567,38 @@ final class ReaderTextView: NSTextView {
         let m = model
         MainActor.assumeIsolated { m?.lastActive = Date() }
         let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
-        if event.charactersIgnoringModifiers == "h", plain, selectedRange().length > 0 {
-            Task { @MainActor in await m?.highlightSelection() }
-            return
+        guard plain, let ch = event.characters, MainActor.assumeIsolated({ articleKey(ch) }) else { return super.keyDown(with: event) }
+    }
+
+    /// The page's article keys (keys.js, scope article).
+    @MainActor
+    private func articleKey(_ ch: String) -> Bool {
+        let m = model, app = AppModel.shared, sel = selectedRange()
+        let item = app.selected
+        switch ch {
+        case "h": Task { if sel.length > 0 { await m?.highlightSelection() } else { await m?.highlightFocus(thenNote: false) } }
+        case "n": Task { if sel.length > 0 { await m?.highlightSelection(thenNote: true) } else { await m?.highlightFocus(thenNote: true) } }
+        case "j": m?.moveFocus(1)
+        case "k": m?.moveFocus(-1)
+        case "p": m?.listen()                                               // listen or pause
+        case "L": m?.listen(from: sel.location)                             // read aloud from here
+        case "e": if let item { Task { await app.done(item) } }
+        case "l": if let item, item.whereIn != "feed" { Task { await app.later(item) } }
+        case "s": if let item, item.whereIn == "feed" { Task { await app.saveToLibrary(item) } }
+        case "f": if let item, item.whereIn != "feed" { Task { await app.star(item) } }
+        case "t": app.showInspector = true; app.focusTags += 1
+        case "N": app.showInspector = true; app.focusNote += 1
+        case "d": if let item { Task { await app.delete(item) } }
+        case "z": app.undoLast()
+        case "o": if let u = m?.doc?.s("url").flatMap(URL.init(string:)) { NSWorkspace.shared.open(u) }
+        case "J": app.step(1)
+        case "K": app.step(-1)
+        case "C": if let u = m?.doc?.s("url") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string); app.say("Link copied") }
+        case "R": Task { await m?.resetProgress() }
+        case "M": app.editMeta = true
+        default: return false
         }
-        if plain, event.characters == "p" { MainActor.assumeIsolated { m?.listen() }; return }               // the page's keys: p listens or pauses,
-        if plain, event.characters == "L" { MainActor.assumeIsolated { m?.listen(from: selectedRange().location) }; return }  // L reads aloud from here
-        super.keyDown(with: event)
+        return true
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -456,36 +611,22 @@ final class ReaderTextView: NSTextView {
         let menu = super.menu(for: event) ?? NSMenu()
         let at = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
         var extra: [NSMenuItem] = []
-        if selectedRange().length > 0 {
+        let sel = selectedRange()
+        if sel.length > 0 {
             extra.append(NSMenuItem(title: "Highlight", action: #selector(highlightNow), keyEquivalent: ""))
+            extra.append(MenuAction.item("Highlight with a Note") { let m = self.model; Task { @MainActor in await m?.highlightSelection(thenNote: true) } })
         }
-        if at < textStorage?.length ?? 0, let hid = textStorage?.attribute(.dafHighlight, at: at, effectiveRange: nil) as? String, !hid.isEmpty {
-            let h = MainActor.assumeIsolated { model?.highlights.first { $0.s("id") == hid } }
-            let note = NSMenuItem(title: (h?.s("user_note") ?? "").isEmpty ? "Add a Note…" : "Edit the Note…", action: #selector(editNote(_:)), keyEquivalent: "")
-            note.representedObject = hid
-            extra.append(note)
-            let colours = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            for c in ["yellow", "green", "blue", "pink", "purple"] {
-                let item = NSMenuItem(title: c.capitalized, action: #selector(recolor(_:)), keyEquivalent: "")
-                item.representedObject = [hid, c]
-                item.target = self
-                item.state = (h?.s("color") ?? "yellow") == c ? .on : .off
-                sub.addItem(item)
-            }
-            colours.submenu = sub
-            extra.append(colours)
-            let item = NSMenuItem(title: "Remove Highlight", action: #selector(removeHighlight(_:)), keyEquivalent: "")
-            item.representedObject = hid
-            extra.append(item)
+        if at < textStorage?.length ?? 0, let hid = textStorage?.attribute(.dafHighlight, at: at, effectiveRange: nil) as? String, !hid.isEmpty, let m = model {
+            extra += MainActor.assumeIsolated { HLMenu.items(for: hid, host: m) }
         }
-        if selectedRange().length > 0 {
+        if sel.length > 0 {
             extra.append(NSMenuItem(title: "Ask About This Passage", action: #selector(askAboutSelection), keyEquivalent: ""))
+            if let m = model, let look = MainActor.assumeIsolated({ HLMenu.lookup((string as NSString).substring(with: sel), at: sel.location, host: m) }) { extra.append(look) }
         }
         let aloud = NSMenuItem(title: "Read Aloud from Here", action: #selector(readFromHere(_:)), keyEquivalent: "")
         aloud.representedObject = at
         extra.append(aloud)
-        for (k, item) in extra.enumerated() { item.target = self; menu.insertItem(item, at: k) }
+        for (k, item) in extra.enumerated() { if item.target == nil { item.target = self }; menu.insertItem(item, at: k) }
         if !extra.isEmpty { menu.insertItem(.separator(), at: extra.count) }
         return menu
     }

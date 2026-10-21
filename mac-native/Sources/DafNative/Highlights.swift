@@ -104,6 +104,7 @@ struct HighlightGroupView: View {
     @Environment(\.openWindow) private var openWindow
     let group: J
     @State private var editing: J?
+    @State private var sheet: HLSheet?
 
     var body: some View {
         ScrollView {
@@ -114,7 +115,8 @@ struct HighlightGroupView: View {
                 }
                 .padding(.bottom, 8)
                 ForEach(group.a("items"), id: \.self) { h in
-                    HighlightCard(h: h, edit: { editing = h }, open: { if let o = h.s("open") { openWindow(id: "route", value: o) } })
+                    HighlightCard(h: h, edit: { editing = h }, open: { if let o = h.s("open") { openWindow(id: "route", value: o) } },
+                                  tool: { sheet = $0 }, title: group.s("title") ?? "", author: group.s("author"))
                 }
             }
             .frame(maxWidth: 720, alignment: .leading)
@@ -123,6 +125,9 @@ struct HighlightGroupView: View {
         }
         .sheet(item: Binding(get: { editing.map(Editing.init) }, set: { editing = $0?.h })) { e in
             NoteSheet(h: e.h)
+        }
+        .sheet(item: $sheet) { s in
+            HLSheetView(sheet: s) { hid, fields in model.highlights.update(hid) { raw in for (k, v) in fields { raw[k] = v } } }
         }
     }
 
@@ -134,6 +139,9 @@ struct HighlightCard: View {
     let h: J
     let edit: () -> Void
     let open: () -> Void
+    var tool: (HLSheet) -> Void = { _ in }
+    var title = ""
+    var author: String? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -143,7 +151,7 @@ struct HighlightCard: View {
                 if let n = h.s("user_note") ?? h.s("note") {
                     Text(n).font(.callout).foregroundStyle(.secondary)
                 }
-                let tags = (h.list("tags") as? [String]) ?? []
+                let tags = h.strings("tags")
                 HStack(spacing: 8) {
                     if !tags.isEmpty { Text(tags.map { "#" + $0 }.joined(separator: " ")).font(.caption).foregroundStyle(.tint) }
                     Text([h.s("chapter"), h.s("page").map { "p. " + $0 }, h.s("source")].compactMap { $0 }.joined(separator: " · "))
@@ -164,7 +172,14 @@ struct HighlightCard: View {
                     Button(c.capitalized) { Task { await color(c) } }
                 }
             }
+            Button("Tags…") { tool(.tags(h)) }
+            Button(h.i("cards").map { $0 > 0 ? "Flashcards (\($0))…" : "Make a Flashcard…" } ?? "Make a Flashcard…") { tool(.cards(h)) }
             Button("Copy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(h.s("text") ?? "", forType: .string) }
+            Button("Share as Image…") { tool(.share(h, title: title, author: author)) }
+            Button(h.s("r_status") == "never" ? "Back into Review" : "Never Show in Review") {
+                let never = h.s("r_status") != "never"
+                Task { if await HLTools.review(id, never: never) { model.highlights.update(id) { $0["r_status"] = never ? "never" : "kept" } } }
+            }
             Divider()
             Button("Delete the Highlight", role: .destructive) { Task { await delete() } }
         }
@@ -183,8 +198,15 @@ struct HighlightCard: View {
         catch { model.error = error.localizedDescription }
     }
     private func delete() async {
-        do { try await API.shared.send("DELETE", "/api/highlights/\(API.enc(id))", nil); model.highlights.remove(id); model.say("Highlight deleted") }
-        catch { model.error = error.localizedDescription }
+        let hid = id, m = model
+        do {
+            try await API.shared.send("DELETE", "/api/highlights/\(API.enc(hid))", nil)
+            m.highlights.remove(hid)
+            m.say("Highlight deleted", undo: "Delete the Highlight") {
+                _ = try? await API.shared.send("POST", "/api/highlights/\(API.enc(hid))/restore", [:])
+                await m.highlights.load()
+            }
+        } catch { model.error = error.localizedDescription }
     }
 }
 

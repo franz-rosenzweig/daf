@@ -18,6 +18,7 @@ struct MainView: View {
                 } detail: {
                     switch model.place {
                     case .review: ReviewView()
+                    case .home: HomeView()
                     case .podcasts: PodcastsView()
                     case .sources: SourcesView()
                     default: StatsView()
@@ -123,6 +124,7 @@ struct Sidebar: View {
             Label("Today", systemImage: "sun.max").tag(Place.today)
             row(.review, "Review", "rectangle.stack")
             Section("Library") {
+                row(.home, "Home", "house")
                 row(.library("inbox"), "Inbox", "tray")
                 row(.library("later"), "Later", "clock")
                 row(.shortlist, "Shortlist", "star")
@@ -240,6 +242,18 @@ struct ItemList: View {
         .onChange(of: model.sortLibrary) { _, _ in model.reload() }
         .onChange(of: model.sortFeed) { _, _ in model.reload() }
         .onChange(of: model.feedTab) { _, _ in model.reload() }
+        .onKeyPress(characters: CharacterSet(charactersIn: "lsftdzjk"), phases: .down) { press in listKey(press.characters) }
+        .safeAreaInset(edge: .top) {
+            if let p = model.place, isFeed(p), let n = model.counts?.i("expired_in_daf"), n > 0, model.feedTab == "unseen" {
+                HStack(spacing: 10) {
+                    Text("FreshRSS still counts " + plural(n, "post") + " as unread that Daf has let go.").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Mark Them Read in FreshRSS Too") { Task { await model.expireInFreshRSS() } }.controlSize(.small)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(.bar)
+            }
+        }
         .onKeyPress("e") {
             let chosen = model.chosen.filter(\.isDoc)
             if chosen.count > 1 { Task { await model.bulk(chosen, chosen.allSatisfy { $0.whereIn == "feed" } ? "seen" : "archive") }; return .handled }
@@ -253,6 +267,25 @@ struct ItemList: View {
             guard let item = model.selected, item.isDoc else { return }
             Task { await model.delete(item) }
         }
+    }
+}
+
+extension ItemList {
+    /// The page's list keys (keys.js, scope list).
+    func listKey(_ ch: String) -> KeyPress.Result {
+        let item = model.selected
+        switch ch {
+        case "j": model.step(1)
+        case "k": model.step(-1)
+        case "l": if let item, item.whereIn != "feed", item.isDoc { Task { await model.later(item) } } else { return .ignored }
+        case "s": if let item, item.whereIn == "feed" { Task { await model.saveToLibrary(item) } } else { return .ignored }
+        case "f": if let item, item.whereIn != "feed", item.isDoc { Task { await model.star(item) } } else { return .ignored }
+        case "t": model.showInspector = true; model.focusTags += 1
+        case "d": if let item, item.isDoc { Task { await model.delete(item) } } else { return .ignored }
+        case "z": model.undoLast()
+        default: return .ignored
+        }
+        return .handled
     }
 }
 
@@ -323,6 +356,7 @@ struct ItemActions: View {
             } else {
                 Button(item.status == "later" ? "Back to Inbox" : "Read Later") { Task { await model.later(item) } }
                 Button(item.status == "archive" ? "Back to Inbox" : "Archive") { Task { await model.done(item) } }
+                Button(item.j.b("starred") ? "Remove from the Shortlist" : "Add to the Shortlist") { Task { await model.star(item) } }
             }
             if let u = item.j.s("url"), let url = URL(string: u) {
                 Divider()
@@ -479,6 +513,12 @@ struct Detail: View {
                     Button { Task { await model.done(item) } } label: {
                         Label(item.whereIn == "feed" ? "Mark Seen" : "Archive", systemImage: item.whereIn == "feed" ? "checkmark.circle" : "archivebox")
                     }
+                    if item.whereIn != "feed" {
+                        Button { Task { await model.star(item) } } label: {
+                            Label(item.j.b("starred") ? "Off the Shortlist" : "On the Shortlist", systemImage: item.j.b("starred") ? "star.fill" : "star")
+                        }
+                        .help("The Shortlist (F)")
+                    }
                 }
                 ToolbarItem {
                     Button { model.showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.right") }
@@ -519,6 +559,12 @@ struct Opened: View {
         .sheet(item: Binding(get: { reader?.editing }, set: { reader?.editing = $0 })) { e in
             NoteSheet(h: e.h, saved: { n in reader?.changed(e.id) { $0["user_note"] = n } }).environment(model)
         }
+        .sheet(item: Binding(get: { reader?.sheet }, set: { reader?.sheet = $0 })) { s in
+            HLSheetView(sheet: s) { hid, fields in reader?.changed(hid) { raw in for (k, v) in fields { raw[k] = v } } }
+        }
+        .sheet(isPresented: Binding(get: { model.editMeta && reader != nil }, set: { model.editMeta = $0 })) {
+            if let reader { MetaSheet(reader: reader) }
+        }
         .task(id: item.id) {
             guard item.isDoc, !["pdf", "video", "podcast", "manga"].contains(item.kind) else { return }
             // the same article made again by SwiftUI (a list refreshing beside it): the one already open
@@ -543,6 +589,8 @@ struct Inspector: View {
     @FocusState private var tagField: Bool
     @State private var question = ""
     @FocusState private var askField: Bool
+    @FocusState private var noteField: Bool
+    @State private var summarizing = false
 
     private var doc: ReaderModel? { reader ?? meta }
 
@@ -562,6 +610,11 @@ struct Inspector: View {
                         .font(.callout)
                         .scrollContentBackground(.hidden)
                         .frame(minHeight: 64)
+                        .focused($noteField)
+                    if let p = doc.doc?.s("vault_path") {
+                        LabeledContent("In the vault") { Button("Open in Obsidian") { doc.openInObsidian() }.buttonStyle(.link) }
+                            .help(p)
+                    }
                 }
                 Section("Tags") {
                     if !doc.tags.isEmpty {
@@ -601,7 +654,10 @@ struct Inspector: View {
                 if !tags.isEmpty { Section("Tags") { Text(tags.joined(separator: ", ")).font(.callout) } }
             }
             if let sum = d.s("ai_summary") ?? d.s("summary") {
-                Section("Summary") { Text(sum).font(.callout) }
+                Section(d.s("ai_summary") != nil ? "Summary (written by AI)" : "Summary") { Text(sum).font(.callout) }
+            }
+            if d.s("ai_summary") == nil, let doc, doc.doc != nil, item.kind != "podcast" {
+                Section { Button(summarizing ? "Summarizing…" : "Summarize") { Task { summarizing = true; await doc.summarize(); summarizing = false } }.disabled(summarizing) }
             }
             if let doc, doc.doc != nil { ask(doc) }
             if let reader, !reader.highlights.isEmpty {
@@ -634,6 +690,7 @@ struct Inspector: View {
         }
         .onChange(of: model.focusTags) { _, _ in tagField = true }
         .onChange(of: model.focusAsk) { _, _ in askField = true }
+        .onChange(of: model.focusNote) { _, _ in noteField = true }
         .onDisappear { meta?.stop() }
     }
 

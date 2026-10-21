@@ -4,6 +4,7 @@ import Observation
 /// A place in the sidebar.
 enum Place: Hashable {
     case today
+    case home                         // the Library's home: its shelves
     case review
     case library(String)              // inbox, later, archive
     case shortlist
@@ -22,11 +23,12 @@ enum Place: Hashable {
     case search
 
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
-    var isPage: Bool { self == .review || self == .stats || self == .podcasts || self == .sources }
+    var isPage: Bool { self == .review || self == .stats || self == .podcasts || self == .sources || self == .home }
 
     var title: String {
         switch self {
         case .today: return "Today"
+        case .home: return "Home"
         case .review: return "Review"
         case .shortlist: return "Shortlist"
         case .highlights: return "Highlights"
@@ -151,6 +153,10 @@ final class AppModel {
     var focusTags = 0
     /// Article › Ask…: the inspector's question field takes the keys.
     var focusAsk = 0
+    /// N: the inspector's note takes the keys.
+    var focusNote = 0
+    /// Article › Edit the Title and Author…
+    var editMeta = false
     @ObservationIgnored private var keptBooks = false
     /// The Feed's folders and feeds with their counts (/api/feed/sources).
     var sources: J?
@@ -244,6 +250,9 @@ final class AppModel {
                     raw["source"] = b.s("author") ?? b.s("progress_note")
                     return Item(J(raw))
                 }
+            case .home:
+                home = try await API.shared.json("/api/home")
+                items = []
             case .review, .highlights, .stats, .podcasts, .sources:
                 items = []
             case .manga:
@@ -446,8 +455,60 @@ final class AppModel {
     // MARK: acting on an item
 
     /// Done in the Library (archive), seen in the Feed.
-    func done(_ item: Item) async { await setStatus(item, item.whereIn == "feed" ? (item.status == "seen" ? "unseen" : "seen") : (item.status == "archive" ? "inbox" : "archive")) }
-    func later(_ item: Item) async { await setStatus(item, item.status == "later" ? "inbox" : "later") }
+    func done(_ item: Item) async {
+        let to = item.whereIn == "feed" ? (item.status == "seen" ? "unseen" : "seen") : (item.status == "archive" ? "inbox" : "archive")
+        await move(item, to: to, saying: ["seen": "Marked seen", "unseen": "Back in Unseen", "archive": "Archived", "inbox": "Back in the Inbox"][to] ?? "Done")
+    }
+    func later(_ item: Item) async {
+        let to = item.status == "later" ? "inbox" : "later"
+        await move(item, to: to, saying: to == "later" ? "Later" : "Back in the Inbox")
+    }
+
+    /// A status change with Undo putting it back, as every change on the page has.
+    func move(_ item: Item, to status: String, saying: String) async {
+        let was = item.status ?? (item.whereIn == "feed" ? "unseen" : "inbox")
+        guard await setStatus(item, status) else { return }
+        say(saying, undo: saying) { [weak self] in
+            guard let self else { return }
+            _ = try? await API.shared.send("POST", "/api/docs/\(API.enc(item.id))/status", ["status": was])
+            await self.load()
+            self.selection = item.id
+        }
+    }
+
+    /// The Shortlist (a star), on or off (/api/docs/{id}/star).
+    func star(_ item: Item) async {
+        let on = !item.j.b("starred")
+        do {
+            try await API.shared.send("PUT", "/api/docs/\(API.enc(item.id))/star", ["starred": on])
+            if let k = items.firstIndex(where: { $0.id == item.id }) {
+                var raw = items[k].j.raw
+                raw["starred"] = on
+                items[k] = Item(J(raw))
+            }
+            counts = try? await API.shared.json("/api/docs/counts")
+            say(on ? "On the Shortlist" : "Off the Shortlist")
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// The next (1) or previous (-1) in the list, opened.
+    func step(_ d: Int) {
+        let list = shown
+        guard !list.isEmpty else { return }
+        let k = list.firstIndex { $0.id == selection } ?? (d > 0 ? -1 : list.count)
+        let n = k + d
+        guard list.indices.contains(n) else { say(d > 0 ? "That's the last one" : "That's the first one"); return }
+        selection = list[n].id
+    }
+
+    /// Sync Now: Daf reads every source again (/api/sync).
+    func syncNow() async {
+        do {
+            try await API.shared.send("POST", "/api/sync", [:])
+            say("Synced")
+            await load()
+        } catch { self.error = error.localizedDescription }
+    }
 
     @discardableResult
     func setStatus(_ item: Item, _ status: String) async -> Bool {

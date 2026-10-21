@@ -22,7 +22,8 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: EPUBs as pages, contents, highlights, bookmarks, search, Ask, read aloud, the Kindle's highlights and place, the Aa panel, footnotes
 - not yet: the Info tab (details, series and the next one, the Kindle's page, the vault path)
 - not yet: go to a percent, go to the beginning, forget my place, download the file, export the highlights
-- not yet: a highlight's tags, favorite, flashcard and share as an image; overlapping highlights merged; selection snapped to words
+- here: a highlight's tags, favorite, flashcards and share as an image; overlapping highlights merged; highlight when selecting; Define and Translate
+- not yet: selection snapped to whole words
 - not yet: line width, a scroll layout, settings just for this book
 - not yet: the player's voice menu and sleep timer
 - not yet: next in the series and the Hardcover "finished" prompt near the end
@@ -32,23 +33,23 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 ## Articles
 
 - here: the native reader, highlights with notes and colours, the note, tags, Ask, read aloud, send to Kindle, delete with Undo, open at a highlight
-- not yet: Shortlist (star), previous and next in the list (⇧J, ⇧K)
-- not yet: Summarize, Load the full article, reset progress, edit the title and author, copy the link, open the note in Obsidian
-- not yet: Define and Translate (/api/lookup)
-- not yet: a highlight's tags, favorite, flashcard and share as an image; picture highlights; overlapping highlights merged
-- not yet: paragraph focus (j, k) and h or n on it; auto highlight
+- here: Shortlist (F), previous and next in the list (⇧J ⇧K, ⌥⌘↓ ⌥⌘↑), Undo on Archive, Later and Delete
+- here: Summarize, Load the Full Article, Reset Reading Progress, Edit the Title and Author, Copy the Link, Open the Note in Obsidian
+- here: Define and Translate (/api/lookup, and "in this sentence")
+- here: a highlight's tags, favorite, flashcards (fill in the blank, question, suggest), share as an image; Remove with Undo; overlapping highlights merged; highlight when selecting (⌥ to just select)
+- here: paragraph focus (j, k) and h or n on it; the page's article keys (h n j k p L e l s f t N d z o J K C R M)
+- not yet: picture highlights
 - not yet: videos natively (the player above the transcript, follow along, clip 30 seconds, captions or transcribe)
 - not yet: highlights in the PDF view, its zoom keys
 - not yet: Torah's language toggle
 
 ## Lists
 
-- here: the Library and the Feed, kinds, tabs, order, filters (length, added, highlighted, not started, tag), saved views, several at once, Undo, the Feed's sources (rename, move, switches, unfollow, follow a site), Check for New Posts
-- not yet: the source and author filters; updating a saved view
-- not yet: Mark seen for what's older than a day, three days, a week
-- not yet: Sync now for the Library; "Mark them read in FreshRSS too"
-- not yet: the Library's home (continue reading, recently added, quick reads, long reads, recently highlighted, new in the Feed)
-- not yet: the list keys (j k e l s f t d z x /)
+- here: the Library and the Feed, kinds, tabs, order, filters (length, added, highlighted, not started, source, author, tag), saved views, several at once, Undo, the Feed's sources (rename, move, switches, unfollow, follow a site), Check for New Posts
+- here: Mark Seen Older Than a day, three days, a week; Sync Now for the Library; "Mark them read in FreshRSS too"
+- here: the Library's home (continue reading, recently added, quick reads, long reads, recently highlighted, new in the Feed), each shelf shown or hidden
+- here: the list keys (j k e l s f t d z)
+- not yet: updating a saved view's filters
 
 ## Pages
 

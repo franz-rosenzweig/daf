@@ -6,6 +6,7 @@ struct DafNativeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel.shared
     @AppStorage("menuBar") private var menuBar = MenuBarSetting.byDefault
+    @AppStorage("autoHighlight") private var autoHighlight = true
 
     var body: some Scene {
         WindowGroup("Daf", id: "main") {
@@ -44,7 +45,16 @@ struct DafNativeApp: App {
             CommandMenu("Article") {
                 Button("Highlight the Selection") { Task { await model.reader?.highlightSelection() } }
                     .keyboardShortcut("h", modifiers: [.command, .shift])
+                Button("Highlight with a Note") { Task { await model.reader?.highlightSelection(thenNote: true) } }
+                Toggle("Highlight When Selecting", isOn: $autoHighlight)
                 Divider()
+                Button("Next in the List") { model.step(1) }.keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                Button("Previous in the List") { model.step(-1) }.keyboardShortcut(.upArrow, modifiers: [.command, .option])
+                Divider()
+                Button(model.selected?.j.b("starred") == true ? "Remove from the Shortlist" : "Add to the Shortlist") {
+                    if let i = model.selected, i.isDoc, i.whereIn != "feed" { Task { await model.star(i) } }
+                }
+                .disabled(model.selected?.whereIn == "feed")
                 Button("Read Later or Back to Inbox") { if let i = model.selected { Task { await model.later(i) } } }
                     .keyboardShortcut("l", modifiers: [.command, .shift])
                 Button("Archive or Mark Seen") { if let i = model.selected { Task { await model.done(i) } } }
@@ -67,6 +77,16 @@ struct DafNativeApp: App {
                 }
                 Button("Open in a New Window") { if let i = model.selected, let r = model.route(for: i) { model.openRoute = r } }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
+                Divider()
+                Button("Load the Full Article") { Task { await model.reader?.loadFull() } }
+                    .disabled(model.selected?.whereIn != "feed")
+                Button("Edit the Title and Author…") { model.editMeta = true }
+                Button("Reset Reading Progress") { Task { await model.reader?.resetProgress() } }
+                Button("Copy the Link") {
+                    if let u = model.reader?.doc?.s("url") ?? model.selected?.j.s("url") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string) }
+                }
+                Button("Open the Note in Obsidian") { model.reader?.openInObsidian() }
+                    .disabled(model.reader?.doc?.s("vault_path") == nil)
             }
             CommandMenu("Feed") {
                 Button("Mark All Seen") { if let p = model.place { Task { await model.markSeen(p) } } }

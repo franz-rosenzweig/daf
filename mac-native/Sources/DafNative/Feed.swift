@@ -35,9 +35,11 @@ extension AppModel {
         }
     }
 
-    /// Everything unseen in a folder or a feed (or the whole Feed), marked seen, with Undo.
-    func markSeen(_ p: Place) async {
+    /// Everything unseen in a folder or a feed (or the whole Feed), marked seen, with Undo; `older`
+    /// (seconds) leaves what came since.
+    func markSeen(_ p: Place, older: Int? = nil) async {
         var body: [String: Any] = [:]
+        if let older { body["older"] = older }
         switch p {
         case .feedSource(let id): body["feed"] = id
         case .feed(let cat): body["cat"] = cat ?? ""
@@ -47,7 +49,7 @@ extension AppModel {
             let r = J(try await API.shared.send("POST", "/api/feed/seen", body))
             let ids = (r?.list("ids") ?? []).compactMap { $0 as? String }
             await feedChanged()
-            guard !ids.isEmpty else { say("Nothing to mark"); return }
+            guard !ids.isEmpty else { say(older == nil ? "Nothing to mark" : "Nothing that old here"); return }
             say("\(ids.count) marked seen", undo: "Mark All Seen") { [weak self] in
                 guard let self else { return }
                 do {
@@ -56,6 +58,15 @@ extension AppModel {
                     await self.feedChanged()
                 } catch { self.error = error.localizedDescription }
             }
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// What FreshRSS still counts as unread after Daf let it go, marked read there too (/api/feed/expire).
+    func expireInFreshRSS() async {
+        do {
+            try await API.shared.send("POST", "/api/feed/expire", [:])
+            say("Marked read in FreshRSS")
+            await feedChanged()
         } catch { self.error = error.localizedDescription }
     }
 
@@ -94,10 +105,12 @@ extension AppModel {
         } catch { self.error = error.localizedDescription }
     }
 
-    /// The list's Refresh: the Feed asks FreshRSS first; anywhere else it's the list again.
+    /// The list's Refresh: the Feed asks FreshRSS for new posts; the Library syncs every source, as the
+    /// page's "Sync now"; anywhere else it's the list again.
     func refresh() {
         switch place {
         case .feed, .feedSource: Task { await refreshFeed() }
+        case .library, .shortlist, .home: Task { await syncNow() }
         default: reload()
         }
     }
@@ -181,6 +194,7 @@ struct ScopeMenu: View {
     let place: Place
     var body: some View {
         Button("Mark All Seen") { Task { await model.markSeen(place) } }
+        OlderMenu(place: place)
         Divider()
         Button("Follow a Site…") { model.sheet = .follow }
     }
@@ -194,6 +208,7 @@ struct FeedMenu: View {
     var body: some View {
         let id = feed.s("id") ?? ""
         Button("Mark All Seen") { Task { await model.markSeen(.feedSource(id)) } }
+        OlderMenu(place: .feedSource(id))
         Divider()
         Button("Rename…") { model.sheet = .renameFeed(id) }
         Menu("Move To") {
@@ -216,6 +231,19 @@ struct FeedMenu: View {
         }
         Divider()
         Button("Unfollow…", role: .destructive) { model.confirmUnfollow = id }
+    }
+}
+
+/// Mark seen what's older than a day, three days or a week, as the page's list menu.
+struct OlderMenu: View {
+    @Environment(AppModel.self) private var model
+    let place: Place
+    var body: some View {
+        Menu("Mark Seen Older Than") {
+            Button("A Day") { Task { await model.markSeen(place, older: 86_400) } }
+            Button("Three Days") { Task { await model.markSeen(place, older: 3 * 86_400) } }
+            Button("A Week") { Task { await model.markSeen(place, older: 7 * 86_400) } }
+        }
     }
 }
 

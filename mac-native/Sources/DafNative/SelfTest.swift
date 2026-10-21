@@ -183,6 +183,75 @@ enum SelfTest {
         let clean = try? await API.shared.json("/api/docs/\(API.enc(r.id))")
         check(clean?.s("note") == nil && clean?.strings("tags") == oldTags, "and both go again", "\(clean?.s("note") ?? "-") / \(clean?.strings("tags") ?? [])")
 
+        // overlapping highlights merge into one, as the page merges them
+        if let blk2 = r.blocks.first(where: { $0.range.length > 80 }) {
+            let before2 = r.highlights.count
+            tv.setSelectedRange(NSRange(location: blk2.range.location + 2, length: 20))
+            await r.highlightSelection()
+            tv.setSelectedRange(NSRange(location: blk2.range.location + 12, length: 40))
+            await r.highlightSelection()
+            let after2 = (try? await API.shared.json("/api/docs/\(API.enc(r.id))"))?.a("highlights") ?? []
+            let merged = after2.count == before2 + 1 && (after2.last?.s("text")?.count ?? 0) >= 40
+            check(merged, "a highlight over another merges them into one", "\(before2) → \(after2.count): “\((after2.last?.s("text") ?? "").prefix(50))”")
+
+            // the highlight's tools: tags, a flashcard, a card to share, a word looked up
+            if let hid = r.highlights.last?.s("id"), let hj = r.highlights.last {
+                let tags = J(try? await API.shared.send("PUT", "/api/highlights/\(API.enc(hid))/tags", ["tags": ["self-test"]]))?.strings("tags") ?? []
+                let fav = await HLTools.fav(hid, true)
+                _ = await HLTools.fav(hid, false)
+                let word = (hj.s("text") ?? "").split(separator: " ").first(where: { $0.count > 3 }).map(String.init) ?? "reading"
+                let front = (hj.s("text") ?? "").replacingOccurrences(of: word, with: "{{" + word + "}}", options: [], range: (hj.s("text") ?? "").range(of: word))
+                let card = J(try? await API.shared.send("POST", "/api/highlights/\(API.enc(hid))/cards", ["kind": "cloze", "front": front]))
+                let cards = card?.a("cards").count ?? 0
+                if let cid = card?.s("id") { _ = try? await API.shared.send("DELETE", "/api/cards/\(API.enc(cid))", nil) }
+                let png = ShareCard(h: hj, title: r.title, author: r.shareAuthor).png()
+                let size = png.flatMap { NSBitmapImageRep(data: $0) }.map { CGSize(width: $0.pixelsWide, height: $0.pixelsHigh) } ?? .zero
+                check(tags == ["self-test"] && fav && cards == 1 && size == CGSize(width: 1080, height: 1350),
+                      "a highlight takes tags, a favorite and a flashcard, and makes a card to share", "\(tags), \(cards) card, \(Int(size.width))×\(Int(size.height))")
+                if let png { try? png.write(to: out.appendingPathComponent("43-share-card.png")) }
+                r.sheet = .cards(hj)
+                await pause(1.2)
+                capture("44-flashcard")
+                r.sheet = nil
+                await pause(0.5)
+                await r.remove(highlight: hid)
+                let gone = (try? await API.shared.json("/api/docs/\(API.enc(r.id))"))?.a("highlights").count ?? -1
+                m.undoLast()
+                var back = -1
+                for _ in 0..<20 { await pause(0.3); back = r.highlights.count; if back == before2 + 1 { break } }
+                check(gone == before2 && back == before2 + 1, "Remove Highlight has Undo, which brings it back", "\(before2 + 1) → \(gone) → \(back)")
+                await r.remove(highlight: hid)
+            }
+
+            // the focused paragraph: j, then h highlights all of it (one with no highlight in it yet)
+            r.moveFocus(1)
+            r.moveFocus(1)
+            let marked = Set(r.highlights.compactMap { h in r.blocks.first { b in (h.o("pos")?.i("b")) == b.i }?.i })
+            if let free = r.blocks.first(where: { !marked.contains($0.i) && $0.range.length > 40 }) { r.focus = free.i }
+            let f = r.focus
+            let b3 = r.highlights.count
+            await r.highlightFocus(thenNote: false)
+            check(f != nil && r.highlights.count == b3 + 1, "j moves the focus a paragraph on, and h highlights the whole of it", "block \(f ?? -1)")
+            if let hid = r.highlights.last?.s("id") { await r.remove(highlight: hid) }
+        }
+
+        // the article's own tools: Summarize, the title and author, reset progress
+        await r.summarize()
+        check((r.doc?.s("ai_summary") ?? "").contains("stand-in"), "Summarize writes a summary (the sandbox's stand-in)")
+        let title0 = r.doc?.s("title") ?? "", author0 = r.doc?.s("author") ?? ""
+        let edited = await r.editMeta(title: "Edited by the self-test", author: "The self-test")
+        let seen = (try? await API.shared.json("/api/docs/\(API.enc(r.id))"))?.s("title")
+        _ = await r.editMeta(title: title0, author: author0)
+        check(edited && seen == "Edited by the self-test", "Edit the Title and Author changes them", seen ?? "-")
+        await r.resetProgress()
+        check(((try? await API.shared.json("/api/docs/\(API.enc(r.id))"))?.d("progress") ?? -1) == 0, "Reset Reading Progress starts it again")
+        if let item = m.selected, item.whereIn != "feed" {
+            await m.star(item)
+            let on = (try? await API.shared.json("/api/docs?where=library&tab=inbox&kind=starred&limit=200"))?.a("items").contains { $0.s("id") == item.id } ?? false
+            if let again = m.items.first(where: { $0.id == item.id }) { await m.star(again) }
+            check(on, "F puts it on the Shortlist (and off again)")
+        }
+
         // Ask (the sandbox's stand-in answers; the model is never asked)
         let asked = r.asks.count
         await r.ask("What is this about?")
@@ -259,8 +328,30 @@ enum SelfTest {
         try? await API.shared.send("PUT", "/api/docs/\(API.enc(article.id))/note", ["note": ""])
         await go(m, .library("inbox"))
 
+        // the Library's home: its shelves
+        await go(m, .home)
+        await pause(2)
+        check(!(m.home?.a("continue").isEmpty ?? true), "Home has the Library's shelves", (m.home?.raw.keys.sorted() ?? []).joined(separator: ", "))
+        capture("42-home")
+
+        // a list filtered by its source
+        await go(m, .library("inbox"))
+        if let src = m.items.compactMap({ $0.j.s("source") }).first {
+            m.listFilter.source = src
+            await m.load()
+            check(!m.items.isEmpty && m.items.allSatisfy { $0.j.s("source") == src }, "the Source filter keeps only that source", "\(src): \(m.items.count)")
+            m.listFilter = ListFilter()
+            await m.load()
+        }
+        let first = m.selection
+        m.step(1)
+        check(m.selection != nil && m.selection != first, "Next in the List opens the next one")
+
         // the Feed, its folders and their feeds
         await go(m, .feed(nil))
+        await m.markSeen(.feed(nil), older: 400 * 86_400)
+        check(m.error == nil, "Mark Seen Older Than leaves what came since", m.toast ?? "")
+        if m.toastUndo { m.undoLast(); await pause(1) }
         check(!m.items.isEmpty, "the Feed lists what's unseen", "\(m.items.count)")
         await m.loadSources()
         let feeds = m.feedFolders.flatMap { $0.a("feeds") }

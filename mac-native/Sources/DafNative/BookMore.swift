@@ -244,3 +244,15 @@ extension BookModel: Listenable {
         return true
     }
 }
+
+extension BookModel: HighlightHost {
+    var shareTitle: String { title }
+    var shareAuthor: String? { details?.s("author") }
+    func paragraph(around loc: Int) -> String {
+        guard let s = pages?.storage.string as NSString?, loc <= s.length else { return "" }
+        let a = s.range(of: "\n", options: .backwards, range: NSRange(location: 0, length: loc)).location
+        let start = a == NSNotFound ? 0 : a + 1
+        let b = s.range(of: "\n", range: NSRange(location: loc, length: s.length - loc)).location
+        return s.substring(with: NSRange(location: start, length: (b == NSNotFound ? s.length : b) - start))
+    }
+}

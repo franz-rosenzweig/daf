@@ -6,6 +6,8 @@ struct ListFilter: Equatable {
     var since = 0           // days
     var hl = false
     var fresh = false
+    var source = ""
+    var author = ""
 
     var isEmpty: Bool { self == ListFilter() }
 
@@ -20,6 +22,8 @@ struct ListFilter: Equatable {
         if since > 0 { d["since"] = since }
         if hl { d["hl"] = 1 }
         if fresh { d["fresh"] = 1 }
+        if !source.isEmpty { d["source"] = source }
+        if !author.trimmingCharacters(in: .whitespaces).isEmpty { d["author"] = author.trimmingCharacters(in: .whitespaces) }
         return d
     }
 
@@ -55,6 +59,20 @@ struct ListOptionsMenu: View {
                 }
                 Toggle("Highlighted", isOn: $model.listFilter.hl)
                 Toggle("Not Started", isOn: $model.listFilter.fresh)
+                let sources = Array(Set(model.items.compactMap { $0.j.s("source") })).sorted()
+                if !sources.isEmpty || !model.listFilter.source.isEmpty {
+                    Picker("Source", selection: $model.listFilter.source) {
+                        Text("Any Source").tag("")
+                        ForEach(sources, id: \.self) { Text($0).tag($0) }
+                    }
+                }
+                let authors = Array(Set(model.items.compactMap { $0.j.s("author") })).sorted()
+                if !authors.isEmpty || !model.listFilter.author.isEmpty {
+                    Picker("Author", selection: $model.listFilter.author) {
+                        Text("Any Author").tag("")
+                        ForEach(authors, id: \.self) { Text($0).tag($0) }
+                    }
+                }
                 if !feed {
                     let tags = tagsHere
                     if !tags.isEmpty || model.tag != nil {
