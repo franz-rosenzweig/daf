@@ -426,14 +426,63 @@ enum SelfTest {
             if let vol = (try? await API.shared.json("/api/manga/series/" + API.enc(s.id)))?.a("books").first, let vid = vol.s("id") {
                 m.openRoute = "#mread/" + API.enc(vid)
                 let shown = await until(25) { NSApp.windows.contains { $0.isVisible && $0.title == (vol.s("name") ?? "") } }
-                let drawn = await until(30) { MangaModel.last.map { $0.image($0.page) != nil } ?? false }
+                let drawn = await until(30) { MangaModel.last.map { m in !m.shownPages.isEmpty && m.shownPages.allSatisfy { m.image($0) != nil } } ?? false }
                 await pause(1)
-                if let w = NSApp.windows.first(where: { $0.isVisible && $0.title == (vol.s("name") ?? "") }) { capture("13-manga", w) }
-                check(shown && drawn, "a volume opens in the native manga reader, its page drawn", "\(vol.s("name") ?? ""), page \(MangaModel.last?.page ?? 0)")
+                let mw = NSApp.windows.first(where: { $0.isVisible && $0.title == (vol.s("name") ?? "") })
                 if let mm = MangaModel.last {
-                    let p0 = mm.page
-                    mm.turn(true)
-                    check(mm.page > p0, "and turns to the next page", "\(p0) → \(mm.page)")
+                    log("INFO  manga: shown \(mm.shownPages) loaded \(mm.shownPages.map { mm.image($0) != nil }) sizes \(mm.shownPages.map { mm.image($0)?.size ?? .zero }) stage \(mm.stage) two \(mm.twoUp) unit \(mm.unit) window \(mw?.frame.size ?? .zero)")
+                }
+                if let mw { capture("13-manga", mw) }
+                if let mm = MangaModel.last {                // the same pages drawn by SwiftUI itself, apart from the window
+                    let r = ImageRenderer(content: MangaUnitView(m: mm, unit: mm.unit, size: mm.stage, ink: .white).background(Color.black))
+                    r.scale = 1
+                    if let png = r.nsImage?.tiffRepresentation.flatMap({ NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) }) {
+                        try? png.write(to: out.appendingPathComponent("13b-manga-drawn.png"))
+                    }
+                    let e = ImageRenderer(content: MangaEndCard(m: mm, ink: .white).frame(width: 600, height: 500).background(Color.black))
+                    if let png = e.nsImage?.tiffRepresentation.flatMap({ NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) }) {
+                        try? png.write(to: out.appendingPathComponent("13c-manga-end-drawn.png"))
+                    }
+                }
+                check(shown && drawn, "a volume opens in the native manga reader, its page drawn", "\(vol.s("name") ?? ""), page \((MangaModel.last?.shownPages.first ?? -1) + 1)")
+                if let mm = MangaModel.last {
+                    let p0 = mm.shownPages.first ?? 0
+                    mm.go(1)
+                    await pause(0.6)
+                    check((mm.shownPages.first ?? 0) > p0 || mm.unit == .end, "and turns to the next page", "\(p0 + 1) → \((mm.shownPages.first ?? 0) + 1)")
+
+                    // one page or two, as the layout says; the cover alone
+                    let mode0 = mm.p.mode, layout0 = mm.p.layout
+                    mm.set("mode", "rtl")
+                    mm.set("layout", "double")
+                    let pairs = mm.units.filter { $0.pages.count == 2 }.count
+                    mm.set("layout", "single")
+                    let singles = mm.units.allSatisfy { $0.pages.count <= 1 }
+                    check(pairs > 0 && singles && mm.units.first(where: { !$0.pages.isEmpty })?.pages == [0], "Two Pages pairs them (the cover alone), One Page doesn't", "\(pairs) pairs")
+
+                    // the settings are the series' own, kept by Daf as the page keeps them
+                    mm.set("scale", "width")
+                    await pause(1.5)
+                    let kept = (try? await API.shared.json("/api/manga/prefs"))?.o("series")?.o(mm.seriesID)
+                    check(kept?.s("layout") == "single" && kept?.s("scale") == "width", "a series keeps its own reading settings in Daf", "\(kept?.raw ?? [:])")
+
+                    // the long strip
+                    mm.set("mode", "strip")
+                    await pause(2)
+                    if let mw { capture("39-manga-strip", mw) }
+                    check(!mm.p.paged && mm.units.last == .end, "Long Strip reads it as one column", "\(mm.count) pages")
+                    mm.set("mode", mode0)
+                    mm.set("layout", layout0)
+                    mm.set("scale", "screen")
+
+                    // the end card, then every page at a glance
+                    mm.lastPage()
+                    mm.go(1)
+                    await pause(0.8)
+                    check(mm.unit == .end, "past the last page, the end card (finished, the next volume)")
+                    if let mw { capture("40-manga-end", mw) }
+                    mm.go(to: 0)
+                    await pause(0.5)
                 }
                 closeOthers()
             }
