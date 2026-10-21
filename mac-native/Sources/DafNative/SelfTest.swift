@@ -89,12 +89,23 @@ enum SelfTest {
         check(m.today?.o("year30")?.list("days").count == 365 && m.today?.o("review") != nil, "with Year 30's days and the day's review", "\(m.today?.o("year30")?.list("days").count ?? -1)")
         await pause(1)
         capture("01-today")
-        if let b = m.standItems.first {
-            m.selection = b.id
-            check(m.selected?.id == b.id, "the nightstand's books open beside Today", b.title)
+        check(m.place?.isPage == true, "Today is a page across the window")
+        let y29 = try? await API.shared.json("/api/year/29")
+        check(y29?.list("days").count == 365, "and Year 29 is there to show", "\(y29?.i("days_read") ?? -1) days read")
+        // the whole page, in a tall window
+        window?.setContentSize(NSSize(width: 1280, height: 2000))
+        await pause(2)
+        capture("01b-today-whole")
+        window?.setContentSize(NSSize(width: 1280, height: 820))
+        await pause(1)
+        let stand = (m.today?.a("nightstand") ?? []) + (m.today?.a("nightstand_suggested") ?? [])
+        if let id = stand.first?.s("id") {
+            m.showBook(id)
+            let opened = await until(8) { m.place == .books && m.selected?.id == id }
+            check(opened, "a nightstand book opens its page on Books", stand.first?.s("title") ?? id)
             await pause(1.5)
             capture("50-today-nightstand")
-            m.selection = nil
+            await go(m, .today)
         }
 
         // daf:// links (this build's are daf-selftest://): a place for Shortcuts, a link from the share menu
@@ -145,7 +156,9 @@ enum SelfTest {
 
         // a highlight from a selection
         let before = r.highlights.count
-        let blk = r.blocks.first { $0.range.length > 120 } ?? r.blocks[0]
+        // a paragraph with no highlight yet (a highlight over one would merge into it)
+        let highlighted = Set(r.highlights.compactMap { $0.o("pos")?.i("b") })
+        let blk = r.blocks.first { $0.range.length > 120 && !highlighted.contains($0.i) } ?? r.blocks.first { $0.range.length > 120 } ?? r.blocks[0]
         tv.setSelectedRange(NSRange(location: blk.range.location + 4, length: 40))
         let pos = r.selectionPosition(tv.selectedRange())
         check(pos != nil, "a selection becomes Daf's position (block, offsets)", pos.map { "b\($0.b) \($0.s)–\($0.e): \($0.text.prefix(30))" } ?? "")
@@ -412,6 +425,14 @@ enum SelfTest {
                 check(m.view(vid) != nil && !m.items.isEmpty, "Save as View keeps the list in the sidebar", "\(m.views.count) views, \(m.items.count) in it")
                 await pause(0.8)
                 capture("28-view")
+                // its filters change in place, and Update the View keeps them
+                m.viewFilter.fresh = true
+                let changed = m.viewChanged
+                await m.updateView()
+                await m.loadViews()
+                let kept = ListFilter(m.view(vid)?.o("filter")?.raw ?? [:]).fresh
+                m.viewAsSaved()
+                check(changed && kept && !m.viewChanged, "a view's filters change, and Update the View keeps them", "\(m.view(vid)?.o("filter")?.raw ?? [:])")
                 await m.removeView(vid)
                 check(m.view(vid) == nil, "and Remove the View takes it away")
                 await go(m, .feedSource(fid))
@@ -485,6 +506,22 @@ enum SelfTest {
             log("INFO  " + trace.joined(separator: " | "))
             capture("06-pdf")
             check(shown && pages() > 0, "a PDF opens in Apple's PDF view, and stays open", "\(pdf.title): \(first) pages, then \(pages())")
+            // a few words on its first page highlighted, kept with the page and its boxes, then removed
+            if let pm = PDFModel.last, pm.id == pdf.id, let v = pm.view, let page = v.document?.page(at: 0),
+               let text = page.string, (text as NSString).length > 40, let sel = page.selection(for: NSRange(location: 0, length: min(90, (text as NSString).length))) {
+                v.setCurrentSelection(sel, animate: false)
+                let before = pm.highlights.count, marks0 = pm.marks
+                await pm.highlightSelection()
+                let made = pm.highlights.last
+                let kept = made?.o("pos")?.o("pdf")?.i("pg") == 1 && !(made?.o("pos")?.o("pdf")?.list("r") ?? []).isEmpty
+                await pause(1)
+                capture("63-pdf-highlight")
+                check(pm.highlights.count == before + 1 && pm.marks > marks0 && kept, "a PDF's words highlight on the page, kept with the page and its boxes", "\(marks0) → \(pm.marks) marks: " + String((made?.s("text") ?? "").prefix(60)))
+                let server = (try? await API.shared.json("/api/docs/\(API.enc(pdf.id))?prefetch=1"))?.a("highlights").contains { $0.s("id") == made?.s("id") } ?? false
+                check(server, "and Daf has it")
+                if let hid = made?.s("id") { await pm.remove(highlight: hid) }
+                check(pm.marks == marks0, "Remove Highlight takes it off the page")
+            } else { log("INFO  the PDF's first page has no words to select") }
             if let route = m.route(for: pdf) {
                 m.openRoute = route
                 let own = await until(30) { NSApp.windows.contains { $0.isVisible && $0 != main && ($0.contentView.flatMap(findPDF)?.document?.pageCount ?? 0) > 0 } }
@@ -613,7 +650,72 @@ enum SelfTest {
             check(opened, "and a reading opens in the native reader", reading.title)
             await pause(1)
             capture("14-torah")
+            // the verses in Hebrew and English, or one of them
+            // Hebrew letters in the reading: the verses' (a heading may have some of its own)
+            let hebrew = { (m.reader?.storage.string ?? "").unicodeScalars.filter { (0x05D0...0x05EA).contains($0.value) }.count }
+            let heBoth = hebrew(), lenBoth = m.reader?.storage.length ?? 0
+            let both = heBoth > 200
+            UserDefaults.standard.set("en", forKey: "torahLang")
+            m.reader?.compose(keepPlace: true)
+            let english = hebrew() < heBoth / 10 && (m.reader?.storage.length ?? 0) < lenBoth
+            UserDefaults.standard.set("he", forKey: "torahLang")
+            m.reader?.compose(keepPlace: true)
+            let onlyHebrew = hebrew() > heBoth * 9 / 10 && (m.reader?.storage.length ?? 0) < lenBoth
+            await pause(0.8)
+            capture("14b-torah-hebrew")
+            UserDefaults.standard.removeObject(forKey: "torahLang")
+            m.reader?.compose(keepPlace: true)
+            check(both && english && onlyHebrew, "its verses show in Hebrew and English, or in one of them", "both \(both), English \(english), Hebrew \(onlyHebrew)")
         }
+
+        // a video: the player above its transcript, a line marked as it's said, Clip 30s
+        let vids = (try? await API.shared.json("/api/docs?where=library&tab=inbox&kind=video&sort=new&limit=50"))?.a("items") ?? []
+        var vidID: String?
+        for v in vids.prefix(10) {
+            if let id = v.s("id"), let d = try? await API.shared.json("/api/docs/" + API.enc(id)), d.s("kind") == "video",
+               d.list("blocks").filter({ J($0)?.s("t") == "cue" }).count >= 2, VideoPlayer.id(d.s("url")) != nil { vidID = id; break }
+        }
+        if let vid = vidID {
+            await go(m, .library("inbox"))
+            if !m.items.contains(where: { $0.id == vid }), let v = vids.first(where: { $0.s("id") == vid }) { m.items.insert(Item(v), at: 0) }
+            m.selection = vid
+            let ready = await until(20) { m.reader?.id == vid && m.reader?.video != nil && (m.reader?.cues.count ?? 0) >= 2 && m.reader?.textView != nil }
+            if ready, let r = m.reader, let v = r.video, let c = r.cues.last {
+                r.syncCue(c.ts + 1, false)
+                let marked = r.textView?.nowRange != nil
+                v.time = c.ts + 5
+                let before = r.highlights.count
+                await r.clip(30)
+                let clipped = r.highlights.count > before
+                await pause(2)
+                capture("66-video")
+                check(marked && clipped, "a video opens natively: its player, its transcript marked as it's said, Clip 30s", "\(r.cues.count) cues, \(r.highlights.count - before) clipped")
+                for h in r.highlights.dropFirst(before) { if let hid = h.s("id") { await r.remove(highlight: hid) } }
+            } else { check(false, "a video opens natively", "\(vid): \(m.reader?.error ?? "not ready")") }
+        } else { log("INFO  no video with a transcript in the sandbox's Inbox") }
+
+        // a picture highlighted, as the page keeps it (![alt](address)), framed in its colour
+        await go(m, .library("inbox"))
+        var picDoc: String?
+        for it in m.items.prefix(30) where it.kind == "article" {
+            if let d = try? await API.shared.json("/api/docs/" + API.enc(it.id)), d.list("blocks").contains(where: { J($0)?.s("t") == "img" }) { picDoc = it.id; break }
+        }
+        if let pid = picDoc {
+            m.selection = pid
+            let ready = await until(15) { m.reader?.id == pid && !(m.reader?.pictures.isEmpty ?? true) && m.reader?.restored == true }
+            let picked = Set(m.reader?.highlights.compactMap { HLPicture.of($0.s("text"))?.src } ?? [])
+            if ready, let r = m.reader, let p = r.pictures.first(where: { !picked.contains($0.src) }) {
+                let before = r.highlights.count
+                await r.highlightPicture(at: p.at)
+                let made = r.highlights.last
+                let marked = !r.pictureMarks.isEmpty && HLPicture.of(made?.s("text"))?.src == p.src
+                r.textView?.scrollRangeToVisible(NSRange(location: p.at, length: 1))
+                await pause(2)
+                capture("62-picture-highlight")
+                check(r.highlights.count == before + 1 && marked, "a picture is highlighted, as the page keeps it", String((made?.s("text") ?? "").prefix(80)))
+                if let hid = made?.s("id") { await r.remove(highlight: hid) }
+            } else { check(false, "a picture is highlighted", "the article didn't open: \(pid)") }
+        } else { log("INFO  no article with a picture in the sandbox's Inbox") }
 
         // Podcasts and Sources
         await go(m, .podcasts)
@@ -699,6 +801,73 @@ enum SelfTest {
         await pause(1.5)
         capture("57-feedback")
         check(m.sheet == .feedback, "Help › Send Feedback… opens its sheet")
+        m.sheet = nil
+        await pause(0.5)
+
+        // Daf's themes: Paper when it's light, Nord dark, kept in Daf; then back as they were
+        let was = (Theme.shared.mode, Theme.shared.light, Theme.shared.dark)
+        await go(m, .today)
+        Theme.shared.choose(mode: "light", light: "paper")
+        await pause(1.5)
+        var paperBG = ""
+        NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
+            paperBG = Theme.nsBG.usingColorSpace(.sRGB).map { String(format: "#%02x%02x%02x", Int(($0.redComponent * 255).rounded()), Int(($0.greenComponent * 255).rounded()), Int(($0.blueComponent * 255).rounded())) } ?? ""
+        }
+        capture("64-theme-paper")
+        Theme.shared.choose(mode: "dark", dark: "nord")
+        await pause(1.5)
+        capture("65-theme-nord")
+        var keptTheme: J?
+        for _ in 0..<16 {          // the choice reaches Daf in the background
+            keptTheme = (try? await API.shared.json("/api/settings"))?.o("appearance")
+            if keptTheme?.s("dark") == "nord" && keptTheme?.s("mode") == "dark" { break }
+            await pause(0.5)
+        }
+        check(paperBG == "#f7f0e3" && keptTheme?.s("light") == "paper" && keptTheme?.s("dark") == "nord" && keptTheme?.s("mode") == "dark",
+              "a theme for light and one for dark, kept in Daf (see 64 and 65)", "\(paperBG), \(keptTheme?.raw ?? [:])")
+        Theme.shared.choose(mode: was.0, light: was.1, dark: was.2)
+        await pause(0.5)
+
+        // ⌘K, Add to Daf (a file, a drop, a paste), the shortcuts
+        m.sheet = .palette
+        await pause(1.5)
+        capture("58-palette")
+        check(m.sheet == .palette, "⌘K opens the palette")
+        m.sheet = nil
+        await pause(0.5)
+        let found = try? await API.shared.json("/api/search?q=the")
+        check(!(found?.a("docs") ?? []).isEmpty && found?.raw["text"] != nil && found?.raw["vault"] != nil,
+              "and searches articles, the words in them, books, highlights and the vault", "\((found?.a("docs") ?? []).count) articles, \((found?.a("text") ?? []).count) in the text")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("Daf self-test.epub")
+        try? Data("not really a book".utf8).write(to: file)
+        let up = J(try? await API.shared.uploadFile("/api/add/file", name: file.lastPathComponent, data: (try? Data(contentsOf: file)) ?? Data()))
+        check(up?.s("where") == "books", "a book sent as a file goes into Calibre (the sandbox's folder)", up?.s("name") ?? "")
+        if let provider = NSItemProvider(contentsOf: file) {
+            _ = m.dropped([provider])
+            let opened = await until(5) { m.sheet == .addLink }
+            await pause(2.5)
+            capture("59-add-dropped")
+            check(opened, "a book dropped on the window opens Add to Daf, and goes")
+            m.sheet = nil
+            await pause(0.5)
+        }
+        let pb = NSPasteboard(name: NSPasteboard.Name("daf-selftest"))
+        pb.clearContents()
+        pb.setString("https://example.com/daf-selftest-paste", forType: .string)
+        let took = m.pasted(from: pb)
+        await pause(1)
+        check(took && m.sheet == .addLink, "a link pasted with nothing to paste into opens Add to Daf with it")
+        capture("60-add-pasted")
+        m.sheet = nil
+        pb.clearContents()
+        pb.setString("just words", forType: .string)
+        check(!m.pasted(from: pb), "and words that aren't a link are left alone")
+        pb.releaseGlobally()
+        await pause(0.5)
+        m.sheet = .shortcuts
+        await pause(1)
+        capture("61-shortcuts")
+        check(m.sheet == .shortcuts, "Help › Keyboard Shortcuts opens")
         m.sheet = nil
         await pause(0.5)
 
@@ -799,6 +968,10 @@ enum SelfTest {
         m.openRoute = "#ebook/" + API.enc(bookID)
         let opened = await until(45) { BookModel.last?.id == bookID && BookModel.last?.text != nil && (BookModel.last?.pages?.pageCount ?? 0) > 0 }
         guard opened, let bm = BookModel.last, let pages = bm.pages, let epub = bm.epub, let t0 = bm.text else {
+            let b = BookModel.last
+            log("INFO  book: last \(b?.id ?? "none") epub \(b?.epub != nil) text \(b?.text != nil) pages \(b?.pages != nil) count \(b?.pages?.pageCount ?? -1) error \(b?.error ?? "-") | windows " +
+                NSApp.windows.map { "'\($0.title)' \($0.isVisible) \(Int($0.frame.width))x\(Int($0.frame.height)) \(type(of: $0.contentView ?? NSView()))" }.joined(separator: ", "))
+            if let w = NSApp.windows.first(where: { $0.isVisible && $0 != main && $0.title != "" }) { capture("29x-book-failed", w) }
             return check(false, "a book opens in the native reader, set as pages", "\(bookID): \(BookModel.last?.error ?? "nothing")")
         }
         await pause(1.5)
@@ -976,6 +1149,21 @@ enum SelfTest {
         bm.ownLook = false
         UserDefaults.standard.removeObject(forKey: "book.look." + bookID)
         bm.restyle(narrow)
+        await pause(0.6)
+        // the Scroll layout: the chapter as one column, Space a window's worth on
+        var scroll = bm.look
+        scroll.flow = "scrolled"
+        bm.restyle(scroll)
+        await pause(1)
+        let scrollFrom = pages.visible.location
+        pages.turn(true)
+        await pause(0.8)
+        let scrollTo = pages.visible.location
+        capture("67-book-scroll", win)
+        check(pages.scrolls && pages.pageCount == 1 && pages.visible.length > 0 && scrollTo > scrollFrom, "the Scroll layout reads the chapter as one column", "\(scrollFrom) → \(scrollTo)")
+        scroll.flow = "paginated"
+        bm.restyle(scroll)
+        await pause(0.6)
         await bm.forgetPlace()
         let forgot = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position") == nil
         check(forgot, "Forget My Place in Daf forgets it")

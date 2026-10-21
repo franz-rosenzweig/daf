@@ -11,6 +11,19 @@ struct ListFilter: Equatable {
 
     var isEmpty: Bool { self == ListFilter() }
 
+    init() {}
+
+    /// From what a saved view keeps (its filter, as /api/docs takes them).
+    init(_ d: [String: Any]) {
+        let n = { (k: String) -> Int? in (d[k] as? NSNumber)?.intValue ?? (d[k] as? String).flatMap { Int($0) } }
+        if n("minlen") != nil || n("maxlen") != nil { length = "\(n("minlen") ?? 0)-" + (n("maxlen").map(String.init) ?? "") }
+        since = n("since") ?? 0
+        hl = (n("hl") ?? 0) != 0
+        fresh = (n("fresh") ?? 0) != 0
+        source = d["source"] as? String ?? ""
+        author = d["author"] as? String ?? ""
+    }
+
     /// As /api/docs takes them (and a saved view keeps them).
     var dict: [String: Any] {
         var d: [String: Any] = [:]
@@ -40,40 +53,41 @@ struct ListOptionsMenu: View {
     var body: some View {
         @Bindable var model = model
         let feed: Bool = { if case .feed = model.place { return true }; if case .feedSource = model.place { return true }; return false }()
-        let active = !model.listFilter.isEmpty || model.tag != nil
+        // in a saved view, the order and filters are the view's own, changed here and kept with Update the View
+        let inView: String? = { if case .view(let id)? = model.place { return id }; return nil }()
+        let filter = inView != nil ? $model.viewFilter : $model.listFilter
+        let viewFeed = inView.flatMap { model.view($0)?.s("where") } == "feed"
+        let active = !filter.wrappedValue.isEmpty || model.tag != nil
         Menu {
-            if case .view(let id)? = model.place {
-                Text("A saved view keeps its own order and filters")
-                Button("Remove This View", role: .destructive) { Task { await model.removeView(id) } }
-            } else {
-                Picker("Order", selection: feed ? $model.sortFeed : $model.sortLibrary) {
+            Group {
+                Picker("Order", selection: inView != nil ? $model.viewSort : feed ? $model.sortFeed : $model.sortLibrary) {
                     ForEach(AppModel.sorts, id: \.0) { Text($0.1).tag($0.0) }
                 }
                 .pickerStyle(.inline)
                 Divider()
-                Picker("Length", selection: $model.listFilter.length) {
+                Picker("Length", selection: filter.length) {
                     ForEach(ListFilter.lengths, id: \.0) { Text($0.1).tag($0.0) }
                 }
-                Picker("Added", selection: $model.listFilter.since) {
+                Picker("Added", selection: filter.since) {
                     ForEach(ListFilter.times, id: \.0) { Text($0.1).tag($0.0) }
                 }
-                Toggle("Highlighted", isOn: $model.listFilter.hl)
-                Toggle("Not Started", isOn: $model.listFilter.fresh)
+                Toggle("Highlighted", isOn: filter.hl)
+                Toggle("Not Started", isOn: filter.fresh)
                 let sources = Array(Set(model.items.compactMap { $0.j.s("source") })).sorted()
-                if !sources.isEmpty || !model.listFilter.source.isEmpty {
-                    Picker("Source", selection: $model.listFilter.source) {
+                if !sources.isEmpty || !filter.wrappedValue.source.isEmpty {
+                    Picker("Source", selection: filter.source) {
                         Text("Any Source").tag("")
                         ForEach(sources, id: \.self) { Text($0).tag($0) }
                     }
                 }
                 let authors = Array(Set(model.items.compactMap { $0.j.s("author") })).sorted()
-                if !authors.isEmpty || !model.listFilter.author.isEmpty {
-                    Picker("Author", selection: $model.listFilter.author) {
+                if !authors.isEmpty || !filter.wrappedValue.author.isEmpty {
+                    Picker("Author", selection: filter.author) {
                         Text("Any Author").tag("")
                         ForEach(authors, id: \.self) { Text($0).tag($0) }
                     }
                 }
-                if !feed {
+                if !feed && !viewFeed {
                     let tags = tagsHere
                     if !tags.isEmpty || model.tag != nil {
                         Picker("Tag", selection: $model.tag) {
@@ -83,11 +97,17 @@ struct ListOptionsMenu: View {
                     }
                 }
                 if active {
-                    Button("Clear the Filters") { model.listFilter = ListFilter(); model.tag = nil }
+                    Button("Clear the Filters") { filter.wrappedValue = ListFilter(); model.tag = nil }
                 }
                 Divider()
-                Button("Save as View…") { model.sheet = .saveView }
-                    .disabled(model.currentView(named: "") == nil)
+                if let id = inView {
+                    Button("Update the View") { Task { await model.updateView() } }.disabled(!model.viewChanged)
+                    Button("Back to the View as Saved") { model.viewAsSaved() }.disabled(!model.viewChanged)
+                    Button("Remove This View", role: .destructive) { Task { await model.removeView(id) } }
+                } else {
+                    Button("Save as View…") { model.sheet = .saveView }
+                        .disabled(model.currentView(named: "") == nil)
+                }
             }
         } label: {
             Label("Order and Filters", systemImage: active ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")

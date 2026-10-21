@@ -98,6 +98,7 @@ struct HighlightGroups: View {
             }
         }
         .listStyle(.inset)
+        .themed(list: true)
         .navigationTitle("Highlights")
         .navigationSubtitle("\(hl.count)")
         .searchable(text: $hl.query, placement: .toolbar, prompt: "Highlights, notes, tags")
@@ -213,7 +214,7 @@ struct HighlightCard: View {
         HStack(alignment: .top, spacing: 12) {
             RoundedRectangle(cornerRadius: 2).fill(Color(ReaderModel.colour(h.s("color")).withAlphaComponent(1))).frame(width: 4)
             VStack(alignment: .leading, spacing: 8) {
-                Text(h.s("text") ?? "").font(.system(size: 17, design: .serif)).lineSpacing(4).textSelection(.enabled)
+                HLQuote(text: h.s("text") ?? "")
                 if let n = h.s("user_note") ?? h.s("note") {
                     Text(n).font(.callout).foregroundStyle(.secondary)
                 }
@@ -228,7 +229,7 @@ struct HighlightCard: View {
             }
         }
         .padding(14)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 10))
+        .background(Theme.shared.card, in: RoundedRectangle(cornerRadius: 10))
         .contextMenu {
             Button("Open at Its Spot", action: open)
             Button("Edit the Note…", action: edit)
@@ -239,9 +240,10 @@ struct HighlightCard: View {
                 }
             }
             Button("Tags…") { tool(.tags(h)) }
-            Button(h.i("cards").map { $0 > 0 ? "Flashcards (\($0))…" : "Make a Flashcard…" } ?? "Make a Flashcard…") { tool(.cards(h)) }
-            Button("Copy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(h.s("text") ?? "", forType: .string) }
-            Button("Share as Image…") { tool(.share(h, title: title, author: author)) }
+            let pic = HLPicture.of(h.s("text"))
+            if pic == nil { Button(h.i("cards").map { $0 > 0 ? "Flashcards (\($0))…" : "Make a Flashcard…" } ?? "Make a Flashcard…") { tool(.cards(h)) } }
+            Button(pic == nil ? "Copy" : "Copy the Picture's Address") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(pic?.src ?? h.s("text") ?? "", forType: .string) }
+            if pic == nil { Button("Share as Image…") { tool(.share(h, title: title, author: author)) } }
             Button(h.s("r_status") == "never" ? "Back into Review" : "Never Show in Review") {
                 let never = h.s("r_status") != "never"
                 Task { if await HLTools.review(id, never: never) { model.highlights.update(id) { $0["r_status"] = never ? "never" : "kept" } } }

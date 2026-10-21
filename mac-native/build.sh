@@ -9,8 +9,8 @@
 #                               so a test never touches Daf's settings, sign-in or keychain
 set -euo pipefail
 cd "${0:A:h}"
-VERSION=0.3.5
-BUILD=18
+VERSION=0.4.0
+BUILD=19
 if [[ -n ${DAF_TEST:-} ]]; then
     NAME="Daf Test"; ID=xyz.tiresia.daf.selftest; SCHEME=daf-selftest; OUT=build/test; EXTENSIONS=
 else

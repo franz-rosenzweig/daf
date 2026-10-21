@@ -1,45 +1,6 @@
 import SwiftUI
 
 /// File › Add a Link…: a link into the Library, read by Daf (/api/add/link).
-struct AddLinkSheet: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    @State private var url = ""
-    @State private var busy = false
-
-    var body: some View {
-        Form {
-            Section {
-                TextField("Link", text: $url, prompt: Text("https://…"))
-                    .onAppear {
-                        if let s = NSPasteboard.general.string(forType: .string), s.hasPrefix("http") { url = s }
-                    }
-            } header: { Text("Add a link to the Library") } footer: {
-                Text("Daf reads the page and keeps its text.").foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-        .frame(width: 440)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Add") { Task { await add() } }.disabled(busy || !url.lowercased().hasPrefix("http"))
-            }
-        }
-    }
-
-    private func add() async {
-        busy = true
-        defer { busy = false }
-        do {
-            try await API.shared.send("POST", "/api/add/link", ["url": url.trimmingCharacters(in: .whitespaces)])
-            model.say("Added to the Library")
-            dismiss()
-            if case .library = model.place { model.reload() }
-        } catch { model.error = error.localizedDescription }
-    }
-}
-
 /// File › Log Paper Minutes…: minutes read on paper, for today, yesterday or Shabbat (/api/paper).
 struct PaperSheet: View {
     @Environment(AppModel.self) private var model
@@ -92,6 +53,7 @@ struct PaperSheet: View {
 struct RouteView: View {
     let route: String
     @State private var reader: ReaderModel?
+    @AppStorage("torahLang") private var torahLang = "both"
 
     private var parts: [String] { route.drop { $0 == "#" }.split(separator: "/").map { $0.removingPercentEncoding.map(String.init) ?? String($0) } }
 
@@ -102,11 +64,11 @@ struct RouteView: View {
             } else if parts.first == "ebook", parts.count > 1 {
                 BookReaderView(id: parts[1], at: parts.count > 2 ? parts.dropFirst(2).joined(separator: "/") : nil)
             } else if parts.first == "pdf", parts.count > 1 {
-                PDFPane(id: parts[1])
+                PDFPane(id: parts[1], at: parts.count > 2 ? parts.last : nil)
             } else if parts.first == "page", parts.count > 1 {
                 WebPane(route: "#" + parts.dropFirst().map { API.enc($0) }.joined(separator: "/"))
             } else if parts.first == "read", parts.count > 1 {
-                if let reader, reader.doc != nil { ArticleReader(model: reader) }
+                if let reader, reader.doc != nil { if reader.doc?.s("kind") == "video" { VideoArticle(model: reader) } else { ArticleReader(model: reader) } }
                 else if let e = reader?.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }
                 else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
             } else {
@@ -114,15 +76,19 @@ struct RouteView: View {
             }
         }
         .frame(minWidth: 640, minHeight: 520)
+        .themed()
+        .tint(Theme.shared.accent)
         .navigationTitle(reader?.title ?? "Daf")
         .task(id: route) {
             guard parts.first == "read", parts.count > 1 else { return }
             let r = ReaderModel(id: parts[1])
             r.pendingReveal = parts.last.flatMap { $0.hasPrefix("hl:") ? String($0.dropFirst(3)) : nil }
+            r.pendingFind = parts.count > 2 ? parts.last.flatMap { $0.hasPrefix("q:") ? String($0.dropFirst(2)) : nil } : nil
             reader = r
             await r.load()
         }
         .onDisappear { reader?.stop() }
+        .onChange(of: torahLang) { _, _ in if reader?.doc?.s("kind") == "torah" { reader?.compose(keepPlace: true) } }
         .sheet(item: Binding(get: { reader?.editing }, set: { reader?.editing = $0 })) { e in
             NoteSheet(h: e.h, saved: { n in reader?.changed(e.id) { $0["user_note"] = n } })
         }

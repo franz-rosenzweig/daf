@@ -75,7 +75,6 @@ final class BookModel {
         self.target = target
         look = BookLook.load(book: id)
         ownLook = UserDefaults.standard.dictionary(forKey: "book.look." + id) != nil
-        Self.last = self
     }
 
     func say(_ s: String) {
@@ -89,6 +88,7 @@ final class BookModel {
     // MARK: opening
 
     func load() async {
+        Self.last = self                // the one on screen (SwiftUI may make others it throws away)
         do {
             let d = try await API.shared.json("/api/ebooks/" + API.enc(id))
             details = d
@@ -571,6 +571,9 @@ final class BookPagesView: NSView, NSTextViewDelegate {
     private var note: NSPopover?
     var rtl = false
     var look = BookLook() { didSet { needsDisplay = true } }
+    /// The Scroll layout: the chapter as one long column in a scroll view, instead of pages.
+    private var scroller: NSScrollView?
+    var scrolls: Bool { look.flow == "scrolled" }
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -583,10 +586,15 @@ final class BookPagesView: NSView, NSTextViewDelegate {
     required init?(coder: NSCoder) { fatalError() }
 
     var pageCount: Int { views.count }
-    var pagesLeft: Int { max(0, views.count - first - perSpread) }
+    var pagesLeft: Int { scrolls ? 0 : max(0, views.count - first - perSpread) }
 
-    /// The characters on the pages shown.
+    /// The characters on the pages shown (in the Scroll layout, in the window).
     var visible: NSRange {
+        if scrolls, let sv = scroller, let tv = views.first, let tc = tv.textContainer {
+            let seen = sv.contentView.bounds.offsetBy(dx: -tv.textContainerOrigin.x, dy: -tv.textContainerOrigin.y)
+            let g = layoutManager.glyphRange(forBoundingRect: seen, in: tc)
+            return layoutManager.characterRange(forGlyphRange: g, actualGlyphRange: nil)
+        }
         guard !views.isEmpty, let a = views[min(first, views.count - 1)].textContainer else { return NSRange(location: 0, length: 0) }
         let b = views[min(first + perSpread - 1, views.count - 1)].textContainer ?? a
         let ga = layoutManager.glyphRange(for: a), gb = layoutManager.glyphRange(for: b)
@@ -606,6 +614,9 @@ final class BookPagesView: NSView, NSTextViewDelegate {
     func paginate() {
         let b = bounds.size
         guard b.width > 200, b.height > 200 else { return }
+        if scrolls { column(b); return }
+        scroller?.removeFromSuperview()
+        scroller = nil
         perSpread = b.width >= 860 && b.width > b.height * 1.08 ? 2 : 1
         let top: CGFloat = 46, bottom: CGFloat = 58
         gutter = perSpread == 2 ? max(56, b.width * 0.065) : 0
@@ -630,6 +641,48 @@ final class BookPagesView: NSView, NSTextViewDelegate {
             let g = layoutManager.glyphRange(for: tc)
             done = NSMaxRange(g) >= layoutManager.numberOfGlyphs || (g.length == 0 && views.count > 1)
         }
+        laidFor = b
+    }
+
+    /// The Scroll layout: one text view the column's width, centred, as tall as the chapter.
+    private func column(_ b: NSSize) {
+        perSpread = 1
+        first = 0
+        let width: CGFloat = min(["narrow": 560, "wide": 820][look.width] ?? 680, b.width - 80)
+        pageSize = NSSize(width: floor(width), height: b.height)
+        fitPictures()
+        for v in views { v.removeFromSuperview() }
+        views.removeAll()
+        while !layoutManager.textContainers.isEmpty { layoutManager.removeTextContainer(at: 0) }
+        let tc = NSTextContainer(size: NSSize(width: pageSize.width, height: CGFloat.greatestFiniteMagnitude))
+        tc.lineFragmentPadding = 0
+        layoutManager.addTextContainer(tc)
+        let tv = BookTextView(frame: NSRect(x: 0, y: 0, width: b.width, height: 100), textContainer: tc)
+        setUp(tv)
+        tv.textContainerInset = NSSize(width: floor((b.width - pageSize.width) / 2), height: 48)
+        tv.isVerticallyResizable = true
+        tv.minSize = NSSize(width: b.width, height: b.height)
+        tv.maxSize = NSSize(width: b.width, height: .greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: tc)
+        tv.frame = NSRect(x: 0, y: 0, width: b.width, height: max(b.height, layoutManager.usedRect(for: tc).height + 140))
+        views = [tv]
+        let sv = scroller ?? {
+            let s = NSScrollView()
+            s.hasVerticalScroller = true
+            s.autohidesScrollers = true
+            s.drawsBackground = false
+            s.contentView.drawsBackground = false
+            s.contentView.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: s.contentView, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.model?.relocated() }
+            }
+            scroller = s
+            return s
+        }()
+        sv.frame = bounds
+        sv.autoresizingMask = [.width, .height]
+        sv.documentView = tv
+        if sv.superview == nil { addSubview(sv) }
         laidFor = b
     }
 
@@ -666,6 +719,14 @@ final class BookPagesView: NSView, NSTextViewDelegate {
     }
 
     func go(toChar char: Int, animated: Bool) {
+        if scrolls, let sv = scroller, let tv = views.first, let tc = tv.textContainer, storage.length > 0 {
+            let g = layoutManager.glyphIndexForCharacter(at: min(max(0, char), storage.length - 1))
+            let r = layoutManager.boundingRect(forGlyphRange: NSRange(location: g, length: 1), in: tc)
+            sv.contentView.scroll(to: NSPoint(x: 0, y: max(0, r.minY + tv.textContainerOrigin.y - 48)))
+            sv.reflectScrolledClipView(sv.contentView)
+            model?.relocated()
+            return
+        }
         let p = page(ofChar: char)
         first = p - p % perSpread
         display(animated: animated, forward: true)
@@ -695,6 +756,18 @@ final class BookPagesView: NSView, NSTextViewDelegate {
     func turn(_ forward: Bool) {
         note?.close()
         model?.lastActive = Date()
+        // the Scroll layout: a window's worth down or up, and on into the next chapter at the end
+        if scrolls, let sv = scroller, let doc = sv.documentView {
+            let cv = sv.contentView, step = cv.bounds.height - 60, y = cv.bounds.minY
+            if forward {
+                if cv.bounds.maxY >= doc.frame.height - 2 { model?.nextSection(); return }
+                cv.animator().setBoundsOrigin(NSPoint(x: 0, y: min(y + step, doc.frame.height - cv.bounds.height)))
+            } else {
+                if y <= 1 { model?.previousSection(); return }
+                cv.animator().setBoundsOrigin(NSPoint(x: 0, y: max(0, y - step)))
+            }
+            return
+        }
         if forward {
             if first + perSpread < views.count { first += perSpread; display(animated: true, forward: true) }
             else { model?.nextSection() }
@@ -764,7 +837,7 @@ final class BookPagesView: NSView, NSTextViewDelegate {
         look.background.setFill()
         bounds.fill()
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: look.quiet]
-        for k in 0..<perSpread where first + k < views.count {
+        for k in 0..<perSpread where first + k < views.count && !scrolls {
             let col = rtl ? perSpread - 1 - k : k
             let s = "\(first + k + 1)" as NSString
             let size = s.size(withAttributes: attrs)
@@ -1279,7 +1352,7 @@ struct LookPanel: View {
                             Text("Aa").font(.system(size: 13, weight: .semibold, design: .serif)).foregroundStyle(Color(nsColor: l.ink))
                         }
                         .frame(width: 38, height: 38)
-                        .overlay(Circle().stroke(look.theme == t.0 ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: look.theme == t.0 ? 2.5 : 1))
+                        .overlay(Circle().stroke(look.theme == t.0 ? Color.daf : Color.secondary.opacity(0.35), lineWidth: look.theme == t.0 ? 2.5 : 1))
                     }
                     .buttonStyle(.plain)
                     .help(t.1)
@@ -1302,6 +1375,11 @@ struct LookPanel: View {
             Toggle("Justify the text", isOn: Binding(get: { look.justify }, set: { look.justify = $0; m.restyle(look) }))
             Picker("Line width", selection: Binding(get: { look.width }, set: { look.width = $0; m.restyle(look) })) {
                 ForEach(BookLook.widths, id: \.0) { Text($0.1).tag($0.0) }
+            }
+            .pickerStyle(.segmented)
+            Picker("Layout", selection: Binding(get: { look.flow }, set: { look.flow = $0; m.restyle(look) })) {
+                Text("Pages").tag("paginated")
+                Text("Scroll").tag("scrolled")
             }
             .pickerStyle(.segmented)
             Toggle("Just for this book", isOn: Binding(get: { m.ownLook }, set: { on in

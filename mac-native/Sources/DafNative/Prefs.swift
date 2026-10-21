@@ -663,7 +663,7 @@ struct ImportPrefs: View {
                     Button("Choose a File…") { choose() }
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 14)
-                .background(RoundedRectangle(cornerRadius: 10).strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5])).foregroundStyle(dropping ? Color.accentColor : .secondary.opacity(0.4)))
+                .background(RoundedRectangle(cornerRadius: 10).strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5])).foregroundStyle(dropping ? Color.daf : .secondary.opacity(0.4)))
                 .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
                     guard let p = providers.first else { return false }
                     _ = p.loadObject(ofClass: URL.self) { u, _ in if let u { Task { @MainActor in await upload(u) } } }

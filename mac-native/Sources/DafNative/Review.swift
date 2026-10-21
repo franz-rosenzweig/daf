@@ -141,10 +141,7 @@ struct ReviewView: View {
 
     private func highlight(_ x: J) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(x.s("text") ?? "")
-                .font(.system(size: 22, design: .serif))
-                .lineSpacing(6)
-                .textSelection(.enabled)
+            HLQuote(text: x.s("text") ?? "", size: 22)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .environment(\.layoutDirection, Self.hebrew(x.s("text")) ? .rightToLeft : .leftToRight)
             if let n = x.s("user_note") ?? x.s("note") {
@@ -266,7 +263,7 @@ struct ReviewView: View {
             Text(review.items.isEmpty ? "New highlights come back here." : "\(kept) kept · \(less) less often · \(review.items.count) seen" + (review.streak?.i("days").map { " · \($0)-day streak" } ?? ""))
             if let week = review.streak?.a("week"), !week.isEmpty {
                 HStack(spacing: 6) {
-                    ForEach(week, id: \.self) { d in Circle().fill(d.b("done") ? Color.accentColor : Color.secondary.opacity(0.25)).frame(width: 9, height: 9) }
+                    ForEach(week, id: \.self) { d in Circle().fill(d.b("done") ? Color.daf : Color.secondary.opacity(0.25)).frame(width: 9, height: 9) }
                 }
                 .padding(.top, 4)
             }

@@ -57,7 +57,7 @@ struct SeriesView: View {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.white, .green).padding(5).frame(maxWidth: .infinity, alignment: .trailing)
         } else if page > 1 {
             GeometryReader { g in
-                Rectangle().fill(Color.accentColor).frame(width: g.size.width * page / pages, height: 4)
+                Rectangle().fill(Color.daf).frame(width: g.size.width * page / pages, height: 4)
             }
             .frame(height: 4)
         }
@@ -228,10 +228,7 @@ final class MangaModel {
     /// For the self-test.
     @ObservationIgnored static weak var last: MangaModel?
 
-    init(id: String) {
-        self.id = id
-        Self.last = self
-    }
+    init(id: String) { self.id = id }
 
     var title: String { book?.s("name") ?? "Manga" }
     var seriesID: String { book?.o("series")?.s("id") ?? "" }
@@ -265,6 +262,7 @@ final class MangaModel {
     // MARK: opening
 
     func load(atEnd: Bool = false, quiet: Bool = false) async {
+        Self.last = self            // the one on screen (SwiftUI may make others it throws away)
         do {
             async let b = API.shared.json("/api/manga/books/" + API.enc(id))
             await MangaSettings.load()

@@ -89,7 +89,7 @@ struct HighlightTagsSheet: View {
                     }
                     .font(.callout)
                     .padding(.leading, 9).padding(.trailing, 5).padding(.vertical, 3)
-                    .background(Capsule().fill(Color.accentColor.opacity(0.14)))
+                    .background(Capsule().fill(Color.daf.opacity(0.14)))
                 }
             }
             TextField("Add a tag (Return or a comma adds it)", text: $field)
@@ -178,7 +178,7 @@ struct FlashcardSheet: View {
                         Text(w)
                             .font(.system(.body, design: .serif))
                             .padding(.horizontal, 3).padding(.vertical, 1)
-                            .background(RoundedRectangle(cornerRadius: 4).fill(hidden.contains(i) ? Color.accentColor.opacity(0.35) : .clear))
+                            .background(RoundedRectangle(cornerRadius: 4).fill(hidden.contains(i) ? Color.daf.opacity(0.35) : .clear))
                             .onTapGesture { if hidden.contains(i) { hidden.remove(i) } else { hidden.insert(i) } }
                     }
                 }
@@ -438,9 +438,13 @@ enum HLMenu {
         out.append(colours)
         let fav = h.b("fav")
         out.append(MenuAction.item(fav ? "Not a Favorite" : "Favorite") { Task { if await HLTools.fav(hid, !fav) { host.changed(hid) { $0["fav"] = !fav } } } })
-        out.append(MenuAction.item("Make a Flashcard…") { host.sheet = .cards(h) })
-        out.append(MenuAction.item("Copy the Highlight") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(h.s("text") ?? "", forType: .string) })
-        out.append(MenuAction.item("Share as Image…") { host.sheet = .share(h, title: host.shareTitle, author: host.shareAuthor) })
+        // a picture has no words for a flashcard or a card to share
+        let pic = HLPicture.of(h.s("text"))
+        if pic == nil { out.append(MenuAction.item("Make a Flashcard…") { host.sheet = .cards(h) }) }
+        out.append(MenuAction.item(pic == nil ? "Copy the Highlight" : "Copy the Picture's Address") {
+            NSPasteboard.general.clearContents(); NSPasteboard.general.setString(pic?.src ?? h.s("text") ?? "", forType: .string)
+        })
+        if pic == nil { out.append(MenuAction.item("Share as Image…") { host.sheet = .share(h, title: host.shareTitle, author: host.shareAuthor) }) }
         if !kindle { out.append(MenuAction.item("Remove Highlight") { Task { await host.remove(highlight: hid) } }) }
         return out
     }
@@ -450,6 +454,39 @@ enum HLMenu {
         guard let w = HLTools.lookupWord(selected) else { return nil }
         return MenuAction.item(w.translate ? "Translate “\(w.word.prefix(24))”" : "Define “\(w.word)”") {
             host.sheet = .lookup(w.word, sentence: host.paragraph(around: loc), translate: w.translate)
+        }
+    }
+}
+
+/// A highlighted picture is kept as Markdown's picture, ![alt](address), as the page keeps it.
+enum HLPicture {
+    private static let pattern = try! NSRegularExpression(pattern: "^!\\[([^\\]\\n]*)\\]\\((\\S+)\\)$")
+
+    static func of(_ text: String?) -> (alt: String, src: String)? {
+        guard let t = text?.trimmingCharacters(in: .whitespacesAndNewlines), t.hasPrefix("!["),
+              let m = Self.pattern.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)),
+              let a = Range(m.range(at: 1), in: t), let b = Range(m.range(at: 2), in: t) else { return nil }
+        return (String(t[a]), String(t[b]))
+    }
+
+    @MainActor static func url(_ src: String) -> URL? { src.hasPrefix("/") ? API.shared.url(src) : URL(string: src) }
+}
+
+/// A highlight's words, or its picture.
+struct HLQuote: View {
+    let text: String
+    var size: CGFloat = 17
+    var body: some View {
+        if let p = HLPicture.of(text) {
+            AsyncImage(url: HLPicture.url(p.src)) { phase in
+                if let i = phase.image { i.resizable().aspectRatio(contentMode: .fit) }
+                else { Label(p.alt.isEmpty ? "A picture" : p.alt, systemImage: "photo").foregroundStyle(.secondary) }
+            }
+            .frame(maxWidth: 460, maxHeight: 320, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .help(p.alt)
+        } else {
+            Text(text).font(.system(size: size, design: .serif)).lineSpacing(size > 20 ? 6 : 4).textSelection(.enabled)
         }
     }
 }

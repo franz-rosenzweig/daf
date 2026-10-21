@@ -58,9 +58,7 @@ struct RecoveryView: View {
     }
 
     private func show(_ id: String?) {
-        guard let id else { return }
-        model.place = .books
-        Task { try? await Task.sleep(nanoseconds: 300_000_000); model.selection = id }
+        if let id { model.showBook(id) }
     }
 
     private func readings(_ r: J) -> some View {

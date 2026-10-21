@@ -24,7 +24,7 @@ enum Place: Hashable {
     case search
 
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
-    var isPage: Bool { self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
+    var isPage: Bool { self == .today || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
 
     var title: String {
         switch self {
@@ -198,14 +198,19 @@ final class AppModel {
     var sheet: Sheet?
     /// A route to open in a window of its own ("#ebook/…", "#mread/…"), from code (menus, the self-test).
     var openRoute: String?
+    /// For Add to Daf: a link dropped or pasted, books and PDFs dropped or pasted.
+    @ObservationIgnored var addURL: String?
+    @ObservationIgnored var addFiles: [URL] = []
     /// Settings, opened from code (the self-test; ⌘, opens it by hand).
     var showSettings = false
 
     enum Sheet: Identifiable, Hashable {
-        case addLink, paper, follow, renameFeed(String), saveView, newShelf(String?), renameShelf(String), feedback
+        case addLink, paper, follow, renameFeed(String), saveView, newShelf(String?), renameShelf(String), feedback, palette, shortcuts
         var id: String {
             switch self {
             case .addLink: return "addLink"
+            case .palette: return "palette"
+            case .shortcuts: return "shortcuts"
             case .feedback: return "feedback"
             case .paper: return "paper"
             case .follow: return "follow"
@@ -227,15 +232,24 @@ final class AppModel {
         }
     }
 
-    var selected: Item? { items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } ?? standItems.first { $0.id == selection } }
-    /// Today's nightstand (or the suggested three), which open beside it.
-    var standItems: [Item] {
-        ((today?.a("nightstand") ?? []) + (today?.a("nightstand_suggested") ?? [])).map { b in
-            var raw = b.raw
-            raw["type"] = "book"
-            raw["kind"] = "book"
-            return Item(J(raw))
+    var selected: Item? { items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } }
+
+    /// A book's page, on Books (from Today, Recovery, a notice).
+    func showBook(_ id: String) {
+        place = .books
+        Task {
+            _ = await until(6) { self.items.contains { $0.id == id } }
+            selection = id
         }
+    }
+
+    private func until(_ timeout: Double, _ cond: () -> Bool) async -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if cond() { return true }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return cond()
     }
     var continueItems: [Item] { (home?.a("continue") ?? []).map(Item.init) }
 
@@ -276,7 +290,7 @@ final class AppModel {
                 if views.isEmpty { await loadViews() }
                 guard let v = view(id) else { items = []; break }
                 let w = v.s("where") == "feed" ? "feed" : "library"
-                items = try await docs(w, tab: v.s("tab") ?? (w == "feed" ? "unseen" : "inbox"), arg: v.s("arg") ?? "", sort: v.s("sort") ?? "new", filter: v.o("filter")?.raw ?? [:])
+                items = try await docs(w, tab: v.s("tab") ?? (w == "feed" ? "unseen" : "inbox"), arg: v.s("arg") ?? "", sort: viewSort, filter: viewFilter.dict)
             case .paper:
                 items = try await API.shared.json("/api/paper/pages").a("pages").map(PaperPages.item)
             case .shelf(let id):
@@ -353,6 +367,7 @@ final class AppModel {
             }
             counts = try await c
             today = try await t
+            Theme.shared.adopt(today?.o("settings")?.o("appearance"))
             needsSignIn = false
             if !keptBooks { keptBooks = true; keepNightstand() }
         } catch is CancellationError {
@@ -377,8 +392,40 @@ final class AppModel {
     /// A new place: nothing chosen, a saved view's tag (or none), the list again.
     func placeChanged() {
         multi = []
-        if case .view(let id)? = place { tag = view(id)?.s("tag") } else { tag = nil }
+        if case .view? = place { viewAsSaved(load: false) } else { tag = nil }
         reload()
+    }
+
+    // a saved view's order and filters, as changed here before Update the View
+    var viewSort = "new"
+    var viewFilter = ListFilter()
+
+    /// The view open, as it was saved.
+    func viewAsSaved(load: Bool = true) {
+        guard case .view(let id)? = place, let v = view(id) else { return }
+        viewSort = v.s("sort") ?? "new"
+        viewFilter = ListFilter(v.o("filter")?.raw ?? [:])
+        tag = v.s("tag").flatMap { $0.isEmpty ? nil : $0 }
+        if load { reload() }
+    }
+
+    var viewChanged: Bool {
+        guard case .view(let id)? = place, let v = view(id) else { return false }
+        return viewSort != (v.s("sort") ?? "new") || viewFilter != ListFilter(v.o("filter")?.raw ?? [:]) || (tag ?? "") != (v.s("tag") ?? "")
+    }
+
+    /// Update the View: its order, filters and tag, as they are now, for every device.
+    func updateView() async {
+        guard case .view(let id)? = place else { return }
+        let list: [[String: Any]] = views.map { v in
+            guard v.s("id") == id else { return v.raw }
+            var raw = v.raw
+            raw["sort"] = viewSort
+            raw["filter"] = viewFilter.dict
+            raw["tag"] = tag ?? ""
+            return raw
+        }
+        if await saveViews(list) { say("The view is updated") }
     }
 
     // MARK: saved views and shelves
@@ -580,7 +627,7 @@ final class AppModel {
         if item.isBook { return item.j.b("readable") ? "#ebook/" + id : nil }
         switch item.kind {
         case "pdf": return "#pdf/" + id
-        case "video", "podcast": return "#page/read/" + id
+        case "video", "podcast": return "#read/" + id
         case "manga": return "#mread/" + id
         default: return "#read/" + id
         }

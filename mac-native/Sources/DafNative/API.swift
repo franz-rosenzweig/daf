@@ -172,6 +172,16 @@ final class API {
         return parsed
     }
 
+    /// A file as a form, as a browser sends one (a book or a PDF for Add to Daf).
+    func uploadFile(_ path: String, name: String, data: Data) async throws -> Any {
+        let boundary = "daf-" + UUID().uuidString
+        let safe = name.replacingOccurrences(of: "\"", with: "").replacingOccurrences(of: "\r", with: "").replacingOccurrences(of: "\n", with: "")
+        var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(safe)\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8)
+        body.append(data)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        return try await upload(path, body, type: "multipart/form-data; boundary=" + boundary)
+    }
+
     /// A POST whose answer is bytes, not JSON (a paragraph's speech).
     func post(_ path: String, _ body: [String: Any]) async throws -> Data {
         if Connection.shared.forced { throw URLError(.notConnectedToInternet) }

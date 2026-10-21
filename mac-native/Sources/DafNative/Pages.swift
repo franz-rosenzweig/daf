@@ -120,7 +120,7 @@ struct BookPage: View {
             let days = st.list("last30").enumerated().map { ($0.offset, ($0.element as? NSNumber)?.doubleValue ?? 0) }
             if days.contains(where: { $0.1 > 0 }) {
                 Chart(days, id: \.0) { d in
-                    BarMark(x: .value("Day", d.0), y: .value("Minutes", d.1)).foregroundStyle(Color.accentColor.opacity(0.7))
+                    BarMark(x: .value("Day", d.0), y: .value("Minutes", d.1)).foregroundStyle(Color.daf.opacity(0.7))
                 }
                 .chartXAxis(.hidden)
                 .frame(height: 90)
@@ -324,7 +324,7 @@ struct SelectableRows: View {
                 Button { model.selection = item.id } label: {
                     ItemRow(item: item)
                         .padding(.horizontal, 8)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(model.selection == item.id ? Color.accentColor.opacity(0.18) : .clear))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(model.selection == item.id ? Color.daf.opacity(0.18) : .clear))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

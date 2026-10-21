@@ -32,6 +32,10 @@ final class ReaderModel {
     @ObservationIgnored let storage = NSTextStorage()
     /// Each block's text in the storage, by its index in the doc's blocks.
     @ObservationIgnored private(set) var blocks: [(i: Int, range: NSRange)] = []
+    /// The pictures, each where it is in the text (one character), for picture highlights.
+    @ObservationIgnored private(set) var pictures: [(i: Int, at: Int, src: String, alt: String)] = []
+    /// Highlighted pictures, framed in their colour by the text view.
+    @ObservationIgnored private(set) var pictureMarks: [(at: Int, color: NSColor)] = []
     @ObservationIgnored weak var textView: ReaderTextView?
     @ObservationIgnored var lastActive = Date()
     @ObservationIgnored private var beatTimer: Timer?
@@ -40,12 +44,25 @@ final class ReaderModel {
     @ObservationIgnored var restored = false
     /// A highlight to bring into view once laid out (Open at Its Spot).
     @ObservationIgnored var pendingReveal: String?
+    /// Opened from a search in the text: the words, found and shown.
+    @ObservationIgnored var pendingFind: String?
     /// For the self-test: what the reader has sent.
     @ObservationIgnored var beatsSent = 0
     @ObservationIgnored var placeSent: [Int] = []
     @ObservationIgnored var lastFraction = -1.0
 
-    init(id: String) { self.id = id }
+    init(id: String) {
+        self.id = id
+        // another theme: the article set again in its colours, where it is
+        NotificationCenter.default.addObserver(forName: .dafTheme, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.textView?.backgroundColor = Theme.nsBG
+                self.textView?.enclosingScrollView?.backgroundColor = Theme.nsBG
+                if self.doc != nil { self.compose(keepPlace: true) }
+            }
+        }
+    }
 
     var title: String { doc?.s("title") ?? "" }
 
@@ -59,9 +76,59 @@ final class ReaderModel {
             asks = d.a("asks")
             questions = d.strings("questions")
             sentPct = d.d("progress") ?? 0
+            if d.s("kind") == "video", video == nil, let yt = VideoPlayer.id(d.s("url")) {
+                let v = VideoPlayer(ytID: yt)
+                v.onTick = { [weak self] t, playing in self?.syncCue(t, playing) }
+                video = v
+            }
             compose()
             startBeats()
         } catch { self.error = error.localizedDescription }
+    }
+
+    // MARK: a video's transcript
+
+    /// The player, for a video (YouTube's, above the transcript).
+    var video: VideoPlayer?
+    /// The transcript's cues: each block's place in the video.
+    @ObservationIgnored private(set) var cues: [(i: Int, ts: Double)] = []
+    @ObservationIgnored private var nowCue = -1
+
+    /// The cue being said, marked, and kept in view while it plays (Follow Along).
+    func syncCue(_ t: Double, _ playing: Bool) {
+        if playing { lastActive = Date() }
+        let i = cues.last { $0.ts <= t }?.i ?? -1
+        guard i != nowCue else { return }
+        nowCue = i
+        let r = blocks.first { $0.i == i }?.range
+        textView?.nowRange = r
+        if let r, playing, video?.follow == true, let tv = textView, let scroll = tv.enclosingScrollView, let lm = tv.layoutManager, let tc = tv.textContainer {
+            let box = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: r, actualCharacterRange: nil), in: tc).offsetBy(dx: 0, dy: tv.textContainerOrigin.y)
+            let seen = scroll.contentView.bounds
+            if box.minY < seen.minY + 10 || box.maxY > seen.maxY - 60 {
+                scroll.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: max(0, box.minY - seen.height / 3)))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+        }
+    }
+
+    /// Clip 30s: the cues of the last 30 seconds highlighted, each with its time.
+    func clip(_ seconds: Double) async {
+        guard let v = video else { return }
+        let now = v.time
+        let these = cues.filter { $0.ts >= now - seconds && $0.ts <= now }
+        guard !these.isEmpty else { AppModel.shared.say("Play the video first; Clip takes the last 30 seconds."); return }
+        let colour = HLTools.lastColour
+        for c in these {
+            guard let r = blocks.first(where: { $0.i == c.i })?.range else { continue }
+            let text = (storage.string as NSString).substring(with: r).trimmingCharacters(in: .whitespacesAndNewlines)
+            do {
+                let res = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/highlights", ["b": c.i, "s": 0, "e": r.length, "text": text, "t": c.ts, "color": colour]))
+                highlights.append(J(["id": res?.s("id") ?? UUID().uuidString, "text": text, "pos": ["b": c.i, "s": 0, "e": r.length], "color": colour]))
+            } catch { self.error = error.localizedDescription; break }
+        }
+        applyHighlights()
+        AppModel.shared.say("Clipped " + VideoPlayer.clock(these[0].ts) + "–" + VideoPlayer.clock(now))
     }
 
     /// Only the doc's own fields (the note, the tags), for a PDF or a video in the inspector.
@@ -93,6 +160,7 @@ final class ReaderModel {
     func stop() {
         beatTimer?.invalidate()
         beatTimer = nil
+        video?.stop()
         noteTask?.cancel()
         noteTask = nil
         if noteDirty {                           // a note still being typed: kept now
@@ -180,7 +248,7 @@ final class ReaderModel {
         guard let d = doc else { return }
         let out = NSMutableAttributedString()
         let serif = Self.serif
-        let ink = NSColor.textColor, quiet = NSColor.secondaryLabelColor
+        let ink = Theme.nsRead, quiet = Theme.nsQuiet
         let baseURL = URL(string: d.s("url") ?? API.shared.base.absoluteString) ?? API.shared.base
 
         func bold(_ f: NSFont, _ size: CGFloat) -> NSFont {
@@ -193,13 +261,53 @@ final class ReaderModel {
         out.append(NSAttributedString(string: by, attributes: [.font: NSFont.systemFont(ofSize: 13), .foregroundColor: quiet, .paragraphStyle: para(26, line: 1.2)]))
 
         var map: [(Int, NSRange)] = []
+        var pics: [(i: Int, at: Int, src: String, alt: String)] = []
+        var cueList: [(i: Int, ts: Double)] = []
         for (i, any) in d.list("blocks").enumerated() {
             guard let b = J(any) else { continue }
             let t = b.s("t") ?? "p"
             if t == "pg" { continue }
             out.append(NSAttributedString(string: "\n"))
             if t == "img" {
-                if let src = b.s("src") { out.append(image(src, baseURL: baseURL)) }
+                if let src = b.s("src") {
+                    pics.append((i, out.length, src, b.s("alt") ?? ""))
+                    out.append(image(src, baseURL: baseURL))
+                }
+                continue
+            }
+            // a line of a video's transcript: its time (a click plays from there), then the words
+            if t == "cue", let x = b.s("x"), !x.isEmpty {
+                let ts = b.d("ts") ?? 0
+                cueList.append((i, ts))
+                out.append(NSAttributedString(string: VideoPlayer.clock(ts) + "  ", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
+                    .foregroundColor: Theme.nsAccent, .dafSeek: ts, .cursor: NSCursor.pointingHand, .paragraphStyle: para()]))
+                if let spk = b.s("spk"), !spk.isEmpty { out.append(NSAttributedString(string: spk + ": ", attributes: [.font: bold(serif, serif.pointSize), .foregroundColor: quiet, .paragraphStyle: para()])) }
+                let start = out.length
+                out.append(InlineHTML.styled(b.s("h"), plain: x, base: [.font: serif, .foregroundColor: ink, .paragraphStyle: para()], baseURL: baseURL))
+                map.append((i, NSRange(location: start, length: out.length - start)))
+                continue
+            }
+            // a verse of Torah: the Hebrew, right to left, and the English, or one of them (Article › Torah)
+            if t == "verse" {
+                let lang = UserDefaults.standard.string(forKey: "torahLang") ?? "both"
+                let n = b.s("n") ?? "", num: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium), .foregroundColor: quiet]
+                if lang != "en", let he = b.s("he"), !he.isEmpty {
+                    let p = para(lang == "he" ? 14 : 4, align: .right, line: 1.5).mutableCopy() as! NSMutableParagraphStyle
+                    p.baseWritingDirection = .rightToLeft
+                    let font = NSFont(name: "Taamey Frank CLM", size: 24) ?? NSFont(name: "New Peninim MT", size: 23) ?? NSFont(name: "Times New Roman", size: 23) ?? serif
+                    let line = NSMutableAttributedString(string: n + "  ", attributes: num.merging([.paragraphStyle: p]) { a, _ in a })
+                    line.append(NSAttributedString(string: he, attributes: [.font: font, .foregroundColor: ink, .paragraphStyle: p]))
+                    out.append(line)
+                    if lang == "both" { out.append(NSAttributedString(string: "\n")) }
+                }
+                if lang != "he", let x = b.s("x"), !x.isEmpty {
+                    var a: [NSAttributedString.Key: Any] = [.font: serif, .foregroundColor: ink, .paragraphStyle: para(18)]
+                    out.append(NSAttributedString(string: n + "  ", attributes: num.merging([.paragraphStyle: a[.paragraphStyle]!]) { a, _ in a }))
+                    let start = out.length
+                    a[.paragraphStyle] = para(18)
+                    out.append(InlineHTML.styled(b.s("h"), plain: x, base: a, baseURL: baseURL))
+                    map.append((i, NSRange(location: start, length: out.length - start)))
+                }
                 continue
             }
             let x = b.s("x") ?? ""
@@ -225,6 +333,9 @@ final class ReaderModel {
         out.append(NSAttributedString(string: "\n\n"))
         storage.setAttributedString(out)
         blocks = map
+        pictures = pics
+        cues = cueList
+        nowCue = -1
         applyHighlights()
         if !keepPlace { restored = false }
     }
@@ -252,15 +363,8 @@ final class ReaderModel {
 
     // MARK: highlights
 
-    static func colour(_ name: String?) -> NSColor {
-        switch name {
-        case "green": return NSColor.systemGreen.withAlphaComponent(0.28)
-        case "blue": return NSColor.systemBlue.withAlphaComponent(0.24)
-        case "pink", "red": return NSColor.systemPink.withAlphaComponent(0.24)
-        case "purple": return NSColor.systemPurple.withAlphaComponent(0.24)
-        default: return NSColor.systemYellow.withAlphaComponent(0.38)
-        }
-    }
+    /// A highlight's colour, as the theme mixes it into its page.
+    static func colour(_ name: String?) -> NSColor { Theme.highlight(name) }
 
     private func range(of h: J) -> NSRange? {
         guard let pos = h.o("pos"), let b = pos.i("b"), let s = pos.i("s"), let e = pos.i("e") else { return nil }
@@ -277,7 +381,18 @@ final class ReaderModel {
         storage.removeAttribute(.dafHighlight, range: all)
         storage.removeAttribute(.toolTip, range: all)
         storage.removeAttribute(.underlineStyle, range: all)
+        var marks: [(at: Int, color: NSColor)] = []
         for h in highlights {
+            if let pic = HLPicture.of(h.s("text")) {
+                // a picture: by its block, else by its address
+                let b = h.o("pos")?.i("b")
+                guard let p = pictures.first(where: { $0.i == b && $0.src == pic.src }) ?? pictures.first(where: { $0.src == pic.src }) else { continue }
+                let r = NSRange(location: p.at, length: 1)
+                storage.addAttribute(.dafHighlight, value: h.s("id") ?? "", range: r)
+                if let n = h.s("user_note"), !n.isEmpty { storage.addAttribute(.toolTip, value: n, range: r) }
+                marks.append((p.at, Self.colour(h.s("color")).withAlphaComponent(0.95)))
+                continue
+            }
             guard let r = range(of: h) else { continue }
             storage.addAttribute(.backgroundColor, value: Self.colour(h.s("color")), range: r)
             storage.addAttribute(.dafHighlight, value: h.s("id") ?? "", range: r)
@@ -287,6 +402,30 @@ final class ReaderModel {
             }
         }
         storage.endEditing()
+        pictureMarks = marks
+        textView?.needsDisplay = true
+    }
+
+    /// The picture at a character, if there's one there.
+    func picture(at loc: Int) -> (i: Int, at: Int, src: String, alt: String)? { pictures.first { $0.at == loc } }
+
+    /// Highlight the Picture, as the page's: kept as ![alt](address), at its block.
+    func highlightPicture(at loc: Int, thenNote: Bool = false) async {
+        guard let p = picture(at: loc) else { return }
+        if let hid = storage.attribute(.dafHighlight, at: loc, effectiveRange: nil) as? String, !hid.isEmpty, let h = highlight(withID: hid) {
+            if thenNote { editing = .init(h: h) }
+            return
+        }
+        let text = "![" + p.alt.replacingOccurrences(of: "[\\[\\]\n]+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces) + "](" + p.src + ")"
+        let colour = HLTools.lastColour
+        do {
+            let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/highlights", ["b": p.i, "s": 0, "e": 0, "text": text, "img": p.src, "color": colour]))
+            if let moved = r?.s("saved_as") { id = moved; movedToLibrary = true }
+            let made: [String: Any] = ["id": r?.s("id") ?? UUID().uuidString, "text": text, "pos": ["b": p.i, "s": 0, "e": 0, "img": p.src], "color": colour]
+            highlights.append(J(made))
+            applyHighlights()
+            if thenNote { editing = .init(h: J(made)) }
+        } catch { self.error = error.localizedDescription }
     }
 
     /// Where a character of the storage is, as Daf counts it: (block, offset in its text).
@@ -338,6 +477,7 @@ final class ReaderModel {
         let colour = color ?? over.first?.0.s("color") ?? HLTools.lastColour
         do {
             var body: [String: Any] = ["b": p.b, "s": p.s, "e": p.e, "text": p.text, "color": colour]
+            if let ts = cues.first(where: { $0.i == p.b })?.ts { body["t"] = ts }
             body["be"] = p.be != p.b ? p.be : NSNull()
             if !over.isEmpty { body["replaces"] = over.compactMap { $0.0.s("id") } }
             let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/highlights", body))
@@ -441,7 +581,7 @@ final class ReaderModel {
         lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSRange(location: 0, length: storage.length))
         guard let b, let r = blocks.first(where: { $0.i == b })?.range else { return }
         storage.enumerateAttribute(.dafHighlight, in: r) { v, sub, _ in
-            if (v as? String)?.isEmpty ?? true { lm.addTemporaryAttribute(.backgroundColor, value: NSColor.controlAccentColor.withAlphaComponent(0.13), forCharacterRange: sub) }
+            if (v as? String)?.isEmpty ?? true { lm.addTemporaryAttribute(.backgroundColor, value: Theme.nsAccent.withAlphaComponent(0.13), forCharacterRange: sub) }
         }
         guard follow, let container = tv.textContainer else { return }
         let glyphs = lm.glyphRange(forCharacterRange: r, actualCharacterRange: nil)
@@ -474,6 +614,17 @@ final class ReaderModel {
     func block(at loc: Int) -> Int? {
         blocks.first { loc < $0.range.location + $0.range.length }?.i
     }
+
+    /// The first place the longest of the words is, as the page's findInDoc.
+    func reveal(words q: String) {
+        guard let tv = textView, let w = q.split(separator: " ").map(String.init).max(by: { $0.count < $1.count }) else { return }
+        let r = (storage.string as NSString).range(of: w, options: [.caseInsensitive, .diacriticInsensitive])
+        guard r.location != NSNotFound else { return }
+        foundRange = r
+        tv.scrollRangeToVisible(r)
+        tv.showFindIndicator(for: r)
+    }
+    @ObservationIgnored var foundRange: NSRange?
 
     func reveal(highlight hid: String) {
         guard let h = highlights.first(where: { $0.s("id") == hid }), let r = range(of: h), let tv = textView else { return }
@@ -519,6 +670,8 @@ final class ReaderModel {
 
 extension NSAttributedString.Key {
     static let dafHighlight = NSAttributedString.Key("dafHighlight")
+    /// A transcript's timestamp: the second it plays from.
+    static let dafSeek = NSAttributedString.Key("dafSeek")
 }
 
 extension ReaderModel: HighlightHost {
@@ -536,19 +689,45 @@ final class ReaderTextView: NSTextView {
     weak var model: ReaderModel?
     /// The focused paragraph (j, k), marked with a bar in the margin.
     var focusRange: NSRange? { didSet { needsDisplay = true } }
+    /// The line of a video's transcript being said, tinted.
+    var nowRange: NSRange? { didSet { needsDisplay = true } }
 
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
+        if let lm = layoutManager, let tc = textContainer, let marks = MainActor.assumeIsolated({ model?.pictureMarks }) {
+            for mark in marks where mark.at < (textStorage?.length ?? 0) {
+                var box = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: NSRange(location: mark.at, length: 1), actualCharacterRange: nil), in: tc)
+                box.origin.x += textContainerOrigin.x
+                box.origin.y += textContainerOrigin.y
+                mark.color.setStroke()
+                let frame = NSBezierPath(roundedRect: box.insetBy(dx: -5, dy: -5), xRadius: 6, yRadius: 6)
+                frame.lineWidth = 4
+                frame.stroke()
+            }
+        }
+        if let r = nowRange, let lm = layoutManager, let tc = textContainer, NSMaxRange(r) <= (textStorage?.length ?? 0) {
+            var box = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: r, actualCharacterRange: nil), in: tc)
+            box.origin.x += textContainerOrigin.x
+            box.origin.y += textContainerOrigin.y
+            Theme.nsAccent.withAlphaComponent(0.1).setFill()
+            NSBezierPath(roundedRect: box.insetBy(dx: -8, dy: -3), xRadius: 6, yRadius: 6).fill()
+        }
         guard let r = focusRange, let lm = layoutManager, let tc = textContainer, NSMaxRange(r) <= (textStorage?.length ?? 0) else { return }
         var box = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: r, actualCharacterRange: nil), in: tc)
         box.origin.x += textContainerOrigin.x
         box.origin.y += textContainerOrigin.y
-        NSColor.controlAccentColor.withAlphaComponent(0.7).setFill()
+        Theme.nsAccent.withAlphaComponent(0.7).setFill()
         NSBezierPath(roundedRect: NSRect(x: box.minX - 16, y: box.minY + 2, width: 3, height: max(8, box.height - 4)), xRadius: 1.5, yRadius: 1.5).fill()
     }
 
     /// Highlight on selecting (a selection of words, unless ⌥ is held), as the page does.
     override func mouseDown(with event: NSEvent) {
+        let at = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
+        if at < (textStorage?.length ?? 0), let ts = textStorage?.attribute(.dafSeek, at: at, effectiveRange: nil) as? Double {
+            let m = model
+            MainActor.assumeIsolated { m?.video?.seek(ts) }
+            return
+        }
         super.mouseDown(with: event)
         let sel = selectedRange()
         guard HLTools.autoHighlight, sel.length > 1, !NSEvent.modifierFlags.contains(.option), event.clickCount == 1,
@@ -576,8 +755,10 @@ final class ReaderTextView: NSTextView {
         let m = model, app = AppModel.shared, sel = selectedRange()
         let item = app.selected
         switch ch {
-        case "h": Task { if sel.length > 0 { await m?.highlightSelection() } else { await m?.highlightFocus(thenNote: false) } }
-        case "n": Task { if sel.length > 0 { await m?.highlightSelection(thenNote: true) } else { await m?.highlightFocus(thenNote: true) } }
+        case "h", "n":
+            let note = ch == "n"
+            if sel.length == 1, m?.picture(at: sel.location) != nil { Task { await m?.highlightPicture(at: sel.location, thenNote: note) } }
+            else { Task { if sel.length > 0 { await m?.highlightSelection(thenNote: note) } else { await m?.highlightFocus(thenNote: note) } } }
         case "j": m?.moveFocus(1)
         case "k": m?.moveFocus(-1)
         case "p": m?.listen()                                               // listen or pause
@@ -595,6 +776,7 @@ final class ReaderTextView: NSTextView {
         case "K": app.step(-1)
         case "C": if let u = m?.doc?.s("url") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string); app.say("Link copied") }
         case "R": Task { await m?.resetProgress() }
+        case "c": if m?.video != nil { Task { await m?.clip(30) } } else { return false }
         case "M": app.editMeta = true
         default: return false
         }
@@ -612,6 +794,14 @@ final class ReaderTextView: NSTextView {
         let at = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
         var extra: [NSMenuItem] = []
         let sel = selectedRange()
+        // a picture: Highlight the Picture, unless it is already
+        let picAt = [at, max(0, at - 1)].first { i in MainActor.assumeIsolated { model?.picture(at: i) != nil } }
+        if let p = picAt, (textStorage?.attribute(.dafHighlight, at: p, effectiveRange: nil) as? String ?? "").isEmpty {
+            extra.append(MenuAction.item("Highlight the Picture") { let m = self.model; Task { @MainActor in await m?.highlightPicture(at: p) } })
+            extra.append(MenuAction.item("Highlight It with a Note") { let m = self.model; Task { @MainActor in await m?.highlightPicture(at: p, thenNote: true) } })
+        } else if let p = picAt, let hid = textStorage?.attribute(.dafHighlight, at: p, effectiveRange: nil) as? String, let m = model, at != p {
+            extra += MainActor.assumeIsolated { HLMenu.items(for: hid, host: m) }
+        }
         if sel.length > 0 {
             extra.append(NSMenuItem(title: "Highlight", action: #selector(highlightNow), keyEquivalent: ""))
             extra.append(MenuAction.item("Highlight with a Note") { let m = self.model; Task { @MainActor in await m?.highlightSelection(thenNote: true) } })
@@ -686,11 +876,11 @@ struct ArticleReader: NSViewRepresentable {
         tv.isSelectable = true
         tv.isRichText = true
         tv.drawsBackground = true
-        tv.backgroundColor = .textBackgroundColor
+        tv.backgroundColor = Theme.nsBG
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
-        tv.linkTextAttributes = [.foregroundColor: NSColor.controlAccentColor, .underlineStyle: NSUnderlineStyle.single.rawValue, .cursor: NSCursor.pointingHand]
+        tv.linkTextAttributes = [.foregroundColor: Theme.nsAccent, .underlineStyle: NSUnderlineStyle.single.rawValue, .cursor: NSCursor.pointingHand]
         tv.usesFindBar = true
         tv.isIncrementalSearchingEnabled = true
         let scroll = ReaderScrollView()
@@ -698,7 +888,7 @@ struct ArticleReader: NSViewRepresentable {
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         scroll.drawsBackground = true
-        scroll.backgroundColor = .textBackgroundColor
+        scroll.backgroundColor = Theme.nsBG
         context.coordinator.watch(scroll, model)
         model.textView = tv
         Speaker.shared.attach(model)
@@ -749,6 +939,12 @@ struct ArticleReader: NSViewRepresentable {
                         model.pendingReveal = nil
                         model.restored = true
                         model.reveal(highlight: hid)
+                        return
+                    }
+                    if let q = model.pendingFind {
+                        model.pendingFind = nil
+                        model.restored = true
+                        model.reveal(words: q)
                         return
                     }
                     if p > 3 && p < 97 {

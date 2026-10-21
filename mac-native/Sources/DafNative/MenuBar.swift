@@ -21,7 +21,7 @@ struct MenuBarPanel: View {
             Divider()
             Button { show(.today) } label: { Label("Open Daf", systemImage: "book") }
             Button { show(.review) } label: { Label("Review", systemImage: "rectangle.stack") }
-            Button { show(nil); model.sheet = .addLink } label: { Label("Add a Link…", systemImage: "link") }
+            Button { show(nil); model.sheet = .addLink } label: { Label("Add to Daf…", systemImage: "plus") }
             Button { show(nil); model.sheet = .paper } label: { Label("Log Paper Minutes…", systemImage: "book.closed") }
         }
         .buttonStyle(.plain)
@@ -156,6 +156,9 @@ struct PrefsView: View {
             GoalsPrefs()
                 .tabItem { Label("Goals", systemImage: "target") }
                 .tag("goals")
+            AppearancePrefs()
+                .tabItem { Label("Appearance", systemImage: "paintpalette") }
+                .tag("appearance")
             AccountPrefs()
                 .tabItem { Label("Account", systemImage: "person.crop.circle") }
                 .tag("account")

@@ -189,7 +189,7 @@ struct MangaReader: View {
                 if m.p.progress {
                     GeometryReader { g in
                         let n = max(1, m.count), f = CGFloat((m.shownPages.max() ?? 0) + 1) / CGFloat(n)
-                        Rectangle().fill(Color.accentColor.opacity(0.85)).frame(width: g.size.width * f, height: 2)
+                        Rectangle().fill(Color.daf.opacity(0.85)).frame(width: g.size.width * f, height: 2)
                             .frame(maxWidth: .infinity, alignment: m.p.mode == "rtl" ? .trailing : .leading)
                     }
                     .frame(height: 2)
@@ -588,7 +588,7 @@ struct MangaThumbs: View {
                                         if let i = ph.image { i.resizable().aspectRatio(contentMode: .fit) } else { Color.secondary.opacity(0.1) }
                                     }
                                     .frame(height: 170)
-                                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(m.shownPages.contains(n) ? Color.accentColor : .clear, lineWidth: 3))
+                                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(m.shownPages.contains(n) ? Color.daf : .clear, lineWidth: 3))
                                     Text("\(n + 1)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                                 }
                             }

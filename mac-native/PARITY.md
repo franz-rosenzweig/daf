@@ -25,7 +25,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: a highlight's tags, favorite, flashcards and share as an image; overlapping highlights merged; highlight when selecting; Define and Translate
 - here: selection snapped to whole words
 - here: line width and settings just for this book
-- not yet: a scroll layout
+- here: the Scroll layout (the chapter as one column), as the Aa panel's Layout
 - here: the player's voice menu and sleep timer
 - here: next in the series and the Hardcover "finished" question near the end
 - here: the time left in the chapter and the book, the page and the percent
@@ -39,10 +39,10 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: Define and Translate (/api/lookup, and "in this sentence")
 - here: a highlight's tags, favorite, flashcards (fill in the blank, question, suggest), share as an image; Remove with Undo; overlapping highlights merged; highlight when selecting (⌥ to just select)
 - here: paragraph focus (j, k) and h or n on it; the page's article keys (h n j k p L e l s f t N d z o J K C R M)
-- not yet: picture highlights
-- not yet: videos natively (the player above the transcript, follow along, clip 30 seconds, captions or transcribe)
-- not yet: highlights in the PDF view, its zoom keys
-- not yet: Torah's language toggle
+- here: picture highlights (right-click a picture, or select it and press H), framed in their colour, shown as the picture everywhere
+- here: videos natively (YouTube's private player above the transcript, follow along, a timestamp plays from there, Clip 30s, C), captions or a transcription when there's none; podcast episodes in the reader
+- here: highlights in the PDF view (as you select, H or N, right-click), the text view's found on the page, its zoom keys (− +), its reading time and the page read
+- here: Torah's verses in Hebrew and English, or one of them (the toolbar, or Article › Torah)
 
 ## Lists
 
@@ -50,13 +50,13 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: Mark Seen Older Than a day, three days, a week; Sync Now for the Library; "Mark them read in FreshRSS too"
 - here: the Library's home (continue reading, recently added, quick reads, long reads, recently highlighted, new in the Feed), each shelf shown or hidden
 - here: the list keys (j k e l s f t d z)
-- not yet: updating a saved view's filters
+- here: a saved view's order and filters changed in place, with Update the View
 
 ## Pages
 
 - here: Today (the ring, the week, the sittings, keep reading), Review (highlights and flashcards), Highlights, Stats, Books, a book's page, shelves, Torah, Podcasts, Sources, Paper pages, Log paper minutes
 - here: Today's notices (Shabbat, the Kindle finished a book, a book read off the nightstand), the other goals' chips, minutes by source, the day's review, On this day, the nightstand (or the suggested three), Year 30's year, how fresh the sources are, a goal met or a milestone said once
-- not yet: Year 29 on Today
+- here: Today as a page across the window, with Year 29 under Year 30
 - here: Review by a book or by whatever the Highlights filters show (a tag, favorites, a colour, a search), Review more, another round; a flashcard, tags and share as an image from the review
 - here: Highlights: source, colour, tag, favorites and private filters, sort (newest, by book, oldest), export (Markdown, CSV, JSON, Anki), Review these
 - here: a book's page: a note on the book, audiobook bookmarks, how often its highlights come back in review, export, review these, a fourth book on the nightstand asks which one steps off
@@ -74,11 +74,11 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: Import (Instapaper, Readwise, Raindrop, Pocket, OPML…), dropped or chosen, followed as it goes
 - here: Morning email, Newsletters, Hardcover, Phone, Podcasts (AntennaPod)
 - here: Send Feedback (Help menu)
-- not yet: appearance (Daf's themes): the Mac app follows the Mac, and books have their own themes
+- here: appearance: Daf's themes (a theme for light and one for dark, with the Mac or always one), kept in Daf for every device; books keep their own
 
 ## Everywhere
 
-- here: search, the File menu's Add a Link and Log Paper Minutes, offline with changes kept, Undo
-- not yet: search everything (highlights and vault notes too, words in the text), go anywhere from it
-- not yet: adding books and PDFs as files, dropping files and links on the window, pasting a link
-- not yet: the shortcuts sheet
+- here: search, the File menu's Add to Daf and Log Paper Minutes, offline with changes kept, Undo
+- here: ⌘K: search everything (articles and the words in them, books, highlights, the vault), go anywhere, do something
+- here: adding books and PDFs as files, dropping files and links on the window, pasting a link or copied files
+- here: the shortcuts sheet (Help › Keyboard Shortcuts, ⌘/)

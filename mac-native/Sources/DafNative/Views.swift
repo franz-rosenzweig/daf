@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 /// The window: the sidebar, the list, and what's open, with the inspector beside it.
 struct MainView: View {
+    @MainActor static var watching = false
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
@@ -16,7 +17,9 @@ struct MainView: View {
                 NavigationSplitView {
                     Sidebar().navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
                 } detail: {
+                    Group {
                     switch model.place {
+                    case .today: TodayView()
                     case .review: ReviewView()
                     case .home: HomeView()
                     case .recovery: RecoveryView()
@@ -24,6 +27,9 @@ struct MainView: View {
                     case .sources: SourcesView()
                     default: StatsView()
                     }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .themed()
                 }
             } else {
                 NavigationSplitView {
@@ -31,20 +37,24 @@ struct MainView: View {
                 } content: {
                     Group {
                         switch model.place {
-                        case .today: TodayView()
                         case .highlights: HighlightGroups()
                         case .torah: TorahList()
                         default: ItemList()
                         }
                     }
                     .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 520)
+                    .themed()
                 } detail: {
+                    Group {
                     if model.place == .highlights {
                         if let g = model.highlights.group { HighlightGroupView(group: g).id(HighlightsModel.key(g)) }
                         else { ContentUnavailableView("No highlights", systemImage: "highlighter") }
                     } else {
                         Detail()
                     }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .themed()
                 }
             }
         }
@@ -65,7 +75,12 @@ struct MainView: View {
         }
         .animation(.snappy, value: model.toast)
         .animation(.snappy, value: Speaker.shared.on)
-        .onAppear { model.undoManager = undoManager }
+        .onDrop(of: [.fileURL, .url], isTargeted: nil) { model.dropped($0) }
+        .tint(Theme.shared.accent)
+        .onAppear {
+            model.undoManager = undoManager
+            if !Self.watching { Self.watching = true; AppModel.watchPaste() }
+        }
         .onChange(of: undoManager) { _, u in model.undoManager = u }
         .confirmationDialog("Unfollow \(model.confirmUnfollow.flatMap { model.feed($0)?.s("title") } ?? "the feed")?",
                             isPresented: Binding(get: { model.confirmUnfollow != nil }, set: { if !$0 { model.confirmUnfollow = nil } })) {
@@ -86,7 +101,9 @@ struct MainView: View {
         }
         .sheet(item: $model.sheet) { s in
             switch s {
-            case .addLink: AddLinkSheet().environment(model)
+            case .addLink: AddSheet().environment(model)
+            case .palette: PaletteSheet().environment(model)
+            case .shortcuts: ShortcutsSheet()
             case .paper: PaperSheet().environment(model)
             case .feedback: FeedbackSheet().environment(model)
             case .follow: FollowSheet().environment(model)
@@ -194,6 +211,7 @@ struct ItemList: View {
             if ids.count == 1, let item = model.items.first(where: { ids.contains($0.id) }), let r = model.route(for: item) { model.openRoute = r }
         }
         .listStyle(.inset)
+        .themed(list: true)
         .onDrop(of: [.image], isTargeted: nil) { model.place == .paper ? PaperPages.take($0) : false }
         .navigationTitle(model.title(model.place))
         .navigationSubtitle(model.shown.isEmpty ? "" : model.multi.count > 1 ? "\(model.multi.count) of \(model.shown.count) chosen" : "\(model.shown.count)")
@@ -235,6 +253,12 @@ struct ItemList: View {
             if model.place.map(hasDocs) == true {
                 ToolbarItem { ListOptionsMenu() }
             }
+            if model.viewChanged {
+                ToolbarItem {
+                    Button("Update the View") { Task { await model.updateView() } }
+                        .help("Keep this order and these filters in the view")
+                }
+            }
             if model.place == .paper {
                 ToolbarItem {
                     Button { PaperPages.choose() } label: { Label("Add a Photo of a Page", systemImage: "camera.badge.ellipsis") }
@@ -248,6 +272,8 @@ struct ItemList: View {
         }
         .onChange(of: model.kind) { _, _ in model.reload() }
         .onChange(of: model.listFilter) { _, _ in model.reload() }
+        .onChange(of: model.viewFilter) { _, _ in if case .view = model.place { model.reload() } }
+        .onChange(of: model.viewSort) { _, _ in if case .view = model.place { model.reload() } }
         .onChange(of: model.sortLibrary) { _, _ in model.reload() }
         .onChange(of: model.sortFeed) { _, _ in model.reload() }
         .onChange(of: model.feedTab) { _, _ in model.reload() }
@@ -405,7 +431,7 @@ struct Ring: View {
             ZStack {
                 Circle().stroke(.quaternary, lineWidth: 10)
                 Circle().trim(from: 0, to: min(1, done / target))
-                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    .stroke(Color.daf, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 Text("\(Int(done))").font(.system(.title, design: .rounded).weight(.semibold)).monospacedDigit()
             }
@@ -431,7 +457,7 @@ struct Week: View {
     var body: some View {
         Chart(Array(days.enumerated()), id: \.offset) { _, d in
             BarMark(x: .value("Day", String((d.s("date") ?? "").suffix(2))), y: .value("Minutes", d.d("minutes") ?? 0))
-                .foregroundStyle((d.d("minutes") ?? 0) >= (d.d("target") ?? 60) ? Color.accentColor : Color.accentColor.opacity(0.45))
+                .foregroundStyle((d.d("minutes") ?? 0) >= (d.d("target") ?? 60) ? Color.daf : Color.daf.opacity(0.45))
             if let t = days.last?.d("target") {
                 RuleMark(y: .value("Goal", t)).lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3])).foregroundStyle(.secondary)
             }
@@ -446,6 +472,7 @@ struct Week: View {
 
 struct Detail: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("torahLang") private var torahLang = "both"
 
     var body: some View {
         @Bindable var model = model
@@ -459,6 +486,18 @@ struct Detail: View {
             }
         }
         .toolbar {
+            if let item = model.selected, item.kind == "torah" {
+                ToolbarItem {
+                    Picker("Language", selection: $torahLang) {
+                        Text("Both").tag("both")
+                        Text("עברית").tag("he")
+                        Text("English").tag("en")
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    .help("The reading in Hebrew, English or both")
+                }
+            }
             if let item = model.selected, item.isDoc {
                 ToolbarItemGroup {
                     if item.whereIn == "feed" {
@@ -489,6 +528,7 @@ struct Opened: View {
     @Environment(AppModel.self) private var model
     let item: Item
     @State private var reader: ReaderModel?
+    @AppStorage("torahLang") private var torahLang = "both"
 
     var body: some View {
         @Bindable var model = model
@@ -498,12 +538,12 @@ struct Opened: View {
             case (_, "paper"): PaperPageView(id: item.id)
             case (true, _): BookPage(id: item.id)
             case (_, "pdf") where item.j.b("has_pdf") || item.kind == "pdf": PDFPane(id: item.id)
-            case (_, "video"), (_, "podcast"): WebPane(route: "#read/" + API.enc(item.id))
             case (_, "manga"): WebPane(route: "#mread/" + API.enc(item.id))
             default:
                 if let reader {
                     if let e = reader.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }
                     else if reader.doc == nil { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+                    else if item.kind == "video" { VideoArticle(model: reader) }
                     else { ArticleReader(model: reader) }
                 } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
             }
@@ -522,7 +562,7 @@ struct Opened: View {
             if let reader { MetaSheet(reader: reader) }
         }
         .task(id: item.id) {
-            guard item.isDoc, !["pdf", "video", "podcast", "manga"].contains(item.kind) else { return }
+            guard item.isDoc, !["pdf", "manga"].contains(item.kind) else { return }
             // the same article made again by SwiftUI (a list refreshing beside it): the one already open
             if let r = model.reader, r.id == item.id, r.doc != nil { reader = r; return }
             let r = ReaderModel(id: item.id)
@@ -531,6 +571,7 @@ struct Opened: View {
             await r.load()
         }
         .onDisappear { if model.selection != item.id { reader?.stop() } }
+        .onChange(of: torahLang) { _, _ in if item.kind == "torah" { reader?.compose(keepPlace: true) } }
     }
 }
 
@@ -588,7 +629,7 @@ struct Inspector: View {
                                 .padding(.leading, 9)
                                 .padding(.trailing, 5)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(Color.accentColor.opacity(0.14)))
+                                .background(Capsule().fill(Color.daf.opacity(0.14)))
                                 .contextMenu { Button("Take the Tag Off") { Task { await doc.set(tags: doc.tags.filter { $0 != t }) } } }
                             }
                         }

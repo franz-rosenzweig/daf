@@ -66,15 +66,15 @@ struct HomeView: View {
                             }
                         } else {
                             ZStack {
-                                Color.accentColor.opacity(0.12)
-                                Text(String(item.title.prefix(1))).font(.system(size: 40, weight: .semibold, design: .serif)).foregroundStyle(Color.accentColor)
+                                Color.daf.opacity(0.12)
+                                Text(String(item.title.prefix(1))).font(.system(size: 40, weight: .semibold, design: .serif)).foregroundStyle(Color.daf)
                             }
                         }
                     }
                     .frame(width: 180, height: item.isBook ? 240 : 112)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     if item.progress > 1 {
-                        Rectangle().fill(Color.accentColor).frame(width: 180 * min(1, item.progress / 100), height: 3)
+                        Rectangle().fill(Color.daf).frame(width: 180 * min(1, item.progress / 100), height: 3)
                     }
                 }
                 Text(item.title).font(.system(.callout, design: .serif).weight(.semibold)).lineLimit(2).frame(width: 180, alignment: .leading)

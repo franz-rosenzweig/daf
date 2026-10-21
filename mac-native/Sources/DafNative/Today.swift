@@ -1,13 +1,18 @@
 import SwiftUI
 
-/// Today, as the page's (/api/today): the day and Year 30, the notices (Shabbat, a book the Kindle
-/// finished, one read off the nightstand), the ring with the other goals and the minutes by source,
-/// the sittings, the day's review, on this day, the nightstand, the week, Year 30's grid, and how
-/// fresh the sources are. A goal met or a milestone reached gets its moment, once.
+/// Today, a page across the window as the page's is (/api/today): the day and Year 30, the notices
+/// (Shabbat, a book the Kindle finished, one read off the nightstand), the ring with the other goals
+/// and the minutes by source beside the sittings, the day's review, what to keep reading, on this
+/// day and the nightstand, the week, Year 30's and Year 29's grids, and how fresh the sources are.
+/// A goal met or a milestone reached gets its moment, once.
 struct TodayView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     @State private var finishing: J?
+    @State private var year29: J?
     @AppStorage("celebrated") private var celebrated = ""
+
+    private let pair = [GridItem(.adaptive(minimum: 380), spacing: 20, alignment: .top)]
 
     var body: some View {
         ScrollView {
@@ -15,36 +20,39 @@ struct TodayView: View {
                 if let t = model.today {
                     hello(t)
                     notices(t)
-                    GoalCard(today: t)
-                    sittings(t)
+                    LazyVGrid(columns: pair, alignment: .leading, spacing: 20) {
+                        GoalCard(today: t)
+                        TodayCard("Sittings") { sittings(t) }
+                    }
                     review(t)
-                    onThisDay(t)
-                    nightstand(t)
-                    if !t.a("week").isEmpty {
-                        Heading("This week")
-                        Week(days: t.a("week"))
-                    }
-                    if let y = t.o("year30") { YearCard(year: y, goal: t.d("goal") ?? 60) }
-                }
-                if !model.continueItems.isEmpty {
-                    Heading("Keep reading")
-                    VStack(spacing: 2) {
-                        ForEach(model.continueItems) { item in
-                            Button { model.selection = item.id } label: {
-                                ItemRow(item: item)
-                                    .padding(.horizontal, 8)
-                                    .background(RoundedRectangle(cornerRadius: 8).fill(model.selection == item.id ? Color.accentColor.opacity(0.18) : .clear))
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
+                    keepReading
+                    let otd = !t.a("on_this_day").isEmpty, stand = !(t.a("nightstand") + t.a("nightstand_suggested")).isEmpty
+                    if otd && stand {
+                        LazyVGrid(columns: pair, alignment: .leading, spacing: 20) {
+                            onThisDay(t)
+                            nightstand(t)
                         }
+                    } else if otd { onThisDay(t) } else if stand { nightstand(t) }
+                    if !t.a("week").isEmpty {
+                        TodayCard("This week") { Week(days: t.a("week")) }
                     }
+                    if let y = t.o("year30") {
+                        TodayCard { YearCard(year: y, goal: t.d("goal") ?? 60, title: "Year 30", range: "October 9, 2026 to October 8, 2027") }
+                    }
+                    if let y = year29 {
+                        TodayCard { YearCard(year: y, goal: t.d("goal") ?? 60, title: "Year 29", range: "October 9, 2025 to October 8, 2026", past: true) }
+                    }
+                    Text(Self.fresh(t)).font(.caption).foregroundStyle(.tertiary)
+                } else {
+                    ProgressView().frame(maxWidth: .infinity).padding(60)
                 }
-                if let t = model.today { Text(Self.fresh(t)).font(.caption).foregroundStyle(.tertiary) }
             }
-            .padding(20)
+            .padding(28)
+            .frame(maxWidth: 1100, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle("Today")
+        .task(id: model.today?.o("settings")?.s("home_tz")) { year29 = try? await API.shared.json("/api/year/29") }
         .toolbar {
             ToolbarItem {
                 Button { model.sheet = .paper } label: { Label("Log Paper", systemImage: "book.pages") }
@@ -100,8 +108,37 @@ struct TodayView: View {
             Notice(icon: "books.vertical") {
                 Text("You've been reading **\(PaperPages.short(o.s("title")))**, and it isn't on the nightstand.")
             } actions: {
-                Button("Swap It In") { model.place = .books; Task { try? await Task.sleep(nanoseconds: 300_000_000); model.selection = o.s("id") } }
+                Button("Swap It In") { if let id = o.s("id") { model.showBook(id) } }
                 Button("Just Browsing") { Task { await justBrowsing(t, o.s("id")) } }
+            }
+        }
+    }
+
+    /// What to keep reading (the Library's home), each opening in a window of its own.
+    @ViewBuilder private var keepReading: some View {
+        let list = model.continueItems
+        if !list.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Heading("Keep reading")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 14) {
+                        ForEach(list) { item in
+                            Button { if let r = model.route(for: item) ?? (item.isBook ? nil : "#read/" + API.enc(item.id)) { openWindow(id: "route", value: r) } } label: {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Cover(path: item.thumb ?? (item.j.b("has_cover") ? "/api/cover/" + API.enc(item.id) : nil), title: item.title, book: item.isBook)
+                                        .frame(width: item.isBook ? 100 : 150, height: item.isBook ? 150 : 94)
+                                    Text(item.title).font(.system(.callout, design: .serif).weight(.semibold)).lineLimit(2)
+                                    Text([item.source, item.progress > 1 ? "\(Int(item.progress))%" : nil].compactMap { $0 }.joined(separator: " · "))
+                                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                                .frame(width: item.isBook ? 120 : 150, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu { ItemActions(item: item) }
+                        }
+                    }
+                }
             }
         }
     }
@@ -109,7 +146,6 @@ struct TodayView: View {
     @ViewBuilder
     private func sittings(_ t: J) -> some View {
         let list = t.a("sessions").filter { ($0.d("minutes") ?? 0) >= 0.5 }
-        Heading("Sittings")
         if list.isEmpty {
             Text("Nothing yet today. Kindle reading arrives when the Kindle sleeps or closes a book; audiobooks every five minutes.")
                 .font(.callout).foregroundStyle(.secondary)
@@ -143,7 +179,7 @@ struct TodayView: View {
             let f = rv.o("first"), books = rv.list("books").compactMap { $0 as? String }.map { PaperPages.short($0) }
             HStack(alignment: .top, spacing: 14) {
                 if done {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 34)).foregroundStyle(Color.accentColor).frame(width: 40)
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 34)).foregroundStyle(Color.daf).frame(width: 40)
                 } else if let f, let b = f.s("book_id"), b.hasPrefix("cal:") {
                     Thumb(path: "/api/cover/" + API.enc(b), book: true)
                 }
@@ -165,17 +201,15 @@ struct TodayView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(14)
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
+            .padding(16)
+            .background(Theme.shared.card, in: RoundedRectangle(cornerRadius: 12))
         }
     }
 
     @ViewBuilder
     private func onThisDay(_ t: J) -> some View {
-        let list = t.a("on_this_day")
-        if !list.isEmpty {
-            HStack { Heading("On this day"); Spacer(); Button("Stats") { model.place = .stats }.buttonStyle(.link).font(.caption) }
-            ForEach(list, id: \.self) { x in
+        TodayCard("On this day", accessory: { Button("Stats") { model.place = .stats }.buttonStyle(.link).font(.caption) }) {
+            ForEach(t.a("on_this_day"), id: \.self) { x in
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\u{201C}" + (x.s("text") ?? "") + "\u{201D}").font(.system(.body, design: .serif))
                     Text(PaperPages.short(x.s("title")) + (x.i("year").map { " · \($0)" } ?? "")).font(.caption).foregroundStyle(.secondary)
@@ -187,44 +221,41 @@ struct TodayView: View {
         }
     }
 
-    @ViewBuilder
+    /// The nightstand's three (or the three Daf suggests); each opens its page on Books.
     private func nightstand(_ t: J) -> some View {
         let own = t.a("nightstand"), list = own.isEmpty ? t.a("nightstand_suggested") : own
-        if !list.isEmpty {
-            HStack {
-                Heading("Nightstand")
-                Spacer()
-                if own.isEmpty {
-                    Button("Use These Three") { Task { await useThese(list) } }.help("Suggested from what you read lately")
-                } else {
-                    Button("Change") { model.place = .books }.buttonStyle(.link).font(.caption)
-                }
+        return TodayCard("Nightstand", accessory: {
+            if own.isEmpty {
+                Button("Use These Three") { Task { await useThese(list) } }.help("Suggested from what you read lately")
+            } else {
+                Button("Change") { model.place = .books }.buttonStyle(.link).font(.caption)
             }
+        }) {
             if own.isEmpty { Text("Suggested from what you read lately. Choose your three on Books.").font(.caption).foregroundStyle(.secondary) }
-            VStack(spacing: 2) {
-                ForEach(list, id: \.self) { b in
-                    Button { model.selection = b.s("id") } label: {
-                        HStack(spacing: 12) {
-                            Thumb(path: b.b("has_cover") ? "/api/cover/" + API.enc(b.s("id") ?? "") : nil, book: true)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(PaperPages.short(b.s("title"))).font(.system(.callout, design: .serif).weight(.semibold)).lineLimit(2)
-                                Text(b.s("author") ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                if let p = b.d("progress") {
-                                    HStack(spacing: 6) {
-                                        ProgressView(value: min(100, p), total: 100).frame(width: 70)
-                                        Text("\(Int(p.rounded()))%" + (b.s("progress_note").map { " · " + $0 } ?? "")).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                                    }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 14, alignment: .top)], alignment: .leading, spacing: 12) {
+            ForEach(list, id: \.self) { b in
+                Button { if let id = b.s("id") { model.showBook(id) } } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        Cover(path: b.b("has_cover") ? "/api/cover/" + API.enc(b.s("id") ?? "") : nil, title: b.s("title") ?? "", book: true)
+                            .frame(width: 60, height: 90)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(PaperPages.short(b.s("title"))).font(.system(.callout, design: .serif).weight(.semibold)).lineLimit(2)
+                            Text(b.s("author") ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            if let p = b.d("progress") {
+                                HStack(spacing: 6) {
+                                    ProgressView(value: min(100, p), total: 100).frame(width: 70)
+                                    Text("\(Int(p.rounded()))%" + (b.s("progress_note").map { " · " + $0 } ?? "")).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                                 }
-                                if let a = b.s("audio_note") { Text("Audiobook · " + a).font(.caption2).foregroundStyle(.secondary) }
                             }
-                            Spacer(minLength: 0)
+                            if let a = b.s("audio_note") { Text("Audiobook · " + a).font(.caption2).foregroundStyle(.secondary) }
                         }
-                        .padding(6)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(model.selection == b.s("id") ? Color.accentColor.opacity(0.18) : .clear))
-                        .contentShape(Rectangle())
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .help("The book's page")
+            }
             }
         }
     }
@@ -313,6 +344,50 @@ struct TodayView: View {
     }
 }
 
+/// A cover, or the title's first letter on a tile when there's none.
+struct Cover: View {
+    let path: String?
+    let title: String
+    var book = true
+    var body: some View {
+        Group {
+            if let path {
+                AsyncImage(url: API.shared.url(path)) { p in
+                    if let i = p.image { i.resizable().aspectRatio(contentMode: .fill) } else { Color.secondary.opacity(0.08) }
+                }
+            } else {
+                ZStack {
+                    Color.daf.opacity(0.12)
+                    Text(String(PaperPages.short(title).prefix(1))).font(.system(size: 30, weight: .semibold, design: .serif)).foregroundStyle(Color.daf)
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: book ? 4 : 8))
+        .shadow(color: .black.opacity(book ? 0.15 : 0), radius: 2, y: 1)
+    }
+}
+
+/// A card on Today: a heading (with something beside it), and what's in it.
+struct TodayCard<Accessory: View, Content: View>: View {
+    let title: String?
+    @ViewBuilder let accessory: Accessory
+    @ViewBuilder let content: Content
+    init(_ title: String? = nil, @ViewBuilder accessory: () -> Accessory = { EmptyView() }, @ViewBuilder content: () -> Content) {
+        self.title = title; self.accessory = accessory(); self.content = content()
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title {
+                HStack(alignment: .firstTextBaseline) { Text(title).font(.headline); Spacer(); accessory }
+            }
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Theme.shared.card, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
 /// A line across Today with something to do about it.
 struct Notice<Words: View, Actions: View>: View {
     let icon: String
@@ -324,14 +399,14 @@ struct Notice<Words: View, Actions: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Image(systemName: icon).foregroundStyle(Color.accentColor)
+                Image(systemName: icon).foregroundStyle(Color.daf)
                 words.font(.callout).fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) { actions }.controlSize(.small).padding(.leading, 26)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.daf.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -351,56 +426,72 @@ struct GoalCard: View {
         let counted = today.d("counted") ?? 0, goal = today.d("goal") ?? 60
         let done = minutesMain ? counted : m?.d("done") ?? 0
         let target = max(1, minutesMain ? goal : m?.d("target") ?? 1)
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 18) {
-                Button { goals() } label: {
-                    ZStack {
-                        Circle().stroke(.quaternary, lineWidth: 10)
-                        Circle().trim(from: 0, to: min(1, done / target))
-                            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                        Text("\(Int(done))").font(.system(.title, design: .rounded).weight(.semibold)).monospacedDigit()
-                    }
-                    .frame(width: 84, height: 84)
-                }
-                .buttonStyle(.plain)
-                .help("Goals")
-                VStack(alignment: .leading, spacing: 3) {
-                    if minutesMain {
-                        Text("of \(Int(goal.rounded())) minutes").font(.title3.weight(.semibold))
-                        Text(counted >= goal ? (goal == 60 ? "That's the hour." : "That's today's goal.") : "\(Int((goal - counted).rounded(.up))) to go")
-                            .font(.callout).foregroundStyle(.secondary)
-                    } else if let m {
-                        Text("of \(m.i("target") ?? 0) " + (m.s("unit") ?? "")).font(.title3.weight(.semibold))
-                        Text((m.s("period_label") ?? "") + " · " + (m.b("met") ? TodayView.metWord(m) : "\((m.i("target") ?? 0) - (m.i("done") ?? 0)) to go"))
-                            .font(.callout).foregroundStyle(.secondary)
-                        Text("\(Int(counted.rounded())) minutes today").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) { ring(done, target, minutesMain, counted, goal, m) }
+                Spacer(minLength: 0)
+                sources
             }
-            let others = today.a("goals").filter { !$0.b("main") }
-            if !others.isEmpty {
-                GoalChips(goals: others, icons: Self.icons) { goals() }
-            }
-            let count = today.o("settings")?.o("count"), mins = today.o("minutes"), labels = today.o("labels")
-            let rows = Self.sources.filter { count?.b($0) == true || (mins?.d($0) ?? 0) > 0 }
-            if !rows.isEmpty {
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
-                    ForEach(rows, id: \.self) { k in
-                        let on = count?.b(k) == true
-                        GridRow {
-                            Text((labels?.s(k) ?? k.capitalized) + (on ? "" : " · not counted"))
-                            Text("\(Int((mins?.d(k) ?? 0).rounded())) min").monospacedDigit().gridColumnAlignment(.trailing)
-                        }
-                        .foregroundStyle(on ? HierarchicalShapeStyle.primary : .tertiary)
-                    }
-                }
-                .font(.callout)
+            VStack(alignment: .leading, spacing: 12) {
+                ring(done, target, minutesMain, counted, goal, m)
+                sources
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
+        .padding(16)
+        .background(Theme.shared.card, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private func ring(_ done: Double, _ target: Double, _ minutesMain: Bool, _ counted: Double, _ goal: Double, _ m: J?) -> some View {
+        HStack(spacing: 18) {
+            Button { goals() } label: {
+                ZStack {
+                    Circle().stroke(.quaternary, lineWidth: 10)
+                    Circle().trim(from: 0, to: min(1, done / target))
+                        .stroke(Color.daf, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(Int(done))").font(.system(.title, design: .rounded).weight(.semibold)).monospacedDigit()
+                }
+                .frame(width: 84, height: 84)
+            }
+            .buttonStyle(.plain)
+            .help("Goals")
+            VStack(alignment: .leading, spacing: 3) {
+                if minutesMain {
+                    Text("of \(Int(goal.rounded())) minutes").font(.title3.weight(.semibold))
+                    Text(counted >= goal ? (goal == 60 ? "That's the hour." : "That's today's goal.") : "\(Int((goal - counted).rounded(.up))) to go")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else if let m {
+                    Text("of \(m.i("target") ?? 0) " + (m.s("unit") ?? "")).font(.title3.weight(.semibold))
+                    Text((m.s("period_label") ?? "") + " · " + (m.b("met") ? TodayView.metWord(m) : "\((m.i("target") ?? 0) - (m.i("done") ?? 0)) to go"))
+                        .font(.callout).foregroundStyle(.secondary)
+                    Text("\(Int(counted.rounded())) minutes today").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        let others = today.a("goals").filter { !$0.b("main") }
+        if !others.isEmpty {
+            GoalChips(goals: others, icons: Self.icons) { goals() }
+        }
+    }
+
+    @ViewBuilder private var sources: some View {
+        let count = today.o("settings")?.o("count"), mins = today.o("minutes"), labels = today.o("labels")
+        let rows = Self.sources.filter { count?.b($0) == true || (mins?.d($0) ?? 0) > 0 }
+        if !rows.isEmpty {
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                ForEach(rows, id: \.self) { k in
+                    let on = count?.b(k) == true
+                    GridRow {
+                        Text((labels?.s(k) ?? k.capitalized) + (on ? "" : " · not counted"))
+                        Text("\(Int((mins?.d(k) ?? 0).rounded())) min").monospacedDigit().gridColumnAlignment(.trailing)
+                    }
+                    .foregroundStyle(on ? HierarchicalShapeStyle.primary : .tertiary)
+                }
+            }
+            .font(.callout)
+        }
     }
 
     private func goals() {
@@ -421,7 +512,7 @@ struct GoalChips: View {
                     Label(g.s("text") ?? "", systemImage: g.b("met") ? "checkmark.circle.fill" : icons[g.s("kind") ?? ""] ?? "target")
                         .font(.caption)
                         .padding(.horizontal, 9).padding(.vertical, 4)
-                        .background(g.b("met") ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.1), in: Capsule())
+                        .background(g.b("met") ? Color.daf.opacity(0.18) : Color.secondary.opacity(0.1), in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .help(g.s("label") ?? "")
@@ -434,6 +525,10 @@ struct GoalChips: View {
 struct YearCard: View {
     let year: J
     let goal: Double
+    var title = "Year 30"
+    var range = ""
+    /// A year that's over (Year 29): its hours, days read and days at the goal.
+    var past = false
     @State private var hover: Int?
 
     var body: some View {
@@ -441,15 +536,21 @@ struct YearCard: View {
         let days = year.list("days").compactMap { ($0 as? NSNumber)?.doubleValue }
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Heading("Year 30")
+                Text(title).font(.headline).foregroundStyle(past ? .secondary : .primary)
                 Spacer()
-                Text("October 9, 2026 to October 8, 2027").font(.caption).foregroundStyle(.tertiary)
+                Text(range).font(.caption).foregroundStyle(.tertiary)
             }
-            HStack(spacing: 18) {
-                stat(String(format: "%.1f h", year.d("total_hours") ?? 0), "of \(Int((targets.reduce(0, +) / 60).rounded()))")
-                stat("\(year.i("days_read") ?? 0)", "days read")
-                stat("\(year.i("days_goal") ?? 0)", "days " + TodayView.atWord(goal))
-                stat("\((year.i("today_index") ?? -1) + 1)", "days in")
+            HStack(spacing: 22) {
+                if past {
+                    stat(String(format: "%.1f h", year.d("total_hours") ?? 0), "read")
+                    stat("\(year.i("days_read") ?? 0)", "days read")
+                    stat("\(year.i("days_goal") ?? 0)", "days at the goal")
+                } else {
+                    stat(String(format: "%.1f h", year.d("total_hours") ?? 0), "of \(Int((targets.reduce(0, +) / 60).rounded()))")
+                    stat("\(year.i("days_read") ?? 0)", "days read")
+                    stat("\(year.i("days_goal") ?? 0)", "days " + TodayView.atWord(goal))
+                    stat("\((year.i("today_index") ?? -1) + 1)", "days in")
+                }
             }
             grid(days, targets)
             HStack(spacing: 4) {
@@ -498,6 +599,7 @@ struct YearCard: View {
             .frame(height: step * 7)
         }
         .aspectRatio(CGFloat(max(1, weeks)) / 7, contentMode: .fit)
+        .frame(maxWidth: CGFloat(max(1, weeks)) * 16)
     }
 
     private func day(_ i: Int) -> String {
@@ -510,5 +612,5 @@ struct YearCard: View {
 
     /// As the page shades it: against that day's goal (an hour: 60, 30, 15 and 1 minutes).
     static func level(_ m: Double, _ t: Double) -> Int { m >= t ? 4 : m >= t / 2 ? 3 : m >= t / 4 ? 2 : m >= 1 ? 1 : 0 }
-    static func shade(_ k: Int) -> Color { k == 0 ? Color.secondary.opacity(0.14) : Color.accentColor.opacity([0, 0.3, 0.5, 0.75, 1][k]) }
+    static func shade(_ k: Int) -> Color { k == 0 ? Color.secondary.opacity(0.14) : Color.daf.opacity([0, 0.3, 0.5, 0.75, 1][k]) }
 }

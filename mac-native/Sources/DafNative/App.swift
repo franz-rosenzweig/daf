@@ -7,6 +7,7 @@ struct DafNativeApp: App {
     @State private var model = AppModel.shared
     @AppStorage("menuBar") private var menuBar = MenuBarSetting.byDefault
     @AppStorage("autoHighlight") private var autoHighlight = true
+    @AppStorage("torahLang") private var torahLang = "both"
 
     var body: some Scene {
         WindowGroup("Daf", id: "main") {
@@ -22,15 +23,18 @@ struct DafNativeApp: App {
                 Button("Daf for Safari…") { Task { await Safari.setUp() } }
             }
             CommandGroup(after: .newItem) {
-                Button("Add a Link…") { model.sheet = .addLink }.keyboardShortcut("l", modifiers: .command)
+                Button("Add to Daf…") { model.sheet = .addLink }.keyboardShortcut("l", modifiers: .command)
                 Button("Log Paper Minutes…") { model.sheet = .paper }.keyboardShortcut("p", modifiers: [.command, .shift])
                 Button("Add a Photo of a Page…") { PaperPages.choose() }
             }
             ImportFromDevicesCommands()
             CommandGroup(after: .help) {
+                Button("Keyboard Shortcuts") { model.sheet = .shortcuts }.keyboardShortcut("/", modifiers: .command)
                 Button("Send Feedback…") { model.sheet = .feedback }
             }
             CommandMenu("Go") {
+                Button("Search Everything…") { model.sheet = .palette }.keyboardShortcut("k", modifiers: .command)
+                Divider()
                 Button("Today") { model.place = .today }.keyboardShortcut("1")
                 Button("Review") { model.place = .review }.keyboardShortcut("2")
                 Button("Inbox") { model.place = .library("inbox") }.keyboardShortcut("3")
@@ -51,6 +55,11 @@ struct DafNativeApp: App {
                     .keyboardShortcut("h", modifiers: [.command, .shift])
                 Button("Highlight with a Note") { Task { await model.reader?.highlightSelection(thenNote: true) } }
                 Toggle("Highlight When Selecting", isOn: $autoHighlight)
+                Picker("Torah", selection: $torahLang) {
+                    Text("Hebrew and English").tag("both")
+                    Text("Hebrew").tag("he")
+                    Text("English").tag("en")
+                }
                 Divider()
                 Button("Next in the List") { model.step(1) }.keyboardShortcut(.downArrow, modifiers: [.command, .option])
                 Button("Previous in the List") { model.step(-1) }.keyboardShortcut(.upArrow, modifiers: [.command, .option])
@@ -139,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSWindow.allowsAutomaticWindowTabbing = false
         MainActor.assumeIsolated {
+            _ = Theme.shared                         // this Mac's last theme, before anything shows
             FeedNews.shared.install()
             Cache.prune()
             Task {

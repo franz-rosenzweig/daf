@@ -15,7 +15,7 @@ struct StatsView: View {
                     Panel("The last two weeks") {
                         Chart(Array(s.a("days14").enumerated()), id: \.offset) { _, d in
                             BarMark(x: .value("Day", Self.day(d.s("date"))), y: .value("Minutes", d.d("minutes") ?? 0))
-                                .foregroundStyle((d.d("minutes") ?? 0) >= goal ? Color.accentColor : Color.accentColor.opacity(0.45))
+                                .foregroundStyle((d.d("minutes") ?? 0) >= goal ? Color.daf : Color.daf.opacity(0.45))
                             RuleMark(y: .value("Goal", goal)).lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3])).foregroundStyle(.secondary)
                         }
                         .frame(height: 180)
@@ -34,7 +34,7 @@ struct StatsView: View {
                                 LineMark(x: .value("Week", Self.day(w.s("week"))), y: .value("Highlights", w.d("n") ?? 0))
                                     .interpolationMethod(.catmullRom)
                                 AreaMark(x: .value("Week", Self.day(w.s("week"))), y: .value("Highlights", w.d("n") ?? 0))
-                                    .interpolationMethod(.catmullRom).foregroundStyle(Color.accentColor.opacity(0.15))
+                                    .interpolationMethod(.catmullRom).foregroundStyle(Color.daf.opacity(0.15))
                             }
                             .frame(height: 180)
                         }
@@ -125,7 +125,7 @@ struct Number: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 10))
+        .background(Theme.shared.card, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
