@@ -38,7 +38,7 @@ KINDS = {
                 "default": {"week": 5}, "range": {"week": (1, 7, 1)}},
 }
 ORDER = list(KINDS)
-# A manga or comic volume: "Kaguya-sama - Love Is War v12", "Naruto Vol. 3". The books goal counts
+# A manga or comic volume: "Some Series v12", "Another Series Vol. 3". The books goal counts
 # them only if you say so.
 VOLUME = re.compile(r"\bv(?:ol\.?)?\s?\d{1,3}\b", re.I)
 

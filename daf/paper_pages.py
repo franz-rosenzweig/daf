@@ -67,7 +67,7 @@ def add_photo(conn, src, caption=None):
 
 
 def parse_caption(caption):
-    """'page', 'p: 112', 'page 112 daring greatly', 'p daring greatly 112' -> (page, title words)."""
+    """'page', 'p: 112', 'page 112 middlemarch', 'p middlemarch 112' -> (page, title words)."""
     c = re.sub(r"^\s*(?:pages?|p)\b\s*:?\s*", "", caption or "", flags=re.I).strip()
     m = re.search(r"\b(\d{1,4})\b", c)
     page = int(m.group(1)) if m else None

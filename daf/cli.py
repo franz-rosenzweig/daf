@@ -12,7 +12,7 @@
     daf note TEXT              file a note (under the morning highlight, or the book open on the Kindle)
     daf voice-note FILE        transcribe a voice note and file it the same way
     daf nightstand [ID ...]    show, or set, the three books on the nightstand
-    daf paper-page PHOTO [--caption "page 112 daring greatly"]   read a marked page into highlights
+    daf paper-page PHOTO [--caption "page 112 middlemarch"]   read a marked page into highlights
     daf clip TEXT              a podcast link with a time (shared from AntennaPod): transcribe the minute before it
     daf jobs                   transcripts and clips waiting or done
 """

@@ -540,7 +540,7 @@ def main(base, cookie, token):
             js("location.hash = 'today', 1")
             time.sleep(1)
             js("location.hash = 'ebook/cal%3A160', 1")
-            check(until(opened, 30), "Bird by Bird opens" + (" in Pages" if flow else ""), str(js("document.body.dataset.flow")))
+            check(until(opened, 30), "the book opens" + (" in Pages" if flow else ""), str(js("document.body.dataset.flow")))
             time.sleep(2.5)
 
         def moved(action, what, forward=True):

@@ -127,7 +127,7 @@ def library(force=False, max_age=60):
 
 
 def display(name):
-    """'Naruto (2003-2015) (Digital) (AnHeroGold-Empire) (Edited)' -> 'Naruto': no release tags or years."""
+    """'Some Series (2003-2015) (Digital) (Group-Name) (Edited)' -> 'Some Series': no release tags or years."""
     t = re.sub(r"\s*[\(\[][^)\]]*[\)\]]", "", name or "").strip(" -")
     return t or (name or "")
 

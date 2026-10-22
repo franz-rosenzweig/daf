@@ -61,7 +61,7 @@ function C.face(list, size)
 end
 local face = C.face
 
--- "Daring Greatly: How the Courage…" → "Daring Greatly"; also cuts at " — " and "(".
+-- "Walden: Or, Life in the Woods" → "Walden"; also cuts at " — " and "(".
 function C.shortTitle(t)
     t = t or ""
     -- (dashes are several bytes: matched as whole strings, not in a [set])
