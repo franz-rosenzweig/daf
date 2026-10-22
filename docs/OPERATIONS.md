@@ -2,7 +2,7 @@
 
 # Daf
 
-A personal Readwise for Nathan's own stack. Goal: an hour of reading a day in Year 30
+A personal Readwise for one reader's own stack. Goal: an hour of reading a day in Year 30
 (2026-10-09 to 2027-10-08). The plan for the whole app is in [PLAN.md](../PLAN.md).
 
 **Open it:** https://daf.tiresia.xyz (the cloudflared tunnel on morten → localhost:8440), or
@@ -39,11 +39,11 @@ After changing code: `systemctl --user restart daf`. The web app has no build st
     daf set-password                    change the web password
     daf kindle-token NAME               new device token (printed once)
     daf review [--json]                 today's highlights
-    daf morning [--send]                the morning highlight (cron 05:32 Sun-Fri sends it)
+    daf morning [--send]                the morning highlight (a cron job sends it)
     daf note "n: text"                  file a note under the morning highlight or the current Kindle book
     daf voice-note FILE                 transcribe (faster-whisper) and file the same way
     daf nightstand [ID ...]             show or set the three nightstand books
-    daf paper-page PHOTO [--caption "page 112 daring greatly"]   a marked paper page -> highlights
+    daf paper-page PHOTO [--caption "page 112 middlemarch"]   a marked paper page -> highlights
     daf clip "TEXT"                     a podcast link with a time: transcribe the minute before it
     daf jobs                            transcripts and clips, waiting or done
 
@@ -53,7 +53,7 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
   otherwise a reading note on the book last read on the Kindle, at that page.
 - A voice note with no text: transcribed and filed under the book read on the Kindle in the
   last 3 hours (or if it starts with "note"); otherwise the transcript comes back unfiled.
-- A photo captioned `page`, `p: 112` or `page 112 daring greatly`: `daf paper-page` (below).
+- A photo captioned `page`, `p: 112` or `page 112 middlemarch`: `daf paper-page` (below).
 - A link with a time that isn't YouTube or X (`#t=750`, AntennaPod's "Starting position: 00:12:30",
   or `clip <link> 12:30`): `daf clip`, the minute before that point, transcribed.
 
@@ -61,7 +61,7 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
 
 - **Books** (`library.py`): one row per work. Kindle copies (by KOReader md5), the
   Audiobookshelf item and the vault note are matched to the Calibre id by normalized title,
-  so two copies of The Kites are one book.
+  so two copies of one novel are one book.
 - **Highlights** (`sources/highlights.py`): KOReader sidecars synced to `/srv/koreader/Libros`
   (parsed by `sources/lua.py`), KoInsight's annotation table as fallback, Karakeep highlights,
   and Audiobookshelf bookmarks whose title is a sentence. Ids are stable hashes of book + text.
@@ -379,7 +379,7 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
   and when Wi-Fi connects. Turns are stored once per (book md5, start) whichever way
   they arrive. Sittings = turns less than 10 minutes apart.
 - **Audiobookshelf:** `absdatabase.sqlite`, read-only. Audiobooks count; the podcast
-  library (speaker talks) is stored private, never named, never counted.
+  library is stored private, never named, never counted.
 - **Paper:** the reading-log notes in the vault, found by `type: reading-log`.
 
 ## The Kindle
@@ -477,7 +477,7 @@ can be kept ahead of time.
     copies.
   - `T.FACES` / `T.stack(id)` give the reading stack; Hebrew falls back to Frank Ruhl Libre (serif) or
     Heebo (sans).
-- **His own fonts:** `POST /api/fonts?name=<file>` (the raw file; TTF, OTF, WOFF or WOFF2 by magic
+- **Your own fonts:** `POST /api/fonts?name=<file>` (the raw file; TTF, OTF, WOFF or WOFF2 by magic
   bytes, up to 8 MB) saves to `STATE/fonts`.
   - The family and style come from the file name ("Bookerly-BoldItalic" → Bookerly, 700, italic).
   - `settings.fonts` lists them; `GET` and `DELETE /api/fonts/<file>`.
@@ -498,13 +498,13 @@ can be kept ahead of time.
 - **Left out:** the manga page cache lives in `STATE/cache/manga`, which Borg's `*/cache/*` rule skips;
   Daf rebuilds it from Komga.
 - **What only Daf has:** reading sessions and time, the Kindle page turns the plugin sent, review
-  history and state, cards, settings, his fonts. Highlights and notes are in the vault as well.
+  history and state, cards, settings, your fonts. Highlights and notes are in the vault as well.
 
 
 ## Delete, pictures, paywalls, keys, AI, the morning email, feedback, imports (2026-10-12)
 
-Nathan held Daf up to Readwise Reader's intro video and asked for all of what was missing, plus the
-four I'd called not worth it.
+Daf was held up to Readwise Reader's intro video, and this round built all of what was missing, plus
+four things first set aside as not worth it.
 
 - **Delete** is a status, `deleted`, for a doc in either place (`reader.set_status`; `docs.deleted`
   is when). Every list, count, search and summary job skips it. A Feed item is marked read in FreshRSS
@@ -536,12 +536,12 @@ four I'd called not worth it.
   `extension/sign.sh`, commit the new file in `extension/signed/`; no restart (read from disk). Chrome
   and Arc (unpacked) don't update themselves; Safari's comes with the Mac app.
 - **Keys** (`web/keys.js`): one table of scope → action → default keys for lists, articles, books,
-  the review and manga; settings `keys` holds his changes (`PUT /api/keys`), `/api/today` brings them,
+  the review and manga; settings `keys` holds your changes (`PUT /api/keys`), `/api/today` brings them,
   localStorage `daf.keys` keeps them for a cold start. Handlers call `DafCore.Keys.is(e, scope, action)`;
   a letter typed with another layout (Hebrew) matches by `e.code`. Every shortcut sheet is
   `Keys.sheet(scope)`. shell.js presses the bound key for the menus (docs/SHELL.md).
 - **AI** (`daf/ai.py`): `DEFAULTS` holds the instruction part of each prompt (summary, ask, ask_book,
-  word_en, word_he, card); settings `ai` keeps his changes, the model (`""` = `DAF_CLAUDE_MODEL`), the
+  word_en, word_he, card); settings `ai` keeps your changes, the model (`""` = `DAF_CLAUDE_MODEL`), the
   ready questions (`/api/docs/{id}` and `/api/ebooks/{id}` send `questions`) and `auto_summary`, which
   `queue_summaries` obeys. `ai.run` is the one place the CLI is called (paper_pages keeps its own,
   with its tools).
@@ -549,7 +549,7 @@ four I'd called not worth it.
   `extras()` sends it once a day at the hour in the home zone, only with something new (kv
   `digest_last`, three tries on a day it fails). SMTP through the Bridge (`PROTON_SMTP_PORT`, 1025),
   from daf@tiresia.xyz (`digest.SENDER`, or settings `digest.from`; tiresia.xyz is a custom domain on
-  his Proton account, so Proton signs it; changed 2026-10-13) to PROTON_USER. `/api/digest/preview`
+  the owner's Proton account, so Proton signs it; changed 2026-10-13) to PROTON_USER. `/api/digest/preview`
   renders it; `POST /api/digest/send` sends one now.
   Private titles are left out.
 - **Feedback** (`daf/feedback.py`): kept in table `feedback`, then `gh issue create -R
@@ -692,7 +692,7 @@ before 3.5 → 0.8 s):
 - settings.json `library.karakeep`: "on" (Karakeep keeps the Library, the old way), "read" (Daf keeps it; Karakeep is only read, for bookmarks made there; nothing is written to it), "off" (Karakeep isn't asked). `daf karakeep-import` moves it from "on" to "read", once; `--again` fills in anything still missing.
 - New saves are dl:<16 hex> rows. A "page" job (its own worker thread, `daf-pages`, so it never waits behind a transcript) reads the page: urllib with the public-address guard, then the headless Chrome in docker-chrome-1 (daf/browser.py, DevTools on :9222) for robot checks and script pages. Pictures are kept in STATE/thumbs (/api/thumb/<hash>.jpg, at most 960 px). Uploaded PDFs are kept in pdfdoc's folder.
 - A "tags" job gives a new save 2 to 4 tags (ai prompt "tags", Preferences → AI switch), never a private one. A "tagtidy" job asks the model for a tidy-up of the doc tags (kv tag_tidy); Preferences → Library tags applies only the ticked changes.
-- **When Karakeep goes for good** (Nathan's OK first): set library.karakeep to "off", `karakeep dump` into the borg backup, stop the web and meilisearch containers, and keep **docker-chrome-1**: browser.py needs it.
+- **When Karakeep goes for good** (with the owner's OK first): set library.karakeep to "off", `karakeep dump` into the borg backup, stop the web and meilisearch containers, and keep **docker-chrome-1**: browser.py needs it.
 - The sandbox has no job workers: run pages.fetch / tagging.tag_doc by hand against its state (scratchpad libtest.py).
 
 ## Karakeep retired (2026-10-19)
@@ -707,7 +707,7 @@ before 3.5 → 0.8 s):
 - settings koinsight = "off": no import, no Sources check. The KoInsight container is stopped and behind the compose profile "koinsight" (backup docker-compose.yml.bak-20261020-koinsight); its data stays in /srv/docker/koinsight (borg). Its old annotations still fill highlights (sources/highlights.py reads the file if it's there).
 - The Kindle: plugins/koinsight.koplugin renamed .retired and settings/koinsight.lua sync_on_suspend false (backup .bak-20261020), so it doesn't try to sync at every sleep. To undo: rename it back, then restart KOReader.
 - Kindle numbers for local tools: /api/tools/kindle?days=N (device token). The desk's Trends and reading card use it with DESK_DAF_TOKEN; the homepage tile "Kindle" uses /srv/docker/homepage/kindle-stats.sh (token "homepage" in kindle-stats.env, cron every 30 min; it replaced koinsight-stats.sh).
-- Left for Nathan's root moment: koinsight.tiresia.xyz in /etc/cloudflared/config.yml.
+- Left for a root moment: koinsight.tiresia.xyz in /etc/cloudflared/config.yml.
 - The Feed: feed_expire_days defaults to 30; Preferences offers a week up to a year or never (3650). A larger window makes the next sync fetch once back to its start (kv feed_window). FreshRSS's archiving keep_unreads is now true (config.php backup .bak-20261020), so unread articles stay as long as the window wants them.
 
 ## The Kindle: Home, and highlights through the plugin (2026-10-20)
