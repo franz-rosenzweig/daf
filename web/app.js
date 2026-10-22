@@ -752,7 +752,7 @@ async function drawPod(token){
     (token ? '<div class="kindlenote"><span class="mute tiny">The AntennaPod password. Daf only shows it once.</span><code class="tok">' + esc(token) + '</code></div>' : '') +
     '<details class="steps"' + (token ? ' open' : '') + '><summary>Set up AntennaPod</summary><ol>' +
     '<li>AntennaPod → Settings → <b>Synchronization</b> → <b>gpodder.net</b>.</li>' +
-    '<li>Server: <code>' + esc(base) + '</code> (AntennaPod may insist on https; then use the secure address once it exists). Username: <code>' + esc(S.user || 'nathan') + '</code>. Password: the one above.</li>' +
+    '<li>Server: <code>' + esc(base) + '</code> (AntennaPod may insist on https; then use the secure address once it exists). Username: <code>' + esc(S.user || 'reader') + '</code>. Password: the one above.</li>' +
     '<li>Pick or create the device <b>AntennaPod</b>, and let it sync.</li>' +
     '<li>To clip: in an episode, <b>Share → with position</b>, send it to Ezer. The minute before that point comes back transcribed, and lands in Highlights and the vault.</li></ol></details>';
 }

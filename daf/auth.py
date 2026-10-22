@@ -1,8 +1,8 @@
-"""One login for Nathan (username + password), signed cookies for the browser, bearer tokens
+"""One login for the owner (username + password), signed cookies for the browser, bearer tokens
 for devices (the Kindle, the phone, AntennaPod).
 
 auth.json lives in STATE, outside the vault and outside git:
-    {"user": "nathan", "salt": hex, "hash": hex, "secret": hex}
+    {"user": "reader", "salt": hex, "hash": hex, "secret": hex}
 Changing the password replaces the secret, which signs out every browser at once.
 Device tokens are stored only as SHA-256 hashes in the devices table.
 """
@@ -30,7 +30,7 @@ def _load():
         return None
 
 
-DEFAULT_USER = "nathan"
+DEFAULT_USER = "reader"     # only for a new install: an auth.json that names a user keeps it
 
 
 def _save(data):

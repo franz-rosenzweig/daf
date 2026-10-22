@@ -5,7 +5,7 @@
     daf today [--json] [--date YYYY-MM-DD]
     daf year [30|29] [--json]
     daf log-paper MINUTES [--date YYYY-MM-DD | --yesterday | --shabbat] [--pages N] [--note TEXT]
-    daf set-password [--user NAME] [--random]   the web login (username "nathan" unless changed)
+    daf set-password [--user NAME] [--random]   the web login (username "reader" unless changed)
     daf kindle-token NAME      make a token for a device (printed once)
     daf review [--json]        today's highlights
     daf morning [--send]       the morning highlight (with --send: to Signal, and remembered for replies)

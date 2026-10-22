@@ -9,7 +9,7 @@ A personal Readwise for Nathan's own stack. Goal: an hour of reading a day in Ye
 http://100.91.202.11:8440 on the tailnet. Install it as an app from the phone's browser menu on the
 https address; offline reading needs that address too (service workers want a secure origin).
 
-**Sign-in:** username + password (`auth.json`; the username is `nathan` unless changed). Change
+**Sign-in:** username + password (`auth.json`; a new install's username is `reader` until changed). Change
 both in Preferences → Account or with `daf set-password [--user NAME]`; a new password signs out
 every other browser. Five wrong tries from one address lock it for 15 minutes, twenty from anywhere
 in an hour pause sign-in for 15 minutes, and Ezer says so on Signal (at most every 6 hours). Behind
