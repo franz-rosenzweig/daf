@@ -1,4 +1,4 @@
-"""Days, totals and the year grids, all in Nathan's home time zone."""
+"""Days, totals and the year grids, all in the home time zone."""
 from collections import defaultdict
 from datetime import date, datetime, time as dtime, timedelta
 from zoneinfo import ZoneInfo

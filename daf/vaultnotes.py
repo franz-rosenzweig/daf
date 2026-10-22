@@ -3,9 +3,9 @@
 
 Daf owns only the text between `<!-- daf -->` and `<!-- daf-end -->`. Everything
 else in the note, including koreader-merge's highlight region, stays byte-identical.
-Each entry ends with a block id (`^daf-…`). If Nathan edits an entry in Obsidian,
+Each entry ends with a block id (`^daf-…`). If you edit an entry in Obsidian,
 the vault wins: Daf notices the text no longer matches what it last wrote and
-takes his version before writing again.
+takes your version before writing again.
 """
 import hashlib
 import json
@@ -69,7 +69,7 @@ def _render(book, hl_notes, reading_notes, settings, listened=()):
 
 
 def _existing_entries(region_text):
-    """block id -> the note text Nathan sees for it now."""
+    """block id -> the note text you see for it now."""
     out = {}
     for m in ENTRY.finditer(region_text):
         body = m.group("body").rstrip()

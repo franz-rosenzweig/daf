@@ -1,8 +1,8 @@
-"""Email newsletters, from Nathan's Proton mailbox through Proton Mail Bridge (IMAP on 127.0.0.1).
+"""Email newsletters, from the owner's Proton mailbox through Proton Mail Bridge (IMAP on 127.0.0.1).
 
 Read-only: messages are fetched with BODY.PEEK, so nothing is marked read and nothing moves.
 Daf finds the senders that send as newsletters (a List-Unsubscribe or List-Id header) and
-lists them in Preferences; issues from the ones Nathan ticks become Library documents of
+lists them in Preferences; issues from the ones you tick become Library documents of
 kind "email" (Readwise's Emails), with ids "nl:<hash of the Message-ID>". Their reading
 state lives in Daf only.
 
@@ -211,7 +211,7 @@ def ranked(conn, settings, senders):
 
 
 def sync(conn, settings, days=30):
-    """New issues from the senders he chose, as Library documents of kind email. Returns how many."""
+    """New issues from the senders you chose, as Library documents of kind email. Returns how many."""
     chosen = [a.lower() for a in (settings.get("newsletters") or []) if isinstance(a, str)]
     if not chosen:
         return 0

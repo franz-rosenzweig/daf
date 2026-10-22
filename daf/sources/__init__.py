@@ -1,1 +1,1 @@
-"""Source adapters. Each one reads a system Nathan already runs and never writes to it."""
+"""Source adapters. Each one reads a system the owner already runs and never writes to it."""

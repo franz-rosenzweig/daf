@@ -298,7 +298,7 @@ def nightstand(conn, settings):
 
 
 def suggest_nightstand(conn):
-    """Until Nathan picks, the three books most recently read on the Kindle."""
+    """Until you pick, the three books most recently read on the Kindle."""
     return [dict(r) for r in conn.execute(
         "SELECT * FROM books WHERE kind = 'book' AND last_read IS NOT NULL AND private = 0 "
         "AND id NOT IN (SELECT book_id FROM manga_books) ORDER BY last_read DESC LIMIT 3")]

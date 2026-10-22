@@ -1,1 +1,1 @@
-"""Daf: a personal Readwise for Nathan's own stack. See PLAN.md."""
+"""Daf: a personal Readwise for one reader's own stack. See PLAN.md."""

@@ -445,7 +445,7 @@ COLORS = ("yellow", "green", "blue", "pink", "purple")
 
 
 def edit_meta(conn, doc_id, title=None, author=None):
-    """Nathan's own title and author for a document. Karakeep and FreshRSS keep theirs; Daf
+    """Your own title and author for a document. Karakeep and FreshRSS keep theirs; Daf
     lays this one over them after every sync (apply_edits)."""
     d = conn.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
     if not d:
@@ -591,14 +591,14 @@ def ask(conn, doc_id, question, quote=None):
     words = text.split()
     if len(words) > 14000:
         text = " ".join(words[:14000]) + " […]"
-    hls = "\n".join(f"- {h['text']}" + (f" (his note: {h['user_note']})" if h.get("user_note") else "") for h in d["highlights"])
+    hls = "\n".join(f"- {h['text']}" + (f" (the reader's note: {h['user_note']})" if h.get("user_note") else "") for h in d["highlights"])
     from . import ai
     prompt = (
-        "You are the Ask feature in Daf, Nathan's reading app. " + ai.prompt("ask") + "\n\n"
+        "You are the Ask feature in Daf, a personal reading app. " + ai.prompt("ask") + "\n\n"
         f"Document: {d['title']} ({d['source'] or d['url'] or ''})\n\n<document>\n{text}\n</document>\n\n"
-        + (f"His highlights in it:\n{hls}\n\n" if hls else "")
-        + (f"The passage he selected:\n\"{quote}\"\n\n" if quote else "")
-        + f"His question: {question}"
+        + (f"The reader's highlights in it:\n{hls}\n\n" if hls else "")
+        + (f"The passage the reader selected:\n\"{quote}\"\n\n" if quote else "")
+        + f"The reader's question: {question}"
     )
     try:
         answer = ai.run(prompt)
@@ -711,7 +711,7 @@ def push_inbox(conn):
 
 
 def expire_in_freshrss(conn, settings):
-    """Mark everything older than the expiry window read in FreshRSS too (only when Nathan asks)."""
+    """Mark everything older than the expiry window read in FreshRSS too (only when you ask)."""
     before = expired_before(settings)
     n = conn.execute("SELECT v FROM kv WHERE k = 'feed_counts'").fetchone()
     freshrss.mark_all_read_before(before)

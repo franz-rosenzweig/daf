@@ -4,7 +4,7 @@ already has tags (given by hand, or brought from Karakeep or another app) keeps 
 is never sent to the model.
 
 Also the tag list's upkeep (Preferences → Tags): rename, merge and remove a document tag everywhere,
-and the tidy-up: the model proposes merges for the whole list, he ticks the ones he wants.
+and the tidy-up: the model proposes merges for the whole list, you tick the ones you want.
 """
 import json
 import re
@@ -65,7 +65,7 @@ def tag_doc(conn, doc_id):
 
 
 def pick(proposed, mine, n=4):
-    """The model's tags, spelled the way his own are when they're the same word, at most n."""
+    """The model's tags, spelled the way your own are when they're the same word, at most n."""
     have = {t.lower(): t for t in mine}
     out = []
     for t in proposed:
@@ -111,7 +111,7 @@ def rename(conn, old, new):
 def propose(conn):
     """The tidy-up: the model looks at the whole list and proposes merges (near-duplicates, a
     plural and its singular, one subject under three names) and tags to drop (used once, saying
-    nothing). Kept in kv until he applies or throws it away."""
+    nothing). Kept in kv until you apply or throw it away."""
     s = config.load_settings()
     c = counts(conn)
     if len(c) < 8:
@@ -151,7 +151,7 @@ def proposal(conn):
 
 
 def apply(conn, ids):
-    """The changes he ticked. Returns how many documents changed."""
+    """The changes you ticked. Returns how many documents changed."""
     p = proposal(conn) or {"changes": []}
     n = 0
     for x in p["changes"]:

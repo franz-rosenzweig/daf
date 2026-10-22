@@ -246,7 +246,7 @@ def post_doc_tag_tidy(c=Depends(conn)):
 
 @app.post("/api/doc-tags/apply", dependencies=[Depends(user)])
 def post_doc_tag_apply(b=Depends(json_body), c=Depends(conn)):
-    """{ids: [...]}: the proposed changes he ticked."""
+    """{ids: [...]}: the proposed changes you ticked."""
     from . import tagging
     ids = [int(x) for x in b.get("ids") or [] if isinstance(x, int) or str(x).isdigit()]
     return {"changed": tagging.apply(c, ids), "tidy": tagging.proposal(c)}
@@ -2430,7 +2430,7 @@ def share(request: Request, url: str = "", title: str = "", text: str = "", c=De
     if not auth.check_cookie(request.cookies.get(auth.COOKIE)):
         return RedirectResponse("/#today")
     import html
-    # A link on some other site could point here with his cookie along (a top-level GET carries it):
+    # A link on some other site could point here with your cookie along (a top-level GET carries it):
     # from anywhere but the share menu or Daf itself, ask first, with a form that posts.
     if request.headers.get("sec-fetch-site", "none") not in ("none", "same-origin"):
         fields = "".join(f'<input type="hidden" name="{k}" value="{html.escape(v)}">' for k, v in (("url", url), ("title", title), ("text", text)))
@@ -2564,7 +2564,7 @@ def kindle_home(name=Depends(device), c=Depends(conn)):
 
 @app.get("/api/kindle/book")
 def kindle_book(md5: str = "", name=Depends(device), c=Depends(conn)):
-    """For the book just opened on the Kindle: where Daf has Nathan in it, and the highlights made in
+    """For the book just opened on the Kindle: where Daf has you in it, and the highlights made in
     Daf that the Kindle doesn't have yet (the plugin adds them to KOReader)."""
     bid = library.book_for_md5(c, md5.strip().lower())
     if not bid:
@@ -2601,7 +2601,7 @@ async def kindle_review(request: Request, name=Depends(device), c=Depends(conn))
     return {"ok": True, "done": done}
 
 
-# ---- his own typefaces (a font he owns, like Bookerly from the Kindle), for the reading views -----
+# ---- your own typefaces (a font you own, like Bookerly from the Kindle), for the reading views ---
 
 FONT_MAGIC = {b"\x00\x01\x00\x00": "ttf", b"true": "ttf", b"OTTO": "otf", b"wOFF": "woff", b"wOF2": "woff2"}
 FONT_TYPES = {"ttf": "font/ttf", "otf": "font/otf", "woff": "font/woff", "woff2": "font/woff2"}
@@ -2621,7 +2621,7 @@ def get_fonts():
 @app.post("/api/fonts", dependencies=[Depends(user)])
 async def post_font(request: Request, name: str = ""):
     """The font file as the body; `name` its file name, which gives the family and the style
-    ("Bookerly-BoldItalic.ttf" → Bookerly, bold, italic). Kept in STATE/fonts, for his devices only."""
+    ("Bookerly-BoldItalic.ttf" → Bookerly, bold, italic). Kept in STATE/fonts, for your devices only."""
     data = await request.body()
     kind = FONT_MAGIC.get(data[:4])
     if not kind or not (1000 < len(data) <= 8_000_000):
@@ -2688,7 +2688,7 @@ def offline_plan(request: Request, c=Depends(conn)):
     recent = [r[0] for r in c.execute("SELECT book_id FROM book_positions ORDER BY updated DESC LIMIT 6")]
     books = [b for b in dict.fromkeys(stand + recent) if b in readable]
     urls += [f"/api/ebooks/{b}" for b in books] + [f"/api/books/{b}" for b in stand]
-    urls += ["/api/fonts"] + [f"/api/fonts/{f['file']}" for f in s.get("fonts", []) if f.get("file")]   # his own typefaces
+    urls += ["/api/fonts"] + [f"/api/fonts/{f['file']}" for f in s.get("fonts", []) if f.get("file")]   # your own typefaces
     images = [f"/api/cover/{b}" for b in dict.fromkeys(stand + recent)]
     return {"version": 1, "day": t.isoformat(), "urls": urls, "docs": docs, "ebooks": books, "images": images}
 

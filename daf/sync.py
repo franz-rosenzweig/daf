@@ -107,7 +107,7 @@ def run():
         except Exception as e:  # noqa: BLE001
             _status(conn, "sefaria", False, str(e))
             log.exception("sefaria")
-        # Newsletters from Proton (read-only), every quarter hour, for the senders he chose.
+        # Newsletters from Proton (read-only), every quarter hour, for the senders you chose.
         conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
         try:
             if settings.get("newsletters"):

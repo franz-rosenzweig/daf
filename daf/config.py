@@ -59,7 +59,7 @@ SOURCE_LABELS = {
 
 DEFAULT_SETTINGS = {
     "home_tz": "America/Phoenix",
-    # What counts toward the hour. Podcasts never do (Nathan, 2026-10-09).
+    # What counts toward the hour. Podcasts never do (decided 2026-10-09).
     "count": {"kindle": True, "ebook": True, "manga": True, "audio": True, "article": True, "paper": True, "podcast": False, "video": False},
     "review_size": 5,
     "feed_expire_days": 30,
@@ -121,7 +121,7 @@ def load_settings():
     a = saved.get("appearance")                         # the theme (web/themes.js): one for light, one for dark, and when
     if isinstance(a, dict):
         s["appearance"] = clean_appearance(a)
-    if isinstance(saved.get("fonts"), list):            # his own font files (STATE/fonts), for the reading views
+    if isinstance(saved.get("fonts"), list):            # your own font files (STATE/fonts), for the reading views
         s["fonts"] = [f for f in saved["fonts"] if isinstance(f, dict) and isinstance(f.get("file"), str)][:30]
     for k in ("ai", "digest", "keys", "tips", "library"):   # Preferences → AI (ai.py), the morning email (digest.py), key bindings, tips (app.py), who keeps the Library (karakeep.mode)
         if isinstance(saved.get(k), dict):

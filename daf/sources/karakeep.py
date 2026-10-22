@@ -153,7 +153,7 @@ def save(url, title=None):
 
 
 def upload_pdf(name, data, title=None):
-    """A PDF from Nathan's computer becomes a Karakeep bookmark of type asset (and then a Daf PDF)."""
+    """A PDF from your computer becomes a Karakeep bookmark of type asset (and then a Daf PDF)."""
     import uuid
     key = secrets.karakeep_key()
     if not key:

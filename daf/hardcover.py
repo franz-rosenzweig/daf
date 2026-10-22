@@ -8,11 +8,11 @@ into the note (Hardcover changed, the vault didn't), the way it does for edits m
 
 - progress from Daf's own book reader, only ever forward, never to a finished book;
 - "Reading" when a book on the Want to read shelf is started in Daf;
-- finished, with an optional rating, when Nathan says so (the book page, the end of a book
+- finished, with an optional rating, when you say so (the book page, the end of a book
   in Daf, or Today when the Kindle reaches the end);
 - a status or rating changed on a book page.
 
-Daf reads his shelves for the Books page (Want to read) and book pages. Books are matched by
+Daf reads your shelves for the Books page (Want to read) and book pages. Books are matched by
 the `hardcoverBookId` in their vault note, or a link made in Daf (`hc_links`). Private books
 are never sent on their own, and one added from Daf goes in private.
 """
@@ -34,7 +34,7 @@ FM_ID = re.compile(r"^hardcoverBookId:\s*['\"]?(\d+)", re.M)
 
 
 def _today():
-    """Today in his home time zone (the server's own clock may be in another)."""
+    """Today in the home time zone (the server's own clock may be in another)."""
     from . import today as T
     return T.today(config.load_settings()).isoformat()
 
@@ -84,7 +84,7 @@ def _check(d, field):
     return d.get(field) or {}
 
 
-# ---- his shelves, cached -----------------------------------------------------
+# ---- your shelves, cached ----------------------------------------------------
 
 def _kv(conn, k, default=None):
     r = conn.execute("SELECT v FROM kv WHERE k = ?", (k,)).fetchone()
@@ -141,7 +141,7 @@ def _pages(ub):
 
 
 def active_read(ub):
-    """The read row that stands for where he is (the vault sync's rule, so the two agree)."""
+    """The read row that stands for where you are (the vault sync's rule, so the two agree)."""
     reads = [r for r in (ub.get("user_book_reads") or []) if r]
     if not reads:
         return None
@@ -393,8 +393,8 @@ def dismiss_finish(conn, book_id):
         _kv_set(conn, "hc_finish_asked", asked[-200:])
 
 
-# ---- his Hardcover lists, as Daf shelves -------------------------------------------
-# Each list he made on Hardcover is a shelf in Daf (shelves.hc_list), kept the same both ways:
+# ---- your Hardcover lists, as Daf shelves ------------------------------------------
+# Each list you made on Hardcover is a shelf in Daf (shelves.hc_list), kept the same both ways:
 # the half-hourly sync brings Hardcover's list into the shelf, and a book put on or taken off the
 # shelf in Daf goes to Hardcover at once. Only books Daf knows on Hardcover (hc_map) take part;
 # a private book never goes up, and the rest of a list is left alone. A shelf made in Daf stays

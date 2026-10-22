@@ -1,4 +1,4 @@
-"""Stats: streaks, totals and a Year 30 projection, when Nathan reads, books in progress and
+"""Stats: streaks, totals and a Year 30 projection, when you read, books in progress and
 the ones that have stalled, highlights per week, and highlights from this day in other years.
 Private books count in the totals but are never named here."""
 from collections import defaultdict

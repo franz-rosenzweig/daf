@@ -1,8 +1,8 @@
 """The morning email, like Readwise Reader's Daily Summaries: what came into the Library in the last
 day, each with its two or three lines, how many new posts wait in the Feed, and yesterday's minutes.
 
-It goes from daf@tiresia.xyz (settings digest.from; tiresia.xyz is a custom domain on Nathan's Proton
-account) to his own address, through the Bridge on morten (the office agent's PROTON_* keys, the same
+It goes from daf@tiresia.xyz (settings digest.from; tiresia.xyz is a custom domain on the owner's Proton
+account) to the account's own address, through the Bridge on morten (the office agent's PROTON_* keys, the same
 ones the newsletters read with). Settings "digest": {on, hour, feed}; the
 sync loop sends it once a day, at that hour in the home time zone, and only when something came in.
 """
@@ -20,7 +20,7 @@ from . import config, db, library, today as T
 from .sources import newsletters
 
 
-SENDER = "daf@tiresia.xyz"     # an address on his Proton account's own domain (Nathan, 2026-10-13)
+SENDER = "daf@tiresia.xyz"     # an address on the Proton account's own domain (since 2026-10-13)
 
 
 def clean(d):
@@ -116,7 +116,7 @@ def render(d, settings):
 
 
 def send_mail(subject, body_html, body_text):
-    """From daf@tiresia.xyz (settings digest.from), an address on his Proton account, to his own
+    """From daf@tiresia.xyz (settings digest.from), an address on the Proton account, to the account's own
     address, through the Bridge. Proton sends only from the account's own addresses: one that isn't
     makes the Bridge refuse the message, and the error says so."""
     c = newsletters._creds()

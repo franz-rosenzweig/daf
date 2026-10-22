@@ -1,4 +1,4 @@
-"""`daf`: the command line. Ezer and the desk call this; so can Nathan.
+"""`daf`: the command line. Ezer and the desk call this; so can you.
 
     daf doctor                 every source and how fresh it is
     daf sync                   pull every source now
@@ -268,7 +268,7 @@ def cmd_backup(a):
     import time as _t
     out_dir = config.STATE / "backups"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_dir.chmod(0o700)                         # his reading history: his eyes only, as Vaultwarden's bundles
+    out_dir.chmod(0o700)                         # your reading history: your eyes only, as Vaultwarden's bundles
     stamp = _t.strftime("%Y-%m-%d-%H%M")
     tmp = out_dir / f".daf-{stamp}.db"
     try:

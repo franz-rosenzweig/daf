@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS review_state (    -- Daf's own data: spaced repetitio
   note_updated INTEGER,
   vault_hash TEXT
 );
-CREATE TABLE IF NOT EXISTS shelves (        -- Nathan's own shelves of books, like BookOrbit's collections
+CREATE TABLE IF NOT EXISTS shelves (        -- your own shelves of books, like BookOrbit's collections
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   created INTEGER NOT NULL
@@ -181,11 +181,11 @@ CREATE TABLE IF NOT EXISTS cards (           -- flashcards made from highlights 
   due TEXT, interval INTEGER, ease REAL, reps INTEGER, lapses INTEGER, last TEXT, first_seen TEXT, suspended INTEGER);
 CREATE TABLE IF NOT EXISTS hc_links (        -- Daf books linked to Hardcover by hand (no hardcoverBookId in a vault note)
   book_id TEXT PRIMARY KEY, hc_book_id INTEGER NOT NULL, linked INTEGER);
-CREATE TABLE IF NOT EXISTS doc_edits (       -- titles and authors Nathan corrected; reapplied after every sync
+CREATE TABLE IF NOT EXISTS doc_edits (       -- titles and authors you corrected; reapplied after every sync
   id TEXT PRIMARY KEY, title TEXT, author TEXT, updated INTEGER);
 CREATE TABLE IF NOT EXISTS book_marks (      -- bookmarks in books read in Daf
   id TEXT PRIMARY KEY, book_id TEXT NOT NULL, cfi TEXT NOT NULL, fraction REAL, chapter TEXT, excerpt TEXT, created INTEGER);
-CREATE TABLE IF NOT EXISTS book_positions (  -- where Nathan is in a book read in Daf (EPUB CFI)
+CREATE TABLE IF NOT EXISTS book_positions (  -- where you are in a book read in Daf (EPUB CFI)
   book_id TEXT PRIMARY KEY, cfi TEXT, fraction REAL, chapter TEXT, updated INTEGER);
 CREATE TABLE IF NOT EXISTS paper_pages (     -- photos of marked paper pages (Phase 7)
   id TEXT PRIMARY KEY, created INTEGER NOT NULL, photo TEXT NOT NULL, caption TEXT,

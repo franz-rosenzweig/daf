@@ -1,4 +1,4 @@
-"""Reading goals: what Nathan aims for, and how he's doing, judged honestly.
+"""Reading goals: what you aim for, and how you're doing, judged honestly.
 
 settings.json "goals" holds one goal per kind, for example
   {"id": "minutes", "kind": "minutes", "period": "day", "target": 60, "on": true, "main": true,
@@ -16,8 +16,8 @@ from datetime import date, datetime, time as dtime, timedelta
 
 from . import config, today as T
 
-AGE35 = date(2031, 10, 9)          # five years on; "by 35" means before it
-BEGINNING = "2000-01-01"           # history entries from before Daf: the goal he started with
+YEAR35_START = config.YEAR30_START.replace(year=config.YEAR30_START.year + 5)   # "by 35" means before it
+BEGINNING = "2000-01-01"           # history entries from before Daf: the goal you started with
 
 # kind: label, unit (one, many), periods, default target per period, (min, max, step) per period
 KINDS = {
@@ -39,7 +39,7 @@ KINDS = {
 }
 ORDER = list(KINDS)
 # A manga or comic volume: "Kaguya-sama - Love Is War v12", "Naruto Vol. 3". The books goal counts
-# them only if he says so.
+# them only if you say so.
 VOLUME = re.compile(r"\bv(?:ol\.?)?\s?\d{1,3}\b", re.I)
 
 DEFAULTS = [
@@ -195,7 +195,7 @@ def period_range(period, t):
         a = _ystart(t)
         return a, date(a.year + 1, a.month, a.day) - timedelta(days=1)
     if period == "by35":
-        return config.YEAR30_START, AGE35 - timedelta(days=1)
+        return config.YEAR30_START, YEAR35_START - timedelta(days=1)
     return t, t
 
 
@@ -249,7 +249,7 @@ def finished_books(conn, a, b, manga=False):
                     out[("hc", ub.get("book_id"))] = f
     hm = conn.execute("SELECT v FROM kv WHERE k = 'hc_map'").fetchone()
     hcmap = json.loads(hm[0]) if hm else {}
-    tz = T.tz_of(config.load_settings())          # the home time zone, not always Phoenix
+    tz = T.tz_of(config.load_settings())          # the home time zone, not the server's
     lo, hi = _epoch(a, tz), _epoch(b + timedelta(days=1), tz)
     mangas = {r[0] for r in conn.execute("SELECT book_id FROM manga_books")}
     for bid, last, title in conn.execute("SELECT id, last_read, title FROM books WHERE kind = 'book' AND progress >= 97 "
@@ -394,7 +394,7 @@ def pace(conn, settings):
             "books_y30": len(finished_books(conn, y30a, t, manga)), "books_since30": len(finished_books(conn, config.YEAR30_START, t, manga)),
             "book_basis": "your Kindle books" if len(est) >= 3 else "a typical book of about nine hours",
             "today": t.isoformat(), "y30_days_left": (period_range("y30", t)[1] - t).days + 1,
-            "days_to_35": (AGE35 - t).days}
+            "days_to_35": (YEAR35_START - t).days}
 
 
 # ---- milestones ---------------------------------------------------------------------
