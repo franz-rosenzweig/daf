@@ -1,14 +1,15 @@
 # Daf for macOS and Android: the brief
 
-For the Claude session on Nathan's Mac that builds native shells. It built Dvarim's and
-Moshe's (`franz-rosenzweig/dvarim`, `franz-rosenzweig/moshe`, both private, both Nathan's),
-and this round should reuse what worked there. Written on morten, where Daf runs.
-Replaces the two small briefs that were in `mac/NEXT.md` and `android/NEXT.md`; their specs
-(the menu-bar minutes, the home-screen widget) are folded in below.
+The brief the native shells were built from: what the Mac and Android apps had to do, and the
+contract between them and the web app. The same approach had already made native shells for
+Dvarim and Moshe (`franz-rosenzweig/dvarim`, `franz-rosenzweig/moshe`), so it reuses what
+worked there. It was written on morten, where Daf runs, and replaces the two small briefs that
+were in `mac/NEXT.md` and `android/NEXT.md`; their specs (the menu-bar minutes, the
+home-screen widget) are folded in below.
 
 ## What Daf is, and how it differs from Dvarim and Moshe
 
-Daf is Nathan's reading app for "Year 30": an hour of reading a day, from 2026-10-09 to
+Daf is a reading app for "Year 30": an hour of reading a day, from 2026-10-09 to
 2027-10-08. Readwise Reader is the model for the look and the reading
 experience. It brings together:
 
@@ -48,8 +49,8 @@ highlight at its exact spot.
 **Sign-in in the WebView** is the page's own form. It sets a cookie named `daf` (Secure on
 https). Keep the default website data store so the cookie survives restarts.
 
-**Native surfaces use device tokens,** never the cookie: `Authorization: Bearer <token>`. Nathan
-makes one in Preferences → Phone → Make a token, or on morten with
+**Native surfaces use device tokens,** never the cookie: `Authorization: Bearer <token>`. You
+make one in Preferences → Phone → Make a token, or on morten with
 `/srv/dev/daf/bin/daf kindle-token <name>` (printed once). Keep it in the Keychain on the Mac
 and in EncryptedSharedPreferences on Android.
 
@@ -96,16 +97,15 @@ Dvarim and Moshe. Keep it short. It should cover:
   back in history); false when there's nowhere to go.
 
 **Page-side code goes in a new file, `web/shell.js`,** loaded by `index.html` and doing nothing
-unless the shell user agent is present. That way the shells' work doesn't collide with mine.
-The morten session is changing `app.js`, `hl.js`, `reader.js`, `book.js` and `style.css`
-right now. If something has to change in one of those, keep it small, say so in the PR,
-and give Nathan a heads-up to pass on. Native code lives in `mac/` and `android/`. One
-branch and one PR per piece.
+unless the shell user agent is present. That way the shells' work doesn't collide with work on
+the web app, where `app.js`, `hl.js`, `reader.js`, `book.js` and `style.css` change often. If
+something has to change in one of those, keep it small and say so in the PR. Native code lives
+in `mac/` and `android/`. One branch and one PR per piece.
 
 **Deploying:** daf.service on morten serves `web/` straight from `/srv/dev/daf`, so a merged
 change to `web/` is live once morten pulls master. Python changes also need
-`systemctl --user restart daf`. There's no autodeploy for Daf yet, so tell Nathan when
-something merges and the morten session will pull it.
+`systemctl --user restart daf`. There's no autodeploy for Daf yet, so a merged change goes
+live when master is pulled on morten.
 
 ## Round 1: Daf for macOS
 
@@ -134,15 +134,15 @@ Start from Moshe's `mac/` (SwiftUI with an AppKit window, `project.yml` for Xcod
 - **Share extension:** "Save to Daf" for links in the macOS share menu, through `POST /api/save`.
 - **Notifications:** none in round 1. The morning highlight already comes through Signal (Ezer).
 - **Done when:**
-  - Nathan reads a whole evening in the Mac app: an article, a book chapter with highlights,
-    and the review.
+  - A whole evening of reading works in the Mac app: an article, a book chapter with
+    highlights, and the review.
   - The minutes sit in the menu bar.
   - One link is saved from Safari's share menu.
 
 ## Round 2: Daf for Android
 
 Start from Dvarim's `android/shell` and Moshe's `android/` (WebView, `release.sh`, keystore),
-renamed to `xyz.tiresia.daf`. Test on his S24+.
+renamed to `xyz.tiresia.daf`. Test on a real phone.
 
 - **The app:** a WebView on the base URL.
   - Back goes through `window.dafBack()` first.
@@ -171,22 +171,22 @@ renamed to `xyz.tiresia.daf`. Test on his S24+.
   - Ask `GET /api/phone/nudge?app_name=<package>` and, if `show`, post a notification
     (`title`, `text`) that opens `url`.
   - The server keeps the rules and counts what was shown and followed.
-  - Make it a switch in the app's settings, off until Nathan turns it on.
+  - Make it a switch in the app's settings, off until it's turned on.
 - **App shortcuts** (long-press the icon): Review, Continue reading (the first nightstand
   book, `#ebook/<id>`), Log paper.
 - **Done when:**
-  - The 4×2 widget sits on the S24's first screen and refreshes on its own.
+  - The 4×2 widget sits on the phone's first screen and refreshes on its own.
   - A link and a photo were shared in.
   - The volume keys turn pages.
   - Build steps are in `android/README.md`, the way Dvarim's are.
 
-## Round 3, after Nathan has used both for a week
+## Round 3, after a week of using both
 
 - Listen with the screen off on Android: a media session and a foreground service playing
   Daf's Kokoro paragraphs. The page hands over the paragraph texts, or the shell asks
   `/api/tts/text` itself.
 - Offline reading for books on the phone (cache the EPUB and the position).
-- Anything Nathan asks for after living with it.
+- Whatever a week of living with it asks for.
 
 ## Rules carried over from Dvarim and Moshe
 
@@ -197,8 +197,7 @@ renamed to `xyz.tiresia.daf`. Test on his S24+.
 - **Data:**
   - Private books stay private: the server already reduces them to "Private reading".
     Never show a title the server didn't send.
-  - Don't put Nathan's email anywhere.
-- **Look:** Readwise Reader. Nathan's screenshots are in his Nextcloud,
-  `Documents/0_BIN/Readwise Clone`.
-- **Ask Nathan before** anything that costs money, publishes to a store, or changes his phone's
-  system settings beyond the permissions the app asks for.
+  - Don't put anyone's email address anywhere.
+- **Look:** Readwise Reader.
+- **Ask the owner first** before anything that costs money, publishes to a store, or changes the
+  phone's system settings beyond the permissions the app asks for.
