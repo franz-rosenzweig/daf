@@ -132,7 +132,7 @@ media.addEventListener('change', () => { if (T.get().mode === 'system') T.apply(
 T.fromSettings = s => { T.fromSettingsFonts(s); if (s && s.appearance) { const a = Object.assign({}, DEFAULT, s.appearance); if (JSON.stringify(a) !== JSON.stringify(T.get())) T.apply(a); } };
 T.apply();
 
-/* ---------- typefaces for reading (web/fonts, tools/fetch-fonts.py), and his own ---------- */
+/* ---------- typefaces for reading (web/fonts, tools/fetch-fonts.py), and your own --------- */
 // [id, name, CSS family, group]. Hebrew falls back to Frank Ruhl Libre in the serifs, Heebo in the sans.
 T.FACES = [
   ['serif', 'Source Serif', "'Source Serif 4'", 'Serif'], ['literata', 'Literata', "'Literata'", 'Serif'],
@@ -154,7 +154,7 @@ T.stack = id => {
   const f = T.faces().find(x => x[0] === id) || T.FACES[0];
   return f[2] + (f[3] === 'Sans' || f[3] === 'Easier to read' ? ", 'Heebo', 'Figtree', system-ui, sans-serif" : ", 'Frank Ruhl Libre', Georgia, serif");
 };
-// @font-face rules for his own fonts; the book's pages get them too (book.js).
+// @font-face rules for your own fonts; the book's pages get them too (book.js).
 T.userFontCSS = (abs) => userFonts.map(f => "@font-face{font-family:'" + f.family.replace(/'/g, '') + "';src:url('" + (abs ? location.origin : '') + '/api/fonts/' + encodeURIComponent(f.file) +
   "');font-weight:" + (f.weight || 400) + ';font-style:' + (f.style || 'normal') + ';font-display:swap}').join('\n');
 T.setUserFonts = list => {

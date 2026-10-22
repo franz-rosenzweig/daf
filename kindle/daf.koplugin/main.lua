@@ -8,9 +8,9 @@ Daf for KOReader.
     the Kindle's own minutes (always fresh) plus every other source's minutes
     from the last time Daf answered.
 
-  * From Daf to the Kindle: when a book opens, if Daf has Nathan further along (read in
-    Daf's book reader since he last read it here), offer to go there; and add the
-    highlights he made in Daf as KOReader highlights, with their notes. Each is added once.
+  * From Daf to the Kindle: when a book opens, if Daf has you further along (read in
+    Daf's book reader since you last read it here), offer to go there; and add the
+    highlights you made in Daf as KOReader highlights, with their notes. Each is added once.
   * The Daf tab (dafscreen.lua): today, the day's review with Keep and Less often, the
     nightstand, and opening a book from it. From the bar, Tools → Daf → Open Daf, or a
     gesture. Works offline from the last answer; taps are queued.

@@ -1,7 +1,7 @@
 /* The manga reader: #mread/<book>[/<page>], full screen over everything, the same in the browser,
    Daf for Mac and Daf for Android.
 
-   Taken from the readers Nathan uses:
+   Taken from the good manga readers:
    - Mihon / Kahon: the page under the finger (it follows a swipe and slides into place on a tap),
      tap zones with their layouts and inversion, the reading modes, the transition page between
      volumes, pinch and double-tap zoom, the quick buttons under the slider.
@@ -696,7 +696,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { save(false); autoStop(); }
   else navigator.wakeLock && navigator.wakeLock.request('screen').then(w => { if (RD) RD.wake = w; }, () => {});
 });
-// Reading time: a beat every 15 seconds while a page is in front of him and he's been active lately (auto counts).
+// Reading time: a beat every 15 seconds while a page is in front of you and you've been active lately (auto counts).
 setInterval(() => {
   if (!RD || document.hidden || (Date.now() - RD.lastActive > 120000 && !RD.auto)) return;
   api('/api/manga/beat', { method: 'POST', body: JSON.stringify({ book: RD.book.id, seconds: 15, at: Math.floor(Date.now() / 1000) }) }).catch(() => {});
@@ -709,7 +709,7 @@ C.views.mread = args => {
   if (!$('#main').innerHTML.trim()) $('#main').innerHTML = '<div class="top"><h1>Manga</h1></div>';
   M.open(id, page);
 };
-// Leaving the reader by the address (Back, a link): it closes, and saves where he was.
+// Leaving the reader by the address (Back, a link): it closes, and saves where you were.
 let lastView = null;
 window.addEventListener('hashchange', () => {
   const v = (location.hash || '').slice(1).split('/')[0];

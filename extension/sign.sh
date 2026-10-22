@@ -1,5 +1,5 @@
 #!/bin/sh
-# Has Mozilla sign the Firefox/Zen build ("unlisted": signed for Nathan, never listed on
+# Has Mozilla sign the Firefox/Zen build ("unlisted": signed for self-distribution, never listed on
 # addons.mozilla.org), keeps it in signed/ (committed), and puts it where Daf's Preferences
 # download it from. build.sh starts dist/ over, so run this after any build.
 #

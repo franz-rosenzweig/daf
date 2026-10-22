@@ -23,7 +23,7 @@ import java.util.Map;
 
 /**
  * The hour on the home screen, where the feed apps are: a ring of the main goal
- * (Preferences → Goals; today's minutes unless he picks another) with its count in
+ * (Preferences → Goals; today's minutes unless you pick another) with its count in
  * it, the day of Year 30 or the goal's own name under it, and on the 4×2 the day's
  * highlight and its book (or "That's the hour." once it's done). Tap the ring for
  * Today, the highlight for Review.

@@ -21,7 +21,7 @@ enum SettingsWindow {
     }
 
     /// Makes this Mac's device token with the sign-in in the Daf window, and keeps it.
-    /// Nil when it worked, otherwise what to tell Nathan.
+    /// Nil when it worked, otherwise what to tell the user.
     static func connect() async -> String? {
         guard let c = DafWindowController.all.first(where: { $0.start == nil }) else {
             DafWindowController.open()

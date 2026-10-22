@@ -24,7 +24,7 @@ G.atWord = goalMin => +goalMin === 60 ? 'at the hour' : 'at your goal';
 G.metWord = (g) => g.kind === 'minutes' && g.period === 'day' && g.target === 60 ? 'That’s the hour.' :
   g.period === 'day' ? 'That’s today’s goal.' : g.period === 'week' ? 'That’s this week’s goal.' : g.period === 'month' ? 'That’s this month’s goal.' : 'Goal met.';
 
-/* ---------- the preview: what a target means at his pace ---------- */
+/* ---------- the preview: what a target means at your pace --------- */
 function perDay(kind, period, t){ return period === 'day' ? t : period === 'week' ? t / 7 : period === 'month' ? t / 30 : t; }
 function preview(g, p){
   const t = g.target, mpb = p.minutes_per_book || 540;

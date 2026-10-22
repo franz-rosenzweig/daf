@@ -31,7 +31,7 @@ const FONTS = {
   sans: "'Figtree', system-ui, -apple-system, sans-serif",
   book: null,
 };
-// Every typeface Daf has (themes.js), his own too; the book's pages load Daf's copies of them.
+// Every typeface Daf has (themes.js), your own too; the book's pages load Daf's copies of them.
 const fontFor = id => id === 'book' ? null : C.Themes ? C.Themes.stack(id) : FONTS[id] || FONTS.serif;
 const fontCSS = () => "@import url('" + location.origin + "/fonts/fonts.css');\n" + (C.Themes ? C.Themes.userFontCSS(true) : '');
 function bookCSS(){
@@ -490,7 +490,7 @@ function onRelocate(e){
     (l.pageItem && l.pageItem.label ? '<span class="mute bpage" title="The printed book’s page"> · p. ' + esc(l.pageItem.label) + '</span>' : '') +
     '<button class="bpct" data-bk="jump" title="Go to a percent">' + pct + '%</button>';
   if (B.d && (l.fraction || 0) > 0.985 && !B.offeredEnd && !B.d.private && C.HC) {
-    // The end: offer to mark it read on Hardcover, if it's on his shelves and not Read yet.
+    // The end: offer to mark it read on Hardcover, if it's on your shelves and not Read yet.
     B.offeredEnd = true; const id = B.d.id, title = B.d.title;
     api('/api/hardcover/book/' + encodeURIComponent(id)).then(s => {
       if (!s.on_shelf || s.status_id === 3 || B.id !== id) return;

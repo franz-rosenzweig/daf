@@ -43,7 +43,7 @@ const store = { get(k, d){ try { const v = localStorage.getItem('daf.' + k); ret
 function applyType(){
   const r = document.documentElement, t = store.get('type', {});
   r.dataset.font = t.font === 'book' ? 'serif' : (t.font || 'serif');
-  if (C.Themes) r.style.setProperty('--read', C.Themes.stack(r.dataset.font));      // any of the typefaces, his own too
+  if (C.Themes) r.style.setProperty('--read', C.Themes.stack(r.dataset.font));      // any of the typefaces, your own too
   r.style.setProperty('--read-size', (t.size || 20) + 'px');
   r.style.setProperty('--measure', (t.measure || 38) + 'rem');
   r.style.setProperty('--read-lh', String(t.spacing || 1.6));
@@ -853,7 +853,7 @@ function drawReaderTop(){
     '<button class="ib aa" data-ract="aa" aria-label="Typography and theme">Aa</button>' +
     (d.kind === 'torah' ? '<button class="btn sm tlcycle" data-tlcycle aria-label="Language: tap to switch">' + TLNAME[store.get('torahLang', 'both')] + '</button>' : '') +
     (d.kind === 'torah' ? '<div class="seg sm tlang" role="radiogroup" aria-label="Language">' + [['both', 'Both'], ['he', 'עברית'], ['en', 'English']].map(x => '<button type="button" role="radio" data-tlang="' + x[0] + '" class="' + ((store.get('torahLang', 'both') === x[0]) ? 'on' : '') + '" aria-checked="' + (store.get('torahLang', 'both') === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' : '') +
-    '<span class="spacer"></span>' +     // whether it counts toward the hour shows on Today and in Stats, not over the text (Nathan, 2026-10-11)
+    '<span class="spacer"></span>' +     // whether it counts toward the hour shows on Today and in Stats, not over the text (decided 2026-10-11)
     (d.blocks.length && d.kind !== 'video' ? '<button class="btn sm' + (R.tts.on && R.tts.doc === d.id && R.tts.playing ? ' on' : '') + '" data-ract="listen">' + ICON.listen + (R.tts.on && R.tts.doc === d.id && R.tts.playing ? 'Pause' : 'Listen') + '</button>' : '') +
     (!feed ? '<button class="ib' + (d.starred ? ' on' : '') + '" data-dact="star" data-id="' + esc(d.id) + '" title="' + (d.starred ? 'Off the Shortlist' : 'Shortlist') + K.tip('article', 'star') + '" aria-label="Shortlist">' + ICON.star(!!d.starred) + '</button>' : '') +
     (feed ? '<button class="btn sm" data-dact="save" data-id="' + esc(d.id) + '">' + ICON.save + 'Save to Library</button>' : '<button class="ib' + (d.status === 'later' ? ' on' : '') + '" data-dact="later" data-id="' + esc(d.id) + '" title="Later' + K.tip('article', 'later') + '" aria-label="Later">' + ICON.later + '</button>') +

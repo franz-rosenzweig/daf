@@ -62,7 +62,7 @@ function visible(el){
   for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e); if (s.visibility === 'hidden' || s.display === 'none' || +s.opacity === 0) return false; }
   return true;
 }
-// Something else has his attention: a menu, a dialog, the search, words selected or a box being typed in.
+// Something else has your attention: a menu, a dialog, the search, words selected or a box being typed in.
 function busy(){
   const ae = document.activeElement;
   return document.hidden || !$('#modal').hidden || !$('#pop').hidden || !$('#selbar').hidden || !$('#palette').hidden || !$('#scrim').hidden ||

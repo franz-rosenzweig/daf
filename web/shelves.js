@@ -1,4 +1,4 @@
-/* Shelves: Nathan's own groups of books (Mussar, Hebrew, a reading project), like BookOrbit's
+/* Shelves: your own groups of books (a subject, a language, a reading project), like BookOrbit's
    collections. On Books, a row of shelves; #shelf/<id> lists one; a book's page toggles which
    shelves it's on. They live in Daf (tables shelves, shelf_books). */
 (() => {
