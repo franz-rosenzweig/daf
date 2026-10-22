@@ -27,7 +27,7 @@ The small drawing turns the crown into one soft, five-lobed silhouette in a sing
 - **The small crown:** it's generic. It reads as "a tree", not as a beech.
 - **The blue accent:** the lit edge lightens the top of the blue end slightly toward teal.
 - **The lower book:** spine-on and spine-deep, it's the heaviest shape in the icon and could pass for a plain wooden plank.
-- **Next to Moshe:** the icon is still quieter than the camel, because it's parchment on white beside his saturated yellow tile.
+- **Next to Moshe:** the icon is still quieter than the camel, because it's parchment on white beside Moshe's saturated yellow tile.
 - **The cliché:** a tree on a stack of books remains a known library motif. The crafted leaves and the dog-ear make it Daf's own, but they don't make it unique.
 
 ## Regenerating

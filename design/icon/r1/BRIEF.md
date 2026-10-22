@@ -5,15 +5,15 @@
 1. **The one idea:** show up for the page every day. An hour of reading a day, and what you
    read comes back to you. Daf is the Hebrew word for a leaf of a book, as in *daf yomi*,
    a page of Talmud a day.
-2. **Audience:** one reader, Nathan. He'll see it every day in his Mac's Dock beside Moshe
-   (the camel) and Dvarim, and on his phone's first screen beside Instagram and Reddit.
+2. **Audience:** one reader, every day: in the Mac's Dock beside Moshe (the camel) and
+   Dvarim, and on the phone's first screen beside Instagram and Reddit.
 3. **Feeling:** calm, old paper, quietly made. Natural rather than glossy; a reading room,
    not a gadget.
 4. **Constraints:** a white tile, a parchment-coloured motif, and no green.
    - Flat or nearly flat. Moshe's camel is the bar: one white silhouette on a coloured tile,
      with a lighter tint for the far legs and a single dot for the eye.
    - No letters or words, Hebrew included.
-   - **No spirals or swirls.** He has asked twice.
+   - **No spirals or swirls.**
    - No generic open book, no glasses, no bookmark glyph.
 5. **Sizes:** macOS 16 to 1024. Android 48 to 512, plus a maskable version. Web favicon 16
    and 32, and apple-touch 180.
@@ -52,7 +52,7 @@ Taken from Daf's own sepia theme (`web/style.css`) and from parchment.
    - **Risk:** it turns to noise at 16 px.
 3. **The curl:** one sheet whose top curls back and whose bottom curls forward, as a single
    flat silhouette.
-   - The idea: Nathan's first idea for the icon.
+   - The idea: the first idea for the icon.
    - **Risk:** it reads as a ribbon, a wave, or a diploma.
 4. **The ribbon:** a silk marker ribbon lying across a page edge.
    - The idea: where you stopped yesterday, and where you begin today.
