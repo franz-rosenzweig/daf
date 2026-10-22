@@ -1,0 +1,92 @@
+{
+  "_about": "Only for the docs screenshots (tools/build_taste.py OUT --docs), never deployed: a made-up Feed (invented sites, folders and posts, written for this file), a made-up Torah shelf for one week, and a made-up Hardcover status, so those pages draw with sample data. Every name here is invented.",
+  "feed": [
+    { "id": "fr:demo-1", "folder": "Writing", "feed": "feed/lamplight", "source": "Lamplight Letters", "author": "June Arden", "days": 0, "hour": 9,
+      "title": "Writing in the margins again",
+      "paragraphs": [
+        "For years I kept my books clean. A pencil line felt like vandalism, so I copied passages into a notebook instead, and the notebook went missing every few months.",
+        "This spring I gave up and started writing in the margins. A tick for a line I liked, a question mark where the author lost me, a word or two when something reminded me of something else. The books look lived in now, and when I open one again the old conversation is still there.",
+        "The surprise was how much slower it made me read, in a good way. You can't argue with a page you're skimming."
+      ] },
+    { "id": "fr:demo-2", "folder": "Writing", "feed": "feed/apageaday", "source": "A Page a Day", "author": "Tomas Reyes", "days": 1, "hour": 18,
+      "title": "The first sentence can wait",
+      "paragraphs": [
+        "Every draft I've abandoned died on its first sentence. I'd polish it for an hour, decide it was wrong, and close the file.",
+        "So now I start in the middle. I write the part I already know, the scene or the argument that made me want to write the thing at all, and the beginning shows up later, once I know what it's the beginning of.",
+        "It feels like cheating. It also works."
+      ] },
+    { "id": "fr:demo-3", "folder": "Writing", "feed": "feed/lamplight", "source": "Lamplight Letters", "author": "June Arden", "days": 2, "hour": 8,
+      "title": "On keeping a commonplace book",
+      "paragraphs": [
+        "A commonplace book is just a notebook of things worth keeping: lines from books, overheard sentences, the occasional recipe. People kept them for centuries before anyone called it a system.",
+        "Mine has one rule. Whatever goes in has to be copied by hand, which means I only copy what I'll want to read again. The rest can stay in the book it came from.",
+        "Reading back through it a year later is the closest thing I have to a diary of what I was thinking about."
+      ] },
+    { "id": "fr:demo-4", "folder": "Writing", "feed": "feed/apageaday", "source": "A Page a Day", "author": "Tomas Reyes", "days": 3, "hour": 7,
+      "title": "Twenty minutes before the news",
+      "paragraphs": [
+        "I moved my reading to the first twenty minutes of the day, before I look at anything with a headline. Same book, same chair, coffee optional.",
+        "Three weeks in, I've read more than in the previous three months, and the day starts with someone else's careful thinking instead of everyone's hurried thinking. I'd recommend it to anyone who keeps saying they have no time to read."
+      ] },
+    { "id": "fr:demo-5", "folder": "Writing", "feed": "feed/lamplight", "source": "Lamplight Letters", "author": "June Arden", "days": 5, "hour": 20,
+      "title": "Short words, long thoughts",
+      "paragraphs": [
+        "A friend who edits for a living told me her whole job is crossing out words that are trying too hard. Utilize becomes use. In order to becomes to. Most sentences get shorter and say more.",
+        "I tried it on a page of my own and lost a third of it. Nothing I cared about went with it."
+      ] },
+    { "id": "fr:demo-6", "folder": "Ideas", "feed": "feed/slowreader", "source": "The Slow Reader", "author": "Mira Okafor", "days": 0, "hour": 12,
+      "title": "Why I reread",
+      "paragraphs": [
+        "The first time through a good book I'm mostly finding out what happens. The second time I get to see how it was done: the line on page ten that only makes sense on page two hundred, the character who was telling the truth all along.",
+        "Rereading used to feel like a waste of time with so many books still unread. Now it feels like the part where I actually read the book."
+      ] },
+    { "id": "fr:demo-7", "folder": "Ideas", "feed": "feed/commonplace", "source": "The Commonplace", "author": "Ben Hollis", "days": 1, "hour": 21,
+      "title": "An hour is shorter than it sounds",
+      "paragraphs": [
+        "An hour of reading a day sounds like a lot until you add up where the hours already go. Twenty minutes on the bus, a chapter at lunch, half an hour before bed, and it's done without giving anything up.",
+        "The trick is counting it. Once the minutes are written down somewhere, the scattered ones start to look like what they are: an hour, most days."
+      ] },
+    { "id": "fr:demo-8", "folder": "Ideas", "feed": "feed/slowreader", "source": "The Slow Reader", "author": "Mira Okafor", "days": 4, "hour": 10,
+      "title": "Highlights you never read again",
+      "paragraphs": [
+        "I have years of highlights in an app somewhere, and I've looked at maybe a dozen of them since. A highlight nobody rereads is just a colored line.",
+        "What changed it for me was seeing a few of them again every morning, chosen for me, with the ones I liked coming back now and then. Some of them I don't remember highlighting at all, which is exactly the point."
+      ] },
+    { "id": "fr:demo-9", "folder": "Nature", "feed": "feed/allotment", "source": "Notes from the Allotment", "author": "Rosa Lindqvist", "days": 0, "hour": 16,
+      "title": "The last tomatoes",
+      "paragraphs": [
+        "The frost came early this year, so the last of the tomatoes are ripening on the kitchen windowsill in a row, green to red, like a slow traffic light.",
+        "Next door's plot is already dug over for winter. Mine is not. I'm telling myself the beans are still thinking about it."
+      ] },
+    { "id": "fr:demo-10", "folder": "Nature", "feed": "feed/fieldmargin", "source": "Field & Margin", "author": "Owen Price", "days": 2, "hour": 14,
+      "title": "A walk with a field guide",
+      "paragraphs": [
+        "I took a pocket field guide on my usual walk and didn't get more than half a mile. Every hedge turned out to have five things in it I'd never looked at.",
+        "Naming things doesn't make them more beautiful, but it does make you stop, and stopping is most of it."
+      ] },
+    { "id": "fr:demo-11", "folder": "Nature", "feed": "feed/allotment", "source": "Notes from the Allotment", "author": "Rosa Lindqvist", "days": 6, "hour": 9,
+      "title": "Seed catalogues as bedtime reading",
+      "paragraphs": [
+        "Nothing makes me more hopeful in October than a seed catalogue. Every page is a promise about next summer that next summer will mostly break.",
+        "I read them the way other people read travel writing: for places I may never get to."
+      ] }
+  ],
+  "torah": {
+    "parasha": { "name": "Noach", "he": "נח" },
+    "week": [
+      { "id": "torah:demo-noach", "author": "Parasha", "title": "Parashat Noach", "summary": "Genesis 6:9–11:32 · seven aliyot", "words": 6900, "progress": 34, "highlights": 2 },
+      { "id": "torah:demo-noach-haftarah", "author": "Haftarah", "title": "Haftarah for Noach", "summary": "Isaiah 54:1–55:5", "words": 900, "progress": 0, "highlights": 0 }
+    ],
+    "ruach": [
+      { "id": "fr:demo-t1", "title": "Building something that floats", "source": "A Weekly Thought (sample)", "this_parasha": true, "days": 1 },
+      { "id": "fr:demo-t2", "title": "The rainbow as a promise, not a reward", "source": "Parsha in Five Minutes (sample)", "this_parasha": true, "days": 2 },
+      { "id": "fr:demo-t3", "title": "Babel and the problem of one language", "source": "Notes on the Weekly Portion (sample)", "this_parasha": true, "days": 3 },
+      { "id": "fr:demo-t4", "title": "Starting over after the flood", "source": "A Weekly Thought (sample)", "this_parasha": true, "days": 5 }
+    ],
+    "earlier": [
+      { "id": "torah:demo-bereshit", "title": "Parashat Bereshit", "summary": "Genesis 1:1–6:8", "highlights": 3 },
+      { "id": "torah:demo-bereshit-haftarah", "title": "Haftarah for Bereshit", "summary": "Isaiah 42:5–43:10", "highlights": 0 }
+    ]
+  },
+  "hardcover": { "cal:1": { "status_id": 2, "progress_pages": 96, "pages": 228 }, "cal:3": { "status_id": 2, "progress_pages": 247, "pages": 392 } }
+}

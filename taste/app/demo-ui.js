@@ -1,33 +1,9 @@
-/* Daf's taste: what the page says about being a demo, and the places it leaves out. It runs after
-   the app's own scripts (tools/build_taste.py puts it there); demo.js answers the app's calls. */
+/* Daf's taste: About this demo, Reset, and downloads made here. It runs after the app's own scripts
+   (tools/build_taste.py puts it there); demo.js answers the app's calls and leaves out the places
+   that need the server, from the app's first drawing on. */
 (function(){
 'use strict';
-const C = window.DafCore, $ = s => document.querySelector(s), esc = C.esc;
-
-// The sidebar without the places that only work with the server behind them. Recovery isn't in the
-// demo at all; the Feed, Manga, Torah and Podcasts read services on my server.
-const GONE = /<button[^>]*data-go="(?:manga|torah|recovery|podcasts|library\/(?:video|tweet|pdf|email))"[^>]*>[\s\S]*?<\/button>/g;
-const INFO = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="6.3" r="1.1" fill="currentColor"/></svg>';
-const nav = C.navExtra;
-C.navExtra = (v, n) => nav(v, n).replace(GONE, '').replace(/<div class="navh"><span>Feed<\/span>[\s\S]*$/, '') +
-  '<div class="nav demonav"><button class="nv" data-demo="about">' + INFO + '<span>About this demo</span></button></div>';
-
-// Reached some other way (a key, the search, an old link): a word on why it isn't here.
-function away(title, text){
-  return () => {
-    $('#main').innerHTML = '<div class="top"><h1>' + esc(title) + '</h1></div><div class="page"><section class="card demoaway"><h2>Not in the demo</h2>' +
-      '<p>' + text + '</p><div class="demoacts"><a class="btn primary" href="#today">Back to Today</a><button class="btn" data-demo="about">About this demo</button></div></section></div>';
-  };
-}
-Object.assign(C.views, {
-  feed: away('Feed', 'The Feed is my RSS reader, FreshRSS, running on my server. Daf reads it from there, so there’s nothing here to read it from.'),
-  torah: away('Torah', 'The Torah shelf brings in the week’s parasha from Sefaria through my server, so it can’t open here.'),
-  manga: away('Manga', 'Manga come from Komga, a comics server on my machine, so there aren’t any in this demo.'),
-  mread: away('Manga', 'Manga come from Komga, a comics server on my machine, so there aren’t any in this demo.'),
-  podcasts: away('Podcasts', 'Podcasts arrive when AntennaPod syncs with my server, so there aren’t any here.'),
-  paper: away('Paper pages', 'A photo of a marked-up paper page goes to Claude on my server, which reads out the lines I marked. That can’t happen in a browser.'),
-  pdf: away('PDF', 'There are no PDFs in this demo.'),
-});
+const C = window.DafCore, $ = s => document.querySelector(s);
 
 // About this demo: what it is, and how to start over.
 function about(){

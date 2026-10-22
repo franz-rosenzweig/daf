@@ -45,6 +45,9 @@ const LABELS = { kindle: 'Kindle', ebook: 'Books in Daf', manga: 'Manga in Daf',
 const SOURCES = ['kindle', 'ebook', 'manga', 'audio', 'article', 'paper', 'podcast', 'video'];
 const COLORS = ['yellow', 'green', 'blue', 'pink', 'purple'];
 const BOOK_BY_ID = Object.fromEntries(SEED.books.map(b => [b.id, b]));
+const TEXTS = SEED.articles.concat(SEED.feed || []);                 // the Feed only in the docs screenshots' build
+const BLOCKS = Object.fromEntries(TEXTS.map(a => [a.id, a.blocks]));
+if (SEED.docs) document.documentElement.classList.add('demo-docs');
 
 /* ---------- the store: made once from the seed, then kept in this browser ---------- */
 let db = load();
@@ -89,6 +92,11 @@ function fresh(){
         color: h.color === 'yellow' ? null : h.color, deleted: false };
       if (h.tags || h.fav || h.user_note) d.rs[id] = { status: 'noted', interval: 0, due: null, reviews: 0, last: null, user_note: h.user_note || null, tags: h.tags || null, fav: h.fav ? 1 : null };
     });
+  }
+  for (const f of SEED.feed || []) {
+    d.docs[f.id] = { id: f.id, kind: 'article', where_: 'feed', status: 'unseen', title: f.title, author: f.author, source: f.source, category: f.folder,
+      url: null, published: back(f.days || 0, f.hour || 9, 0), added: back(f.days || 0, f.hour || 9, 5), words: f.words, summary: f.summary, thumb: null, progress: 0,
+      note: null, opened: null, tags: [], starred: 0, ai_summary: null, duration: null, feed: f.feed, full: 1 };
   }
   // The last three days' reviews were done: a streak to keep going.
   const ids = Object.keys(d.hls).filter(id => d.hls[id].text.length >= 30);
@@ -510,9 +518,9 @@ const MINS = d => d.duration ? d.duration / 60 : (d.words || 0) / 238;
 const docMins = d => d.duration ? Math.round(d.duration / 60) : d.words ? Math.max(1, Math.round(d.words / 238)) : null;
 function listDocs(q){
   const where = q.get('where') || 'feed', tab = q.get('tab') || (where === 'feed' ? 'unseen' : 'inbox'), kind = q.get('kind'), sort = q.get('sort') || 'new';
-  if (where === 'feed') return [];
   let xs = Object.values(db.docs).filter(d => d.where_ === where && d.status !== 'deleted');
-  if (kind === 'starred') xs = xs.filter(d => d.starred && d.status !== 'archive');
+  if (where === 'feed') { xs = xs.filter(d => d.status === (tab === 'seen' ? 'seen' : 'unseen')); if (q.get('cat')) xs = xs.filter(d => d.category === q.get('cat')); if (q.get('feed')) xs = xs.filter(d => d.feed === q.get('feed')); }
+  else if (kind === 'starred') xs = xs.filter(d => d.starred && d.status !== 'archive');
   else { xs = xs.filter(d => d.status === tab); if (kind) xs = xs.filter(d => d.kind === kind); }
   const src = q.get('source'), author = q.get('author'), minlen = +q.get('minlen') || 0, maxlen = +q.get('maxlen') || 0, since = +q.get('since') || 0;
   if (src) xs = xs.filter(d => d.source === src);
@@ -530,14 +538,14 @@ function listDocs(q){
 function docPublic(d){ return Object.assign({}, d, { tags: JSON.stringify(d.tags || []) }); }
 function counts(){
   const lib = {}; Object.values(db.docs).filter(d => d.where_ === 'library' && d.status === 'inbox').forEach(d => { lib[d.kind] = (lib[d.kind] || 0) + 1; });
-  return { feed: {}, feed_total: 0, freshrss_unread: null, expired_in_daf: 0, library: lib, emails_on: false,
+  const feed = {}; Object.values(db.docs).filter(d => d.where_ === 'feed' && d.status === 'unseen').forEach(d => { feed[d.category || ''] = (feed[d.category || ''] || 0) + 1; });
+  return { feed, feed_total: Object.values(feed).reduce((a, b) => a + b, 0), freshrss_unread: null, expired_in_daf: 0, library: lib, emails_on: false,
     starred: Object.values(db.docs).filter(d => d.where_ === 'library' && d.starred && !['archive', 'deleted'].includes(d.status)).length };
 }
 function getDoc(id){
   const d = db.docs[id]; if (!d) throw err(404, 'Not found');
-  const a = SEED.articles.find(x => x.id === id);
   if (!d.opened) { d.opened = nowSec(); save(); }
-  return Object.assign(docPublic(d), { blocks: a ? a.blocks : [], has_pdf: false, mins: docMins(d), counted: !!db.settings.count.article,
+  return Object.assign(docPublic(d), { blocks: BLOCKS[id] || [], has_pdf: false, mins: docMins(d), counted: !!db.settings.count.article,
     highlights: liveHls().filter(h => h.book_id === id).sort((x, y) => x.created - y.created).map(h => ({ id: h.id, text: h.text, pos: h.pos, created: h.created, color: h.color, source: h.source,
       user_note: (db.rs[h.id] || {}).user_note || null })), asks: [], vault_path: null, kindle_sent: null,
     questions: ['Summarize this', 'What’s the main argument?', 'What should I remember from this?'] });
@@ -556,7 +564,7 @@ function home(){
   const recent = {}; liveHls().filter(h => h.created > now - 21 * 86400).forEach(h => { const r = recent[h.book_id] || (recent[h.book_id] = { at: 0, n: 0 }); r.at = Math.max(r.at, h.created); r.n++; });
   out.highlighted = Object.entries(recent).sort((a, b) => b[1].at - a[1].at).map(([id, r]) => { const d = db.docs[id], b = db.books[id];
     const c = d ? card(d) : b ? bcard(b) : null; if (c) c.highlights = r.n; return c; }).filter(Boolean);
-  out.feed = [];
+  out.feed = Object.values(db.docs).filter(d => d.where_ === 'feed' && d.status === 'unseen').sort((a, b) => b.added - a.added).slice(0, 12).map(card);
   return out;
 }
 
@@ -638,7 +646,7 @@ function search(q){
   const highlights = liveHls().filter(h => h.text.toLowerCase().includes(ql) || String((db.rs[h.id] || {}).user_note || '').toLowerCase().includes(ql)).slice(0, 10)
     .map(h => ({ id: h.id, text: h.text, book_id: h.book_id, title: (db.books[h.book_id] || db.docs[h.book_id] || {}).title }));
   const have = new Set(docs.map(d => d.id)), text = [];
-  for (const a of SEED.articles) {
+  for (const a of TEXTS) {
     const d = db.docs[a.id]; if (!d || d.status === 'deleted' || have.has(a.id)) continue;
     for (const b of a.blocks) {
       const i = b.x.toLowerCase().indexOf(ql); if (i < 0) continue;
@@ -921,8 +929,28 @@ on('GET', '/api/podcasts', () => ({ subs: [], clips: [], recent: [], last_sync: 
 on('GET', '/api/voices', () => ({ voices: [] }));
 on('GET', '/api/newsletters', () => ({ configured: false, senders: [], chosen: [] }));
 on('GET', '/api/imports', () => ({ imports: [] }));
-on('GET', '/api/feed/folders', () => ({ folders: [] }));
-on('GET', '/api/feed/sources', () => ({ folders: [], total: 0, stale: [] }));
+on('GET', '/api/feed/folders', () => ({ folders: [...new Set((SEED.feed || []).map(f => f.folder))].sort() }));
+on('GET', '/api/feed/sources', () => {
+  const folders = {};
+  for (const f of SEED.feed || []) {
+    const fo = folders[f.folder] || (folders[f.folder] = { name: f.folder, count: 0, feeds: [] });
+    let x = fo.feeds.find(y => y.id === f.feed); if (!x) fo.feeds.push(x = { id: f.feed, title: f.source, folder: f.folder, url: '', site: '', icon: '', count: 0, full: true, notify: false });
+    if (db.docs[f.id] && db.docs[f.id].status === 'unseen') { x.count++; fo.count++; }
+  }
+  const out = Object.values(folders).sort((a, b) => a.name < b.name ? -1 : 1); out.forEach(f => f.feeds.sort((a, b) => a.title < b.title ? -1 : 1));
+  return { folders: out, total: out.reduce((a, f) => a + f.count, 0), stale: false };
+});
+// The Torah shelf and a Hardcover status: only in the docs screenshots' build, from made-up data.
+on('GET', '/api/torah', () => {
+  if (!SEED.torah) throw err(404, NOT_HERE);
+  const t = clone(SEED.torah), now = nowSec();
+  t.ruach.forEach(r => { r.added = now - (r.days || 0) * 86400 - 3600; r.status = 'unseen'; });
+  return Object.assign({ essays: [] }, t);
+});
+on('GET', '/api/hardcover/book/:id', p => {
+  const h = SEED.hardcover && SEED.hardcover[p[0]]; if (!h) throw err(404, NOT_HERE);
+  return Object.assign({ linked: true, on_shelf: true, url: null, rating: null, finished_at: null, private: false }, h);
+});
 on('POST', '/api/feedback', () => { throw err(503, 'Feedback goes to Daf’s own server, so it can’t be sent from this demo. An issue on GitHub reaches me too.'); });
 
 async function route(method, path, q, body){
@@ -953,7 +981,45 @@ window.fetch = function(input, init){
   return answer(url, init, req);
 };
 window.DafTaste.answer = (href, init) => answer(new URL(href, location.href), init || {}, null);
+window.DafTaste.docs = !!SEED.docs;
 window.DafTaste.db = () => db;
+
+// The places that need the server, left out from the app's first drawing on: the sidebar is
+// filtered and those pages say why they aren't here as soon as app.js makes DafCore and reader.js
+// adds its part of the sidebar (a page can draw before the later scripts have run). Recovery isn't
+// in the demo at all, nor in the docs' screenshots; the Feed, Manga, Torah and Podcasts read
+// services on the server. The docs build (--docs) keeps the rest of the sidebar and has no demo notes.
+const GONE = /<button[^>]*data-go="(?:manga|torah|recovery|podcasts|library\/(?:video|tweet|pdf|email))"[^>]*>[\s\S]*?<\/button>/g;
+const RECOVERY = /<button[^>]*data-go="recovery"[^>]*>[\s\S]*?<\/button>/g;
+const INFO = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="6.3" r="1.1" fill="currentColor"/></svg>';
+const navFilter = SEED.docs ? h => h.replace(RECOVERY, '') : h => h.replace(GONE, '').replace(/<div class="navh"><span>Feed<\/span>[\s\S]*$/, '') +
+  '<div class="nav demonav"><button class="nv" data-demo="about">' + INFO + '<span>About this demo</span></button></div>';
+const escHTML = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function away(title, text){
+  return () => {
+    document.getElementById('main').innerHTML = '<div class="top"><h1>' + escHTML(title) + '</h1></div><div class="page"><section class="card demoaway"><h2>Not in the demo</h2>' +
+      '<p>' + text + '</p><div class="demoacts"><a class="btn primary" href="#today">Back to Today</a><button class="btn" data-demo="about">About this demo</button></div></section></div>';
+  };
+}
+const AWAY = {
+  feed: away('Feed', 'The Feed is my RSS reader, FreshRSS, running on my server. Daf reads it from there, so there’s nothing here to read it from.'),
+  torah: away('Torah', 'The Torah shelf brings in the week’s parasha from Sefaria through my server, so it can’t open here.'),
+  manga: away('Manga', 'Manga come from Komga, a comics server on my machine, so there aren’t any in this demo.'),
+  mread: away('Manga', 'Manga come from Komga, a comics server on my machine, so there aren’t any in this demo.'),
+  podcasts: away('Podcasts', 'Podcasts arrive when AntennaPod syncs with my server, so there aren’t any here.'),
+  paper: away('Paper pages', 'A photo of a marked-up paper page goes to Claude on my server, which reads out the lines I marked. That can’t happen in a browser.'),
+  pdf: away('PDF', 'There are no PDFs in this demo.'),
+};
+const RECOVERY_VIEW = () => { location.replace('#today'); };
+let core;
+Object.defineProperty(window, 'DafCore', { configurable: true, get(){ return core; }, set(v){
+  core = v;
+  if (!v || typeof v !== 'object') return;
+  let extra = v.navExtra;
+  Object.defineProperty(v, 'navExtra', { configurable: true, enumerable: true, get(){ return extra && ((x, n) => navFilter(extra(x, n))); }, set(f){ extra = f; } });
+  const views = v.views || (v.views = {}), fixed = Object.assign(SEED.docs ? {} : AWAY, { recovery: RECOVERY_VIEW });
+  for (const [k, f] of Object.entries(fixed)) Object.defineProperty(views, k, { configurable: true, enumerable: true, get(){ return f; }, set(){} });
+} });
 
 // No service worker and no Cache Storage in the taste: everything above answers at once, and this
 // page shares its address with the other stuffs, which mustn't keep Daf's lists.

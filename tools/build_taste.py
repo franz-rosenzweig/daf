@@ -2,6 +2,7 @@
 """Build Daf's taste: a public, static page where anyone can try Daf on sample data.
 
     python3 tools/build_taste.py OUT_DIR
+    python3 tools/build_taste.py OUT_DIR --docs    # only for the docs' screenshots (tools/docs_shots.py)
 
 OUT_DIR gets the page from taste/ (index.html, taste.css, taste.js, shots/) and, in OUT_DIR/app/,
 a copy of the real web app (web/) that runs with no server: taste/app/demo.js answers its api/
@@ -20,6 +21,10 @@ The sample library is taste/data: four public-domain books from Project Gutenber
 made them, three public-domain essays, covers made for the demo, and made-up highlights. Every
 highlight is checked against its book or essay here, so the build stops if one can't be found.
 Standard library only; it reads the EPUBs as zip files and never runs anything in them.
+
+--docs makes a build for the screenshots in docs/images and nothing else: it adds taste/data/docs.json
+(a made-up Feed, Torah shelf and Hardcover status), keeps the whole sidebar but Recovery, and leaves
+out the demo's own notes. It is never deployed: the build refuses to write it under stuffs.
 """
 import html
 import json
@@ -95,7 +100,7 @@ def place_article_highlight(blocks, h, title):
     fail(f"{title}: can't find “{h['text'][:60]}”")
 
 
-def seed():
+def seed(docs=False):
     books = json.loads((DATA / "books.json").read_text())
     arts = {a["id"]: a for a in json.loads((DATA / "articles.json").read_text())}
     out = {"books": [], "articles": []}
@@ -115,6 +120,15 @@ def seed():
         summary = first if len(first) <= 220 else first[:220].rsplit(" ", 1)[0] + "…"
         hs = [h | {"pos": place_article_highlight(a["blocks"], h, a["title"])} for h in st.get("highlights", [])]
         out["articles"].append(a | {"summary": summary, "state": st | {"highlights": hs}})
+    if docs:
+        d = json.loads((DATA / "docs.json").read_text())
+        out["docs"] = True
+        out["feed"] = []
+        for f in d["feed"]:
+            blocks = [{"t": "p", "x": t, "h": html.escape(t, quote=False)} for t in f["paragraphs"]]
+            out["feed"].append({k: v for k, v in f.items() if k != "paragraphs"} | {"blocks": blocks, "summary": f["paragraphs"][0],
+                                "words": sum(len(t.split()) for t in f["paragraphs"])})
+        out["torah"], out["hardcover"] = d["torah"], d["hardcover"]
     m = re.search(r"const NEWS = \[\s*\{\s*id:\s*'([^']+)'", (WEB / "tips.js").read_text())
     out["news"] = m.group(1) if m else ""
     return out
@@ -195,16 +209,20 @@ def copy_app(app):
 
 
 def main():
-    if len(sys.argv) != 2:
+    args = [a for a in sys.argv[1:] if a != "--docs"]
+    docs = "--docs" in sys.argv[1:]
+    if len(args) != 1:
         sys.exit(__doc__)
-    out = Path(sys.argv[1]).resolve()
+    out = Path(args[0]).resolve()
+    if docs and "stuffs" in out.parts:
+        fail("a --docs build is only for the screenshots; it never goes on stuffs")
     if out.exists() and any(out.iterdir()):
         if not (out / MARK).exists():
             fail(f"{out} isn't empty and isn't a taste build (no {MARK}); not touching it")
         shutil.rmtree(out)
     out.mkdir(parents=True)
     (out / MARK).write_text("Built by daf/tools/build_taste.py; the whole folder is replaced on each build.\n")
-    s = seed()
+    s = seed(docs)
     app = out / "app"
     copy_app(app)
     for f in ("demo.js", "demo-ui.js", "demo.css"):

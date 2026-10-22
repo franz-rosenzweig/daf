@@ -1,11 +1,12 @@
-/* Daf's taste: the controls that need Daf's own server are hidden here (demo.js would only say so). */
-#side [data-go="feed"], #side [data-go="paper"], #side [data-go="sources"], #side [data-act="add"],
-[data-hb="define"], [data-hb="translate"], [data-hb="ask"],
-[data-ptab="ask"], [data-bpt="ask"], [data-summ],
-[data-ract="listen"], [data-bk="listen"],
+/* Daf's taste: the controls that need Daf's own server are hidden here (demo.js would only say so).
+   The build for the docs' screenshots (html.demo-docs) shows the ones that appear in them. */
+html:not(.demo-docs) #side [data-go="feed"], html:not(.demo-docs) #side [data-go="paper"], html:not(.demo-docs) #side [data-go="sources"],
+html:not(.demo-docs) [data-act="add"], html:not(.demo-docs) [data-ptab="ask"], html:not(.demo-docs) [data-bpt="ask"],
+html:not(.demo-docs) [data-ract="listen"], html:not(.demo-docs) [data-bk="listen"], html:not(.demo-docs) #hcsec,
+[data-hb="define"], [data-hb="translate"], [data-hb="ask"], [data-summ],
 #phonecard, #podcard, #hccard, #nlcard, #digestcard, #aicard, #importcard, #fbcard, #tagscard,
 .card:has(#acctf), .card:has(#tz), .prow:has(#ttsvoice), .prow:has(#ttsspeed), .prow:has(#expire),
-#hcwant, #hcsec, .vault, .bookhead > div > span.tiny.mute:last-child { display: none !important; }
+#hcwant, .vault, .bookhead > div > span.tiny.mute:last-child { display: none !important; }
 
 .demonav { margin-top: 8px; }
 .demonav .nv { color: var(--accent); }
