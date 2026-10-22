@@ -2,17 +2,15 @@
 
 *Written 2026-10-09.*
 
-**Status (2026-10-09 evening):** Phases 0–4 built and running; the Kindle plugin is installed and
-reporting. HTTPS (for installing the app and the share menu) waits on one sudo command. Phase 2's "done when" (seven mornings of review in a row) starts with the first
-05:32 message. Operating notes are in [docs/OPERATIONS.md](docs/OPERATIONS.md).
+**Status:** Phases 0–7 were built on 2026-10-09 and Phase 8 in part (each heading says what); what came
+after is in the operating notes, [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 
 ## What Daf is for
 
 One goal: **read at least an hour a day in Year 30** (2026-10-09 → 2027-10-08).
-Year 29 was 65 hours on 185 days; twelve days reached the hour.
 
-Daf is a personal Readwise. It gathers reading from the apps Nathan already uses, counts the
+Daf is a personal Readwise. It gathers reading from the apps already in use, counts the
 time, brings old highlights back each morning, and writes highlights and notes into the
 Obsidian vault. It reads articles, feeds and video transcripts itself. Books stay on the
 Kindle, audiobooks in Audiobookshelf, podcasts in AntennaPod.
@@ -25,7 +23,7 @@ Kindle, audiobooks in Audiobookshelf, podcasts in AntennaPod.
 | Counts toward the hour | Kindle books, audiobooks, articles read in Daf, paper books. **Not** podcasts. Videos off by default. |
 | Readers stay where they are | KOReader on the Kindle for books, Audiobookshelf for audiobooks, AntennaPod for podcasts. Daf reads articles, feeds and videos. |
 | Feed vs Library | Feed = FreshRSS (passes by). Library = what you keep: Karakeep for articles, videos, tweets and PDFs; Calibre for books. |
-| Ask | Stays. Claude on the subscription, answering from the document and Nathan's highlights. |
+| Ask | Stays. Claude on the subscription, answering from the document and your highlights. |
 | File over app | The vault holds every highlight, note and hand-logged minute. Daf's database is an index plus review state, rebuildable from the sources and the vault. |
 | Sources stay in charge | Daf never deletes anything in FreshRSS, Karakeep, Calibre, Audiobookshelf or the vault. |
 | Hardcover | `hardcover-sync.py` stays the only writer to Hardcover. Daf never touches `rating`, `status`, `read`, `consuming` or `progress`. |
@@ -48,13 +46,13 @@ Kindle, audiobooks in Audiobookshelf, podcasts in AntennaPod.
 | Ezer | `.claude/scripts/signal-bot.py` (cron, every minute; calls CLIs) | "read 40 paper", voice notes, the morning highlight. |
 | Kokoro | `kokoro-tts` on network `openreader_default`, port 8880 | Read-aloud. |
 | Desk | `/srv/docker/desk` collectors | A Reading card fed by `daf today --json`. |
-| Tasker on the S24 | Already reports app use to ActivityWatch | The evening "read instead?" nudge. |
+| Tasker on the phone | Already reports app use to ActivityWatch | The evening "read instead?" nudge. |
 | Deploy pattern | Dvarim and Moshe: compose service, `tools/autodeploy.sh`, worktree | Same setup for Daf. |
 
 ## Architecture
 
 ```
- Kindle (KOReader)          Phone (S24)                 Mac / desk browser
+ Kindle (KOReader)          Phone (Android)             Mac / desk browser
   daf.koplugin               PWA + widget + Tasker       PWA
   sleep screen patch              │                          │
         │ Tailscale               └──────────┬───────────────┘
@@ -103,8 +101,8 @@ notes by frontmatter `type:` and never by a fixed path.
 | Videos | `Reference/youtube/` | New notes in the Web Clipper format already used there, plus `## Highlights` with timestamps. |
 | Reading log | `Reference/reading/2026.md` (new) | One line per hand-logged session (paper, Shabbat). These minutes exist nowhere else, so they live in the vault. |
 
-Each highlight carries a block id (`^daf-7f3a`). When Nathan edits a note's text in Obsidian,
-the vault wins: Daf reads the region back before writing and keeps his text.
+Each highlight carries a block id (`^daf-7f3a`). When a note's text is edited in Obsidian,
+the vault wins: Daf reads the region back before writing and keeps that text.
 
 ## Phases
 
@@ -140,7 +138,7 @@ use for a week, and the next one starts after that.
 - One highlight index across KOReader, Karakeep and Audiobookshelf bookmarks.
 - Daily review: five highlights a day, spaced repetition (kept ones come back less often),
   Keep / Note / Less.
-- Morning message: Ezer sends the first highlight with the 05:30 reading, Sunday to Friday.
+- Morning message: Ezer sends the first highlight every morning.
   A reply becomes a note.
 - **Voice notes while reading:** a voice note to Ezer is transcribed and filed under the
   book open on the Kindle, at the current page.
@@ -148,18 +146,18 @@ use for a week, and the next one starts after that.
 - Nightstand: three books. Starting a fourth asks which one steps off.
 - **Done when:** the morning review has run seven days in a row.
 
-### Phase 3 — The phone (2 evenings) · BUILT 2026-10-09 (server side; widget brief in `android/NEXT.md`; HTTPS waits on `sudo tailscale set --operator=lander`)
-- PWA installed on the S24: Today, Review, Nightstand.
+### Phase 3 — The phone (2 evenings) · BUILT 2026-10-09 (server side; the widget brief, first in `android/NEXT.md`, is now `docs/NATIVE.md`)
+- PWA installed on the phone: Today, Review, Nightstand.
 - Tasker nudge: opening Instagram, Reddit, X or Discord after 21:00 shows one highlight and
   the minutes left today. It doesn't block anything. On by default, easy to turn off.
 - Android shell with a home-screen widget (today's ring, one highlight) and a share target
-  ("Save to Daf" goes to Karakeep). The Mac session builds it from `android/NEXT.md`, like
+  ("Save to Daf" goes to Karakeep), built natively from the brief (now `docs/NATIVE.md`), like
   Dvarim's.
 - **Done when:** the widget and nudge have been live for a week.
 
 ### Phase 4 — The reader (5–7 evenings) · BUILT 2026-10-09 (Daf keeps its own highlights on Karakeep items; pushing them into Karakeep's reader was dropped, since its offsets don't match; offline reading added in the polish pass, and it needs the HTTPS address, since service workers only run on secure origins)
 - Feed from FreshRSS: folders, Unseen/Seen, read state synced back.
-- **Feed expiry:** anything unseen for 14 days moves to Seen, so the 2,382 never becomes a
+- **Feed expiry:** anything unseen for 14 days moves to Seen, so the backlog never becomes a
   pile.
 - Library from Karakeep: Articles, Tweets, PDFs (list now, reader later), Inbox/Later/Archive.
 - Reading view: contents, focus bar, highlight with selection or `h`, notes, tags, the Aa menu,
@@ -171,12 +169,12 @@ use for a week, and the next one starts after that.
 - Offline reading on the phone for saved items.
 - **Done when:** a week of feed reading happens in Daf instead of Read You.
 
-### Phase 5 — Watch and listen (3 evenings) · BUILT 2026-10-09 (playback is YouTube's privacy-mode embed, since Invidious can't stream here; the AntennaPod share-position test on the S24 is Nathan's)
+### Phase 5 — Watch and listen (3 evenings) · BUILT 2026-10-09 (playback is YouTube's privacy-mode embed, since Invidious can't stream here)
 - Videos: captions with yt-dlp, faster-whisper when there are none. Transcript beside the
   player, chapters, timestamped highlights, Clip 30s. Playback through Invidious.
 - AntennaPod: Daf speaks the small gpodder sync API, so subscriptions and positions arrive
   without new habits. A "share with position" from AntennaPod becomes a transcribed clip.
-  (Test the old share-position bug, AntennaPod #2012, on the S24 first.) Podcasts never count
+  (Test the old share-position bug, AntennaPod #2012, on the phone first.) Podcasts never count
   toward the hour.
 - Audiobookshelf bookmarks: the minute before each bookmark gets transcribed into a highlight.
 - **Done when:** one clip from each source is in the vault.
@@ -189,9 +187,9 @@ use for a week, and the next one starts after that.
 - **Done when:** a morning review happens on the Kindle.
 
 ### Phase 7 — Paper and Torah (3 evenings) · BUILT 2026-10-09 (OCR through the Claude CLI, not a separate OCR engine; lookup is a selection-bar button, which is the long-press on the phone)
-- **Paper pages:** after Shabbat, photograph a marked page (Signal to Ezer, or the share
-  target), OCR it in English or Hebrew, choose the lines, and they become highlights in that
-  book's note.
+- **Paper pages:** after a day away from screens (Shabbat, say), photograph a marked page
+  (Signal to Ezer, or the share target), OCR it in English or Hebrew, choose the lines, and
+  they become highlights in that book's note.
 - **Torah shelf:** the week's parasha from the Ruach feeds, texts from Sefaria, highlights
   and notes on them like anything else.
 - **Lookup:** long-press a word for a definition or Hebrew↔English.
@@ -212,33 +210,33 @@ series); its kosync/two-way KOReader sync, highlight colors and stats dashboard 
 
 ## Traps already known
 
-- **Two copies of one book.** The Kites has two copies on the Kindle. One 605-page copy
-  read to its last page by 2026-07-21, then a 562-page copy opened at page 178, at page
-  348 (62%) on Aug 29. Never compute progress across editions or copies.
+- **Two copies of one book.** A book can have two copies on the Kindle: say a 605-page
+  edition read to its last page, then a 562-page one opened later at page 178 and read on
+  from there. Never compute progress across editions or copies.
 - **Syncthing duplicates.** `.sdr` folders get duplicated and `sync-conflict` files appear.
   Ignore conflict files and trust the newest session.
 - **KOReader rewrites its settings on exit.** Use user patches and the plugin, never live
   edits.
-- **Hardcover's conflict detector.** A new writer on its fields reads as Nathan's edit and
+- **Hardcover's conflict detector.** A new writer on its fields reads as a hand edit and
   gets pushed up. Daf stays off those fields.
 - **Redeploys need `up -d --build`.** Autodeploy refuses a dirty tree.
 - **Tailscale-IP binds stay down after a reboot.** A plain `docker start` gives no ports;
-  recreate (see the reboot memory).
+  recreate the container instead.
 - **Morten's IPv6 to Cloudflare is dead.** Test public hostnames with `curl -4`.
 - **No Node and no sudo on the host.** Builds in `node:22`, tools in containers.
-- **Which day a session belongs to.** Nathan lives between Phoenix and Jerusalem. Store
+- **Which day a session belongs to.** The reader may travel between time zones. Store
   sessions in UTC and count days in a "home time zone" setting. Shabbat minutes logged after
   havdalah belong to Saturday.
 - **FreshRSS's database is www-data only.** Use the API, not the file.
 
-## Questions for Nathan
+## Open questions at the start
 
 1. **BookOrbit:** Daf doesn't need it. Its value would be two-way KOReader sync and a web
    EPUB reader. Recommendation: skip until Phase 4 is done, then decide.
 2. **Hostname:** Tailscale only (recommended), or also `daf.tiresia.xyz` through cloudflared
    for use without Tailscale?
 3. **Home time zone:** switch it by hand when traveling, or follow the phone?
-4. **The morning message:** fold the highlight into the 05:30 reading, or send it separately?
+4. **The morning message:** fold the highlight into a message that already goes out each morning, or send it separately?
 5. **Pace:** keep the "a phase starts after a week of daily use" rule? An optional extra:
    each phase also waits for a reading milestone (Phase 2 after 10 hours read in Year 30,
    Phase 4 after 30, Phase 6 after 60).
