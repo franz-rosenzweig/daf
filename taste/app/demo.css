@@ -1,0 +1,14 @@
+/* Daf's taste: the controls that need Daf's own server are hidden here (demo.js would only say so). */
+#side [data-go="feed"], #side [data-go="paper"], #side [data-go="sources"], #side [data-act="add"],
+[data-hb="define"], [data-hb="translate"], [data-hb="ask"],
+[data-ptab="ask"], [data-bpt="ask"], [data-summ],
+[data-ract="listen"], [data-bk="listen"],
+#phonecard, #podcard, #hccard, #nlcard, #digestcard, #aicard, #importcard, #fbcard, #tagscard,
+.card:has(#acctf), .card:has(#tz), .prow:has(#ttsvoice), .prow:has(#ttsspeed), .prow:has(#expire),
+#hcwant, #hcsec, .vault, .bookhead > div > span.tiny.mute:last-child { display: none !important; }
+
+.demonav { margin-top: 8px; }
+.demonav .nv { color: var(--accent); }
+.demoaway p { margin: 0; max-width: 40rem; }
+.demoacts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.demoacts .spacer { flex: 1; }

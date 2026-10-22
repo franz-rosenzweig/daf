@@ -1,0 +1,77 @@
+{
+  "_about": "The sample library of Daf's taste (tools/build_taste.py): four public-domain books from Project Gutenberg, kept in taste/data/books as Gutenberg made them, with a made-up reader's place in each and made-up highlights. 'days' is how many days before today a highlight was made; 'sec' picks the book's section when the words appear in more than one.",
+  "books": [
+    {
+      "id": "cal:1", "file": "meditations.epub", "cover": "meditations.jpg",
+      "title": "Meditations", "author": "Marcus Aurelius", "translator": "Meric Casaubon",
+      "year": "1634", "gutenberg": 2680,
+      "description": "The private notebook of a Roman emperor, written in camp at night to remind himself how to live: be kind, do the work in front of you, don't fret about what isn't yours to change. This is Meric Casaubon's translation of 1634, with the 1906 introduction.",
+      "kindle": { "page": 96, "total": 228, "days": 1 },
+      "nightstand": true,
+      "highlights": [
+        { "text": "In the morning when thou findest thyself unwilling to rise, consider with thyself presently, it is to go about a man's work that I am stirred up.", "chapter": "The Fifth Book", "page": 71, "days": 2, "color": "yellow", "tags": ["mornings"], "fav": true },
+        { "text": "Let not things future trouble thee. For if necessity so require that they come to pass, thou shalt (whensoever that is) be provided for them with the same reason, by which whatsoever is now present, is made both tolerable and acceptable unto thee.", "chapter": "The Seventh Book", "page": 112, "days": 1, "color": "blue", "note": "Read this twice." },
+        { "text": "The best kind of revenge is, not to become like unto them.", "chapter": "The Sixth Book", "page": 88, "days": 1, "color": "yellow", "sec": 8 },
+        { "text": "Remember how long thou hast already put off these things, and how often a certain day and hour as it were, having been set unto thee by the gods, thou hast neglected it.", "chapter": "The Second Book", "page": 34, "days": 9, "color": "pink", "tags": ["procrastination"] },
+        { "text": "our life is short; we must endeavour to gain the present time with best discretion and justice.", "chapter": "The Fourth Book", "page": 58, "days": 5, "color": "yellow" }
+      ]
+    },
+    {
+      "id": "cal:2", "file": "walden.epub", "cover": "walden.jpg",
+      "title": "Walden, and On the Duty of Civil Disobedience", "author": "Henry David Thoreau",
+      "year": "1854", "gutenberg": 205,
+      "description": "Two years, two months and two days in a cabin Thoreau built himself by Walden Pond: what he ate, what he read, what the ice did in winter, and why he thought most of us were living too fast to notice any of it.",
+      "kindle": null, "daf": 18,
+      "nightstand": true,
+      "highlights": [
+        { "text": "The mass of men lead lives of quiet desperation.", "chapter": "Economy", "page": 8, "days": 12, "color": "yellow" },
+        { "text": "I went to the woods because I wished to live deliberately, to front only the essential facts of life, and see if I could not learn what it had to teach, and not, when I came to die, discover that I had not lived.", "chapter": "Where I Lived, and What I Lived For", "page": 90, "days": 6, "color": "green", "fav": true },
+        { "text": "Simplify, simplify. Instead of three meals a day, if it be necessary eat but one; instead of a hundred dishes, five; and reduce other things in proportion.", "chapter": "Where I Lived, and What I Lived For", "page": 92, "days": 6, "color": "yellow" },
+        { "text": "Books are the treasured wealth of the world and the fit inheritance of generations and nations.", "chapter": "Reading", "page": 103, "days": 3, "color": "yellow", "tags": ["reading"] },
+        { "text": "How many a man has dated a new era in his life from the reading of a book.", "chapter": "Reading", "page": 107, "years_ago": 1, "color": "yellow", "tags": ["reading"], "source": "paper", "user_note": "Underlined in pencil, on the porch." }
+      ]
+    },
+    {
+      "id": "cal:3", "file": "pride-and-prejudice.epub", "cover": "pride-and-prejudice.jpg",
+      "title": "Pride and Prejudice", "author": "Jane Austen",
+      "year": "1813", "gutenberg": 1342,
+      "description": "Five unmarried sisters, one entailed estate, and a proud young man who says the wrong thing at a ball. This is the 1894 edition with Hugh Thomson's illustrations (the pictures are left out here).",
+      "kindle": { "page": 247, "total": 392, "days": 3 },
+      "nightstand": true,
+      "highlights": [
+        { "text": "I could easily forgive his pride, if he had not mortified mine", "chapter": "Chapter V", "page": 21, "days": 16, "color": "pink" },
+        { "text": "I declare, after all, there is no enjoyment like reading! How much sooner one tires of anything than of a book!", "chapter": "Chapter XI", "page": 58, "days": 14, "color": "yellow", "note": "Says the woman who never turns a page.", "tags": ["reading"] },
+        { "text": "There is a stubbornness about me that never can bear to be frightened at the will of others. My courage always rises with every attempt to intimidate me.", "chapter": "Chapter XXXI", "page": 171, "days": 8, "color": "green" },
+        { "text": "Till this moment, I never knew myself.", "chapter": "Chapter XXXVI", "page": 204, "days": 4, "color": "purple", "fav": true }
+      ]
+    },
+    {
+      "id": "cal:4", "file": "odyssey.epub", "cover": "odyssey.jpg",
+      "title": "The Odyssey", "author": "Homer", "translator": "Samuel Butler",
+      "year": "1900", "gutenberg": 1727,
+      "description": "Ten years getting home from a war: the Cyclops, Circe, the Sirens, and a wife holding a houseful of suitors off with a loom. Samuel Butler's prose translation, made for people who can't read the Greek.",
+      "kindle": null, "audio": { "pct": 26, "note": "3h 10m of 12h 5m" },
+      "nightstand": false,
+      "highlights": []
+    }
+  ],
+  "articles": {
+    "pg:bacon-of-studies": {
+      "status": "inbox", "days": 1, "progress": 0, "starred": true, "tags": ["reading"],
+      "highlights": [
+        { "text": "Some books are to be tasted, others to be swallowed, and some few to be chewed and digested", "days": 1, "color": "yellow", "tags": ["reading"], "fav": true },
+        { "text": "Reading maketh a full man; conference a ready man; and writing an exact man.", "days": 1, "color": "blue" }
+      ]
+    },
+    "pg:lamb-books-and-reading": {
+      "status": "inbox", "days": 2, "progress": 34, "tags": ["reading", "essays"],
+      "highlights": [
+        { "text": "I love to lose myself in other men's minds. When I am not walking, I am reading; I cannot sit and think. Books think for me.", "days": 2, "color": "green", "user_note": "Me on a train." }
+      ]
+    },
+    "pg:schopenhauer-thinking": {
+      "status": "later", "days": 5, "progress": 0, "tags": ["essays"],
+      "highlights": []
+    }
+  }
+}

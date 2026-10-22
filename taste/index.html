@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Daf</title>
+<meta name="description" content="My reading app for an hour of reading a day: every minute from everywhere I read in one ring, a reader with highlights, and a daily review. Try it here on sample data.">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="app/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app/fonts/fonts.css">
+<link rel="stylesheet" href="taste.css">
+</head>
+<body>
+<main class="page">
+  <header class="intro">
+    <p class="mark"><img src="app/icon-192.png" width="40" height="40" alt=""><b>Daf</b><span>an hour of reading a day</span></p>
+    <h1>Every minute I read, in one ring</h1>
+    <p class="lede">I gave myself one goal for the year I turned 30: read for an hour every day. Daf is the app I built for it. It adds up the minutes from everywhere I read, the Kindle, audiobooks, paper books and its own reader, into one ring, and every morning it brings a few of my highlights back so what I read stays with me.</p>
+  </header>
+
+  <section class="taste" aria-labelledby="tasteTitle">
+    <div class="bar">
+      <span class="tag">Demo</span>
+      <h2 id="tasteTitle">Try it on sample data</h2>
+      <span class="sp"></span>
+      <button class="btn" id="reset" type="button">Reset the demo</button>
+      <a class="btn" href="app/" target="_blank" rel="noopener">Open it full screen</a>
+    </div>
+    <p class="note">This is the real app, running in your browser on a little sample library: four old books from Project Gutenberg, three essays about reading, and a made-up reader’s year. Everything you do here stays in this browser.</p>
+    <div class="frame"><iframe id="app" src="app/#today" title="Daf, running on sample data in this page"></iframe></div>
+    <ul class="try">
+      <li><b>Pick up where the Kindle left off.</b> Open <i>Books</i>, then <i>Meditations</i>, and press <i>Read in Daf</i>. The Kindle is further along, so Daf offers to take you there.</li>
+      <li><b>Highlight something.</b> Select a sentence in a book or an essay. Change its color, add a note, and find it again under <i>Highlights</i>.</li>
+      <li><b>Do the daily review.</b> Five highlights: <i>Keep</i>, <i>Less</i> or <i>Never</i>, and the ones you keep come back in a few days.</li>
+      <li><b>Fill the ring.</b> Read for a few minutes, or press <i>Log paper</i>, and watch <i>Today</i> catch up.</li>
+    </ul>
+  </section>
+
+  <section class="shots" aria-labelledby="shotsTitle">
+    <h2 id="shotsTitle">From the full app</h2>
+    <div class="wide">
+      <figure><img src="shots/reader.webp" width="1600" height="1000" alt="Walden in Daf’s reader with two highlights from the Kindle on the page, and the Notebook beside it listing the book’s highlights in reading order" loading="lazy"><figcaption>A book in Daf’s own reader, with the Kindle’s highlights on the page and the Notebook beside it</figcaption></figure>
+      <figure><img src="shots/today-dark.webp" width="1600" height="1000" alt="Today in dark mode: a ring at 41 of 60 minutes, the minutes by source, three sittings, and the daily review" loading="lazy"><figcaption>Today, in dark mode</figcaption></figure>
+    </div>
+    <div class="strip">
+      <figure><img src="shots/today-phone.webp" width="540" height="1169" alt="Today on a phone: the daily review card with a quote from Pride and Prejudice, above the ring" loading="lazy"><figcaption>Today on a phone</figcaption></figure>
+      <figure><img src="shots/review-phone.webp" width="540" height="1169" alt="The daily review on a phone: one highlight with its note, and Never, Flashcard, Less and Keep below it" loading="lazy"><figcaption>The daily review</figcaption></figure>
+      <figure><img src="shots/book-phone.webp" width="540" height="1169" alt="Meditations’ page on a phone: 42% on the Kindle, the hours read, when it’ll be done, and a bar for each of the last 30 days" loading="lazy"><figcaption>A book’s page: the time it’s had, and when it’ll be done</figcaption></figure>
+      <figure><img src="shots/stats-phone.webp" width="540" height="1169" alt="Stats on a phone: a five-day streak at the hour, the totals, and when in the day the reading happens" loading="lazy"><figcaption>Stats</figcaption></figure>
+    </div>
+  </section>
+
+  <div class="lower">
+    <section class="what" aria-labelledby="whatTitle">
+      <h2 id="whatTitle">What the full app does</h2>
+      <p><b>It counts the hour.</b> The Kindle sends its page turns through a small KOReader plugin, audiobooks come in from Audiobookshelf, paper books get logged with a button or a text message, and books and articles count while they’re open in Daf. Today shows the ring, every sitting, the week, and the whole year as a grid.</p>
+      <p><b>It’s a reader.</b> Every book in my Calibre library opens in Daf’s own reader, with seventeen themes and two dozen typefaces. The Library keeps what I save from the web, the Feed is my RSS, and there’s a Torah shelf with the week’s parasha in Hebrew and English.</p>
+      <p><b>The highlights come back.</b> The Kindle’s highlights, the ones I make in Daf or on web pages, and photos of pages I marked in pencil all land in ONE place, open at the exact spot, and go into my Obsidian notes. Five come back every morning, and the ones I keep return less and less often.</p>
+      <p><b>It goes where I read.</b> There’s a Mac app with today’s minutes in the menu bar, an Android app with a home-screen widget, a browser extension for highlighting web pages, and the review and today’s minutes show up on the Kindle too.</p>
+      <p class="muted">What needs my server isn’t in the demo: the Kindle and audiobook sync, the Feed, the Torah shelf, Claude’s summaries and answers, read-aloud, and signing in.</p>
+    </section>
+
+    <section class="own" aria-labelledby="ownTitle">
+      <h2 id="ownTitle">Running your own</h2>
+      <p>The real Daf runs on my own server and reads my own library, so I can’t open it up to everyone, but all of its code is on GitHub. It’s one Python program with one SQLite file, plus a web app with no build step. I built it around the services I already run, so a copy of your own means pointing it at yours, and the docs are honest about where that takes some editing. It’s free software under the GPL.</p>
+      <p class="links">
+        <a class="btn primary" href="https://github.com/franz-rosenzweig/daf">Run your own</a>
+        <a class="btn" href="https://docs.tiresia.xyz/daf/">Docs</a>
+        <a class="btn ghost" href="../">Back to stuffs</a>
+      </p>
+    </section>
+  </div>
+
+  <footer class="credits">
+    <p>The books are from Project Gutenberg: <i>Meditations</i> by Marcus Aurelius, translated by Meric Casaubon; <i>Walden</i> by Henry David Thoreau; <i>Pride and Prejudice</i> by Jane Austen; and <i>The Odyssey</i> by Homer, translated by Samuel Butler. The essays are Francis Bacon’s “Of Studies”, Charles Lamb’s “Detached Thoughts on Books and Reading”, and Arthur Schopenhauer’s “On Thinking for Oneself”, translated by T. Bailey Saunders. All of them are in the public domain. I made the covers for this page, and the reader, their highlights and their year are made up.</p>
+    <p>Daf’s code is under the GPL-3.0. Nothing you do on this page leaves your browser.</p>
+  </footer>
+</main>
+<script src="taste.js"></script>
+</body>
+</html>
