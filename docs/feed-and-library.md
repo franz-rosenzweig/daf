@@ -8,7 +8,7 @@ This page is about everything in Daf that isn't a book: the **Feed**, which pass
 
 The Feed is my FreshRSS, read through its API, and it's where my RSS lives now instead of Read You. **All feeds** in the sidebar shows everything, and each folder under it shows one folder. Press the list's title, the one with the small arrow, for the **Sources** sheet with every feed, where **Follow a site** adds one and the **…** next to a feed renames it, moves it or unfollows it. The feed's editor also has **Always load the full article**, for feeds that only send a summary, and **Notify me of new posts**, which the Mac and Android apps turn into notifications.
 
-![The Craft folder of the Feed](images/feed.png)
+![The Writing folder of the Feed](images/feed.png)
 *One folder of the Feed, with the info panel on the right.*
 
 Each list has two tabs, **UNSEEN** and **SEEN**. Opening an item in Daf marks it read in FreshRSS, and anything read somewhere else shows as seen here on the next sync. Anything still unseen after a month moves to Seen by itself, which means the Feed never becomes a pile. **Preferences → Reader → The Feed lets go after** changes that, from a week up to a year, or never: make it longer and the unread items FreshRSS still has come back on the next sync. FreshRSS keeps unread articles for good and read ones for three months. The list's **…** menu has **Mark seen** for everything, or everything older than a day, three days or a week.
@@ -22,7 +22,7 @@ The Library is what I save: **Articles**, **Videos**, **Tweets** and **PDFs**, p
 Daf keeps the Library itself. When I save a link, Daf reads the page from my server: its text, its title, author and date, and its picture, which stays on the server so it outlives the site. A page that only shows itself to a real browser (a robot check, a page built by scripts) is read by a headless browser on the server instead. Saving a link I already have doesn't make a second copy: an archived one comes back to the top of the Inbox. Everything that was in Karakeep came across, notes, highlights and its lists (as tags) included. Karakeep itself is switched off now (October 19, 2026); its data is kept on the server, just in case.
 
 ![The Articles list](images/library.png)
-*Articles, with a summary and its tags in the info panel.*
+*Articles, with the opening and the tags of the one picked in the info panel.*
 
 Library documents with text get a two- or three-sentence summary, which shows in the info panel and as the line under the title in the list. A new save gets two to four tags from the model, from the tags I already use when one fits (**Preferences → AI → Tags for what you save**, never on a private one). The **All tags** menu filters by one, and **+ Tag** in the info panel adds your own. **Preferences → Library tags** lists them all with how many use each: rename one (a name already in use merges the two), remove one everywhere, or press **Propose a tidy-up** and the model suggests merges for the whole list; only the ones you tick happen.
 

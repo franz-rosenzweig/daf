@@ -5,7 +5,7 @@
 **Today** is the page Daf opens on, and it answers one question: how much have I read today, and how far am I from the goal. This page goes through it card by card, and then through the goals in Preferences that decide what the ring is measuring.
 
 ![Today](images/hero-light.png)
-*Today, with 45 of 60 minutes read.*
+*Today, with 41 of 60 minutes read.*
 
 ## The top of the page
 

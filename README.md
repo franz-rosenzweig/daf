@@ -22,7 +22,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
-  <img src="docs/images/hero-light.png" alt="Daf's Today page: a ring at 45 of 60 minutes, the minutes by source, today's sittings, and the daily review card">
+  <img src="docs/images/hero-light.png" alt="Daf's Today page: a ring at 41 of 60 minutes, the minutes by source, today's sittings, and the daily review card">
 </picture>
 
 ## Why I built it
@@ -78,8 +78,8 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 
 <p align="center"><img src="docs/images/phones.webp" alt="Daf on a phone: Today, a book with a green highlight, and the daily review"></p>
 
-![A book in Daf's reader with blue and yellow highlights, and the Notebook listing them in reading order](docs/images/reader.png)
-*A book in Daf, with my Kindle highlights in their colors and the Notebook beside it.*
+![A book in Daf's reader with a green highlight from the Kindle, and the Notebook listing the book's highlights in reading order](docs/images/reader.png)
+*A book in Daf, with the Kindle's highlights in their colors and the Notebook beside it.*
 
 ![The daily review: one highlight with Never, Flashcard, Less and Keep](docs/images/review.png)
 *The daily review: five highlights a day, one at a time.*
@@ -111,11 +111,11 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 ![The Stats page with the streak, totals and charts](docs/images/stats.png)
 *Stats.*
 
-![A book page with reading time, sittings, Hardcover and the highlights in reading order](docs/images/book.png)
-*A book's page: the time I've spent with it, Hardcover, and its highlights.*
+![A book page with the reading time, sittings, shelves and Hardcover](docs/images/book.png)
+*A book's page: the time spent with it, its shelves and Hardcover, with its highlights further down.*
 
 ![The Books page with the nightstand and shelves](docs/images/books.png)
-*Books: the nightstand and my shelves.*
+*Books: the nightstand and the shelves.*
 
 ![A book in Pages layout, two columns in the Paper theme, on a tablet-sized screen](docs/images/tablet.webp)
 *Pages layout on a tablet, in the Paper theme.*
