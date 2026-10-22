@@ -234,6 +234,19 @@ final class AppModel {
 
     var selected: Item? { items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } }
 
+    /// The vault's essays on this week's parasha (Reference/torah/<parasha>/), as the reader opens
+    /// them: Daf makes each readable when it's first opened, and its highlights go into the same note.
+    static func essays(_ t: J) -> [J] {
+        t.a("essays").map { e in
+            var raw: [String: Any] = ["id": e.s("id") ?? "", "type": "doc", "kind": "article", "title": e.s("title") ?? "", "vault_essay": e.s("path") ?? "",
+                                      "source": e.s("author") ?? e.s("series") ?? "Your vault"]
+            if let w = e.i("words") { raw["mins"] = max(1, Int((Double(w) / 238).rounded())) }
+            if let p = e.d("progress") { raw["progress"] = p }
+            if let h = e.i("highlights"), h > 0 { raw["highlights"] = h }
+            return J(raw)
+        }
+    }
+
     /// A book's page, on Books (from Today, Recovery, a notice).
     func showBook(_ id: String) {
         place = .books
@@ -326,7 +339,7 @@ final class AppModel {
             case .torah:
                 let t = try await API.shared.json("/api/torah")
                 torah = t
-                items = (t.a("week") + t.a("ruach") + t.a("earlier")).map(Item.init)
+                items = (t.a("week") + t.a("ruach") + Self.essays(t) + t.a("earlier")).map(Item.init)
             case .feed(let cat):
                 if sources == nil { await loadSources() }
                 items = try await docs("feed", tab: feedTab, arg: cat, sort: sortFeed, filter: listFilter.dict)

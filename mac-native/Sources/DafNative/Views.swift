@@ -565,6 +565,10 @@ struct Opened: View {
             guard item.isDoc, !["pdf", "manga"].contains(item.kind) else { return }
             // the same article made again by SwiftUI (a list refreshing beside it): the one already open
             if let r = model.reader, r.id == item.id, r.doc != nil { reader = r; return }
+            // a vault essay: Daf makes it readable first (/api/torah/essay)
+            if let path = item.j.s("vault_essay"), !path.isEmpty {
+                _ = try? await API.shared.send("POST", "/api/torah/essay", ["path": path])
+            }
             let r = ReaderModel(id: item.id)
             reader = r
             model.reader = r
