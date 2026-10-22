@@ -76,8 +76,8 @@ Dvarim's (`dvarim/android/keystore.properties`, beside this repository). Git ign
 ## Check it
 
 ```sh
-tools/mac-sandbox.sh                          # on morten: a sandbox Daf, and the three arguments
-android/check.sh http://100.91.202.11:8441 COOKIE TOKEN    # on the Mac, the phone plugged in and unlocked
+tools/mac-sandbox.sh                          # on the server: a sandbox Daf, and the three arguments
+android/check.sh http://<server>:8441 COOKIE TOKEN    # on the Mac, the phone plugged in and unlocked
 ```
 
 It installs the test build and opens it on the sandbox (the phone reaches it through the Mac:

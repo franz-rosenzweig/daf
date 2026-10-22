@@ -47,9 +47,9 @@ Whether the time counts toward your hour isn't shown over the text any more; Tod
 - **The themes:** Daf, Paper (sepia), Nord, GitHub, GitHub dimmed, Cupertino, Solarized, Gruvbox, Catppuccin, Rosé Pine, Tokyo Night, One, Dracula, Everforest, E-ink, High contrast and Black (for OLED screens). Each one has a light and a dark version, and the card shows both.
 - **Light or dark:** Match the system (light by day, dark at night, as the device is set), Always light, or Always dark.
 - **A different theme for dark:** for example GitHub by day and Nord at night.
-- **Your own fonts:** add a TTF, OTF or WOFF file you have, such as Bookerly from a Kindle. Bookerly is Amazon's, so Daf can't ship it, but a copy you add stays on morten and your devices. It then appears under **Yours** in Aa, for articles and books alike.
+- **Your own fonts:** add a TTF, OTF or WOFF file you have, such as Bookerly from a Kindle. Bookerly is Amazon's, so Daf can't ship it, but a copy you add stays on the server and your devices. It then appears under **Yours** in Aa, for articles and books alike.
 
-The choice is kept on morten, so every device follows it.
+The choice is kept on the server, so every device follows it.
 
 ![Preferences → Appearance](images/appearance.png)
 *The themes, each card with its light half and its dark half.*

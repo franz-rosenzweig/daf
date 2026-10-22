@@ -3,7 +3,7 @@
 The brief the native shells were built from: what the Mac and Android apps had to do, and the
 contract between them and the web app. The same approach had already made native shells for
 Dvarim and Moshe (`franz-rosenzweig/dvarim`, `franz-rosenzweig/moshe`), so it reuses what
-worked there. It was written on morten, where Daf runs, and replaces the two small briefs that
+worked there. It was written on the server, where Daf runs, and replaces the two small briefs that
 were in `mac/NEXT.md` and `android/NEXT.md`; their specs (the menu-bar minutes, the
 home-screen widget) are folded in below.
 
@@ -22,13 +22,13 @@ experience. It brings together:
 
 **The big difference: Daf is server-first.** Dvarim and Moshe are "file over app": the engine
 runs in the page, and the shell hands it a folder. Daf has no folder and no engine to bundle.
-It's a FastAPI app with SQLite on morten that reads all those sources, so:
+It's a FastAPI app with SQLite on the server that reads all those sources, so:
 
 - **The shells load the live site.** They don't bundle the page and don't need the folder
   bridge (`BRIDGE.md` in the other two repos). What they add is a proper window, the things
   a web page can't do, and small always-visible surfaces (menu bar, widget).
 - **Base URL `https://daf.tiresia.xyz`** (Cloudflare tunnel; username + password sign-in).
-  The tailnet address `http://100.91.202.11:8440` also works, but it needs an ATS exception
+  The tailnet address `http://<server>:8440` also works, but it needs an ATS exception
   on the Mac and cleartext permission on Android. Make the base URL a setting, with the
   https one as the default.
 
@@ -50,7 +50,7 @@ highlight at its exact spot.
 https). Keep the default website data store so the cookie survives restarts.
 
 **Native surfaces use device tokens,** never the cookie: `Authorization: Bearer <token>`. You
-make one in Preferences → Phone → Make a token, or on morten with
+make one in Preferences → Phone → Make a token, or on the server with
 `/srv/dev/daf/bin/daf kindle-token <name>` (printed once). Keep it in the Keychain on the Mac
 and in EncryptedSharedPreferences on Android.
 
@@ -102,10 +102,10 @@ the web app, where `app.js`, `hl.js`, `reader.js`, `book.js` and `style.css` cha
 something has to change in one of those, keep it small and say so in the PR. Native code lives
 in `mac/` and `android/`. One branch and one PR per piece.
 
-**Deploying:** daf.service on morten serves `web/` straight from `/srv/dev/daf`, so a merged
-change to `web/` is live once morten pulls master. Python changes also need
+**Deploying:** daf.service on the server serves `web/` straight from `/srv/dev/daf`, so a merged
+change to `web/` is live once the server pulls master. Python changes also need
 `systemctl --user restart daf`. There's no autodeploy for Daf yet, so a merged change goes
-live when master is pulled on morten.
+live when master is pulled on the server.
 
 ## Round 1: Daf for macOS
 

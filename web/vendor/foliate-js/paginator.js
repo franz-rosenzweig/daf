@@ -752,7 +752,7 @@ export class Paginator extends HTMLElement {
         return { height, width, margin, gap, columnWidth }
     }
     render() {
-        if (!this.#view) return
+        if (!this.#view || !this.#view.document?.body) return   // Daf: not while a section is still loading
         this.#view.render(this.#beforeRender({
             vertical: this.#vertical,
             rtl: this.#rtl,

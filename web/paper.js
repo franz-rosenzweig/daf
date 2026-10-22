@@ -65,7 +65,7 @@ async function pageView(id){
   $('#pph').textContent = (p.page ? 'Page ' + p.page : 'A page') + (p.book ? ' · ' + short(p.book.title) : '');
   const reading = p.status === 'new' || (p.job && (p.job.status === 'queued' || p.job.status === 'running'));
   let right;
-  if (reading) right = '<section class="card"><h2>Reading the page…</h2><p class="mute" style="margin:0">Reading the marked lines on morten. About fifteen seconds.</p></section>';
+  if (reading) right = '<section class="card"><h2>Reading the page…</h2><p class="mute" style="margin:0">Reading the marked lines on the server. About fifteen seconds.</p></section>';
   else if (p.status === 'error') right = '<section class="card"><h2>Couldn’t read it</h2><p class="mute" style="margin:0">' + esc(p.error || '') + '</p><button class="btn" data-pp="reread" style="align-self:flex-start">Try again</button></section>';
   else right = '<section class="card ppform">' + bookBox() +
     '<div class="pprow"><label class="mute tiny" for="pppg">Page</label><input class="field" id="pppg" type="number" inputmode="numeric" value="' + (p.page || '') + '" style="width:110px"></div>' +

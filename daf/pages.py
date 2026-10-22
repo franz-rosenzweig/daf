@@ -3,12 +3,12 @@ phone's share menu (reader.push_inbox), the Feed's Save (reader.save_to_library)
 file of another app (imports.py).
 
 Daf keeps the Library itself (karakeep.mode() "read" or "off"): a save is a dl: row at once, and a
-"page" job (media.py) reads the page from morten: its text, title, author, date and picture, which
+"page" job (media.py) reads the page from the server: its text, title, author, date and picture, which
 is kept here too (STATE/thumbs) so it outlives the site. A page that only shows itself to a real
 browser (a robot check, a script-only page) is read by the headless Chrome (browser.py). The old
 way ("on"), Karakeep keeps the saved copy and reads the page.
 
-Either way the page is read from morten, signed in nowhere, so a page behind a paywall comes out as
+Either way the page is read from the server, signed in nowhere, so a page behind a paywall comes out as
 its teaser. When the browser sends the page as you see it (the extension does, with `html`), Daf
 keeps that text instead: the article is found in it the way fulltext.py finds it in a page it
 fetched, and it replaces Daf's copy whenever it has more words. An export that carries the
@@ -211,7 +211,7 @@ def _robot(html, status=200):
 
 
 def keep_thumb(img_url):
-    """The page's picture, kept on morten (STATE/thumbs, at most 960 px): its address in Daf, or None."""
+    """The page's picture, kept on the server (STATE/thumbs, at most 960 px): its address in Daf, or None."""
     try:
         raw, ctype, _, _ = _get(img_url, MAX_PICTURE, "image/avif,image/webp,image/*,*/*;q=0.5")
     except Exception:  # noqa: BLE001 - no picture is fine

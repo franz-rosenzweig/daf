@@ -179,7 +179,9 @@ def rewrite_index(s):
 def guard_paginator(s):
     """foliate-js lays a section out again whenever the page resizes, and a resize can land while a new
     section is still loading, before its <body> exists: then it throws (harmless, the load lays it out
-    again a moment later). The live app has the same race; here the copy simply waits for the body."""
+    again a moment later). Daf's own copy now carries the same guard, so this is only for an older one."""
+    if "!this.#view.document?.body" in s:   # Daf's own copy has the guard since 2026-10-22
+        return s
     old = "    render() {\n        if (!this.#view) return\n"
     if s.count(old) != 1:
         fail("foliate-js paginator.js changed; update guard_paginator")

@@ -50,7 +50,7 @@ async function api(path, opts){
   catch(e){
     clearTimeout(timer);
     if (late) return outbox.add(path, o);
-    if (!navigator.onLine || e instanceof TypeError) throw new Error('No connection: this needs Daf on morten. Try again when you’re back online.');
+    if (!navigator.onLine || e instanceof TypeError) throw new Error('No connection: this needs Daf on the server. Try again when you’re back online.');
     throw e;
   }
   if (r.status === 401 && path !== '/api/login') { renderLogin(); throw new Error('signed out'); }
@@ -70,7 +70,7 @@ window.addEventListener('unhandledrejection', e => noteErr('unhandled: ' + ((e.r
 // Articles too: their highlights (the id is the server's own hash, as for books), status, progress,
 // star, note, tags and title; reading time; the daily review and cards; paper minutes; reading notes.
 const OUTBOX = /^\/api\/(ebooks\/[^/?]+\/(position|highlights|bookmarks(\/[^/?]+)?)|highlights\/[^/?]+(\/(color|note|fav|tags|restore))?|manga\/books\/[^/?]+\/progress|manga\/beat|docs\/[^/?]+\/(highlights|status|progress|star|note|tags|meta)|docs\/bulk|read\/beat|review\/[^/?]+|cards\/[^/?]+\/grade|paper|notes|feedback|tips|books\/[^/?]+\/review)$/;
-// The day of a moment in Daf's own time zone (home_tz), as morten counts it, whatever this device is set to.
+// The day of a moment in Daf's own time zone (home_tz), as the server counts it, whatever this device is set to.
 const dayIn = at => { const tz = (S.data && S.data.settings && S.data.settings.home_tz) || (S.settings && S.settings.home_tz);
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz || undefined, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at * 1000)); } catch(e){ return isoOf(new Date(at * 1000)); } };
 const opId = () => { const b = new Uint8Array(12); crypto.getRandomValues(b); return 'op' + Array.from(b, x => x.toString(16).padStart(2, '0')).join(''); };
@@ -105,7 +105,7 @@ const outbox = {
     if (path === '/api/notes') return { vault: 'later', queued: true };
     return { ok: true, queued: true };
   },
-  // Minutes read on this device that haven't reached morten: Today counts them.
+  // Minutes read on this device that haven't reached the server: Today counts them.
   pending(day){
     let sec = 0; const by = {};
     for (const x of outbox.get()) {
@@ -186,7 +186,7 @@ setTimeout(warm, 4000);
 setInterval(warm, 60e3);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(warm, 1500); });
 
-// "Offline · 3 waiting": what this device holds for morten. A tap sends it now.
+// "Offline · 3 waiting": what this device holds for the server. A tap sends it now.
 function drawSyncPill(){
   let el = $('#syncpill');
   const n = outbox.get().length, off = !navigator.onLine;
@@ -194,7 +194,7 @@ function drawSyncPill(){
   if (!el) { el = document.createElement('button'); el.id = 'syncpill'; el.className = 'syncpill'; el.addEventListener('click', () => { outbox.flush(); toast(navigator.onLine ? 'Sending…' : 'No connection yet: it goes by itself when there is'); }); document.body.appendChild(el); }
   el.hidden = false; el.classList.toggle('off', off);
   el.textContent = (off ? 'Offline' : 'Not yet synced') + (n ? ' · ' + n + ' waiting' : '');
-  el.title = n ? 'Saved on this device; it goes to morten when the connection is back' : 'No connection: what you do is kept on this device';
+  el.title = n ? 'Saved on this device; it goes to the server when the connection is back' : 'No connection: what you do is kept on this device';
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) outbox.flush(); });
 setTimeout(() => outbox.flush(), 2500);
@@ -294,7 +294,7 @@ function bookRow(b, extra){
 }
 function renderToday(){
   let d = S.data; if (!d) { $('#main').innerHTML = '<div class="page mute">Loading…</div>'; return; }
-  // Minutes read on this device that haven't reached morten yet (offline) count already.
+  // Minutes read on this device that haven't reached the server yet (offline) count already.
   const pend = d.date === d.today ? outbox.pending(d.today) : { min: 0, by: {} };
   if (pend.min > 0.1) {
     const M2 = Object.assign({}, d.minutes); let add = 0;
@@ -608,7 +608,7 @@ async function renderSources(){
     '<div class="src"><span class="dot' + (c.ok ? '' : ' bad') + '" aria-label="' + (c.ok ? 'Working' : 'Not working') + '"></span><b>' + esc(c.name) + '</b><span class="dt mute">' + esc(c.detail) + '</span><span class="mute tiny">' + esc(USE[c.name] || '') + '</span></div>'
   ).join('') + '</div></section><p class="mute tiny" style="margin:0">Daf only reads these. In the vault it writes the reading log, a “From Daf” section at the end of book notes, and notes for what you highlight in Daf (Reference/clippings, youtube, podcasts, torah). Nothing else.</p>';
 }
-/* ---------- read-aloud voices (Kokoro on morten) ---------- */
+/* ---------- read-aloud voices (Kokoro on the server) ---------- */
 // Kokoro's voice names start with two letters for the accent and whose voice it is (af_heart: an
 // American woman's). Only the English ones read English well. Each group goes clearest first, by
 // Kokoro's own ratings.
@@ -649,7 +649,7 @@ const Voices = {
   // The list, from the read-aloud bar: a voice's name picks it, ▶ plays a line in it.
   async menu(anchor){
     const p = $('#pop'), all = await Voices.load();
-    if (!all.length) { toast('Kokoro isn’t answering on morten'); return; }
+    if (!all.length) { toast('Kokoro isn’t answering on the server'); return; }
     let group = '';
     p.onclick = p.oninput = p.onkeydown = null;
     p.innerHTML = '<span class="lbl">Read-aloud voice</span><div class="vlist">' + all.map(id => {
@@ -680,12 +680,12 @@ async function renderPrefs(){
   const s = await api('/api/settings');
   S.settings = s;
   const sw = (k, label, desc, locked) => '<div class="prow"><div class="d"><b>' + label + '</b><span>' + desc + '</span></div><input type="checkbox" class="sw" id="c-' + k + '" data-count="' + k + '"' + (s.count[k] ? ' checked' : '') + (locked ? ' disabled' : '') + ' aria-label="' + esc(label) + '"></div>';
-  const zones = ['America/Phoenix','Asia/Jerusalem']; if (zones.indexOf(s.home_tz) < 0) zones.push(s.home_tz);
+  let zones = []; try { zones = Intl.supportedValuesOf('timeZone'); } catch(e) {} if (zones.indexOf('UTC') < 0) zones.unshift('UTC'); if (s.home_tz && zones.indexOf(s.home_tz) < 0) zones.push(s.home_tz);
   $('#main').innerHTML = '<div class="top"><h1>Preferences</h1></div><div class="page"><section class="card" id="goalscard"><h2>Goals</h2><span class="mute">Loading…</span></section><section class="card" id="appearcard"></section><section class="card"><h2>What counts toward the goal</h2><div>' +
     sw('kindle','Books on the Kindle','KOReader reading time') + sw('manga','Manga in Daf','Time in Daf’s manga reader') + sw('audio','Audiobooks','Listening time from Audiobookshelf') + sw('article','Articles in Daf','Time with an article open in Daf') +
     sw('paper','Paper books','Minutes you log here or with Ezer') + sw('video','Videos','Time with a video open in Daf') + sw('podcast','Podcasts','Never counted', true) + '</div></section>' +
     '<section class="card"><h2>Daily review</h2><div class="prow"><div class="d"><b>Highlights per day</b><span>Ezer sends the first one in the morning. Takes effect tomorrow.</span></div><select class="field" id="revsize" style="width:auto">' + [3,5,8,12].map(n => '<option' + (n === s.review_size ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div></section>' +
-    '<section class="card"><h2>Reader</h2><div class="prow"><div class="d"><b>Read-aloud voice</b><span>Kokoro on morten. The voice button in the read-aloud bar changes it too, with a line in each voice.</span></div><select class="field" id="ttsvoice" style="width:auto"><option value="' + esc(s.tts_voice || 'af_heart') + '">' + esc(Voices.label(s.tts_voice || 'af_heart')) + '</option></select><button class="btn sm" id="ttshear">Hear it</button></div>' +
+    '<section class="card"><h2>Reader</h2><div class="prow"><div class="d"><b>Read-aloud voice</b><span>Kokoro on the server. The voice button in the read-aloud bar changes it too, with a line in each voice.</span></div><select class="field" id="ttsvoice" style="width:auto"><option value="' + esc(s.tts_voice || 'af_heart') + '">' + esc(Voices.label(s.tts_voice || 'af_heart')) + '</option></select><button class="btn sm" id="ttshear">Hear it</button></div>' +
     '<div class="prow"><div class="d"><b>Read-aloud speed</b></div><select class="field" id="ttsspeed" style="width:auto">' + [0.9, 1, 1.1, 1.25, 1.5].map(n => '<option value="' + n + '"' + (n === (s.tts_speed || 1) ? ' selected' : '') + '>' + n + '×</option>').join('') + '</select></div>' +
     (document.documentElement.classList.contains('shell-android') ? '<div class="prow"><div class="d"><b>Volume buttons turn pages</b><span>In books and manga. While music or read-aloud plays they change the volume. On this device.</span></div><input type="checkbox" class="sw" id="volkeys"' + (lsGet('volumeKeys', false) ? ' checked' : '') + ' aria-label="Volume buttons turn pages"></div>' : '') +
     '<div class="prow"><div class="d"><b>After Done or Later, open the next one</b><span>In an article, archiving it or moving it to Later opens the next item in the list instead of going back to the list. On this device.</span></div><input type="checkbox" class="sw" id="autoadv"' + (lsGet('autoAdvance', false) ? ' checked' : '') + ' aria-label="Open the next one"></div>' +
@@ -732,7 +732,7 @@ async function drawNewsletters(fresh){
   let r;
   try { r = fresh ? Object.assign(await api('/api/newsletters'), await api('/api/newsletters/scan', { method:'POST' })) : await api('/api/newsletters'); }
   catch(e){ card.innerHTML = '<h2>Newsletters</h2><p class="mute" style="margin:0">' + esc(e.message) + '</p>'; return; }
-  if (!r.configured) { card.innerHTML = '<h2>Newsletters</h2><p class="mute" style="margin:0">Needs Proton Mail Bridge on morten (the office agent’s PROTON_USER and PROTON_BRIDGE_PASSWORD).</p>'; return; }
+  if (!r.configured) { card.innerHTML = '<h2>Newsletters</h2><p class="mute" style="margin:0">Needs Proton Mail Bridge on the server (the office agent’s PROTON_USER and PROTON_BRIDGE_PASSWORD).</p>'; return; }
   const chosen = new Set(r.chosen || []);
   const row = s => '<label class="nlrow"><input type="checkbox" data-nl="' + esc(s.address) + '"' + (chosen.has(s.address) ? ' checked' : '') + '><span><b>' + esc(s.name) + '</b> <span class="mute tiny">' + esc(s.address) + ' · ' + s.count + ' in 45 days</span><span class="mute tiny nlsub">' + esc(s.last_subject || '') + '</span></span></label>';
   const likely = r.senders.filter(s => s.likely || chosen.has(s.address)), rest = r.senders.filter(s => !s.likely && !chosen.has(s.address));
@@ -746,7 +746,7 @@ async function drawNewsletters(fresh){
 async function drawPod(token){
   const card = $('#podcard'); if (!card) return;
   const p = await api('/api/podcasts');
-  const base = ((S.settings || {}).public_url || 'http://100.91.202.11:8440').replace(/\/$/, '');
+  const base = ((S.settings || {}).public_url || location.origin).replace(/\/$/, '');
   card.innerHTML = '<h2>Podcasts (AntennaPod)</h2>' +
     '<div class="prow"><div class="d"><b>Sync</b><span>' + (p.last_sync ? 'Last sync ' + ago(p.last_sync) + ', ' + p.subs.length + ' subscriptions.' : 'Not connected yet.') + ' Listening shows on Today but never counts toward the hour.</span></div><button class="btn sm" data-act="podtoken">' + (p.device ? 'New password' : 'Make a password') + '</button></div>' +
     (token ? '<div class="kindlenote"><span class="mute tiny">The AntennaPod password. Daf only shows it once.</span><code class="tok">' + esc(token) + '</code></div>' : '') +
@@ -762,7 +762,7 @@ async function drawPhone(token){
   const s = S.settings || {};
   const phoneDev = p.devices.find(d => d.name === 'phone');
   const n = p.nudges;
-  const base = (s.public_url || 'http://100.91.202.11:8440').replace(/\/$/, '');
+  const base = (s.public_url || location.origin).replace(/\/$/, '');
   let h = '<h2>Phone</h2>';
   h += '<div class="prow"><div class="d"><b>The evening nudge</b><span>' + (n.shown ? n.shown + ' shown this week, ' + n.followed + ' followed by reading within 30 minutes.' : 'Nothing shown this week yet.') + '</span></div></div>';
   h += '<div class="prow"><div class="d"><b>Phone token</b><span>' + (phoneDev ? 'Made ' + epochDate(phoneDev.created) + (phoneDev.last_seen ? ', last used ' + ago(phoneDev.last_seen) : '') + '. A new one replaces it.' : 'For Tasker and the widget.') + '</span></div><button class="btn sm" data-act="phonetoken">' + (phoneDev ? 'New token' : 'Make a token') + '</button></div>';
@@ -773,7 +773,7 @@ async function drawPhone(token){
     '<li>Add <b>Task → If</b> <code>%http_data.show</code> <b>~</b> <code>true</code>.</li>' +
     '<li>Add <b>Alert → Notify</b>: Title <code>%http_data.title</code>, Text <code>%http_data.text</code>. Under Actions, add <b>Net → Browse URL</b> <code>%http_data.url</code> so tapping it opens Daf.</li>' +
     '<li>Add <b>Task → End If</b>. Daf decides the rest: at most one nudge every 25 minutes, none once the hour is done.</li></ol></details>';
-  h += '<div class="prow"><div class="d"><b>Install Daf as an app</b><span>' + (s.public_url ? 'Open ' + esc(s.public_url) + ' on the phone, then the browser menu → Install app. “Save to Daf” then shows up in the share menu.' : 'Needs HTTPS. Run <code>sudo tailscale set --operator=lander</code> on morten once, and Daf gets a secure address on your tailnet.') + '</span></div></div>';
+  h += '<div class="prow"><div class="d"><b>Install Daf as an app</b><span>' + (s.public_url ? 'Open ' + esc(s.public_url) + ' on the phone, then the browser menu → Install app. “Save to Daf” then shows up in the share menu.' : 'Needs HTTPS. Run <code>sudo tailscale set --operator=lander</code> on the server once, and Daf gets a secure address on your tailnet.') + '</span></div></div>';
   if (p.inbox.length) h += '<div class="prow"><div class="d"><b>Shared to Daf</b><span>' + p.inbox.slice(0, 5).map(x => esc(x.title || x.url)).join(' · ') + '</span></div></div>';
   card.innerHTML = h;
 }
@@ -967,7 +967,7 @@ document.addEventListener('click', async e => {
     }
     else if (act === 'devoff'){
       const n = a.dataset.name;
-      if (!confirm(n === 'kindle' ? 'Disconnect the Kindle? It stops sending pages and highlights until you make a new token on morten (daf kindle-token kindle) and put it on the Kindle.' : 'Disconnect ' + n + '? It stops until it connects again.')) return;
+      if (!confirm(n === 'kindle' ? 'Disconnect the Kindle? It stops sending pages and highlights until you make a new token on the server (daf kindle-token kindle) and put it on the Kindle.' : 'Disconnect ' + n + '? It stops until it connects again.')) return;
       await api('/api/devices/' + encodeURIComponent(n), { method:'DELETE' }); toast('Disconnected'); drawDevices(); if (n === 'phone') drawPhone();
     }
     else if (act === 'booknote'){ const v = $('#bnote').value.trim(); if (!v) return; const r = await api('/api/notes', { method:'POST', body:JSON.stringify({ text:v, book_id:a.dataset.id }) }); toast(r.vault === 'written' || r.vault === 'unchanged' ? 'Saved to the vault note' : 'Saved in Daf'); renderBook(a.dataset.id); }

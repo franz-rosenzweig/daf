@@ -156,7 +156,7 @@ def cmd_review(a):
     return 0
 
 
-NOTIFY = "/srv/obsidian/Synergathan/.claude/scripts/notify.sh"
+NOTIFY = config.NOTIFY   # kept for the modules that import it from here
 
 
 def cmd_morning(a):
@@ -175,9 +175,9 @@ def cmd_morning(a):
                f"Reply with \"n:\" and a thought, and it goes under this highlight in your vault. "
                f"{rest} more in today's review: {config.public_url(s)}/#review")
         if a.send:
-            rc = subprocess.run([NOTIFY, "Daf", msg]).returncode
+            rc = config.notify("Daf", msg, timeout=120)
             if rc != 0:
-                print("Signal didn't take it (notify.sh failed).", file=sys.stderr)
+                print("The message didn't go (no DAF_NOTIFY command, or it failed).", file=sys.stderr)
                 return 1
             notes.remember_morning(c, it["id"])
         print(msg)
@@ -294,7 +294,7 @@ def cmd_backup(a):
         tmp.unlink(missing_ok=True)
         msg = f"Daf backup failed: {e}"
         print(msg, file=sys.stderr)
-        subprocess.run(["/srv/obsidian/Synergathan/.claude/scripts/notify.sh", "⚠️ Daf backup failed", str(e)[:300]], timeout=60, check=False)
+        config.notify("⚠️ Daf backup failed", str(e)[:300])
         return 1
 
 

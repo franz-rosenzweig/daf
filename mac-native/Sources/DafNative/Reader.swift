@@ -552,7 +552,7 @@ final class ReaderModel {
     func openInObsidian() {
         guard let p = doc?.s("vault_path") else { return }
         let f = p.hasSuffix(".md") ? String(p.dropLast(3)) : p
-        if let u = URL(string: "obsidian://open?vault=Synergathan&file=" + API.enc(f)) { NSWorkspace.shared.open(u) }
+        if let u = URL(string: "obsidian://open?vault=" + API.enc(doc?.s("vault_name") ?? "vault") + "&file=" + API.enc(f)) { NSWorkspace.shared.open(u) }
     }
 
     // MARK: the focused paragraph (j, k)

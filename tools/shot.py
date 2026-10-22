@@ -21,7 +21,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from daf import auth  # noqa: E402
 
 CONTAINER = "docker-chrome-1"
-BASE = "http://100.91.202.11:8440"
+from daf import config  # noqa: E402
+BASE = f"http://{config.HOSTS[-1]}:{config.PORT}"
 
 
 def container_ip():

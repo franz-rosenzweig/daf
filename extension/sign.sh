@@ -5,13 +5,16 @@
 #
 #   extension/sign.sh
 #
-# Needs AMO_JWT_ISSUER and AMO_JWT_SECRET in the vault's .claude/.env (made at
+# Needs AMO_JWT_ISSUER and AMO_JWT_SECRET in an .env file (made at
 # https://addons.mozilla.org/developers/addon/api/key/). Mozilla signs each version once, so
-# bump "version" in manifest.json before signing a change. Node isn't on morten: web-ext runs
+# bump "version" in manifest.json before signing a change. Node needn't be on the server: web-ext runs
 # in the node:22 image. The key is passed in the environment, never on a command line.
 set -eu
 cd "$(dirname "$0")"
-ENV_FILE=/srv/obsidian/Synergathan/.claude/.env
+STATE=${DAF_STATE:-/srv/docker/daf}
+# The .env with the AMO keys: $AMO_ENV_FILE, or AMO_ENV_FILE= in the state folder's daf.env, else daf.env itself.
+ENV_FILE=${AMO_ENV_FILE:-$(sed -n "s/^AMO_ENV_FILE=//p" "$STATE/daf.env" 2>/dev/null | tail -1)}
+ENV_FILE=${ENV_FILE:-$STATE/daf.env}
 get(){ sed -n "s/^$1=//p" "$ENV_FILE" | tail -1 | sed "s/^['\"]//; s/['\"]$//"; }
 AMO_JWT_ISSUER=$(get AMO_JWT_ISSUER); AMO_JWT_SECRET=$(get AMO_JWT_SECRET)
 if [ -z "$AMO_JWT_ISSUER" ] || [ -z "$AMO_JWT_SECRET" ]; then

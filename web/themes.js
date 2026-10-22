@@ -3,7 +3,7 @@
    system). A theme is a handful of base colours; every token in style.css comes from them, so a
    theme reads the same everywhere: lists, the reading views, highlights, charts.
 
-   The choice lives on morten (settings.appearance) so every device reads alike, and in localStorage
+   The choice lives on the server (settings.appearance) so every device reads alike, and in localStorage
    (daf.themeVars) so index.html paints it before anything shows. Preferences → Appearance picks;
    the Aa menu switches light and dark. */
 (() => {
@@ -191,7 +191,7 @@ T.section = box => {
     (split ? '<span class="lbl">For light</span><div class="thgrid">' + FAMILIES.map(f => card(f, 'light')).join('') + '</div><span class="lbl">For dark</span><div class="thgrid">' + FAMILIES.map(f => card(f, 'dark')).join('') + '</div>'
       : '<div class="thgrid">' + FAMILIES.map(f => card(f, 'both')).join('') + '</div>') +
     '<label class="aaline thsplit"><input type="checkbox" data-thsplit' + (split ? ' checked' : '') + '> A different theme for dark</label>' +
-    '<div class="prow thfonts"><div class="d"><b>Your own fonts</b><span>A font file you have (TTF, OTF or WOFF), such as Bookerly from a Kindle. It stays on morten and your devices, ' +
+    '<div class="prow thfonts"><div class="d"><b>Your own fonts</b><span>A font file you have (TTF, OTF or WOFF), such as Bookerly from a Kindle. It stays on the server and your devices, ' +
     'and shows under Typeface in Aa.</span></div><label class="btn sm">Add a font file<input type="file" accept=".ttf,.otf,.woff,.woff2" multiple hidden data-thfont></label></div>' +
     (userFonts.length ? '<div class="thmine">' + userFonts.map(f => '<span class="chip">' + '<span style="font-family:\'' + esc(f.family) + '\';font-weight:' + f.weight + ';font-style:' + f.style + '">' + esc(f.family) + '</span>' +
       ' <span class="mute tiny">' + (f.weight >= 700 ? 'bold ' : f.weight <= 300 ? 'light ' : '') + (f.style === 'italic' ? 'italic' : f.weight >= 700 || f.weight <= 300 ? '' : 'regular') + '</span>' +

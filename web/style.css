@@ -1173,7 +1173,7 @@ html.rail:not(.shell-mac) .side.open::after{content:"";position:fixed;inset:0 0 
   .lvmain > .top #tagf{max-width:150px}
 }
 @media (max-width:600px){ .lvmain > .top [data-ract=lfilter]{order:3} }
-/* "Offline · 3 waiting" (app.js drawSyncPill): what this device holds for morten */
+/* "Offline · 3 waiting" (app.js drawSyncPill): what this device holds for the server */
 .syncpill{position:fixed;left:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:30;border:1px solid var(--line-2);background:var(--bg);color:var(--fg-2);
   border-radius:999px;padding:6px 12px 6px 26px;font:500 12.5px/1.2 inherit;box-shadow:var(--shadow);cursor:pointer}
 .syncpill::before{content:"";position:absolute;left:11px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:#d4a017}

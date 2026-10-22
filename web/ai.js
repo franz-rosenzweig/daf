@@ -1,5 +1,5 @@
 /* Preferences → AI: what Daf asks the model, and which model (daf/ai.py), like Readwise's
-   Ghostreader settings. Each prompt starts as Daf's own; one changed here is kept on morten for
+   Ghostreader settings. Each prompt starts as Daf's own; one changed here is kept on the server for
    every device, and "Daf's own" brings the original back. */
 (function(){
 const C = window.DafCore, { $, esc, api, toast } = C;

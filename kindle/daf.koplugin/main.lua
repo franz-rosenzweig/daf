@@ -1,7 +1,7 @@
 --[[
 Daf for KOReader.
 
-  * Sends new page turns from KOReader's statistics database to Daf on morten
+  * Sends new page turns from KOReader's statistics database to Daf on your server
     when the Kindle goes to sleep, closes a book, or comes online, and with them each
     book's highlights and notes from its KOReader notes file (sendHighlights).
   * Keeps the sleep-screen message current: today's minutes toward the hour,
@@ -247,7 +247,7 @@ end
 
 -- ---------------------------------------------------------------- highlights, Kindle to Daf
 -- Each book's highlights and notes live in its KOReader notes file (book.sdr/metadata.*.lua).
--- Daf used to read those from Syncthing's copy on morten and from KoInsight; now the plugin sends
+-- Daf used to read those from Syncthing's copy on the server and from KoInsight; now the plugin sends
 -- them: the open book as it is in memory, and every book in the history whose notes file changed
 -- since it was last sent (the first time, all of them, a few batches per send). Daf keeps the
 -- newest per book and reads them on its next sync.

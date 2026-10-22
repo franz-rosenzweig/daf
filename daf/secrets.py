@@ -11,7 +11,8 @@ from functools import lru_cache
 
 from . import config
 
-FILES = ["/srv/docker/homepage/.env", "/srv/obsidian/Synergathan/.claude/.env", str(config.STATE / "daf.env")]
+# Other .env files to read keys from, separated by ":" (DAF_SECRET_FILES), then STATE/daf.env last.
+FILES = [f for f in config.setting("DAF_SECRET_FILES").split(":") if f] + [str(config.STATE / "daf.env")]
 
 
 def _read(path):

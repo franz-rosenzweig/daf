@@ -260,6 +260,7 @@ def get_doc(conn, doc_id, prefetch=False):
     d["asks"] = [dict(r) for r in conn.execute("SELECT q, quote, a, at FROM asks WHERE doc_id = ? ORDER BY at", (doc_id,))]
     b = conn.execute("SELECT vault_path FROM books WHERE id = ?", (doc_id,)).fetchone()
     d["vault_path"] = b[0] if b else None
+    d["vault_name"] = config.VAULT.name
     if not d["opened"] and not prefetch:
         conn.execute("UPDATE docs SET opened = ? WHERE id = ?", (int(time.time()), doc_id))
     return d

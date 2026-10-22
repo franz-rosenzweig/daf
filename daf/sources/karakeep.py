@@ -221,7 +221,7 @@ def take_over(conn, settings, say=print):
 
     - every bookmark's row (a last sync the old way), its text, and its PDF when it is one;
     - its note (when Daf has none), Karakeep's summary (when Daf has no model summary);
-    - its picture, kept on morten: Karakeep's own copy of the banner, else the page's picture;
+    - its picture, kept on the server: Karakeep's own copy of the banner, else the page's picture;
     - its highlights, placed by their words in Daf's copy of the text;
     - Karakeep's lists, as tags of the same name."""
     from .. import imports, pages, pdfdoc

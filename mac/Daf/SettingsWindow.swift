@@ -44,7 +44,7 @@ enum SettingsWindow {
             guard let token = body?["token"] as? String, !token.isEmpty else { return "Daf answered without a token." }
             return Token.set(token) ? nil : "The Keychain didn't take the token."
         case 401: return "Sign in to Daf in its window first, then press Connect again."
-        case 404, 405: return "This Daf can't make tokens for a Mac yet. On morten, run daf kindle-token mac and paste what it prints below."
+        case 404, 405: return "This Daf can't make tokens for a Mac yet. On the server, run daf kindle-token mac and paste what it prints below."
         default: return (body?["detail"] as? String) ?? "Daf answered \(status)."
         }
     }
@@ -74,7 +74,7 @@ struct SettingsView: View {
                         .onSubmit(useAddress)
                     Button("Use", action: useAddress).disabled(address == Server.base.absoluteString)
                 }
-                note(addressNote ?? "https://daf.tiresia.xyz, or http://100.91.202.11:8440 on the tailnet.")
+                note(addressNote ?? "Your Daf address, e.g. https://daf.example.com, or http://<server>:8440 on your tailnet.")
             } header: { Text("Daf's address") }
 
             Section {

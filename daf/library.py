@@ -72,7 +72,7 @@ def vault_books():
 
 def sidecars(conn=None):
     """KOReader sidecars: (path, parsed table). The Daf plugin sends each book's own (kindle_sidecars,
-    since 2026-10-20); a copy synced to morten by Syncthing is used for a book the plugin hasn't sent.
+    since 2026-10-20); a copy synced to the server by Syncthing is used for a book the plugin hasn't sent.
     Conflict copies skipped."""
     sent = {}
     if conn is not None:

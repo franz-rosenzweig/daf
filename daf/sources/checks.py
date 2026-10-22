@@ -50,7 +50,7 @@ def check_kindle(conn):
     try:
         out = subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True, timeout=10)
         for p in json.loads(out.stdout).get("Peer", {}).values():
-            if "100.66.33.78" in (p.get("TailscaleIPs") or []):
+            if config.setting("DAF_KINDLE_ADDR") in (p.get("TailscaleIPs") or []):
                 online = p.get("Online")
     except (OSError, ValueError, subprocess.TimeoutExpired):
         pass

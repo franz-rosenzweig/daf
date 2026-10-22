@@ -15,7 +15,32 @@ DB_PATH = STATE / "daf.db"
 AUTH_PATH = STATE / "auth.json"
 SETTINGS_PATH = STATE / "settings.json"
 
-VAULT = Path(os.environ.get("DAF_VAULT", "/srv/obsidian/Synergathan"))
+
+
+def _env_file():
+    """STATE/daf.env: KEY=value lines, read by the server, the CLI and cron alike (secrets.py reads it too)."""
+    out = {}
+    try:
+        for line in open(STATE / "daf.env", encoding="utf-8"):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                out[k.strip()] = v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return out
+
+
+_FILE = _env_file()
+
+
+def setting(name, default=""):
+    """A DAF_* value: the environment first, then STATE/daf.env, then the default."""
+    return os.environ.get(name) or _FILE.get(name) or default
+
+
+# The Obsidian vault the reading log and book notes live in.
+VAULT = Path(setting("DAF_VAULT", str(Path.home() / "vault")))
 READING_LOG_DIR = VAULT / "Reference" / "reading"
 
 KOINSIGHT_DB = Path("/srv/docker/koinsight/prod.sqlite3")
@@ -28,9 +53,24 @@ CWA_INGEST = Path(os.environ.get("DAF_CWA_INGEST", "/srv/docker/cwa-ingest"))
 FRESHRSS_URL = os.environ.get("DAF_FRESHRSS_URL", "http://127.0.0.1:8080")   # a sandbox points it elsewhere
 KARAKEEP_URL = "https://keep.tiresia.xyz"
 
-# Both binds succeed at boot because net.ipv4.ip_nonlocal_bind=1 on morten.
-HOSTS = [h for h in os.environ.get("DAF_HOSTS", "127.0.0.1,100.91.202.11").split(",") if h]
+# The addresses to listen on, e.g. "127.0.0.1,<a tailnet address>". Binding an address that isn't up yet at
+# boot needs net.ipv4.ip_nonlocal_bind=1.
+HOSTS = [h for h in setting("DAF_HOSTS", "127.0.0.1").split(",") if h]
 PORT = int(os.environ.get("DAF_PORT", "8440"))
+
+# A command run as `NOTIFY "Daf" "<text>"` for alerts and the morning message (a Signal or ntfy script, say).
+NOTIFY = setting("DAF_NOTIFY")
+
+
+def notify(title, text, timeout=60):
+    """Sends an alert through NOTIFY. Returns the command's exit code, or 1 when there's no command."""
+    import subprocess
+    if not NOTIFY:
+        return 1
+    try:
+        return subprocess.run([NOTIFY, title, text], timeout=timeout, check=False).returncode
+    except (OSError, subprocess.TimeoutExpired):
+        return 1
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
@@ -58,7 +98,7 @@ SOURCE_LABELS = {
 }
 
 DEFAULT_SETTINGS = {
-    "home_tz": "America/Phoenix",
+    "home_tz": "UTC",
     # What counts toward the hour. Podcasts never do (decided 2026-10-09).
     "count": {"kindle": True, "ebook": True, "manga": True, "audio": True, "article": True, "paper": True, "podcast": False, "video": False},
     "review_size": 5,
@@ -148,6 +188,6 @@ def save_settings(s):
 
 
 def public_url(settings=None):
-    """Where links in messages point: the HTTPS address once it exists, else the tailnet one."""
+    """Where links in messages point: the HTTPS address once it exists, else the last address it listens on."""
     s = settings if settings is not None else load_settings()
-    return (s.get("public_url") or f"http://100.91.202.11:{PORT}").rstrip("/")
+    return (s.get("public_url") or f"http://{HOSTS[-1]}:{PORT}").rstrip("/")

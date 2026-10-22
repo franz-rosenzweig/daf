@@ -430,7 +430,7 @@ def is_manga(conn):
     return {r[0] for r in conn.execute("SELECT book_id FROM manga_books")}
 
 
-# ---- the reader's settings, kept on morten so every device reads the same way -------------
+# ---- the reader's settings, kept on the server so every device reads the same way -------------
 # {"defaults": {...}, "series": {series id: {...}}}: how pages are laid out is kept per series
 # (the reader decides which keys), everything else once.
 

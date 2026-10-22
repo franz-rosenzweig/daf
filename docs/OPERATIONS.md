@@ -1,12 +1,12 @@
-*Moved here from the top-level README on 2026-10-11, word for word; the README is now the project's front page. This is the working log of how Daf runs on morten.*
+*Moved here from the top-level README on 2026-10-11, word for word; the README is now the project's front page. This is the working log of how Daf runs on the server.*
 
 # Daf
 
 A personal Readwise for one reader's own stack. Goal: an hour of reading a day in Year 30
 (2026-10-09 to 2027-10-08). The plan for the whole app is in [PLAN.md](../PLAN.md).
 
-**Open it:** https://daf.tiresia.xyz (the cloudflared tunnel on morten → localhost:8440), or
-http://100.91.202.11:8440 on the tailnet. Install it as an app from the phone's browser menu on the
+**Open it:** https://daf.tiresia.xyz (the cloudflared tunnel on the server → localhost:8440), or
+http://<server>:8440 on the tailnet. Install it as an app from the phone's browser menu on the
 https address; offline reading needs that address too (service workers want a secure origin).
 
 **Sign-in:** username + password (`auth.json`; a new install's username is `reader` until changed). Change
@@ -92,7 +92,7 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
   `/api/me`, Today, Review, Books, Highlights, Torah, lists and single docs. Opening the Library
   prefetches the text of up to 30 Inbox/Later articles and tweets (`?prefetch=1` doesn't mark them
   opened). Service workers only run on a secure origin, so this works once Daf has its HTTPS address
-  (or on `localhost`); on `http://100.91.202.11:8440` the page simply needs the network.
+  (or on `localhost`); on `http://<server>:8440` the page simply needs the network.
 
 ## Watch and listen (Phase 5)
 
@@ -435,7 +435,7 @@ Komga is the library and Daf is where it's read; nothing is copied out of Komga.
 
 ## Offline
 
-What you do with no network is kept on the device and goes to morten when it's back; what you read
+What you do with no network is kept on the device and goes to the server when it's back; what you read
 can be kept ahead of time.
 
 - **The outbox** (`app.js` `OUTBOX`, `localStorage daf.outbox`): book places, highlights, bookmarks;
@@ -447,7 +447,7 @@ can be kept ahead of time.
   (a highlight's id is the server's own hash). Time is kept with each write (`at`): an offline review
   counts on the day it was done, a highlight keeps when it was made, paper minutes their day.
 - **Shown:** "Offline · N waiting" in the corner (tap: send now); Today counts the minutes still on
-  the device. What needs morten (Ask, summaries, Send to Kindle, adding links) says so offline.
+  the device. What needs the server (Ask, summaries, Send to Kindle, adding links) says so offline.
 - **Kept ahead:** `GET /api/offline/plan` names what to keep (the pages' own requests, character for
   character: Today, the review for today and the next three days, the Library and Feed lists, Books,
   Highlights, manga; `docs` to keep with their pictures; `ebooks` files; covers). Daf for Android keeps
@@ -485,9 +485,9 @@ can be kept ahead of time.
 
 ## Backups
 
-- **Borg** (`/srv/obsidian/Synergathan/.claude/scripts/borg-backup.sh`, 03:30) takes all of `/srv/docker`,
+- **Borg** (a nightly Borg script, 03:30) takes all of `/srv/docker`,
   Daf's state included, and `/srv/dev`. It keeps 7 daily, 4 weekly and 6 monthly archives and mirrors
-  them to old morten.
+  them to old the server.
 - **`daf backup`** (cron 03:00, before Borg) writes a consistent copy of `daf.db` to
   `STATE/backups/daf-<date>.db.gz` and keeps 14 (mode 600).
   - It uses SQLite's online backup, so it's safe while Daf writes in WAL mode, which a plain file copy
@@ -621,7 +621,7 @@ Two read-only audit agents (server and web) went through Daf; these are the fixe
   front takes the keys (and Esc closes only it); a Library tag doesn't follow into the Feed; a saved
   view's order can change and be saved; the manga reader doesn't open over a page you've gone to;
   the Notebook's Delete highlight removes it from the text too; picture highlights undo, list in
-  Contents and jump to the figure; Forget my place forgets on morten (`DELETE
+  Contents and jump to the figure; Forget my place forgets on the server (`DELETE
   /api/ebooks/{id}/position`); leaving an article opened straight from a link goes to its list;
   several dragged links are each saved; key hints and `/` follow Preferences → Keyboard; keys work by
   position with a Hebrew layout (Q no longer opens search; the brackets aren't mirrored); `?` answers
@@ -646,7 +646,7 @@ There's no check-in form and no date counter, on purpose.
 
 ## Speed (2026-10-13)
 
-Daf answers in 5-35 ms; through daf.tiresia.xyz every request costs 250-450 ms (even from morten), so
+Daf answers in 5-35 ms; through daf.tiresia.xyz every request costs 250-450 ms (even from the server), so
 a page that made several reads and revalidated ~40 files took seconds. Now (measured with 300 ms added
 per request: Daf opens 2.0 s → 0.4 s, the Library list 418 → 65 ms, Books 339 → 11 ms, a book opened
 before 3.5 → 0.8 s):

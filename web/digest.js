@@ -7,7 +7,7 @@ const hour = h => (h % 12 || 12) + ':00 ' + (h < 12 ? 'am' : 'pm');
 
 function draw(card){
   const d = G.digest, last = G.last;
-  if (!G.configured) { card.innerHTML = '<h2>Morning email</h2><p class="mute" style="margin:0">Needs Proton Mail Bridge on morten (the office agent’s PROTON_USER and PROTON_BRIDGE_PASSWORD).</p>'; return; }
+  if (!G.configured) { card.innerHTML = '<h2>Morning email</h2><p class="mute" style="margin:0">Needs Proton Mail Bridge on the server (the office agent’s PROTON_USER and PROTON_BRIDGE_PASSWORD).</p>'; return; }
   card.innerHTML = '<h2>Morning email</h2>' +
     '<p class="mute" style="margin:0">What you saved to the Library in the last day, each with its summary, and how much waits in the Feed. It comes from daf@tiresia.xyz, and only on a day something came in.</p>' +
     '<div class="prow"><div class="d"><b>Send it</b><span>' + (last && last.sent ? 'The last one went ' + ago(last.at) + ' with ' + last.new + ' new.' : last && last.error ? 'The last one didn’t go: ' + esc(last.error) : 'Right now it would have ' + G.now.new + ' new' + (G.now.feed ? ' and ' + G.now.feed + ' in the Feed' : '') + '.') + '</span></div>' +

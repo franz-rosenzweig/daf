@@ -9,7 +9,7 @@
      the tap-zone overlay, cropped borders.
    - Komga: the thumbnail explorer, the keyboard help, full screen.
 
-   Pages and progress come from Komga through daf/manga.py; the settings live on morten
+   Pages and progress come from Komga through daf/manga.py; the settings live on the server
    (/api/manga/prefs), the layout ones per series, so every device reads a series the same way. */
 (() => {
 const C = window.DafCore, { api, esc, toast, $ } = C;

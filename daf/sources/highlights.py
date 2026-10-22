@@ -1,6 +1,6 @@
 """Every highlight, in one index.
 
-- Kindle: KOReader's sidecars (synced to morten by Syncthing), the freshest and
+- Kindle: KOReader's sidecars (synced to the server by Syncthing), the freshest and
   fullest record, with KoInsight's annotation table filling any book whose
   sidecar never synced.
 - Karakeep: highlights on saved articles, read-only from its SQLite file.
@@ -78,7 +78,7 @@ class DafEpubHighlights:
 
 def import_all(conn, settings):
     now = int(time.time())
-    tz = ZoneInfo(settings.get("home_tz") or "America/Phoenix")
+    tz = ZoneInfo(settings.get("home_tz") or "UTC")
     rows = {}
     # Articles sent with Send to Kindle: a highlight there belongs to the article it was made in.
     from .. import kindlesend
@@ -122,7 +122,7 @@ def import_all(conn, settings):
                          "page": a.get("pageno") if isinstance(a.get("pageno"), int) else None, "created": created,
                          "pos": pos if isinstance(pos, str) or pos is None else json.dumps(pos)}   # PDFs give a table
 
-    # KoInsight fills books whose sidecar never reached morten.
+    # KoInsight fills books whose sidecar never reached the server.
     try:
         k = read_only(config.KOINSIGHT_DB)
         try:

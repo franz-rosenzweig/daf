@@ -49,7 +49,7 @@ The contract between the two is `docs/SHELL.md`; the brief is `docs/NATIVE.md`, 
 The menu bar and Save to Daf use a device token, never the window's cookie. Settings → **Connect
 This Mac** makes one: it calls `POST /api/devices {"name": "mac"}` with the window's own sign-in
 and keeps the answer in the login keychain. Preferences → Account in the page lists it as "Daf
-for Mac", with Disconnect. A token from `daf kindle-token mac` on morten can be pasted instead.
+for Mac", with Disconnect. A token from `daf kindle-token mac` on the server can be pasted instead.
 
 With an ad hoc signature the Keychain asks once after each new build whether Daf may read its
 own token, because the signature changed. An Apple Development identity (Xcode → Settings →
@@ -76,10 +76,10 @@ not in git.
 ## Test it
 
 ```sh
-# on morten: a sandbox Daf on the tailnet, and the three arguments for the test
+# on the server: a sandbox Daf on the tailnet, and the three arguments for the test
 tools/mac-sandbox.sh
 # on the Mac
-mac/selftest.sh http://100.91.202.11:8441 COOKIE TOKEN          # or e.g. … TOKEN keys,book
+mac/selftest.sh http://<server>:8441 COOKIE TOKEN          # or e.g. … TOKEN keys,book
 ```
 
 It builds the app with `SelfTest/` linked in, as its own app (`xyz.tiresia.daf.selftest`, so Daf

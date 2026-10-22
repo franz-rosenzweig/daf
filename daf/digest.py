@@ -2,7 +2,7 @@
 day, each with its two or three lines, how many new posts wait in the Feed, and yesterday's minutes.
 
 It goes from daf@tiresia.xyz (settings digest.from; tiresia.xyz is a custom domain on the owner's Proton
-account) to the account's own address, through the Bridge on morten (the office agent's PROTON_* keys, the same
+account) to the account's own address, through the Bridge on the server (the office agent's PROTON_* keys, the same
 ones the newsletters read with). Settings "digest": {on, hour, feed}; the
 sync loop sends it once a day, at that hour in the home time zone, and only when something came in.
 """
@@ -121,7 +121,7 @@ def send_mail(subject, body_html, body_text):
     makes the Bridge refuse the message, and the error says so."""
     c = newsletters._creds()
     if not (c.get("PROTON_USER") and c.get("PROTON_BRIDGE_PASSWORD")):
-        raise RuntimeError("Proton Mail Bridge isn't set up on morten")
+        raise RuntimeError("Proton Mail Bridge isn't set up on the server")
     sender = clean(config.load_settings().get("digest"))["from"]
     m = EmailMessage()
     m["From"] = f"Daf <{sender}>"
@@ -183,9 +183,7 @@ def maybe_send():
             if n < 3:
                 return out
             # The third failure today: said on Signal, so a broken Bridge doesn't go unnoticed.
-            import subprocess
-            from .cli import NOTIFY
-            subprocess.run([NOTIFY, "Daf", f"This morning's email didn't go after three tries: {out['error'][:200]}"], timeout=60, check=False)
+            config.notify("Daf", f"This morning's email didn't go after three tries: {out['error'][:200]}")
     with db.session() as c:
         c.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('digest_last', ?)", (json.dumps(out),))
     return out

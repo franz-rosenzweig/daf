@@ -83,8 +83,8 @@ def _alert(text):
         return
     _last_alert = time.time()
     try:
-        subprocess.Popen(["/srv/obsidian/Synergathan/.claude/scripts/notify.sh", "Daf", text],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if config.NOTIFY:
+            subprocess.Popen([config.NOTIFY, "Daf", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError:
         log.warning("couldn't send the sign-in alert")
 
@@ -260,7 +260,7 @@ def user_or_device(request: Request, c=Depends(conn)):
 
 @app.get("/api/thumb/{name}", dependencies=[Depends(user_or_device)])
 def get_thumb(name: str):
-    """A saved page's picture, kept on morten (pages.keep_thumb). The name is its content's hash."""
+    """A saved page's picture, kept on the server (pages.keep_thumb). The name is its content's hash."""
     from . import pages
     if not re.match(r"^[0-9a-f]{16}\.jpg$", name) or not (pages.THUMBS / name).is_file():
         raise HTTPException(404, "No such picture")
@@ -399,7 +399,7 @@ def get_today(d: str | None = None, c=Depends(conn)):
 def _book_card(b):
     b = dict(b)
     return {k: b.get(k) for k in ("id", "title", "author", "progress", "progress_note", "last_read", "audio_pct",
-                                  "audio_note", "vault_path", "status", "kind", "url")} | {"has_cover": bool(b.get("calibre_path"))}
+                                  "audio_note", "vault_path", "status", "kind", "url")} | {"has_cover": bool(b.get("calibre_path")), "vault_name": config.VAULT.name}
 
 
 def _offstand(c, s):
@@ -836,7 +836,7 @@ def get_highlights(q: str = "", book: str = "", private: int = 0, source: str = 
     groups = {}
     for r in rows:
         g = groups.setdefault(r["book_id"], {"book_id": r["book_id"], "title": r["book_title"], "author": r["book_author"],
-                                             "vault_path": r["vault_path"], "kind": r["kind"], "has_cover": bool(r["calibre_path"]),
+                                             "vault_path": r["vault_path"], "vault_name": config.VAULT.name, "kind": r["kind"], "has_cover": bool(r["calibre_path"]),
                                              "items": [], "latest": 0, "notes": 0})
         g["items"].append(r)
         g["latest"] = max(g["latest"], r["created"] or 0)
@@ -1652,7 +1652,7 @@ async def add_file(request: Request, c=Depends(conn)):
         from .sources import karakeep
         import asyncio
         if not karakeep.writes():
-            # Daf keeps the Library: the PDF is kept on morten (pdfdoc's folder) and read there
+            # Daf keeps the Library: the PDF is kept on the server (pdfdoc's folder) and read there
             from . import media, pages, pdfdoc
             if not data.startswith(b"%PDF"):
                 raise HTTPException(400, "That isn't a PDF")
@@ -2289,7 +2289,7 @@ async def device_save(request: Request, name=Depends(device), c=Depends(conn)):
     return {"ok": True, "saved": saved}
 
 
-# ---- local tools on morten (the desk, the office agent): the Library with a device token ----
+# ---- local tools on the server (the desk, the office agent): the Library with a device token ----
 # They used to ask Karakeep. A private title never leaves through here.
 
 def _tool_item(r, base):
@@ -2397,13 +2397,13 @@ DEVICE_NAME = re.compile(r"^[a-z0-9-]{1,24}$")
 @app.post("/api/devices", dependencies=[Depends(user)])
 async def make_device(request: Request, c=Depends(conn)):
     """A token for a named device (the Mac app, the Android app), asked for by a signed-in window.
-    A new one replaces that device's old token. Shown once. The Kindle's is made on morten."""
+    A new one replaces that device's old token. Shown once. The Kindle's is made on the server."""
     b = await _body(request)
     name = str(b.get("name") or "").strip().lower()
     if not DEVICE_NAME.match(name):
         raise HTTPException(400, "A name of 1 to 24 lower-case letters, digits or dashes")
     if name == "kindle":
-        raise HTTPException(400, "The Kindle's token is made on morten: daf kindle-token kindle")
+        raise HTTPException(400, "The Kindle's token is made on the server: daf kindle-token kindle")
     c.execute("DELETE FROM devices WHERE name = ?", (name,))
     if name.startswith("android-"):
         # each Android device has its own name now (android-<model>); the old shared "android" goes,
@@ -2804,7 +2804,7 @@ def get_extension(name: str):
     if signed:                                   # Mozilla's signed build, which Zen keeps for good
         p = signed[-1]
     if not p.exists():
-        raise HTTPException(404, "Not packed yet: run extension/build.sh on morten")
+        raise HTTPException(404, "Not packed yet: run extension/build.sh on the server")
     return FileResponse(p, media_type="application/zip" if name.endswith(".zip") else "application/x-xpinstall",
                         headers={"Content-Disposition": f'attachment; filename="{name}"'})
 

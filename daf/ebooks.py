@@ -100,7 +100,7 @@ def details(conn, book_id):
     path, fmt = book_file(conn, book_id)
     out = {"id": b["id"], "title": b["title"], "author": b["author"], "private": bool(b["private"]), "format": fmt,
            "size": path.stat().st_size if path else None, "has_cover": bool(b["calibre_path"]),
-           "vault_path": b["vault_path"], **_calibre_details(db, b["calibre_id"]),
+           "vault_path": b["vault_path"], "vault_name": config.VAULT.name, **_calibre_details(db, b["calibre_id"]),
            "series": series(conn, db, b["calibre_id"])}
     pos = conn.execute("SELECT cfi, fraction, chapter, updated FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
     out["position"] = dict(pos) if pos else None

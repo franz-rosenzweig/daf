@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Checks the test build on the phone plugged into this Mac (USB debugging on), against a
-# sandbox Daf on morten, never the real one: it signs in there, opens a book and saves a
-# link. On morten, tools/mac-sandbox.sh starts one and prints the three arguments.
+# sandbox Daf on the server, never the real one: it signs in there, opens a book and saves a
+# link. On the server, tools/mac-sandbox.sh starts one and prints the three arguments.
 #
 #   ./check.sh BASE COOKIE TOKEN
 #

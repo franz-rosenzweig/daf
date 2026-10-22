@@ -1,7 +1,7 @@
 /* Daf book reader: EPUB (and MOBI/AZW3/FB2) from Calibre, rendered by foliate-js, inside
    Daf's reading view. Contents, bookmarks and search on the left, Info / Notebook / Ask on the
    right, highlights anchored by CFI, the Kindle's highlights placed by KOReader's own position,
-   the position kept on morten so phone and desktop agree, and time with a book open counting
+   the position kept on the server so phone and desktop agree, and time with a book open counting
    toward the hour. */
 import './vendor/foliate-js/view.js';
 import * as CFI from './vendor/foliate-js/epubcfi.js';
@@ -870,7 +870,7 @@ document.addEventListener('click', async e => {
     else if (a === 'auto') { H.setAuto(!H.auto()); toast(H.auto() ? 'Auto highlight on: selecting a passage highlights it' : 'Auto highlight off'); }
     else if (a === 'keys') showKeys();
     else if (a === 'reset') {
-      // Forgotten on morten too, and not saved again as the book closes (savePosition checks B.forget).
+      // Forgotten on the server too, and not saved again as the book closes (savePosition checks B.forget).
       B.forget = true; B.forgetAt = Date.now(); store.set('bookpos.' + B.d.id, null);
       api('/api/ebooks/' + encodeURIComponent(B.d.id) + '/position', { method: 'DELETE' }).then(() => toast('Daf forgot your place in this book'), err => toast(err.message));
     }

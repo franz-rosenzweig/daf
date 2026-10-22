@@ -71,7 +71,7 @@ Kindle, audiobooks in Audiobookshelf, podcasts in AntennaPod.
  daf CLI (host): what Ezer and the desk call
 ```
 
-**Stack (as built).** Python 3.12 + FastAPI + SQLite, running directly on morten as the
+**Stack (as built).** Python 3.12 + FastAPI + SQLite, running directly on the server as the
 systemd user service `daf.service`, not in a container: everything Daf talks to is on the
 host (the Kindle stats, Audiobookshelf's database, the transcriber, Claude, signal-cli, the
 vault), and a container would only add mounts and read-only-SQLite problems. The web app is
@@ -222,7 +222,7 @@ series); its kosync/two-way KOReader sync, highlight colors and stats dashboard 
 - **Redeploys need `up -d --build`.** Autodeploy refuses a dirty tree.
 - **Tailscale-IP binds stay down after a reboot.** A plain `docker start` gives no ports;
   recreate the container instead.
-- **Morten's IPv6 to Cloudflare is dead.** Test public hostnames with `curl -4`.
+- **The server's IPv6 to Cloudflare is dead.** Test public hostnames with `curl -4`.
 - **No Node and no sudo on the host.** Builds in `node:22`, tools in containers.
 - **Which day a session belongs to.** The reader may travel between time zones. Store
   sessions in UTC and count days in a "home time zone" setting. Shabbat minutes logged after

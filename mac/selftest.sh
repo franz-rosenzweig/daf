@@ -7,7 +7,7 @@
 #   ./selftest.sh BASE COOKIE TOKEN keys,book   # some: load window keys menus article book hidden outside downloads share menubar save settings offline
 #
 # BASE must be a sandbox copy of Daf, never the real one: the test opens a book and an
-# article, saves a link and makes a device token. On morten, tools/mac-sandbox.sh starts
+# article, saves a link and makes a device token. On the server, tools/mac-sandbox.sh starts
 # one and prints the three arguments. It takes the keyboard for about a minute: leave the
 # Mac alone meanwhile. Pictures of each window land in build/selftest/out.
 set -euo pipefail

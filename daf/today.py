@@ -8,9 +8,9 @@ from . import config
 
 def tz_of(settings):
     try:
-        return ZoneInfo(settings.get("home_tz") or "America/Phoenix")
+        return ZoneInfo(settings.get("home_tz") or "UTC")
     except Exception:  # noqa: BLE001 - a bad name in settings must not break the page
-        return ZoneInfo("America/Phoenix")
+        return ZoneInfo("UTC")
 
 
 def today(settings):

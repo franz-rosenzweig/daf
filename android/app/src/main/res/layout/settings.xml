@@ -41,7 +41,7 @@
         <TextView
             android:id="@+id/baseNote"
             style="@style/Settings.Note"
-            android:text="https://daf.tiresia.xyz, or http://100.91.202.11:8440 on the tailnet." />
+            android:text="your Daf address, e.g. https://daf.example.com, or http://&lt;server&gt;:8440 on the tailnet." />
 
         <!-- the token -->
         <TextView style="@style/Settings.Heading" android:text="This phone" />

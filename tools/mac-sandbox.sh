@@ -13,6 +13,7 @@ set -eu
 PORT=${1:-8441}
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIR=$(mktemp -d -t daf-mac-sandbox.XXXXXX)
+HOST=${DAF_SANDBOX_HOST:-}
 cp -a /srv/docker/daf "$DIR/state"
 mkdir -p "$DIR/vault"
 cd "$ROOT"
@@ -22,11 +23,12 @@ if [ -z "${DAF_KOMGA_CONF:-}" ]; then
     "$PY" -c 'import json, sys; c = json.load(open("/srv/docker/manga-import/komga.json")); c["url"] = "http://127.0.0.1:9"; json.dump(c, open(sys.argv[1], "w"))' "$DAF_KOMGA_CONF" 2>/dev/null || true
     chmod 600 "$DAF_KOMGA_CONF" 2>/dev/null || true
 fi
-DAF_KOMGA_CONF="$DAF_KOMGA_CONF" DAF_FRESHRSS_URL="${DAF_FRESHRSS_URL:-http://127.0.0.1:9}" DAF_STATE="$DIR/state" DAF_VAULT="$DIR/vault" nohup "$PY" -m uvicorn daf.app:app \
-    --host 100.91.202.11 --port "$PORT" >"$DIR/server.log" 2>&1 &
+[ -n "$HOST" ] || HOST=$("$PY" -c 'from daf import config; print(config.HOSTS[-1])')   # the address the Mac can reach
+DAF_NOTIFY=/bin/true DAF_KOMGA_CONF="$DAF_KOMGA_CONF" DAF_FRESHRSS_URL="${DAF_FRESHRSS_URL:-http://127.0.0.1:9}" DAF_STATE="$DIR/state" DAF_VAULT="$DIR/vault" nohup "$PY" -m uvicorn daf.app:app \
+    --host "$HOST" --port "$PORT" >"$DIR/server.log" 2>&1 &
 echo $! >"$DIR/server.pid"
 COOKIE=$(DAF_STATE="$DIR/state" "$PY" -c 'from daf import auth; print(auth.make_cookie())')
 TOKEN=$(DAF_STATE="$DIR/state" DAF_VAULT="$DIR/vault" "$PY" -m daf.cli kindle-token selftest)
-for _ in 1 2 3 4 5 6 7 8 9 10; do curl -sf "http://100.91.202.11:$PORT/api/health" >/dev/null && break; sleep 0.5; done
+for _ in 1 2 3 4 5 6 7 8 9 10; do curl -sf "http://$HOST:$PORT/api/health" >/dev/null && break; sleep 0.5; done
 echo "sandbox in $DIR (pid $(cat "$DIR/server.pid"))" >&2
-echo "http://100.91.202.11:$PORT $COOKIE $TOKEN"
+echo "http://$HOST:$PORT $COOKIE $TOKEN"

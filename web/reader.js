@@ -909,7 +909,7 @@ function moreAct(a){
   else if (a === 'reset') api('/api/docs/' + encodeURIComponent(d.id) + '/progress', { method:'DELETE' }).then(() => { d.progress = 0; $('#main').scrollTo({ top:0, behavior:'smooth' }); toast('Back to the start; progress cleared'); }).catch(e => toast(e.message));
   else if (a === 'open' && d.url) window.open(d.url, '_blank', 'noopener');
   else if (a === 'copy' && d.url) navigator.clipboard && navigator.clipboard.writeText(d.url).then(() => toast('Link copied'), () => {});
-  else if (a === 'vault' && d.vault_path) location.href = 'obsidian://open?vault=Synergathan&file=' + encodeURIComponent(d.vault_path.replace(/\.md$/, ''));
+  else if (a === 'vault' && d.vault_path) location.href = 'obsidian://open?vault=' + encodeURIComponent(d.vault_name || 'vault') + '&file=' + encodeURIComponent(d.vault_path.replace(/\.md$/, ''));
   else if (a === 'keys') showKeys();
   else if (a === 'meta') editMeta();
 }
@@ -953,9 +953,9 @@ async function readView(id){
   if (d.kind === 'video') h += videoHead(d);
   if (tweetParts(d).lead) h += '<p class="tweetlead">' + esc(tweetParts(d).lead) + '</p>';
   if (d.kind === 'tweet') { const seen = {}; d.blocks.forEach(b => { if (b.t === 'img') seen[b.src] = (seen[b.src] || 0) + 1; }); R.avatars = new Set(Object.keys(seen).filter(k => seen[k] > 1)); } else R.avatars = null;
-  if (!d.blocks.length && d.kind === 'video') h += '<div class="placeholder" id="trstatus">No transcript yet. <button class="btn sm" data-tr="captions">Get YouTube’s captions</button> <button class="btn sm" data-tr="whisper">Transcribe on morten (slow)</button></div>';
-  else if (!d.blocks.length && d.kind === 'pdf') h += '<div class="placeholder">' + (d.preparing ? '<span id="trstatus">Reading the PDF on morten. The text appears here in a moment.</span>' : 'Couldn’t read this PDF: ' + esc(d.content_error || '') + '.') + ' <a href="/api/docs/' + encodeURIComponent(d.id) + '/pdf" target="_blank" rel="noopener">Open the original layout</a></div>';
-  else if (!d.blocks.length && d.preparing) h += '<div class="placeholder"><span id="trstatus">Reading the page on morten. The text appears here in a moment.</span> <a href="' + esc(d.url || '#') + '" target="_blank" rel="noopener">Open the original</a></div>';
+  if (!d.blocks.length && d.kind === 'video') h += '<div class="placeholder" id="trstatus">No transcript yet. <button class="btn sm" data-tr="captions">Get YouTube’s captions</button> <button class="btn sm" data-tr="whisper">Transcribe on the server (slow)</button></div>';
+  else if (!d.blocks.length && d.kind === 'pdf') h += '<div class="placeholder">' + (d.preparing ? '<span id="trstatus">Reading the PDF on the server. The text appears here in a moment.</span>' : 'Couldn’t read this PDF: ' + esc(d.content_error || '') + '.') + ' <a href="/api/docs/' + encodeURIComponent(d.id) + '/pdf" target="_blank" rel="noopener">Open the original layout</a></div>';
+  else if (!d.blocks.length && d.preparing) h += '<div class="placeholder"><span id="trstatus">Reading the page on the server. The text appears here in a moment.</span> <a href="' + esc(d.url || '#') + '" target="_blank" rel="noopener">Open the original</a></div>';
   else if (!d.blocks.length) h += '<div class="placeholder">' + (d.content_error ? (/^Daf /.test(d.content_error) ? esc(d.content_error) : 'Karakeep didn’t answer: ' + esc(d.content_error)) : d.kind === 'pdf' ? 'PDFs open in the reader in a later round. For now, open the original.' : d.kind === 'podcast' ? 'A podcast episode. Listen in AntennaPod, and share it to Ezer with its position to clip the minute before.' : 'There’s no saved text for this one.') + (d.url ? ' <a href="' + esc(d.url) + '" target="_blank" rel="noopener">Open the original</a>' : '') + '</div>';
   else h += '<div class="body" id="docbody">' + d.blocks.map(blockHTML).join('') + '</div>';
   // A feed that sends only the start: the page has the rest (daf/fulltext.py)
@@ -987,7 +987,7 @@ function drawPanel(){
       '<div class="nbook"><div class="nbhead"><span class="lbl">Highlights</span><span class="spacer"></span>' + (d.highlights.length ? '<a class="linkbtn tiny" href="/api/highlights/export?fmt=md&book=' + encodeURIComponent(d.id) + '" download>Export</a>' : '') + '</div>' +
         (d.highlights.length ? sortedHls(d).map(x => H.row(Object.assign(x, { source: x.source || 'daf', open: '#read/' + encodeURIComponent(d.id) + '/hl:' + encodeURIComponent(x.id) }), (H.rowOpts = { chapter: false, date: false }))).join('')
           : '<span class="mute tiny">' + (H.auto() ? 'Select a passage and it’s highlighted (hold Alt to select without), or press h on the paragraph with the bar.' : 'Select text and choose Highlight, or press h on the paragraph with the bar.') + '</span>') + '</div>' +
-      (d.vault_path ? '<div class="vault"><b>In your vault</b><code>' + esc(d.vault_path) + '</code><a class="tiny" href="obsidian://open?vault=Synergathan&file=' + encodeURIComponent(d.vault_path.replace(/\.md$/, '')) + '">Open in Obsidian</a></div>' : '<div class="vault"><span class="mute tiny">The first highlight creates a note in <code>Reference/clippings</code>.</span></div>') + '</div>';
+      (d.vault_path ? '<div class="vault"><b>In your vault</b><code>' + esc(d.vault_path) + '</code><a class="tiny" href="obsidian://open?vault=' + encodeURIComponent(d.vault_name || 'vault') + '&file=' + encodeURIComponent(d.vault_path.replace(/\.md$/, '')) + '">Open in Obsidian</a></div>' : '<div class="vault"><span class="mute tiny">The first highlight creates a note in <code>Reference/clippings</code>.</span></div>') + '</div>';
   } else {
     const chips = d.questions || ['Summarize this', 'What’s the main argument?', 'What should I remember from this?'];   // Preferences → AI
     h += '<div class="pbody"><span class="mute tiny">Answers come from this document and your highlights in it.</span>' +
@@ -1199,7 +1199,7 @@ const ACT = {
 };
 window.addEventListener('daf-hl-changed', e => { if (C.S.route[0] === 'read' && R.doc) { const h = R.doc.highlights.find(x => x.id === e.detail.id); if (h) { Object.assign(h, e.detail); ACT.changed(h); } } });
 
-/* ---------- read aloud (Kokoro on morten) ---------- */
+/* ---------- read aloud (Kokoro on the server) ---------- */
 function ttsBlocks(){ const d = R.doc; return d ? d.blocks.map((b, i) => [b, i]).filter(x => x[0].t !== 'img' && x[0].t !== 'pg' && (x[0].x || '').trim()).map(x => x[1]) : []; }
 function startTTS(){
   const d = R.doc; if (!d) return;
@@ -1236,7 +1236,7 @@ function drawPlayer(){
   const p = $('#player'), T = R.tts;
   if (!T.on) { p.hidden = true; document.body.classList.remove('playing'); return; }
   p.hidden = false; document.body.classList.add('playing');
-  p.innerHTML = '<div class="pt"><b>' + esc(shortTitle(T.title)) + '</b><span class="mute">Read aloud by Kokoro on morten · ¶ ' + Math.min(T.i + 1, T.blocks.length) + ' of ' + T.blocks.length + '</span></div>' +
+  p.innerHTML = '<div class="pt"><b>' + esc(shortTitle(T.title)) + '</b><span class="mute">Read aloud by Kokoro on the server · ¶ ' + Math.min(T.i + 1, T.blocks.length) + ' of ' + T.blocks.length + '</span></div>' +
     '<button class="btn sm" data-tts="prev" aria-label="Previous paragraph">‹ ¶</button><button class="round" data-tts="play" aria-label="' + (T.playing ? 'Pause' : 'Play') + '">' + (T.playing ? ICON.pause : ICON.play) + '</button><button class="btn sm" data-tts="next" aria-label="Next paragraph">¶ ›</button>' +
     '<button class="btn sm" data-tts="rate">' + (T.rate || 1) + '×</button><button class="btn sm" data-tts="voice" aria-label="Voice: ' + esc(C.Voices.cur ? C.Voices.label(C.Voices.cur) : 'choose one') + '">' + esc(C.Voices.cur ? C.Voices.name(C.Voices.cur) : 'Voice') + '</button>' + (R.doc && R.doc.id !== T.doc ? '<a class="btn sm" href="#read/' + encodeURIComponent(T.doc) + '">Back to it</a>' : '') + '<button class="ib" data-tts="close" aria-label="Close">' + ICON.close + '</button>';
 }
@@ -1534,7 +1534,7 @@ document.addEventListener('click', e => {
   const sk = t.closest('[data-seek]'); if (sk) { seek(+sk.dataset.seek); return; }
   const vc = t.closest('[data-vclip]'); if (vc) { clipVideo(+vc.dataset.vclip); return; }
   const tr = t.closest('[data-tr]');
-  if (tr && R.doc) { const d = R.doc; api('/api/docs/' + encodeURIComponent(d.id) + '/transcript', { method:'POST', body:JSON.stringify({ whisper: tr.dataset.tr === 'whisper' }) }).then(() => { $('#trstatus').innerHTML = 'Working on it on morten' + (tr.dataset.tr === 'whisper' ? ' (whisper takes a while for a long video)' : '') + '. This page fills in when it’s ready.'; pollTranscript(d.id); }).catch(err => toast(err.message)); return; }
+  if (tr && R.doc) { const d = R.doc; api('/api/docs/' + encodeURIComponent(d.id) + '/transcript', { method:'POST', body:JSON.stringify({ whisper: tr.dataset.tr === 'whisper' }) }).then(() => { $('#trstatus').innerHTML = 'Working on it on the server' + (tr.dataset.tr === 'whisper' ? ' (whisper takes a while for a long video)' : '') + '. This page fills in when it’s ready.'; pollTranscript(d.id); }).catch(err => toast(err.message)); return; }
   const pi = t.closest('[data-pi]'); if (pi) { palGo(+pi.dataset.pi); return; }
   const act = t.closest('[data-act]');
   if (act && act.dataset.act === 'palette') { openPalette(); return; }
@@ -1606,7 +1606,7 @@ function pollTranscript(id){
     try { const st = await api('/api/docs/' + encodeURIComponent(id) + '/transcript');
       if (st.ready || (st.page && ['done', 'failed'].includes(st.page.status) && !st.pdf)) { readView(id); return; }
       const j = st.pdf || st.whisper || st.captions;
-      if (j && j.status === 'failed') { $('#trstatus').innerHTML = 'That didn’t work: ' + esc(j.error || '') + ' <button class="btn sm" data-tr="whisper">Transcribe on morten instead</button>'; return; }
+      if (j && j.status === 'failed') { $('#trstatus').innerHTML = 'That didn’t work: ' + esc(j.error || '') + ' <button class="btn sm" data-tr="whisper">Transcribe on the server instead</button>'; return; }
     } catch(e){}
     pollTranscript(id);
   }, 5000);

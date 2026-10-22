@@ -92,9 +92,7 @@ def retry():
         with db.session() as c:
             c.execute("UPDATE feedback SET issue = ?, error = NULL WHERE id = ?", (url, r["id"]))
     for r in lost:
-        from .cli import NOTIFY
-        subprocess.run([NOTIFY, "Daf", "Feedback that never reached GitHub (it's still in Daf, Preferences → Feedback):\n\n" + r["text"][:600]],
-                       timeout=60, check=False)
+        config.notify("Daf", "Feedback that never reached GitHub (it's still in Daf, Preferences → Feedback):\n\n" + r["text"][:600])
         with db.session() as c:
             c.execute("UPDATE feedback SET error = 'told: ' || COALESCE(error, '') WHERE id = ?", (r["id"],))
 

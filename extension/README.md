@@ -20,13 +20,13 @@ Daf keeps the page as I see it, which means a paywalled article I'm signed in to
 
 ## Making the files
 
-On morten:
+On the server:
 
-    cd /srv/dev/daf/extension && ./build.sh
+    cd daf/extension && ./build.sh
 
 That makes `dist/`, which has a folder and a file for each browser: `dist/firefox` and `dist/daf-extension.xpi` for Zen and Firefox, and `dist/chromium` and `dist/daf-extension.zip` for Chrome and Arc. To get them onto the Mac:
 
-    scp -r morten:/srv/dev/daf/extension/dist ~/Daf-extension
+    scp -r yourserver:/path/to/daf/extension/dist ~/Daf-extension
 
 ## Zen or Firefox, just to try it
 
@@ -42,7 +42,7 @@ Firefox (and Zen, which is built on it) only keeps add-ons that Mozilla has sign
        AMO_JWT_ISSUER=user:12345678:123
        AMO_JWT_SECRET=…
 
-3. On morten: `extension/sign.sh`. It packs the extension, sends it to Mozilla, waits for the signed file, keeps it in `extension/signed/`, and Daf's Preferences download it from then on.
+3. On the server: `extension/sign.sh`. It packs the extension, sends it to Mozilla, waits for the signed file, keeps it in `extension/signed/`, and Daf's Preferences download it from then on.
 4. In Zen: download it from Preferences → Account → Browser extension → Firefox or Zen, then `about:addons` → the gear → "Install Add-on From File…".
 
 Mozilla won't sign the same version twice, so for the next change bump `"version"` in `manifest.json` first.
@@ -72,7 +72,7 @@ The extension's files are the same as Zen's; `build.sh` gives Safari's build `sa
 
 1. In Daf, go to Preferences, then Account. Under "Connected devices" there's a "Browser extension" row. Click "Make a token" and copy the token. Daf only shows it ONCE.
 2. Click the Daf button in the toolbar and choose "Options" (or right-click the button and pick Options).
-3. The address is already `https://daf.tiresia.xyz`. Paste the token, then "Save and connect". It should say "Connected to Daf." The tailnet address (`http://100.91.202.11:8440`) works too, but only while you're on Tailscale.
+3. The address is already `https://daf.tiresia.xyz`. Paste the token, then "Save and connect". It should say "Connected to Daf." The tailnet address (`http://<server>:8440`) works too, but only while you're on Tailscale.
 
 If the browser asks whether Daf can read the pages you visit, say yes; that's how it draws the highlights. Zen might ask when you hit "Save and connect". To change Alt+H, it's `about:addons` → gear → "Manage Extension Shortcuts" in Zen, and `chrome://extensions/shortcuts` in Chrome.
 

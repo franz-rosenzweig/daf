@@ -54,7 +54,7 @@ def calendar(conn, day=None):
     row = conn.execute("SELECT v FROM kv WHERE k = ?", (key,)).fetchone()
     if row:
         return json.loads(row[0])
-    q = urllib.parse.urlencode({"diaspora": 1, "timezone": s.get("home_tz", "America/Phoenix"),
+    q = urllib.parse.urlencode({"diaspora": 1, "timezone": s.get("home_tz") or "UTC",
                                 "year": day.year, "month": day.month, "day": day.day})
     d = _get(f"{API}/calendars?{q}")
     items = {}

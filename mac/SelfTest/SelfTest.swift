@@ -320,7 +320,7 @@ enum SelfTest {
         Outside.opened = []
         await js(web, "window.open('https://example.com/opened', '_blank'), 1")
         await js(web, "(() => { const a = document.createElement('a'); a.href = 'https://example.org/linked'; document.body.appendChild(a); a.click(); a.remove(); return 1; })()")
-        await js(web, "location.href = 'obsidian://open?vault=Synergathan&file=x', 1")
+        await js(web, "location.href = 'obsidian://open?vault=vault&file=x', 1")
         _ = await until(3) { Outside.opened.count >= 3 }
         let got = Outside.opened.map(\.absoluteString)
         check(got.contains("https://example.com/opened"), "window.open elsewhere goes to the browser", "\(got)")
