@@ -2,7 +2,7 @@
 
 # The Torah shelf
 
-The Torah shelf is the week's Torah reading in Daf: the parasha and the haftarah, the divrei Torah from my feeds, and my own essays on that parasha, all in one place before Shabbat. Reading here counts toward the hour like any other reading, and highlights work the same way.
+The Torah shelf is the week's Torah reading in Daf: the parasha and the haftarah, the divrei Torah from the Feed, and the essays in the vault on that parasha, all in one place before Shabbat. Reading here counts toward the hour like any other reading, and highlights work the same way.
 
 ![The Torah shelf](images/torah-shelf.png)
 *The Torah shelf for Noach.*
@@ -13,7 +13,7 @@ The Torah shelf is the week's Torah reading in Daf: the parasha and the haftarah
 
 - **Parasha** and **Haftarah:** this week's readings from Sefaria's calendar (the diaspora schedule, in your home time zone), with the verses and the Shabbat they're read on.
 - **Divrei Torah this week:** the posts from the "Ruach" folder of my Feed, the ones that name this parasha first.
-- **From your vault:** essays filed in the vault under this parasha. For me that's Rabbi Sacks' Covenant & Conversation, a whole folder of essays for each parasha. They open in Daf, so the time counts, and highlights go back into the same note.
+- **From your vault:** essays filed in the vault under this parasha, like Rabbi Sacks' Covenant & Conversation kept as a folder of essays for each parasha. They open in Daf, so the time counts, and highlights go back into the same note.
 - **Earlier weeks:** the parashiot from the weeks before, still there if you fell behind.
 
 On Friday, Today reminds you that Shabbat is coming and that the parasha is waiting here.

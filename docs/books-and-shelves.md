@@ -33,7 +33,7 @@ Every list you made on Hardcover comes into Daf as a shelf, marked "Hardcover li
 Click any book, anywhere, and you get its page.
 
 ![A book's page](images/book.png)
-*Daring Greatly: the time with it, Hardcover, and the highlights below.*
+*A book's page: the time with it, Hardcover, and the highlights below.*
 
 At the top: the progress on the Kindle, in Daf and in the audiobook, when you last opened it, **Read in Daf** (or **Continue in Daf** with the percent), and **Put on the nightstand** or **Take off the nightstand**.
 

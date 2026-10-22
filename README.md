@@ -17,7 +17,7 @@
   <a href="#install">Install</a> ·
   <a href="#features">Features</a> ·
   <a href="#screenshots">Screenshots</a> ·
-  <a href="docs/how-i-use-it.md">How I use it</a>
+  <a href="docs/how-i-use-it.md">A day with Daf</a>
 </p>
 
 <picture>
@@ -27,9 +27,9 @@
 
 ## Why I built it
 
-I turned 30 in the fall of 2026, and I gave myself one goal for the year: read for an hour a day. I call it Year 30. The year before, I read about 68 hours on 180 days, and only 13 of those days reached the hour, which told me the problem wasn't wanting to read, it was that nothing kept the hour in front of me.
+I gave myself one goal for a year: read for an hour a day. I call it Year 30. The year before, I read on plenty of days, but only a handful of them reached the hour, which told me the problem wasn't wanting to read, it was that nothing kept the hour in front of me.
 
-I used Readwise Reader for years and I liked it, but it only knows what I read inside it. Most of my reading happens on a Kindle with KOReader, in audiobooks, and in paper books on Shabbat, and none of that showed up anywhere. So I started building my own. "Daf" is Hebrew for a page, as in daf yomi, the page a day.
+I used Readwise Reader for years and I liked it, but it only knows what I read inside it. Most of my reading happens on a Kindle with KOReader, in audiobooks, and in paper books, and none of that showed up anywhere. So I started building my own. "Daf" is Hebrew for a page, as in daf yomi, the page a day.
 
 Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the paper books I log with a text message, and the books and articles I read in Daf itself, and puts them in one ring. Then it does what I loved about Readwise: it brings my highlights back every morning, so what I read stays with me. Basically, instead of five apps that each know a piece of my reading, I have ONE page that tells me how far I am from the hour.
 
@@ -53,7 +53,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 - **The morning email.** At the hour I pick, what I saved the day before, each with its summary, plus what's waiting in the Feed.
 - **PDFs.** Read as text, or as printed with pdf.js, with highlights on the page.
 - **Listen.** Any article or book read aloud by Kokoro, in the voice I pick, following along sentence by sentence, and the time counts.
-- **The Torah shelf.** The week's parasha and haftarah from Sefaria, Hebrew beside the English, the week's divrei Torah, and my Covenant & Conversation essays for that parasha.
+- **The Torah shelf.** The week's parasha and haftarah from Sefaria, Hebrew beside the English, the week's divrei Torah, and the essays in the vault for that parasha.
 - **Look it up.** Select a word for a definition (Hebrew from Sefaria's dictionaries, English from Wiktionary), or ask about the passage you're in.
 - **Keys and Undo.** Keys for every list, article, book and the review, which I can change in Preferences, and an Undo for everything I do to a list, Delete included.
 - **Offline.** The Mac and Android apps keep their own copy of Daf, so they open and work with no connection. **Keep on this device** holds on to any article or book I want with me, and a manga volume downloads with one button. In a browser, what I've opened before keeps working.
@@ -62,7 +62,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 
 - **One place for every highlight.** The Kindle's, Daf's own, Karakeep's, audiobook bookmarks, photos of marked paper pages, and my old Readwise highlights, in five colors, with notes and tags. A picture in an article can be a highlight too.
 - **Open at the exact spot.** Every highlight opens where it is in the book or article, and the spot flashes.
-- **The daily review.** Five highlights a day, spaced so the ones I keep come back less and less often. The first one comes to my phone at 05:32, Sunday to Friday, and a reply becomes a note.
+- **The daily review.** Five highlights a day, spaced so the ones I keep come back less and less often. The first one comes to my phone every morning, and a reply becomes a note.
 - **Flashcards.** Fill in the blank or question and answer, graded like Anki, and exported for Anki too.
 - **Into the vault.** Highlights and notes go into my Obsidian notes, which means the vault is the record and Daf is the reading room.
 
@@ -81,7 +81,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 ![A book in Daf's reader with blue and yellow highlights, and the Notebook listing them in reading order](docs/images/reader.png)
 *A book in Daf, with my Kindle highlights in their colors and the Notebook beside it.*
 
-![The daily review: one highlight from The Kites with Never, Flashcard, Less and Keep](docs/images/review.png)
+![The daily review: one highlight with Never, Flashcard, Less and Keep](docs/images/review.png)
 *The daily review: five highlights a day, one at a time.*
 
 ![Parashat Noach in Daf, verse by verse, English beside the Hebrew](docs/images/torah.png)
@@ -99,7 +99,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 ![Selecting a sentence in an article: it turns green and the highlight bar shows the five colors](docs/images/article.png)
 *An article from the Library, a sentence just highlighted.*
 
-![The Craft folder of the Feed with the info panel](docs/images/feed.png)
+![One folder of the Feed with the info panel](docs/images/feed.png)
 *The Feed, one folder at a time, with the opening of each post.*
 
 ![The Articles list of the Library with Inbox, Later and Archive](docs/images/library.png)
@@ -173,7 +173,7 @@ Daf is one Python process with a SQLite file, run as a systemd user service. I b
 
 The docs are a set of short pages, written the way I'd explain Daf to a friend.
 
-- **Getting started:** [What is Daf?](docs/what-is-daf.md), [How I use it](docs/how-i-use-it.md), [Install](docs/install.md)
+- **Getting started:** [What is Daf?](docs/what-is-daf.md), [A day with Daf](docs/how-i-use-it.md), [Install](docs/install.md)
 - **Using Daf:** [Today and goals](docs/today-and-goals.md), [Where the minutes come from](docs/reading-time.md), [Paper books](docs/paper-books.md), [The reader](docs/reader.md), [The Feed and the Library](docs/feed-and-library.md), [Videos and podcasts](docs/videos-and-podcasts.md), [Highlights and review](docs/highlights-and-review.md), [Books and shelves](docs/books-and-shelves.md), [The Torah shelf](docs/torah.md), [Stats](docs/stats.md), [Manga](docs/manga.md)
 - **Devices:** [The Kindle](docs/kindle.md), [The Mac app](docs/mac.md), [The Android app](docs/android.md), [The browser extension](docs/browser-extension.md), [Sharing, messages and the widget](docs/phone-shortcuts.md)
 - **Running your own server:** [Your own server](docs/server.md)

@@ -5,13 +5,13 @@
 Daf's reading view is where books, articles and PDFs open, and it works the same way for all three: the text in the middle, contents on the left, and a side panel on the right with **Info**, **Notebook** and **Ask**. This page covers books first, then what's different for articles and PDFs, then Listen, looking words up and the keys.
 
 ![A book in Daf with highlights and the Notebook](images/reader.png)
-*Daring Greatly in Daf, with the Notebook open on the right.*
+*A book in Daf, with the Notebook open on the right.*
 
 ## Books
 
 Every book in my Calibre library with an EPUB, KEPUB, AZW3, MOBI, FB2 or CBZ file opens in Daf. On a book's page press **Read in Daf**, or **Continue in Daf** with the percent once you've started. The reader is foliate-js, the engine inside the Foliate e-reader.
 
-Your place is kept per book on the server, so the phone and the desk agree, and the newest place wins when you open it ("Picked up at 45%"). If the Kindle is further along, Daf says "On the Kindle you're at page 348 of 562", with **Go there** and **Stay here**.
+Your place is kept per book on the server, so the phone and the desk agree, and the newest place wins when you open it ("Picked up at 45%"). If the Kindle is further along, Daf says "On the Kindle you're at page 212 of 480", with **Go there** and **Stay here**.
 
 The top bar has, from the left: back, **Contents and search** (t), **Aa**, the bookmark ribbon (b), **Listen**, the **…** menu and the side panel. The footer has the chapter, the minutes left in it and in the book, the printed page when the EPUB knows it, and the percent. Tap the percent to jump anywhere.
 

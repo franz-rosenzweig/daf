@@ -2,11 +2,11 @@
 <h1 align="center">Daf docs</h1>
 <p align="center">My reading app for Year 30: an hour a day, counted from everywhere I read.</p>
 
-These pages explain Daf the way I'd explain it to a friend sitting next to me: what each screen is for, what the buttons do, and how I use it myself. If you're new, read "What is Daf?" first and then "How I use it", which is the quickest way to see how the pieces fit together. The pages under "Under the hood" are the working notes I keep for running and building it, and you only need them if you're changing Daf itself.
+These pages explain Daf the way I'd explain it to a friend sitting next to me: what each screen is for, what the buttons do, and how it all fits into a day. If you're new, read "What is Daf?" first and then "A day with Daf", which is the quickest way to see how the pieces fit together. The pages under "Under the hood" are the working notes I keep for running and building it, and you only need them if you're changing Daf itself.
 
 ### Getting started
 - [What is Daf?](what-is-daf.md) — what it does, what works where, and what it connects to
-- [How I use it](how-i-use-it.md) — a day with Daf, from the morning highlight to Shabbat
+- [A day with Daf](how-i-use-it.md) — how the pieces fit together, from the morning highlight to Shabbat
 - [Install](install.md) — the web app, the Mac and Android apps, the Kindle plugin and the extension
 
 ### Using Daf

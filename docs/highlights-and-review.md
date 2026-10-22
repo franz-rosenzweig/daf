@@ -61,7 +61,7 @@ On a phone, swipe right to keep and left for less often. A note you write goes i
 
 A book's page can make its highlights come up **More**, **As usual**, **Less** or **Never**, and there are themed reviews too, of one tag, one color, your favorites or one book.
 
-The first highlight of the day also comes to my phone at 05:32, Sunday to Friday, through my Signal bot, and a reply that starts with "n:" becomes its note (see [Sharing, messages and the widget](phone-shortcuts.md)).
+The first highlight of the day also comes to my phone every morning, through my Signal bot, and a reply that starts with "n:" becomes its note (see [Sharing, messages and the widget](phone-shortcuts.md)).
 
 ## Flashcards
 

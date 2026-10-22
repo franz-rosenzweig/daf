@@ -15,12 +15,12 @@ A shared link waits in Daf for a moment and goes into the Library on the next sy
 
 ## The morning highlight
 
-At 05:32, Sunday to Friday, the first highlight of the day's review comes to my phone on Signal. It looks like this:
+Every morning, the first highlight of the day's review comes to my phone on Signal. It looks like this:
 
 > today's highlight
 >
-> "Bruno would arrive and sit down at the piano and I would listen to Chopin's Polonaise…"
-> — The Kites, Romain Gary
+> "Books are the treasured wealth of the world and the fit inheritance of generations and nations."
+> — Walden, Henry David Thoreau
 >
 > Reply with "n:" and a thought, and it goes under this highlight in your vault. 4 more in today's review: …/#review
 
@@ -36,7 +36,7 @@ My Signal bot, Ezer, isn't part of Daf: it's a small script of mine that recogni
 | "shabbat 60" | an hour on Saturday | `daf log-paper 60 --shabbat` |
 | "n: …" or "note: …" | a note under this morning's highlight, or else under the book on the Kindle, at its page | `daf note "n: …"` |
 | a voice note | transcribed and filed under the book read on the Kindle in the last three hours | `daf voice-note FILE` |
-| a photo captioned "page" or "page 112 daring greatly" | a paper page, read into highlights | `daf paper-page PHOTO --caption "…"` |
+| a photo captioned "page" or "page 112 middlemarch" | a paper page, read into highlights | `daf paper-page PHOTO --caption "…"` |
 | a link with a time in it | the minute before that point, transcribed into a highlight | `daf clip "…"` |
 
 If you run your own Daf and have your own way of sending a message to a script, those commands are the whole interface.

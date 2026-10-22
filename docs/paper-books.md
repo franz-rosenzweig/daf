@@ -2,7 +2,7 @@
 
 # Paper books
 
-Paper books are the one kind of reading Daf can't see by itself, so this page covers the two ways you tell it about them: logging the minutes, and photographing the pages you marked so the lines become highlights. I read paper mostly on Shabbat, when there are no screens, so both of these are built to be done afterwards, in a minute.
+Paper books are the one kind of reading Daf can't see by itself, so this page covers the two ways you tell it about them: logging the minutes, and photographing the pages you marked so the lines become highlights. Paper is often what gets read when there are no screens, on Shabbat for one, so both of these are built to be done afterwards, in a minute.
 
 ## Logging minutes
 
@@ -27,7 +27,7 @@ I log paper with my Signal bot, Ezer, which runs the `daf` command line on the s
 - "read 40 paper" or "paper 40" logs 40 minutes today;
 - "shabbat 60" logs an hour on Saturday.
 
-On the server it's `daf log-paper 40`, with `--yesterday`, `--shabbat` or `--date 2026-10-10` for another day, `--pages 32` for a page goal and `--note "Gilead"` for a note. If you have your own way of sending a message to a script, that's the command to call.
+On the server it's `daf log-paper 40`, with `--yesterday`, `--shabbat` or `--date 2026-10-10` for another day, `--pages 32` for a page goal and `--note "Middlemarch"` for a note. If you have your own way of sending a message to a script, that's the command to call.
 
 ## Shabbat
 
@@ -35,11 +35,11 @@ Daf counts days in your home time zone, so an hour read on Shabbat afternoon bel
 
 ## Paper pages: pencil marks into highlights
 
-When I read paper I mark the lines I like in pencil, the old way. Afterwards I photograph the page, and Daf reads it and keeps the marked lines as highlights in that book, the same as a Kindle highlight.
+If you mark the lines you like in pencil, the old way, photograph the page afterwards, and Daf reads it and keeps the marked lines as highlights in that book, the same as a Kindle highlight.
 
 There are three ways to send a photo:
 
-- Text it to Ezer with the caption **page**, or **page 112 daring greatly**, which names the page and the book.
+- Text it to Ezer with the caption **page**, or **page 112 middlemarch**, which names the page and the book.
 - Share it to Daf from the phone's gallery, with "Save to Daf".
 - Open **Paper pages** in the sidebar and press **Add a page**. You can pick several photos at once.
 

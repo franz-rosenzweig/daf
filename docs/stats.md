@@ -17,7 +17,7 @@ Today, the last 7 days, the last 30 days (with the average a day), and Year 30 s
 
 ## When you read
 
-Two charts over the last 90 days. The first is the hour of the day you start reading, which showed me that most of my reading happens after nine at night. The second is the average minutes for each day of the week, with today's weekday darker.
+Two charts over the last 90 days. The first is the hour of the day you start reading, which can be a surprise: it shows when the reading really happens. The second is the average minutes for each day of the week, with today's weekday darker.
 
 ## Where the minutes came from
 

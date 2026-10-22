@@ -9,11 +9,11 @@ Daf is my reading app for one goal: an hour of reading a day for a year, from Oc
 
 ## What it does
 
-Most of my reading never happened in one app. Books are on a Kindle with KOReader, audiobooks are in Audiobookshelf, Shabbat is paper books, and articles were in Read You and Readwise. Each of those knew a piece, and none of them could tell me whether I'd read for an hour today. Daf reads all of them and adds it up on the **Today** page.
+Most of my reading never happened in one app. Books are on a Kindle with KOReader, audiobooks are in Audiobookshelf, some books are on paper, and articles were in Read You and Readwise. Each of those knew a piece, and none of them could tell me whether I'd read for an hour today. Daf reads all of them and adds it up on the **Today** page.
 
 Then it's a reader of its own, built after Readwise Reader. The Feed is my FreshRSS, the Library is Daf's own (it was my Karakeep), and every book in my Calibre library opens in Daf's own EPUB reader. Time spent reading in Daf counts too, so it doesn't matter where I pick up.
 
-The third part is the highlights. Every highlight from every source ends up in one place: the Kindle's, the ones I make in Daf, the ones I make on web pages with the browser extension, audiobook bookmarks, photos of pages I marked in pencil, and the years of Readwise highlights from before. Five of them come back every day in the **Daily review**, and the first one is on my phone at 05:32.
+The third part is the highlights. Every highlight from every source ends up in one place: the Kindle's, the ones I make in Daf, the ones I make on web pages with the browser extension, audiobook bookmarks, photos of pages I marked in pencil, and the years of Readwise highlights from before. Five of them come back every day in the **Daily review**, and the first one comes to my phone in the morning.
 
 Basically, instead of five apps that each know a little, I have ONE place that knows what I read, how long, and what I wanted to remember.
 
@@ -55,6 +55,6 @@ Daf reads a lot of things it doesn't own, and it only changes something in them 
 
 ## Next step
 
-If you want to try it, start with [Install](install.md). If you'd rather see it in use first, read [How I use it](how-i-use-it.md).
+If you want to try it, start with [Install](install.md). If you'd rather see it in use first, read [A day with Daf](how-i-use-it.md).
 
-<sub>Next: [How I use it](how-i-use-it.md) →</sub>
+<sub>Next: [A day with Daf](how-i-use-it.md) →</sub>
