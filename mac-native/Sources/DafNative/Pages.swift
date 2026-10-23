@@ -294,9 +294,30 @@ struct TorahList: View {
                             if let h = t.o("haftarah")?.s("name") { Text("Haftarah: \(h)").font(.callout).foregroundStyle(.secondary) }
                         }
                     }
-                    rows("This week", t.a("week"))
-                    rows("Ruach", t.a("ruach"))
-                    rows("Earlier", t.a("earlier"))
+                    if t.a("week").isEmpty {
+                        Heading("This week")
+                        Text("This week's reading isn't here yet: Sefaria didn't answer. Daf tries again on the next sync.").font(.callout).foregroundStyle(.secondary)
+                    } else {
+                        rows("This week", t.a("week"))
+                    }
+                    Heading("Divrei Torah this week")
+                    if t.a("ruach").isEmpty {
+                        Text("Nothing new in Ruach this week.").font(.callout).foregroundStyle(.secondary)
+                    } else {
+                        Text("From the Ruach folder").font(.caption).foregroundStyle(.secondary)
+                        SelectableRows(items: t.a("ruach").map(Item.init))
+                    }
+                    let essays = AppModel.essays(t)
+                    if !essays.isEmpty {
+                        Heading("From your vault")
+                        Text((t.a("essays").first?.s("series") ?? "Your vault") + (t.o("parasha")?.s("name").map { " on " + $0 } ?? ""))
+                            .font(.caption).foregroundStyle(.secondary)
+                        SelectableRows(items: essays.map(Item.init))
+                        Text("Opens in Daf, so the time counts. Highlights go into the same note.").font(.caption).foregroundStyle(.tertiary)
+                    }
+                    rows("Earlier weeks", t.a("earlier"))
+                    Text("Texts from Sefaria (JPS translation). Right-click a word to define it, or a Hebrew phrase to translate it. Highlights go to Reference/torah in the vault.")
+                        .font(.caption).foregroundStyle(.tertiary)
                 }
             }
             .padding(20)

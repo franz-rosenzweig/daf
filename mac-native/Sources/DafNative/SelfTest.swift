@@ -668,6 +668,16 @@ enum SelfTest {
             check(both && english && onlyHebrew, "its verses show in Hebrew and English, or in one of them", "both \(both), English \(english), Hebrew \(onlyHebrew)")
         }
 
+        // an essay from the vault on this week's parasha (Reference/torah/<parasha>/) opens in the reader
+        await go(m, .torah)
+        if let t = m.torah, let e = AppModel.essays(t).first, let eid = e.s("id") {
+            m.selection = eid
+            let opened = await until(20) { m.reader?.id == eid && (m.reader?.storage.length ?? 0) > 200 }
+            await pause(1)
+            capture("68-torah-essay")
+            check(opened, "an essay from the vault on this week's parasha opens in the reader", (e.s("title") ?? "") + ": \(m.reader?.storage.length ?? -1) characters")
+        } else { log("INFO  no vault essay on this week's parasha in the sandbox") }
+
         // a video: the player above its transcript, a line marked as it's said, Clip 30s
         let vids = (try? await API.shared.json("/api/docs?where=library&tab=inbox&kind=video&sort=new&limit=50"))?.a("items") ?? []
         var vidID: String?
@@ -1017,9 +1027,15 @@ enum SelfTest {
         pages.turn(true)
         await pause(0.6)
         check(pages.first > f0 || bm.section > s0, "→ turns the page", "page \(f0 + 1) → \(pages.first + 1), chapter \(s0) → \(bm.section)")
+        await pause(2)                     // the place saved on its own after a turn, then by hand
         await bm.savePosition()
-        let kept = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position")?.s("cfi") ?? ""
-        let keptAt = bm.text?.range(of: CFI.parse(kept))?.location ?? -1
+        var kept = "", keptAt = -1
+        for _ in 0..<6 {
+            kept = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position")?.s("cfi") ?? ""
+            keptAt = bm.text?.range(of: CFI.parse(kept))?.location ?? -1
+            if keptAt >= pages.visible.location { break }
+            await pause(0.5)
+        }
         check(epub.section(ofCFI: CFI.parse(kept)) == bm.section && keptAt >= pages.visible.location && keptAt <= NSMaxRange(pages.visible),
               "and Daf keeps the new place", kept)
 

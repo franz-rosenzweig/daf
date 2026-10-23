@@ -62,7 +62,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: a book's page: a note on the book, audiobook bookmarks, how often its highlights come back in review, export, review these, a fourth book on the nightstand asks which one steps off
 - here: Books: the nightstand, Want to read (from Hardcover), Opened lately, the whole library, a search by title or author
 - here: Hardcover (link a book, its status and rating, finished)
-- not yet: Torah's essays from the vault
+- here: Torah's essays from the vault (Reference/torah/<parasha>/), opened in the reader, the time counted and the highlights back in the same note
 
 ## Preferences
 
