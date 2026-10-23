@@ -208,7 +208,7 @@ code{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;word-brea
   .app{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
   .side{grid-row:2;border-right:0;border-top:1px solid var(--line);padding:0 4px env(safe-area-inset-bottom,0px);overflow:visible;position:relative}
   .side .navfull{display:none}
-  .side.open .navfull{display:flex;flex-direction:column;position:fixed;left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom,0px));max-height:70vh;overflow:auto;background:var(--side);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);z-index:40;padding-bottom:8px}
+  .side.open .navfull{display:flex;flex-direction:column;position:fixed;left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom,0px));min-height:0;max-height:70vh;overflow:auto;overscroll-behavior:contain;background:var(--side);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);z-index:40;padding-bottom:8px}
   .side.open .sidefoot,.side.open .soon,.side.open .brand{display:none}
   .mobbar{display:flex;justify-content:space-around}
   .main{grid-row:1}
