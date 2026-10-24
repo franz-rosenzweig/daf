@@ -69,7 +69,7 @@ window.addEventListener('unhandledrejection', e => noteErr('unhandled: ' + ((e.r
 // made offline keeps its id and can be changed again before it's sent.
 // Articles too: their highlights (the id is the server's own hash, as for books), status, progress,
 // star, note, tags and title; reading time; the daily review and cards; paper minutes; reading notes.
-const OUTBOX = /^\/api\/(ebooks\/[^/?]+\/(position|highlights|bookmarks(\/[^/?]+)?)|highlights\/[^/?]+(\/(color|note|fav|tags|restore))?|manga\/books\/[^/?]+\/progress|manga\/beat|docs\/[^/?]+\/(highlights|status|progress|star|note|tags|meta)|docs\/bulk|read\/beat|review\/[^/?]+|cards\/[^/?]+\/grade|paper|notes|feedback|tips|books\/[^/?]+\/review)$/;
+const OUTBOX = /^\/api\/(ebooks\/[^/?]+\/(position|highlights|bookmarks(\/[^/?]+)?)|highlights\/[^/?]+(\/(color|note|fav|tags|restore))?|manga\/books\/[^/?]+\/progress|manga\/beat|docs\/[^/?]+\/(highlights|status|progress|star|note|tags|meta|ink)|docs\/bulk|read\/beat|review\/[^/?]+|cards\/[^/?]+\/grade|paper|notes|feedback|tips|books\/[^/?]+\/review)$/;
 // The day of a moment in Daf's own time zone (home_tz), as the server counts it, whatever this device is set to.
 const dayIn = at => { const tz = (S.data && S.data.settings && S.data.settings.home_tz) || (S.settings && S.settings.home_tz);
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz || undefined, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at * 1000)); } catch(e){ return isoOf(new Date(at * 1000)); } };

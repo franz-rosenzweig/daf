@@ -258,6 +258,8 @@ def get_doc(conn, doc_id, prefetch=False):
         except ValueError:
             h["pos"] = None
     d["asks"] = [dict(r) for r in conn.execute("SELECT q, quote, a, at FROM asks WHERE doc_id = ? ORDER BY at", (doc_id,))]
+    from . import ink
+    d["ink"] = ink.strokes(conn, doc_id)
     b = conn.execute("SELECT vault_path FROM books WHERE id = ?", (doc_id,)).fetchone()
     d["vault_path"] = b[0] if b else None
     d["vault_name"] = config.VAULT.name
@@ -364,7 +366,7 @@ def all_doc_tags(conn):
 
 
 def save_to_library(conn, doc_id):
-    """Feed item → the Library (Daf's own, or Karakeep the old way). Highlights move with it.
+    """Feed item → the Library (Daf's own, or Karakeep the old way). Highlights and ink move with it.
     Returns the new doc id."""
     d = conn.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
     if not d or not d["url"]:
@@ -417,6 +419,7 @@ def save_to_library(conn, doc_id):
         except Exception:  # noqa: BLE001 - saved is what matters
             pass
     conn.execute("UPDATE highlights SET book_id = ? WHERE book_id = ?", (new_id, doc_id))
+    conn.execute("UPDATE ink SET doc = ? WHERE doc = ?", (new_id, doc_id))
     # Its note in the vault goes with it, unless the Library copy has one already.
     conn.execute("UPDATE OR IGNORE books SET id = ? WHERE id = ?", (new_id, doc_id))
     conn.execute("DELETE FROM books WHERE id = ?", (doc_id,))

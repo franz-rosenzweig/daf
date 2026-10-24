@@ -60,6 +60,16 @@ CREATE TABLE IF NOT EXISTS books (           -- one row per work: every Kindle c
   private INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS book_keys (key TEXT PRIMARY KEY, book_id TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS ink (           -- what's written on an article with a pen (ink.py)
+  id TEXT PRIMARY KEY,                      -- the page's own id for the stroke
+  doc TEXT NOT NULL,
+  tool TEXT NOT NULL,                       -- pen | marker
+  color TEXT,
+  size REAL,
+  data TEXT NOT NULL,                       -- {"at": its place, "pts": [[x, y, pressure], ...]}
+  created INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ink_doc ON ink (doc);
 CREATE TABLE IF NOT EXISTS highlights (
   id TEXT PRIMARY KEY,
   book_id TEXT,

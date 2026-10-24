@@ -59,7 +59,7 @@ class Net:
 
 
 NET = Net()
-ONLY = os.environ.get("DAF_CHECK", "")       # "offline", "book", "manga", "mangadl", "news", "boot", "docs", "theme", "prune" or "listen": only those checks
+ONLY = os.environ.get("DAF_CHECK", "")       # "offline", "book", "manga", "mangadl", "news", "boot", "docs", "theme", "prune", "listen" or "ink": only those checks
 
 
 def forward(listen_port, target):
@@ -291,6 +291,85 @@ def main(base, cookie, token):
         adb("forward", "--remove", "tcp:9224", check_=False)
         note = f" ({skipped} skipped)" if skipped else ""
         print(("CHECK passed" if not failures else f"CHECK {failures} failed") + note, flush=True)
+        return 1 if failures else 0
+
+    if ONLY == "ink":
+        # Writing with a pen (ink.js), with the stylus as `input stylus` sends it: an S Pen's
+        # events, without the S Pen. Leave the tablet alone while it runs.
+        doc = js("fetch('/api/docs?where=library&tab=inbox&kind=article&limit=40').then(r => r.json()).then(j => ((j.items || []).find(d => (d.words || 0) > 600) || {}).id || '')")
+        check(bool(doc), "an article to write on", str(doc))
+        js(f"location.hash = 'read/' + encodeURIComponent({json.dumps(doc)}), 1")
+        check(until("document.querySelector('#docbody p[data-i]') && window.DafCore.Ink", 20), "it opens")
+        time.sleep(1)
+        js("(() => { const e = [...document.querySelectorAll('#docbody p[data-i]')].find(e => e.textContent.length > 250 && !e.querySelector('mark')); const m = document.querySelector('#main'); m.scrollTop += e.getBoundingClientRect().top - 260; return 1; })()")
+        time.sleep(0.8)
+        # where the page is on the screen: a stylus tap at a known point, as the page saw it
+        js("window.__probe = null; addEventListener('pointerdown', e => { window.__probe = [e.clientX, e.clientY, e.pointerType, devicePixelRatio]; }, { capture: true, once: true }), 1")
+        size = adb("shell", "wm", "size").split()[-1].split("x")
+        w, h = int(size[0]), int(size[1])
+        adb("shell", "input", "stylus", "tap", str(w // 2), str(h // 2))
+        until("window.__probe", 5)
+        probe = js("window.__probe")
+        check(isinstance(probe, list) and probe[2] == "pen", "the stylus reaches the page as a pen", str(probe))
+        if not isinstance(probe, list):
+            return 1
+        dpr = probe[3]
+        ox, oy = w // 2 - probe[0] * dpr, h // 2 - probe[1] * dpr
+        scr = lambda x, y: (str(int(ox + x * dpr)), str(int(oy + y * dpr)))
+        box = js("(() => { const e = [...document.querySelectorAll('#docbody p[data-i]')].find(e => e.textContent.length > 250 && !e.querySelector('mark')); const r = e.getBoundingClientRect(); return { i: +e.dataset.i, l: r.left, t: r.top, r: r.right, b: r.bottom, lh: parseFloat(getComputedStyle(e).lineHeight) }; })()")
+        st = lambda: js("window.DafCore.Ink.state()") or {}
+        top = lambda: js("document.querySelector('#main').scrollTop")
+        js("window.DafCore.Ink.state().on || document.querySelector('.inkpal [data-ink=\"on\"]').click(), 1")
+        js("document.querySelector('.inkpal [data-ink=\"pen\"]') && document.querySelector('.inkpal [data-ink=\"pen\"]').click(), 1")
+        n0, y0 = st().get("strokes", 0), top()
+        # down the page, which a finger would scroll
+        adb("shell", "input", "stylus", "swipe", *scr(box["l"] + 40, box["t"] + box["lh"] * 1.5), *scr(box["l"] + 90, box["t"] + box["lh"] * 5), "400")
+        time.sleep(0.6)
+        check(st().get("strokes") == n0 + 1, "the pen writes a stroke", str(st()))
+        check(top() == y0, "and the page stays put under it", f"{y0} → {top()}")
+        check(js("!!document.querySelector('.inkpal')") is True, "the pen's tools are there")
+        adb("shell", "input", "touchscreen", "swipe", *scr(box["l"] + 120, box["t"] + box["lh"] * 6), *scr(box["l"] + 120, box["t"] + box["lh"] * 2), "300")
+        time.sleep(0.8)
+        check(st().get("strokes") == n0 + 1 and top() != y0, "a finger still scrolls, and writes nothing", f"{st().get('strokes')} strokes, {y0} → {top()}")
+        js(f"document.querySelector('#main').scrollTop = {y0}, 1")
+        time.sleep(0.5)
+        # the highlighter along the paragraph's third line: a highlight of those words
+        marks = lambda: js("document.querySelectorAll('#docbody mark[data-h]').length")
+        m0 = marks()
+        js("document.querySelector('.inkpal [data-ink=\"marker\"]').click(), 1")
+        y = box["t"] + box["lh"] * 2.5
+        adb("shell", "input", "stylus", "swipe", *scr(box["l"] + 10, y), *scr(box["r"] - 40, y), "500")
+        check(until(f"document.querySelectorAll('#docbody mark[data-h]').length > {m0}", 6), "the highlighter over words makes a highlight", f"{m0} → {marks()}")
+        # in the margin, then the eraser over it, and Undo
+        js("document.querySelector('.inkpal [data-ink=\"pen\"]').click(), 1")
+        js("window.DafCore.Ink.state().margin || document.querySelector('.inkpal [data-ink=\"margin\"]').click(), 1")
+        time.sleep(0.6)
+        r = js(f"(() => {{ const e = document.querySelector('#docbody [data-i=\"{box['i']}\"]').getBoundingClientRect(); return [e.right, e.top, innerWidth]; }})()")
+        check(r[2] - r[0] > 180, "Margin leaves room on the right", str(r))
+        n1 = st().get("strokes", 0)
+        adb("shell", "input", "stylus", "swipe", *scr(r[0] + 40, r[1] + 20), *scr(r[0] + 150, r[1] + 30), "300")
+        time.sleep(0.5)
+        check(st().get("strokes") == n1 + 1, "the pen writes in the margin", str(st()))
+        js("document.querySelector('.inkpal [data-ink=\"eraser\"]').click(), 1")
+        adb("shell", "input", "stylus", "swipe", *scr(r[0] + 90, r[1] - 10), *scr(r[0] + 95, r[1] + 60), "300")
+        time.sleep(0.5)
+        check(st().get("strokes") == n1, "the eraser takes it away", str(st()))
+        js("document.querySelector('.inkpal [data-ink=\"undo\"]').click(), 1")
+        time.sleep(0.3)
+        check(st().get("strokes") == n1 + 1, "Undo brings it back", str(st()))
+        js("document.querySelector('.inkpal [data-ink=\"pen\"]').click(), 1")
+        os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build"), exist_ok=True)
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "ink.png"), "wb") as f:   # to look at
+            f.write(subprocess.run([ADB, "exec-out", "screencap", "-p"], capture_output=True).stdout)
+        # kept: there again when the article opens again
+        until("window.DafCore.Ink.state().queued === 0", 6)
+        time.sleep(1)
+        js("location.reload(), 1")
+        time.sleep(1)
+        check(until(f"window.DafCore && window.DafCore.Ink && window.DafCore.Ink.state().strokes === {n1 + 1}", 20), "the strokes are there when it opens again", str(js("window.DafCore && window.DafCore.Ink && window.DafCore.Ink.state()")))
+        adb("reverse", "--remove", f"tcp:{PORT}", check_=False)
+        adb("forward", "--remove", "tcp:9224", check_=False)
+        print(("CHECK passed" if not failures else f"CHECK {failures} failed"), flush=True)
         return 1 if failures else 0
 
     if ONLY == "docs":
