@@ -59,7 +59,7 @@ class Net:
 
 
 NET = Net()
-ONLY = os.environ.get("DAF_CHECK", "")       # "offline", "book", "manga", "mangadl", "news", "boot", "docs", "theme" or "prune": only those checks
+ONLY = os.environ.get("DAF_CHECK", "")       # "offline", "book", "manga", "mangadl", "news", "boot", "docs", "theme", "prune" or "listen": only those checks
 
 
 def forward(listen_port, target):
@@ -237,6 +237,62 @@ def main(base, cookie, token):
           "Share as image finds the share sheet behind navigator.share")
 
     # an article kept on the device by hand: marked in its list, and it opens with Daf out of reach
+    def listen_check():
+        global skipped
+        # listening with the screen off (last: the phone ends up locked)
+        if not awake or locked:
+            skipped += 1
+            print("SKIP  listening with the screen off: unlock the phone and run again", flush=True)
+        else:
+            adb("shell", "am", "start", "-n", f"{PKG}/xyz.tiresia.daf.MainActivity")
+            time.sleep(1)
+            doc = js("fetch('/api/docs?where=library&limit=30').then(r => r.json()).then(j => { const d = (j.items || j.docs || []).find(d => d.kind === 'article' && (d.mins || 0) >= 2); return d ? d.id : ''; })")
+            js(f"location.hash = 'read/' + encodeURIComponent({json.dumps(doc)}), 1")
+            until("document.getElementById('docbody')", 15)
+            js("dafCommand('listen'), 1")
+            para = "(() => { const m = /¶ (\\d+) of/.exec((document.querySelector('#player .pt .mute') || {}).textContent || ''); return m ? +m[1] : 0; })()"
+            playing = until("(document.querySelector('[data-tts=\"play\"]') || {}).getAttribute && document.querySelector('[data-tts=\"play\"]').getAttribute('aria-label') === 'Pause'", 20)
+            check(playing, "read-aloud starts in the app", doc)
+            time.sleep(2)
+            svc = adb("shell", "dumpsys", "activity", "services", PKG, check_=False)
+            check("xyz.tiresia.daf.Listen" in svc and "isForeground=true" in svc, "it runs as a media-playback service")
+            sess = adb("shell", "dumpsys", "media_session", check_=False)
+            mine = sess.split(PKG, 1)[-1][:3000] if PKG in sess else ""
+            check("state=PLAYING(3)" in mine or "{state=3," in mine, "with a media session on the lock screen, playing")
+            if "state=PLAYING(3)" not in mine and "{state=3," not in mine:
+                routed = [l.strip() for l in sess.splitlines() if "media button session" in l.lower()]
+                print("INFO  media: " + (" | ".join(routed) or "no media button session") + " || " + " ".join(mine.split())[:600], flush=True)
+            # the media buttons go to whichever app last played sound: wait until that's Daf
+            for _ in range(30):
+                if f"Media button session is {PKG}/" in adb("shell", "dumpsys", "media_session", check_=False):
+                    break
+                time.sleep(0.5)
+            # the media keys, as headphones and the lock screen send them (Android 12's
+            # `cmd media_session dispatch` never reaches an app's session; a key event does)
+            adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE", check_=False)
+            paused = until("document.querySelector('[data-tts=\"play\"]').getAttribute('aria-label') === 'Play'", 6)
+            check(paused, "its pause button pauses the page")
+            adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PLAY", check_=False)
+            check(until("document.querySelector('[data-tts=\"play\"]').getAttribute('aria-label') === 'Pause'", 6), "and play plays it again")
+            start = js(para)
+            adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
+            time.sleep(45)
+            on = js(para)
+            check(isinstance(on, int) and on > start, "with the screen off it goes on to the next paragraphs", f"¶ {start} → ¶ {on}")
+            js("dafCommand('listen:stop'), 1")
+            time.sleep(2)
+            check("xyz.tiresia.daf.Listen" not in adb("shell", "dumpsys", "activity", "services", PKG, check_=False), "stopping ends the service")
+            adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+
+
+    if ONLY == "listen":
+        listen_check()
+        adb("reverse", "--remove", f"tcp:{PORT}", check_=False)
+        adb("forward", "--remove", "tcp:9224", check_=False)
+        note = f" ({skipped} skipped)" if skipped else ""
+        print(("CHECK passed" if not failures else f"CHECK {failures} failed") + note, flush=True)
+        return 1 if failures else 0
+
     if ONLY == "docs":
         doc = js("fetch('/api/docs?where=library&tab=inbox&kind=article&limit=40').then(r => r.json()).then(j => ((j.items || []).find(d => (d.words || 0) > 300 && d.thumb) || (j.items || []).find(d => (d.words || 0) > 300) || {}).id || '')")
         check(bool(doc), "an article to keep", str(doc))
@@ -753,43 +809,7 @@ def main(base, cookie, token):
     sc = adb("shell", "cmd", "shortcut", "get-shortcuts", "--user", "0", PKG, check_=False)
     print("INFO  shortcuts: " + " ".join(sorted(set(w for w in sc.replace(",", " ").split() if w.startswith("id=")))), flush=True)
 
-    # listening with the screen off (last: the phone ends up locked)
-    if not awake or locked:
-        skipped += 1
-        print("SKIP  listening with the screen off: unlock the phone and run again", flush=True)
-    else:
-        adb("shell", "am", "start", "-n", f"{PKG}/xyz.tiresia.daf.MainActivity")
-        time.sleep(1)
-        doc = js("fetch('/api/docs?where=library&limit=30').then(r => r.json()).then(j => { const d = (j.items || j.docs || []).find(d => d.kind === 'article' && (d.mins || 0) >= 2); return d ? d.id : ''; })")
-        js(f"location.hash = 'read/' + encodeURIComponent({json.dumps(doc)}), 1")
-        until("document.getElementById('docbody')", 15)
-        js("dafCommand('listen'), 1")
-        para = "(() => { const m = /¶ (\\d+) of/.exec((document.querySelector('#player .pt .mute') || {}).textContent || ''); return m ? +m[1] : 0; })()"
-        playing = until("(document.querySelector('[data-tts=\"play\"]') || {}).getAttribute && document.querySelector('[data-tts=\"play\"]').getAttribute('aria-label') === 'Pause'", 20)
-        check(playing, "read-aloud starts in the app", doc)
-        time.sleep(2)
-        svc = adb("shell", "dumpsys", "activity", "services", PKG, check_=False)
-        check("xyz.tiresia.daf.Listen" in svc and "isForeground=true" in svc, "it runs as a media-playback service")
-        sess = adb("shell", "dumpsys", "media_session", check_=False)
-        check(PKG in sess and "state=PLAYING(3)" in sess.split(PKG, 1)[-1][:3000], "with a media session on the lock screen, playing")
-        # the media buttons go to whichever app last played sound: wait until that's Daf
-        for _ in range(30):
-            if f"Media button session is {PKG}/" in adb("shell", "dumpsys", "media_session", check_=False):
-                break
-            time.sleep(0.5)
-        adb("shell", "cmd", "media_session", "dispatch", "pause", check_=False)
-        check(until("document.querySelector('[data-tts=\"play\"]').getAttribute('aria-label') === 'Play'", 6), "its pause button pauses the page")
-        adb("shell", "cmd", "media_session", "dispatch", "play", check_=False)
-        check(until("document.querySelector('[data-tts=\"play\"]').getAttribute('aria-label') === 'Pause'", 6), "and play plays it again")
-        start = js(para)
-        adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
-        time.sleep(45)
-        on = js(para)
-        check(isinstance(on, int) and on > start, "with the screen off it goes on to the next paragraphs", f"¶ {start} → ¶ {on}")
-        js("dafCommand('listen:stop'), 1")
-        time.sleep(2)
-        check("xyz.tiresia.daf.Listen" not in adb("shell", "dumpsys", "activity", "services", PKG, check_=False), "stopping ends the service")
-        adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+    listen_check()
 
     adb("reverse", "--remove", f"tcp:{PORT}", check_=False)
     adb("forward", "--remove", "tcp:9224", check_=False)

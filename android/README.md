@@ -89,6 +89,11 @@ link, and the widget's numbers arriving when you leave the app. Leave the phone 
 runs; with it locked, the key checks are skipped. Remove the test build afterwards with
 `adb uninstall xyz.tiresia.daf.debug`.
 
+`DAF_CHECK=listen` runs only read-aloud: the media-playback service, the media session on the
+lock screen, the media keys pausing and playing the page (sent as key events, the way headphones
+send them: Android 12's `cmd media_session dispatch` never reaches an app), and reading on with
+the screen off. With two devices plugged in, choose one with `ANDROID_SERIAL`.
+
 By hand, after that: put the 4×2 widget on the first screen and see it fill in, share a link from
 Chrome and a photo of a marked page, and switch on the nudge and press Show one now.
 
