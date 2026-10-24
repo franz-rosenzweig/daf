@@ -43,6 +43,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: videos natively (YouTube's private player above the transcript, follow along, a timestamp plays from there, Clip 30s, C), captions or a transcription when there's none; podcast episodes in the reader
 - here: highlights in the PDF view (as you select, H or N, right-click), the text view's found on the page, its zoom keys (− +), its reading time and the page read
 - here: Torah's verses in Hebrew and English, or one of them (the toolbar, or Article › Torah)
+- not yet: what's written on an article with a pen (ink.js, /api/docs/{id}/ink), shown over the text and in the margin
 
 ## Lists
 

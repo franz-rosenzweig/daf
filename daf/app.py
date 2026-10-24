@@ -1734,6 +1734,30 @@ def post_doc_highlight(doc_id: str, b=Depends(json_body), c=Depends(conn)):
     return {"id": hid}
 
 
+@app.post("/api/docs/{doc_id}/ink", dependencies=[Depends(user)])
+def post_doc_ink(doc_id: str, b=Depends(json_body), c=Depends(conn)):
+    """Strokes written with a pen (add) and erased (remove: their ids), in one go (web/ink.js)."""
+    from . import ink
+    if not c.execute("SELECT 1 FROM docs WHERE id = ?", (doc_id,)).fetchone():
+        raise HTTPException(404, "Not found")
+    if not isinstance(b, dict):
+        raise HTTPException(400, "Bad stroke")
+    try:
+        added, removed = ink.change(c, doc_id, b.get("add") or [], b.get("remove") or [], b.get("at"))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e) or "Bad stroke")
+    out = {"added": added, "removed": removed}
+    # Written on in the Feed: kept, as a highlight keeps it.
+    d = c.execute("SELECT where_ FROM docs WHERE id = ?", (doc_id,)).fetchone()
+    if added and d["where_"] == "feed":
+        try:
+            out["saved_as"] = reader.save_to_library(c, doc_id)
+        except Exception as e:  # noqa: BLE001 - the ink stands on the Feed item
+            log.warning("save on ink: %s", e)
+            out["save_error"] = str(e)
+    return out
+
+
 @app.put("/api/highlights/{hl_id}/color", dependencies=[Depends(user)])
 async def put_highlight_color(hl_id: str, request: Request, c=Depends(conn)):
     b = await _body(request)

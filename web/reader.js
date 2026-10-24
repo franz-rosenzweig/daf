@@ -970,6 +970,7 @@ async function readView(id){
   if (d.progress > 3 && d.progress < 98) setTimeout(() => { main.scrollTop = (main.scrollHeight - main.clientHeight) * d.progress / 100; }, 50);
   main.onscroll = onScroll; R.lastActive = Date.now();
   markSpeaking();
+  if (C.Ink) C.Ink.open(d);                           // what's written on it with a pen (ink.js)
 }
 function drawToc(){
   const d = R.doc, t = $('#toc'); if (!t || !d) return;
@@ -1152,6 +1153,7 @@ async function highlight(info, withNote, quiet){
     else if (r.save_error) toast('Highlighted, but the page wasn’t saved to the Library: ' + r.save_error);
     if (withNote) openNoteA(h);
     else { drawPanel(); if (!quiet) showHlBar(h); }
+    return h;
   } catch(err){ toast(err.message); }
 }
 function showHlBar(h){
@@ -1169,17 +1171,21 @@ function showHl(id){
   ms[0].scrollIntoView({ block:'center', behavior:'smooth' });
   ms.forEach(m => m.classList.add('flash')); setTimeout(() => ms.forEach(m => m.classList.remove('flash')), 1800);
 }
-async function removeHl(id){
-  const d = R.doc; if (!d) return;
+// quiet: no Undo toast (the pen's eraser has its own Undo); either way it answers with the way back.
+async function removeHl(id, quiet){
+  const d = R.doc; if (!d) return null;
   const h = d.highlights.find(x => x.id === id);
-  try { await api('/api/highlights/' + encodeURIComponent(id), { method:'DELETE' }); } catch(e){ toast(e.message); return; }
+  try { await api('/api/highlights/' + encodeURIComponent(id), { method:'DELETE' }); } catch(e){ toast(e.message); return null; }
   d.highlights = d.highlights.filter(x => x.id !== id);
   unmark(id); H.hide(); drawPanel(); drawToc();
-  if (h) H.undo('Highlight deleted', async () => {
+  if (!h) return null;
+  const back = async () => {
     await api('/api/highlights/' + encodeURIComponent(id) + '/restore', { method:'POST' });
     if (R.doc !== d) return;
     d.highlights.push(h); if (H.picture(h.text)) markImg(h); else markHl(h); drawPanel(); drawToc();
-  });
+  };
+  if (!quiet) H.undo('Highlight deleted', back);
+  return back;
 }
 // What the highlight toolbar does in the reading view.
 const ACT = {
@@ -1333,6 +1339,7 @@ function palGo(i){ const x = palItems[i]; closePalette(); if (!x) return; if (x.
 
 /* ---------- views ---------- */
 C.sendBeat = sendBeat; C.openAa = openAa;
+C.Reader = { getSel, highlight, removeHl, moved: movedToLibrary };   // for the pen (ink.js)
 C.views.podcasts = async () => {
   R.doc = null;
   $('#main').innerHTML = '<div class="top"><h1>Podcasts</h1><span class="spacer"></span><span class="mute tiny">From AntennaPod · never counted toward the hour</span></div><div class="page" id="podpage"><span class="mute">Loading…</span></div>';

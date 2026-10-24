@@ -89,6 +89,11 @@ link, and the widget's numbers arriving when you leave the app. Leave the phone 
 runs; with it locked, the key checks are skipped. Remove the test build afterwards with
 `adb uninstall xyz.tiresia.daf.debug`.
 
+`DAF_CHECK=ink` runs only writing with a pen (`web/ink.js`), on a tablet with the stylus as `adb shell
+input stylus` sends it: the stylus reaching the page as a pen, a stroke that doesn't scroll the page,
+a finger that still does, the highlighter making a highlight, the margin, the eraser, Undo, and the
+strokes there again after a reload.
+
 `DAF_CHECK=listen` runs only read-aloud: the media-playback service, the media session on the
 lock screen, the media keys pausing and playing the page (sent as key events, the way headphones
 send them: Android 12's `cmd media_session dispatch` never reaches an app), and reading on with

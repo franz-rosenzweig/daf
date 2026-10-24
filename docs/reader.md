@@ -71,6 +71,21 @@ The article **…** menu has **Add a document note**, **Read aloud from here**, 
 ![An article with a new green highlight](images/article.png)
 *Selecting a sentence highlights it, and the bar above it changes the color, adds a note or tags it.*
 
+## Writing with a pen
+
+On a tablet with a pen (the S Pen on a Galaxy Tab, or an Apple Pencil on an iPad) you can write straight on an article, the way you'd write in the margins of a paper book. The pen writes and your fingers scroll and select, so there's no mode to switch. It works in the Android app and in the browser. The pen's tools show on the right of the screen the first time the pen touches an article:
+
+- **Pen**, in black (white on a dark theme), blue, red or green, fine, medium or bold. The line gets thicker the harder you press.
+- **Highlighter.** Drawn along a line of text, it highlights those words, as selecting them does, so the highlight is in the Notebook, Highlights and the review like any other. Drawn down a few lines, it highlights from where you started to where you stopped. Anywhere else, like a ring around a paragraph or a stroke in the margin, it stays a marker's stroke. Its colour is your highlight colour.
+- **Eraser**, or hold the S Pen's button while you write. It takes away whole strokes, and any highlight it passes over.
+- **Undo** and **Redo**.
+- **Margin** moves the text over to leave room on the right for notes. It comes on by itself in an article that already has notes in its margin.
+- **›** puts the tools away, and then the pen scrolls and selects like a finger. The pen button brings them back.
+
+A hand resting on the screen while you write doesn't scroll the page. What you write is kept on the server, so it's there on every device, and each stroke stays with the words it was written on: change the font size or the line width and it moves with them, and a note in the margin stays beside its paragraph. Written with no signal, it waits on the device and goes when you're back online, as highlights do. Writing on a Feed item saves it to the Library, as a highlight does.
+
+For now it's articles. Books are next.
+
 ## PDFs
 
 A PDF opens as text first, which reads like an article and reflows on a phone. **Pages** opens it as printed, with pdf.js, drawn page by page with a text layer you can select and highlight. Zoom with + and −. Highlights made on the page show in the text view too when their words are there, and the other way around.
