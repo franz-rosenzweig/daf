@@ -99,7 +99,7 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
 - **Jobs** (`media.py`): a queue in `jobs`, worked by one thread in the service (restarts requeue
   anything left running). `daf jobs` lists them.
 - **Videos** (Karakeep video bookmarks): captions with yt-dlp first, faster-whisper when there are none
-  (`tools/whisper_segments.py`, run with the host's `/usr/bin/python3`). The transcript is cue blocks
+  (`tools/whisper_segments.py`, run with Daf's own Python; yt-dlp and faster-whisper are in its .venv from requirements.txt since the October 2026 OS upgrade to Python 3.14 left the host's copies behind). The transcript is cue blocks
   with timestamps, speakers and chapters. The player is YouTube's privacy-mode embed
   (`youtube-nocookie.com`); Invidious couldn't stream (its companion answers 500), so it's only a link.
   Click a line to seek, `c` or Clip 30s highlights the last 30 seconds, Follow along scrolls with it.

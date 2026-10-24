@@ -16,7 +16,9 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -25,8 +27,12 @@ from pathlib import Path
 from . import config, db
 
 log = logging.getLogger("daf.media")
-WHISPER = [str(Path(__file__).resolve().parent.parent / "tools" / "whisper_segments.py")]
-YTDLP = "/usr/local/bin/yt-dlp"
+# yt-dlp and faster-whisper are in Daf's own environment (requirements.txt), run with the same Python
+# as Daf, so an upgrade of the system's Python can't take them away (October 2026's did).
+WHISPER = [sys.executable, str(Path(__file__).resolve().parent.parent / "tools" / "whisper_segments.py")]
+# YouTube now wants a JavaScript runtime for some of what yt-dlp asks it; deno, where it's installed.
+_DENO = shutil.which("deno") or str(Path.home() / ".deno" / "bin" / "deno")
+YTDLP = [sys.executable, "-m", "yt_dlp"] + (["--js-runtimes", f"deno:{_DENO}"] if os.path.exists(_DENO) else [])
 ABS_MOUNTS = {"/audiobooks": "/srv/media/audiobooks", "/podcasts": "/srv/media/podcasts"}
 
 
@@ -118,7 +124,7 @@ def start_worker():
 
 
 def whisper(path, start=None, duration=None):
-    cmd = ["/usr/bin/python3"] + WHISPER + [path]
+    cmd = WHISPER + [path]
     if start is not None:
         cmd += ["--start", str(start)]
     if duration is not None:
@@ -196,7 +202,7 @@ def video_transcript(doc_id, use_whisper=False):
     with tempfile.TemporaryDirectory() as tmp:
         info = {}
         if not use_whisper:
-            subprocess.run([YTDLP, "--skip-download", "--write-subs", "--write-auto-subs", "--sub-langs", "en.*,en,he.*,he",
+            subprocess.run(YTDLP + ["--skip-download", "--write-subs", "--write-auto-subs", "--sub-langs", "en.*,en,he.*,he",
                             "--sub-format", "vtt", "--write-info-json", "-o", f"{tmp}/%(id)s.%(ext)s", url],
                            capture_output=True, text=True, timeout=180)
             infos = glob.glob(f"{tmp}/*.info.json")
@@ -207,7 +213,7 @@ def video_transcript(doc_id, use_whisper=False):
                 raise RuntimeError("no captions on YouTube for this video; try the whisper transcript")
             lines = _parse_vtt(open(vtts[0], encoding="utf-8").read())
         else:
-            r = subprocess.run([YTDLP, "-f", "bestaudio", "-x", "--audio-format", "m4a", "--write-info-json", "-o",
+            r = subprocess.run(YTDLP + ["-f", "bestaudio", "-x", "--audio-format", "m4a", "--write-info-json", "-o",
                                 f"{tmp}/%(id)s.%(ext)s", url], capture_output=True, text=True, timeout=1800)
             audio = glob.glob(f"{tmp}/*.m4a")
             if not audio:

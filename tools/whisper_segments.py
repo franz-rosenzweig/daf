@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """whisper_segments.py FILE [--start S] [--duration D] [--model small]
 
-Transcribe with faster-whisper (the host's own python, where it's installed) and
+Transcribe with faster-whisper (in Daf's own environment: media.py runs this with Daf's Python) and
 print JSON: {"language": "en", "segments": [{"start": s, "end": e, "text": "..."}]}.
 --start/--duration cut a window first (ffmpeg), for clips and bookmarks."""
 import argparse

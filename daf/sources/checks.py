@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -173,12 +174,13 @@ def check_kokoro():
 
 
 def check_tools():
-    whisper = subprocess.run(["/usr/bin/python3", "-c", "import faster_whisper"], capture_output=True, timeout=30).returncode == 0
+    runs = lambda *a: subprocess.run([sys.executable, *a], capture_output=True, timeout=30).returncode == 0
+    whisper = runs("-c", "import faster_whisper")
     have = {
         "claude": os.path.exists(config.CLAUDE),
         "faster-whisper": whisper,
         "ffmpeg": bool(shutil.which("ffmpeg")),
-        "yt-dlp": bool(shutil.which("yt-dlp")),
+        "yt-dlp": runs("-m", "yt_dlp", "--version"),
         "signal-cli": bool(shutil.which("signal-cli")),
     }
     missing = [k for k, v in have.items() if not v]
