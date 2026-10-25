@@ -153,6 +153,22 @@ enum SelfTest {
         capture("03-reader")
         guard let r = m.reader, let tv = r.textView else { return finish("the reader didn't open") }
         check(!r.blocks.isEmpty, "its blocks are laid out", "\(r.blocks.count) blocks")
+        // as it opened, the article is as tall as its text, and the wheel scrolls it and it stays
+        // (on macOS 27 the view stopped growing to its text: one screen tall, springing back)
+        if let sv = tv.enclosingScrollView, let w = tv.window {
+            check(tv.frame.height > sv.contentView.bounds.height * 1.5, "the article is as tall as its text", "view \(Int(tv.frame.height)), window \(Int(sv.contentView.bounds.height))")
+            if let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -600, wheel2: 0, wheel3: 0) {
+                let y0 = sv.contentView.bounds.origin.y
+                let onScreen = w.convertPoint(toScreen: sv.convert(NSPoint(x: sv.bounds.midX, y: sv.bounds.midY), to: nil))
+                cg.location = CGPoint(x: onScreen.x, y: (w.screen?.frame.maxY ?? 0) - onScreen.y)
+                if let e = NSEvent(cgEvent: cg) { w.sendEvent(e) }
+                await pause(0.8)
+                let y1 = sv.contentView.bounds.origin.y
+                await pause(2.5)
+                let y2 = sv.contentView.bounds.origin.y
+                check(y1 > y0 + 100 && abs(y2 - y1) < 2, "as it opened, the wheel scrolls the article, and it stays", "\(Int(y0)) → \(Int(y1)) → \(Int(y2))")
+            }
+        }
 
         // focus mode (Focus.swift): the article on the whole screen, the toolbar away until the top
         if let w = main {
