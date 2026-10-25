@@ -113,8 +113,10 @@ def by_hc(conn, **kw):
 # ---- which Daf book is which Hardcover book ------------------------------------
 
 def build_map(conn):
-    """Daf book id -> Hardcover book id, from the vault notes' hardcoverBookId and links made in Daf."""
-    m = {}
+    """Daf book id -> Hardcover book id: the id each book row carries (library.rebuild: Calibre's
+    hardcover-book identifier, a note's hardcoverBookId, a book added from Daf), the vault notes'
+    hardcoverBookId, and links made in Daf, in that order of strength."""
+    m = {bid: int(h) for bid, h in conn.execute("SELECT id, hc_id FROM books WHERE hc_id IS NOT NULL AND kind = 'book'")}
     for bid, rel in conn.execute("SELECT id, vault_path FROM books WHERE vault_path IS NOT NULL AND kind = 'book'").fetchall():
         p = config.VAULT / rel
         try:
@@ -303,17 +305,90 @@ def search(conn, book_id=None, q=None):
                                  "author": ", ".join(c["author"]["name"] for c in (bk.get("cached_contributors") or [])[:2] if c.get("author")), "isbn": True})
         q = f"{b['title'].split(':')[0]} {b['author'] or ''}".strip()
     if q:
-        res = gql('query($q:String!){ search(query:$q, query_type:"Book", per_page:6, page:1){ results } }', {"q": q})["search"]["results"]
+        res = gql('query($q:String!){ search(query:$q, query_type:"Book", per_page:10, page:1){ results } }', {"q": q})["search"]["results"]
         for h in (res or {}).get("hits", []):
             d = h["document"]
             if any(x["id"] == int(d["id"]) for x in hits):
                 continue
             hits.append({"id": int(d["id"]), "title": d.get("title"), "year": d.get("release_year"), "image": (d.get("image") or {}).get("url"),
                          "author": ", ".join((d.get("author_names") or [])[:2]), "readers": d.get("users_count")})
-    return hits[:8]
+    return hits[:10]
 
 
 # ---- on its own, every half hour -------------------------------------------------
+
+# ---- adding a book from Daf (Books → Add a book) -----------------------------------
+
+BOOK = """query($id:Int!){ books_by_pk(id:$id){ id title release_year image { url } cached_contributors
+  default_physical_edition { isbn_13 isbn_10 } default_ebook_edition { isbn_13 isbn_10 } } }"""
+
+
+def _authors(bk):
+    """The book's authors: cached_contributors without the illustrators, translators and editors."""
+    cs = [c for c in (bk.get("cached_contributors") or []) if c.get("author") and not c.get("contribution")]
+    cs = cs or [c for c in (bk.get("cached_contributors") or []) if c.get("author")][:1]
+    return ", ".join(c["author"]["name"] for c in cs[:3])
+
+
+def find_books(conn, q):
+    """Hardcover's books for a title, author or ISBN, each with what Daf and Hardcover already have of
+    it: the Daf book (and whether it has a file) and its Hardcover shelf."""
+    q = (q or "").strip()
+    if not q:
+        return []
+    hits = []
+    isbn = re.sub(r"[^0-9Xx]", "", q)
+    if len(isbn) in (10, 13) and len(re.sub(r"[\s-]", "", q)) == len(isbn):
+        f = "isbn_13" if len(isbn) == 13 else "isbn_10"
+        for e in gql("query($i:String!){ editions(where:{%s:{_eq:$i}}, limit:1){ book { id title image { url } cached_contributors release_year users_count } } }" % f,
+                     {"i": isbn})["editions"]:
+            bk = e["book"]
+            hits.append({"id": bk["id"], "title": bk["title"], "year": bk.get("release_year"), "image": (bk.get("image") or {}).get("url"),
+                         "author": _authors(bk), "readers": bk.get("users_count"), "isbn": True})
+    if not hits:
+        # Hardcover's search ranks study guides ("Summary of …") with the book itself: the most read first
+        hits = sorted(search(conn, q=q), key=lambda h: -(h.get("readers") or 0))
+    daf = {r["hc_id"]: r for r in conn.execute("SELECT id, hc_id, calibre_id FROM books WHERE hc_id IS NOT NULL AND kind = 'book'")}
+    try:                                         # the sync keeps this fresh; a few hours old is fine for a hint
+        shelf_of = {hid: ub["status_id"] for hid, ub in by_hc(conn, max_age=6 * 3600).items()}
+    except Exception:  # noqa: BLE001 - the shelves can wait
+        shelf_of = {}
+    for h in hits:
+        b = daf.get(h["id"])
+        h["book_id"] = b["id"] if b else None
+        h["has_file"] = bool(b and b["calibre_id"])
+        h["status_id"] = shelf_of.get(h["id"])
+        h["status"] = STATUS.get(h["status_id"])
+    return hits
+
+
+def add_book(conn, settings, hc_id, status_id=1, kindle_shelf=None):
+    """A Hardcover book into Daf: on the Hardcover shelf (Want to read, or Reading) if it isn't on one,
+    private when its title is on Daf's private list, and a Daf book at once (book_adds; its row is
+    hc:<id> until hardcover-sync's note or the Calibre file takes over). Returns the Daf book id."""
+    from . import library
+    bk = gql(BOOK, {"id": int(hc_id)})["books_by_pk"]
+    if not bk:
+        raise HardcoverError("Hardcover doesn't have that book")
+    author = _authors(bk)
+    ed = bk.get("default_physical_edition") or bk.get("default_ebook_edition") or {}
+    private = library.is_private(bk["title"], settings)
+    if status_id in (1, 2) and int(hc_id) not in by_hc(conn, force=True):
+        _check(gql(INSERT, {"o": {"book_id": int(hc_id), "status_id": status_id, "privacy_setting_id": 3 if private else 1}}), "insert_user_book")
+        if status_id == 2:
+            ub = _fresh(conn, int(hc_id))
+            if ub and not active_read(ub):
+                _check(gql(INSERT_READ, {"ubid": ub["id"], "r": {"started_at": _today()}}), "insert_user_book_read")
+        fetch(conn, force=True)
+    conn.execute("INSERT OR REPLACE INTO book_adds (hc_id, title, author, cover, isbn, year, status, created, kindle_shelf) "
+                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 (int(hc_id), bk["title"], author or None, (bk.get("image") or {}).get("url"), ed.get("isbn_13") or ed.get("isbn_10"),
+                  bk.get("release_year"), status_id, int(time.time()), kindle_shelf))
+    library.rebuild(conn, settings)
+    build_map(conn)
+    row = conn.execute("SELECT id FROM books WHERE hc_id = ? AND kind = 'book' ORDER BY calibre_id IS NULL, vault_path IS NULL LIMIT 1", (int(hc_id),)).fetchone()
+    return row["id"] if row else f"hc:{hc_id}"
+
 
 def push_progress(conn, settings, max_writes=5):
     """Progress from Daf's book reader, forward only. Starts a Want-to-read book as Reading."""

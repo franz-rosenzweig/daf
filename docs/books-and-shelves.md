@@ -13,6 +13,23 @@ Putting a fourth book on asks "Which one steps off?", which is the whole point: 
 ![The Books page](images/books.png)
 *Books: the nightstand, then the shelves.*
 
+## Adding a book
+
+**Add a book**, at the top of **Books**, searches Hardcover by title, author or ISBN. Each result says what I already have of it: "In your library" (Calibre has the file), "In Daf, no file yet", and its Hardcover shelf if it's on one. Study guides and "summary of" knock-offs sink to the bottom, because the results go by how many people read them. Picking one I already have just opens it.
+
+For a new one I choose where it goes on Hardcover (**Want to read**, **Reading**, or **Not on Hardcover**), and I can give it its file right there. Then:
+
+- It's in Daf at once, with its cover, and its Hardcover status is set, privately if the title is on my private list. Its 📚 note in the vault comes from the Hardcover sync within half an hour, the same way as a book added on Hardcover itself.
+- The file goes into Calibre through Calibre-Web, which converts it to EPUB and fills in the details from Hardcover. Daf writes the book's Hardcover id and ISBN into the file first, so Calibre ends up with the right book even when it gives it a slightly different title. A few minutes later the book opens in Daf's reader.
+- When the file arrives, the book in Daf becomes the Calibre one and keeps everything: its shelves, its place on the nightstand, where I am in it and my notes. It's still one book, not two.
+- If Calibre already has the book, Daf says so instead of sending it a second time.
+
+A book without its file has **The book's file** on its page: **Add the file** sends one, and the card says how it's going ("Sent 2 minutes ago", "Calibre has it now", or why Calibre-Web couldn't take it).
+
+## The Kindle
+
+On a book's page, **The Kindle** has **Put it on the Kindle** and a shelf to put it on (Books, Nightstand, Ivrit…, the Kindle's own shelves). The Kindle downloads it on its next Wi-Fi sync. A book still waiting for its file goes once Calibre has it, and **Add a book** asks for the shelf as soon as I give it a file. The card then says where it went and when, with **Send it again**.
+
 ## The rest of the Books page
 
 - **Shelves:** your own groups of books, with **New shelf** to make one. A shelf's page has **Rename** and **Delete**.

@@ -189,6 +189,15 @@ CREATE TABLE IF NOT EXISTS kindle_pushed (   -- Daf highlights the Kindle plugin
 CREATE TABLE IF NOT EXISTS cards (           -- flashcards made from highlights (cards.py)
   id TEXT PRIMARY KEY, hl_id TEXT NOT NULL, kind TEXT NOT NULL, front TEXT NOT NULL, back TEXT, created INTEGER,
   due TEXT, interval INTEGER, ease REAL, reps INTEGER, lapses INTEGER, last TEXT, first_seen TEXT, suspended INTEGER);
+CREATE TABLE IF NOT EXISTS book_adds (       -- books added from Daf's Add a book (Hardcover), shown until a note or Calibre has them
+  hc_id INTEGER PRIMARY KEY, title TEXT NOT NULL, author TEXT, cover TEXT, isbn TEXT, year INTEGER,
+  status INTEGER, created INTEGER NOT NULL, kindle_shelf TEXT);
+CREATE TABLE IF NOT EXISTS book_files (      -- a book file sent to Calibre-Web's import folder, until Calibre has it
+  name TEXT PRIMARY KEY, hc_id INTEGER, book_id TEXT, title TEXT, author TEXT, created INTEGER NOT NULL,
+  cal_id INTEGER, kindle_shelf TEXT, error TEXT);
+CREATE TABLE IF NOT EXISTS kindle_queue (    -- files for the Kindle, which its plugin downloads on Wi-Fi (kindlequeue.py)
+  id TEXT PRIMARY KEY, kind TEXT NOT NULL, ref TEXT, name TEXT NOT NULL, shelf TEXT NOT NULL, path TEXT NOT NULL,
+  size INTEGER, requested INTEGER NOT NULL, delivered INTEGER, error TEXT);
 CREATE TABLE IF NOT EXISTS hc_links (        -- Daf books linked to Hardcover by hand (no hardcoverBookId in a vault note)
   book_id TEXT PRIMARY KEY, hc_book_id INTEGER NOT NULL, linked INTEGER);
 CREATE TABLE IF NOT EXISTS doc_edits (       -- titles and authors you corrected; reapplied after every sync
@@ -280,7 +289,7 @@ def connect():
     return conn
 
 
-MIGRATIONS = [("docs", "duration", "INTEGER"), ("audio_bookmarks", "transcribed", "INTEGER"), ("highlights", "color", "TEXT"), ("review_state", "tags", "TEXT"), ("review_state", "fav", "INTEGER"),
+MIGRATIONS = [("books", "hc_id", "INTEGER"), ("docs", "duration", "INTEGER"), ("audio_bookmarks", "transcribed", "INTEGER"), ("highlights", "color", "TEXT"), ("review_state", "tags", "TEXT"), ("review_state", "fav", "INTEGER"),
               ("docs", "tags", "TEXT"), ("docs", "ai_summary", "TEXT"),
               ("docs", "starred", "INTEGER"), ("sessions", "pages", "INTEGER"),
               ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("docs", "full", "INTEGER"),

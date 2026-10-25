@@ -1069,6 +1069,126 @@ async def put_nightstand(request: Request, c=Depends(conn)):
     return {"nightstand": s["nightstand"]}
 
 
+# ---- adding a book: Hardcover's catalog, then its file into Calibre (hardcover.add_book, bookfiles.py) ----
+
+@app.get("/api/books/find", dependencies=[Depends(user)])
+def find_books(q: str = "", c=Depends(conn)):
+    """Books on Hardcover for a title, author or ISBN, with what Daf and Hardcover have of each."""
+    from . import hardcover
+    try:
+        return {"hits": hardcover.find_books(c, q)}
+    except hardcover.HardcoverError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.post("/api/books/add", dependencies=[Depends(user)])
+async def add_book(request: Request, c=Depends(conn)):
+    """{hc_book_id, status: 1 Want to read | 2 Reading | 0 just Daf, kindle_shelf?}: the book in Daf now."""
+    from . import hardcover
+    b = await _body(request)
+    try:
+        hid = int(b.get("hc_book_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Which book?")
+    status = int(b.get("status") if b.get("status") is not None else 1)
+    shelf = str(b.get("kindle_shelf") or "").strip()[:80] or None
+    try:
+        book_id = await asyncio.to_thread(hardcover.add_book, c, config.load_settings(), hid, status if status in (1, 2) else None, shelf)
+    except hardcover.HardcoverError as e:
+        raise HTTPException(502, str(e))
+    return {"book_id": book_id}
+
+
+@app.post("/api/books/{book_id}/file", dependencies=[Depends(user)])
+async def post_book_file(book_id: str, request: Request, c=Depends(conn)):
+    """The book's file (multipart: file, kindle_shelf?, force?), to Calibre through Calibre-Web's import."""
+    from . import bookfiles
+    form = await request.form()
+    f = form.get("file")
+    if f is None or not getattr(f, "filename", None):
+        raise HTTPException(400, "No file")
+    data = await f.read(bookfiles.MAX_BYTES + 1)
+    try:
+        name = bookfiles.attach(c, book_id, f.filename, data, str(form.get("kindle_shelf") or "").strip()[:80] or None,
+                                force=str(form.get("force") or "") in ("1", "true"))
+    except bookfiles.Exists as e:
+        return JSONResponse({"detail": str(e), "book_id": e.book_id}, status_code=409)
+    except KeyError:
+        raise HTTPException(404, "No such book")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"name": name, "file": bookfiles.pending(c, book_id)}
+
+
+# ---- the Kindle's downloads (kindlequeue.py): its plugin fetches what's waiting on Wi-Fi ----
+
+@app.get("/api/kindle/inbox")
+def kindle_inbox(name=Depends(device), c=Depends(conn)):
+    from . import kindlequeue
+    return {"files": kindlequeue.inbox(c)}
+
+
+@app.get("/api/kindle/inbox/{qid}/file")
+def kindle_inbox_file(qid: str, name=Depends(device), c=Depends(conn)):
+    from . import kindlequeue
+    p, fname = kindlequeue.file_for(c, qid)
+    if not p:
+        raise HTTPException(404, "Not waiting any more")
+    return FileResponse(p, media_type="application/epub+zip" if p.suffix == ".epub" else "application/octet-stream")
+
+
+@app.post("/api/kindle/inbox/{qid}/done")
+async def kindle_inbox_done(qid: str, request: Request, name=Depends(device), c=Depends(conn)):
+    """{error?}: the plugin has the file in its shelf (or couldn't)."""
+    from . import kindlequeue
+    b = await _body(request)
+    return {"ok": kindlequeue.done(c, qid, error=b.get("error"))}
+
+
+@app.post("/api/kindle/shelves")
+async def kindle_shelves_report(request: Request, name=Depends(device), c=Depends(conn)):
+    """{shelves: [folder names in the Kindle's home folder]}, from the plugin."""
+    from . import kindlequeue
+    b = await _body(request)
+    return {"shelves": kindlequeue.set_shelves(c, b.get("shelves") or [])}
+
+
+@app.get("/api/kindle/shelves", dependencies=[Depends(user)])
+def kindle_shelves(c=Depends(conn)):
+    from . import kindlequeue
+    return {"shelves": kindlequeue.shelves(c)}
+
+
+@app.post("/api/books/{book_id}/kindle", dependencies=[Depends(user)])
+async def put_on_kindle(book_id: str, request: Request, c=Depends(conn)):
+    """{shelf}: the book to the Kindle on its next Wi-Fi sync; one still waiting for its file goes once Calibre has it."""
+    from . import kindlequeue
+    shelf = str((await _body(request)).get("shelf") or "").strip() or kindlequeue.DEFAULT_SHELF
+    try:
+        return {"kindle": kindlequeue.queue_book(c, book_id, shelf)}
+    except LookupError:
+        b = c.execute("SELECT hc_id FROM books WHERE id = ?", (book_id,)).fetchone()
+        if not b:
+            raise HTTPException(404, "No such book")
+        n = c.execute("UPDATE book_files SET kindle_shelf = ? WHERE book_id = ? AND cal_id IS NULL AND error IS NULL", (shelf, book_id)).rowcount
+        if b["hc_id"]:
+            n += c.execute("UPDATE book_adds SET kindle_shelf = ? WHERE hc_id = ?", (shelf, b["hc_id"])).rowcount
+        if not n:
+            raise HTTPException(409, "Daf doesn't have this book's file. Add it first, and it can go to the Kindle.")
+        return {"kindle": {"shelf": shelf, "after_file": True}}
+
+
+@app.delete("/api/books/{book_id}/kindle", dependencies=[Depends(user)])
+def cancel_kindle(book_id: str, c=Depends(conn)):
+    from . import kindlequeue
+    kindlequeue.cancel(c, book_id)
+    b = c.execute("SELECT hc_id FROM books WHERE id = ?", (book_id,)).fetchone()
+    c.execute("UPDATE book_files SET kindle_shelf = NULL WHERE book_id = ?", (book_id,))
+    if b and b["hc_id"]:
+        c.execute("UPDATE book_adds SET kindle_shelf = NULL WHERE hc_id = ?", (b["hc_id"],))
+    return {"ok": True}
+
+
 @app.get("/api/books/{book_id}", dependencies=[Depends(user)])
 def get_book(book_id: str, c=Depends(conn)):
     b = c.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
@@ -1091,6 +1211,19 @@ def get_book(book_id: str, c=Depends(conn)):
     f = c.execute("SELECT freq FROM book_review WHERE book_id = ?", (book_id,)).fetchone()
     card["review_freq"] = f[0] if f else "normal"
     card["shelves"] = [r[0] for r in c.execute("SELECT shelf_id FROM shelf_books WHERE book_id = ?", (book_id,))]
+    from . import bookfiles
+    card["hc_id"] = b["hc_id"]
+    card["file"] = bookfiles.pending(c, book_id)          # a file sent to Calibre from Daf, and how it went
+    card["has_file"] = bool(b["calibre_id"])
+    from . import kindlequeue
+    card["kindle"] = kindlequeue.state(c, book_id)
+    if not card["kindle"]:                                  # waiting for its file, then the Kindle
+        w = c.execute("SELECT kindle_shelf FROM book_files WHERE book_id = ? AND kindle_shelf IS NOT NULL AND cal_id IS NULL AND error IS NULL", (book_id,)).fetchone() \
+            or (c.execute("SELECT kindle_shelf FROM book_adds WHERE hc_id = ? AND kindle_shelf IS NOT NULL", (b["hc_id"],)).fetchone() if b["hc_id"] else None)
+        if w:
+            card["kindle"] = {"shelf": w[0], "after_file": True}
+    if not card["has_cover"] and b["hc_id"] and c.execute("SELECT cover FROM book_adds WHERE hc_id = ? AND cover IS NOT NULL", (b["hc_id"],)).fetchone():
+        card["has_cover"] = True
     return card
 
 
@@ -1207,6 +1340,19 @@ async def put_book_review(book_id: str, request: Request, c=Depends(conn)):
 def get_cover(book_id: str, c=Depends(conn)):
     p = library.cover_path(c, book_id)
     if not p:
+        # A book added from Hardcover, without its file yet: Hardcover's cover, kept here like a page's picture.
+        from . import pages
+        r = c.execute("SELECT a.hc_id, a.cover FROM books b JOIN book_adds a ON a.hc_id = b.hc_id WHERE b.id = ?", (book_id,)).fetchone()
+        if r and r["cover"]:
+            if not r["cover"].startswith("/api/thumb/"):
+                kept = pages.keep_thumb(r["cover"])
+                if kept:
+                    c.execute("UPDATE book_adds SET cover = ? WHERE hc_id = ?", (kept, r["hc_id"]))
+                r = {"cover": kept}
+            if r["cover"] and r["cover"].startswith("/api/thumb/"):
+                p = pages.THUMBS / r["cover"].rsplit("/", 1)[1]
+    from pathlib import Path
+    if not p or not Path(str(p)).exists():
         raise HTTPException(404, "No cover")
     return FileResponse(p, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=604800, stale-while-revalidate=2592000"})
 

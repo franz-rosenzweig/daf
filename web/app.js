@@ -518,7 +518,7 @@ function hlCard(x){ return window.DafCore.HL.row(x); }
 
 /* ---------- books ---------- */
 async function renderBooks(){
-  $('#main').innerHTML = '<div class="top"><h1>Books</h1></div><div class="page"><span class="mute">Loading…</span></div>';
+  $('#main').innerHTML = '<div class="top"><h1>Books</h1><span class="spacer"></span><button class="btn sm primary" data-act="addbook">Add a book</button></div><div class="page"><span class="mute">Loading…</span></div>';
   const r = await swr('/api/books');
   S.books = r;
   const stand = r.nightstand.length ? r.nightstand : [];
@@ -580,6 +580,7 @@ async function renderBook(id, hl){
     (b.url ? '<a class="btn" href="' + esc(b.url) + '" target="_blank" rel="noopener">Open original</a>' : '') + '</div>' +
     (b.vault_path ? '<span class="tiny mute">Vault: <code>' + esc(b.vault_path) + '</code></span>' : '<span class="tiny mute">No vault note for this book yet; notes stay in Daf until there is one.</span>') + '</div></div>';
   if (b.stats) h += bookStats(b.stats);
+  if (window.DafCore.AddBook) h += window.DafCore.AddBook.sections(b);
   if (b.kind === 'book') h += '<section class="card" id="bshelves"></section>';
   if (b.kind === 'book' && !b.private) h += '<section class="card hcsec" id="hcsec"><div class="cardh"><h2>Hardcover</h2></div><span class="mute tiny">Asking Hardcover…</span></section>';
   h += '<section class="card"><div class="cardh"><h2>A note on this book</h2></div><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="field" id="bnote" placeholder="A thought while reading" style="flex:1 1 260px"><button class="btn primary" data-act="booknote" data-id="' + esc(b.id) + '">Save</button></div>' +

@@ -1,8 +1,12 @@
 """Book identity: every Kindle copy, the audiobook and the vault note of one work
 become one row in `books`, keyed by Calibre id when Calibre has it.
 
-Matching is by normalized title (subtitles, articles and punctuation dropped),
-checked against the author's surname when several books share a title.
+Matching is by Hardcover's book id first, where both sides have one (Calibre keeps it as the
+`hardcover-book` identifier, a vault note as `hardcoverBookId`), then by normalized title
+(subtitles, articles and punctuation dropped), checked against the author's surname when several
+books share a title. A book added from Daf (book_adds) is a row of its own, `hc:<id>`, until its
+note or its file arrives. When a book's id changes that way (hc: → vault: → cal:), everything that
+pointed at the old id moves to the new one (rekey).
 """
 import json
 import re
@@ -21,7 +25,18 @@ def norm(title):
     t = re.split(r"[:(\[]| - ", t)[0]
     t = re.sub(r"[^a-z0-9 ]+", " ", t)
     t = ARTICLES.sub("", re.sub(r"\s+", " ", t).strip())
-    return t
+    if t:
+        return t
+    # A title in another script (Hebrew) keeps its own letters, or every such title would be "".
+    r = re.split(r"[:(\[]| - ", unicodedata.normalize("NFKC", title or "").lower())[0]
+    return re.sub(r"\s+", " ", re.sub(r"[^\w ]+", " ", r)).strip()
+
+
+def slug(title):
+    """A vault book's id: its normalized title in a-z0-9, or a hash of it for one in another script."""
+    import hashlib
+    n = norm(title)
+    return re.sub(r"[^a-z0-9]+", "-", n).strip("-") or "t" + hashlib.sha1(n.encode()).hexdigest()[:10]
 
 
 def surname(author):
@@ -49,9 +64,16 @@ def calibre_books():
         rows = c.execute(
             "SELECT b.id, b.title, b.path, b.has_cover, group_concat(a.name, ' & ') FROM books b "
             "LEFT JOIN books_authors_link l ON l.book = b.id LEFT JOIN authors a ON a.id = l.author GROUP BY b.id").fetchall()
+        hc, isbn = {}, {}
+        for book, typ, val in c.execute("SELECT book, type, val FROM identifiers WHERE type IN ('hardcover-book', 'isbn', 'isbn13', 'isbn10')"):
+            if typ == "hardcover-book" and str(val).isdigit():
+                hc[book] = int(val)
+            elif typ != "hardcover-book":
+                isbn.setdefault(book, []).append(re.sub(r"[^0-9Xx]", "", str(val)))
     finally:
         c.close()
-    return [{"id": r[0], "title": r[1], "path": str(db.parent / r[2]) if r[3] else None, "author": r[4] or ""} for r in rows]
+    return [{"id": r[0], "title": r[1], "path": str(db.parent / r[2]) if r[3] else None, "author": r[4] or "",
+             "hc": hc.get(r[0]), "isbn": isbn.get(r[0], [])} for r in rows]
 
 
 def vault_books():
@@ -65,8 +87,9 @@ def vault_books():
             continue
         if fm.get("type") != "book":
             continue
+        hcid = str(fm.get("hardcoverBookId") or "").strip()
         out.append({"title": fm.get("title") or p.stem, "author": fm.get("author", ""), "status": fm.get("status", ""),
-                    "path": str(p.relative_to(config.VAULT))})
+                    "path": str(p.relative_to(config.VAULT)), "hc": int(hcid) if hcid.isdigit() else None})
     return out
 
 
@@ -118,12 +141,16 @@ def abs_books():
 
 class Matcher:
     def __init__(self, cal, vault):
-        self.cal = {}
+        self.cal, self.cal_hc = {}, {}
         for b in cal:
             self.cal.setdefault(norm(b["title"]), []).append(b)
-        self.vault = {}
+            if b.get("hc"):
+                self.cal_hc.setdefault(b["hc"], b)
+        self.vault, self.vault_hc = {}, {}
         for v in vault:
             self.vault.setdefault(norm(v["title"]), []).append(v)
+            if v.get("hc"):
+                self.vault_hc.setdefault(v["hc"], v)
 
     @staticmethod
     def _pick(cands, author):
@@ -135,11 +162,15 @@ class Matcher:
                 return c
         return cands[0]
 
-    def calibre(self, title, author):
+    def calibre(self, title, author, hc=None):
+        if hc and hc in self.cal_hc:
+            return self.cal_hc[hc]
         c = self.cal.get(norm(title))
         return self._pick(c, author) if c else None
 
-    def vault_note(self, title, author):
+    def vault_note(self, title, author, hc=None):
+        if hc and hc in self.vault_hc:
+            return self.vault_hc[hc]
         v = self.vault.get(norm(title))
         return self._pick(v, author) if v else None
 
@@ -153,23 +184,65 @@ def is_private(title, settings):
     return any(p in t for p in private_patterns(settings))
 
 
+# Where a book's id is kept: (table, column, keyed by it). A keyed row that the new id already has
+# is the new id's, and the old one goes.
+BOOK_REFS = [("highlights", "book_id", False), ("shelf_books", "book_id", True), ("book_review", "book_id", True),
+             ("ebook_pages", "book_id", True), ("reading_notes", "book_id", False), ("audio_bookmarks", "book_id", False),
+             ("hc_links", "book_id", True), ("book_marks", "book_id", False), ("book_positions", "book_id", True),
+             ("paper_pages", "book_id", False), ("book_files", "book_id", False)]
+
+
+def rekey(conn, settings, old, new):
+    """Everything that pointed at book `old` points at `new`: a want-to-read book that got its note, a
+    note that got its Calibre file."""
+    import logging
+    for table, col, keyed in BOOK_REFS:
+        if keyed:
+            conn.execute(f"UPDATE OR IGNORE {table} SET {col} = ? WHERE {col} = ?", (new, old))
+            conn.execute(f"DELETE FROM {table} WHERE {col} = ?", (old,))
+        else:
+            conn.execute(f"UPDATE {table} SET {col} = ? WHERE {col} = ?", (new, old))
+    conn.execute("UPDATE sessions SET item = ? WHERE item = ? AND source IN ('ebook', 'paper')", (new, old))
+    conn.execute("UPDATE OR IGNORE kindle_queue SET id = ?, ref = ? WHERE id = ?", (f"book:{new}", new, f"book:{old}"))
+    ns = settings.get("nightstand") or []
+    if old in ns:
+        s = config.load_settings()
+        s["nightstand"] = [new if i == old else i for i in s.get("nightstand", [])]
+        s["nightstand"] = list(dict.fromkeys(s["nightstand"]))[:3]
+        config.save_settings(s)
+        settings["nightstand"] = s["nightstand"]
+    logging.getLogger("daf.library").info("book %s is now %s", old, new)
+
+
 def rebuild(conn, settings):
     """Recompute books and book_keys from Calibre, the vault, the Kindle and Audiobookshelf."""
+    from . import bookfiles
+    try:
+        bookfiles.settle(conn)                  # files sent from Daf: which Calibre book each became
+    except Exception:  # noqa: BLE001 - the books still build
+        import logging
+        logging.getLogger("daf.library").exception("bookfiles.settle")
     cal, vault = calibre_books(), vault_books()
+    ov = bookfiles.overrides(conn)
+    for c in cal:
+        if c["id"] in ov:
+            c["hc"] = ov[c["id"]]
     m = Matcher(cal, vault)
     books, keys = {}, {}
 
-    def ensure(bid, kind, title, author, cal_row=None):
+    def ensure(bid, kind, title, author, cal_row=None, hc=None):
         b = books.get(bid)
         if not b:
+            hc = hc or (cal_row or {}).get("hc")
             b = books[bid] = {"id": bid, "kind": kind, "title": title, "author": author or None,
                               "calibre_id": cal_row["id"] if cal_row else None,
                               "calibre_path": cal_row["path"] if cal_row else None, "vault_path": None, "status": None,
                               "progress": None, "progress_note": None, "last_read": None, "audio_pct": None,
-                              "audio_note": None, "url": None, "private": 0}
-            v = m.vault_note(title, author)
+                              "audio_note": None, "url": None, "private": 0, "hc_id": hc}
+            v = m.vault_note(title, author, hc)
             if v:
                 b["vault_path"], b["status"] = v["path"], v["status"]
+                b["hc_id"] = b["hc_id"] or v.get("hc")
         return b
 
     def resolve(title, author):
@@ -178,8 +251,7 @@ def rebuild(conn, settings):
             return ensure(f"cal:{c['id']}", "book", c["title"], c["author"], c)
         v = m.vault_note(title, author)
         if v:
-            slug = re.sub(r"[^a-z0-9]+", "-", norm(v["title"])).strip("-")
-            return ensure(f"vault:{slug}", "book", v["title"], v["author"])
+            return ensure(f"vault:{slug(v['title'])}", "book", v["title"], v["author"], hc=v.get("hc"))
         return None
 
     # The Kindle: titles from KoInsight/plugin and from the sidecars.
@@ -211,17 +283,24 @@ def rebuild(conn, settings):
 
     # Every vault book note is a book even if nothing has been read on a device.
     for v in vault:
-        if not m.calibre(v["title"], v["author"]):
-            slug = re.sub(r"[^a-z0-9]+", "-", norm(v["title"])).strip("-")
+        c = m.calibre(v["title"], v["author"], v.get("hc"))
+        if not c:
             if not any(b.get("vault_path") == v["path"] for b in books.values()):
-                ensure(f"vault:{slug}", "book", v["title"], v["author"])
+                ensure(f"vault:{slug(v['title'])}", "book", v["title"], v["author"], hc=v.get("hc"))
         else:
-            c = m.calibre(v["title"], v["author"])
             ensure(f"cal:{c['id']}", "book", c["title"], c["author"], c)
 
     # And every book in Calibre, so the whole library can be opened in Daf's reader.
     for c in cal:
         ensure(f"cal:{c['id']}", "book", c["title"], c["author"], c)
+
+    # Books added from Daf (Add a book) that no note and no Calibre book has yet.
+    have_hc = {b["hc_id"] for b in books.values() if b.get("hc_id")}
+    for a in conn.execute("SELECT * FROM book_adds").fetchall():
+        if a["hc_id"] in have_hc:
+            continue
+        b = ensure(f"hc:{a['hc_id']}", "book", a["title"], a["author"], hc=a["hc_id"])
+        b["status"] = b["status"] or {1: "want-to-read", 2: "reading"}.get(a["status"])
 
     # Kindle progress: the newest page turn in any copy of the book.
     latest = conn.execute(
@@ -248,13 +327,33 @@ def rebuild(conn, settings):
     for b in books.values():
         b["private"] = 1 if is_private(b["title"], settings) else 0
 
+    # A book whose id changed (its note or its file arrived): its shelves, place, notes and the rest follow.
+    moved = {}
+    for old in conn.execute("SELECT id, hc_id, vault_path, calibre_id FROM books WHERE kind = 'book'").fetchall():
+        if old["id"] in books:
+            continue
+        new = next((b["id"] for b in books.values() if
+                    (old["hc_id"] and b.get("hc_id") == old["hc_id"]) or
+                    (old["vault_path"] and b.get("vault_path") == old["vault_path"]) or
+                    (old["calibre_id"] and b.get("calibre_id") == old["calibre_id"])), None)
+        if new:
+            moved[old["id"]] = new
+    for old, new in moved.items():
+        rekey(conn, settings, old, new)
+
     conn.execute("DELETE FROM books WHERE kind = 'book'")
     conn.execute("DELETE FROM book_keys WHERE key NOT LIKE 'kk:%'")
     cols = ["id", "kind", "title", "author", "calibre_id", "calibre_path", "vault_path", "status", "progress",
-            "progress_note", "last_read", "audio_pct", "audio_note", "url", "private"]
+            "progress_note", "last_read", "audio_pct", "audio_note", "url", "private", "hc_id"]
     conn.executemany(f"INSERT OR REPLACE INTO books ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
                      [tuple(b[c] for c in cols) for b in books.values()])
     conn.executemany("INSERT OR REPLACE INTO book_keys (key, book_id) VALUES (?, ?)", list(keys.items()))
+    try:
+        from . import kindlequeue
+        kindlequeue.follow_up(conn)             # books that were to go to the Kindle once their file came
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger("daf.library").exception("kindlequeue.follow_up")
     return len(books)
 
 
@@ -262,10 +361,9 @@ def add_paper_book(conn, title, author=None):
     """A book that exists only on paper: a vault note (so rebuild keeps it) and a books row."""
     from . import vaultnotes
     title, author = title.strip(), (author or "").strip() or None
-    slug = re.sub(r"[^a-z0-9]+", "-", norm(title)).strip("-")
-    if not slug:
+    if not norm(title):
         raise ValueError("A title, please")
-    bid = f"vault:{slug}"
+    bid = f"vault:{slug(title)}"
     row = conn.execute("SELECT * FROM books WHERE id = ?", (bid,)).fetchone()
     if not row:
         conn.execute("INSERT INTO books (id, kind, title, author, private) VALUES (?, 'book', ?, ?, 0)", (bid, title, author))

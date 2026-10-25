@@ -748,3 +748,27 @@ before 3.5 → 0.8 s):
   - The same lapsed session sent again is answered `same` and nothing is retried.
 - **The extension (0.6.0, "cookies" permission):** `syncInstagram()` in background.js runs on install and startup, when instagram.com's `sessionid` cookie changes, and when a page on instagram.com loads (content.js). It asks `/api/web/instagram` and POSTs instagram.com's cookies only when `want` and the hash differs, or Daf's is expired.
 - **The apps** (to come, the native session): a "Sign in to Instagram" web view that posts `cookie_header` to `/api/instagram/cookies` with the device token.
+
+## Adding books, and the Kindle's downloads (2026-10-25)
+
+- **Matching** (`library.py`):
+  - Calibre's `hardcover-book` identifier (CWA fills it for most books), a note's `hardcoverBookId` and `book_adds` give each row `books.hc_id`. Matching is by that id first, then by title.
+  - `norm()` keeps a non-Latin title's own letters (Hebrew titles all used to normalize to "" and matched each other).
+  - `slug()` hashes such a title for its vault id.
+  - `hardcover.build_map` starts from `books.hc_id`, so 60 more Calibre books have Hardcover sync.
+  - **rekey:** when a book's id changes (hc: → vault: → cal:), `library.rekey` moves its rows in BOOK_REFS, its ebook/paper sessions, its kindle_queue row and its nightstand slot. It's found by hc_id, vault_path or calibre_id.
+- **Add a book** (`hardcover.find_books`, `hardcover.add_book`, `web/addbook.js`):
+  - `GET /api/books/find?q=`: ISBN through editions, else Hardcover search sorted by readers. Each hit is annotated with the Daf book, whether it has a file, and its Hardcover status (cached shelves up to 6 h old).
+  - `POST /api/books/add {hc_book_id, status 1|2|0, kindle_shelf?}`: `insert_user_book` (privacy 3 for a private title; Reading also starts a read) unless it's already on a shelf, then a `book_adds` row. `rebuild` shows that as `hc:<id>` until a note or Calibre has the hc id. The cover comes from Hardcover through `pages.keep_thumb`, via `/api/cover/hc:<id>`.
+  - hardcover-sync makes the note. Its cron runs WITHOUT `--no-create` again since 10-25. Two notes on old ids were re-pointed first (The Gay Science → 442702, Primary Greatness → 447079), after a dry run showed they'd otherwise duplicate. Backups are in that session's scratchpad.
+- **A book's file** (`bookfiles.py`):
+  - `POST /api/books/<id>/file` (multipart: file, kindle_shelf, force) refuses a book Calibre has (by hc id, ISBN or title: 409 with its id). It writes ISBN and `hardcover-book:<id>` identifiers into an EPUB's OPF (OPF2 `opf:scheme`, OPF3 `urn:isbn:` / `hardcover-book:`) and puts it in `CWA_INGEST` as "Title - Author.ext" (hidden `.part` first). The row goes in `book_files`.
+  - `settle()` (before each rebuild) finds the Calibre book it became among those added since: by hc id, ISBN or title. It sets `cal_id`, writes `hc_links`, and `overrides()` makes the chosen hc id win over CWA's.
+  - It notes a file in CWA's `processed_books/failed`, or one still not in Calibre after 6 h.
+  - Calibre-Web's `metadata_provider_hierarchy` now starts with hardcover (cwa.db `cwa_settings`, backup taken 10-25). It's read fresh for each import.
+- **The Kindle's downloads** (`kindlequeue.py`): Syncthing is off on the Kindle, so the plugin fetches its files itself.
+  - Table `kindle_queue`. Device routes: `GET /api/kindle/inbox`, `GET /api/kindle/inbox/<id>/file`, `POST /api/kindle/inbox/<id>/done {error?}`, `POST /api/kindle/shelves {shelves}` (stored in kv `kindle_shelves`).
+  - User routes: `GET /api/kindle/shelves`, `POST|DELETE /api/books/<id>/kindle {shelf}`. Books are named "Title - Author (<calibre id>).epub", like the Kindle's own.
+  - A book waiting for its file keeps `kindle_shelf` on book_files/book_adds, and `follow_up()` (end of rebuild) queues it once Calibre has it.
+  - Send to Kindle's EPUBs are queued too (shelf "Daf").
+  - The plugin side is the Kindle session's job (briefed 10-25).

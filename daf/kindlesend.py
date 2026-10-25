@@ -270,6 +270,8 @@ def make_epub(conn, ids, when=None):
     tmp.replace(path)
     now = int(time.time())
     conn.executemany("INSERT OR REPLACE INTO kindle_sent (doc_id, file, at) VALUES (?, ?, ?)", [(d["id"], fname, now) for d, _ in docs])
+    from . import kindlequeue
+    kindlequeue.queue_file(conn, path, "Daf")       # the plugin fetches it (Syncthing no longer carries Libros)
     record(conn, path)
     return {"file": fname, "title": title, "count": len(docs), "skipped": skipped, "images": len(images.files)}
 
