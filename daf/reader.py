@@ -244,6 +244,24 @@ def get_doc(conn, doc_id, prefetch=False):
             d["preparing"] = True
         else:
             d["content_error"] = st["error"]
+    if d["kind"] == "video" and d["url"]:
+        from . import social
+        if social.is_reel(d["url"]):                 # a reel: Daf's own copy, its caption and transcript
+            d["reel"] = True
+            if social.media_path(doc_id).exists():
+                from urllib.parse import quote
+                d["media"] = "/api/media/" + quote(doc_id, safe="")
+            if not blocks and not prefetch:
+                from . import media
+                st = media.job_status(conn, "reel", doc_id)
+                if not st or (st["status"] == "failed" and st.get("error") != social.LOGIN_ERROR
+                              and time.time() - (st.get("finished") or 0) > 3600):
+                    media.queue(conn, "reel", doc_id)
+                    d["preparing"] = True
+                elif st["status"] in ("queued", "running"):
+                    d["preparing"] = True
+                elif st.get("error"):
+                    d["content_error"] = st["error"]
     d["has_pdf"] = d["kind"] == "pdf"
     d["blocks"] = blocks
     d["mins"] = round(d["duration"] / 60) if d.get("duration") else max(1, round((d["words"] or 0) / 238)) if d["words"] else None

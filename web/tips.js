@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-10-25-reels', date: 'Oct 25', title: 'Save Instagram reels', text: 'Share a reel to Daf: it keeps the video, the caption and a transcript you can highlight.', go: '#prefs/instagram' },
   { id: '2026-10-21-kindle-covers', date: 'Oct 21', title: 'Covers come fast on the Kindle', text: 'Shelves open with every cover at once, and the next page is ready before you swipe.' },
   { id: '2026-10-21-ext-updates', date: 'Oct 21', title: 'The extension updates itself', text: 'In Firefox and Zen, from 0.5.1: install it once more from Preferences, then never again.', go: '#prefs' },
   { id: '2026-10-21-ext-ask', date: 'Oct 21', title: 'The extension asks first', text: 'Selecting text on a page shows a Highlight button; nothing saves until you press it.' },

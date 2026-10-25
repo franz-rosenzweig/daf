@@ -233,8 +233,10 @@ def write_article(conn, settings, doc_id):
         rel = None
     if not hls and not m_["note"] and not rel:       # a note already written still loses its last highlight
         return "nothing to write"
+    from . import social
+    reel = m_["kind"] == "video" and social.is_reel(m_["url"])     # an Instagram reel: beside the YouTube notes, its own folder
     if not rel:
-        folder = FOLDERS.get(m_["kind"], CLIP_DIR)
+        folder = "Reference/instagram" if reel else FOLDERS.get(m_["kind"], CLIP_DIR)
         base = _clip_name(m_["title"])
         rel = f"{folder}/{base}.md"
         n = 2
@@ -244,6 +246,8 @@ def write_article(conn, settings, doc_id):
         published = datetime.fromtimestamp(m_["published"]).strftime("%Y-%m-%d") if m_["published"] else ""
         tags = {"video": "  - clippings\n  - youtube\n  - videos\n", "podcast": "  - clippings\n  - podcasts\n",
                 "torah": "  - clippings\n  - torah\n"}.get(m_["kind"], "  - clippings\n")
+        if reel:
+            tags = "  - clippings\n  - instagram\n  - videos\n"
         head = ("---\ntags:\n" + tags + "datasource: daf\n"
                 f"url: {_yaml(m_['url'])}\nauthor: {_yaml(m_['author'])}\nsource: {_yaml(m_['source'])}\n"
                 + (f"published: {published}\n" if published else "") + "---\n#ai-assisted-note\n"

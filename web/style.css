@@ -367,6 +367,13 @@ body.playing .main{padding-bottom:84px}
 .vhead{position:sticky;top:56px;z-index:4;background:var(--bg);padding:6px 0 10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 .vframe{position:relative;aspect-ratio:16/9;width:100%;border-radius:12px;overflow:hidden;background:#000}
 .vframe iframe,.vframe #ytp{position:absolute;inset:0;width:100%;height:100%;border:0}
+/* a reel stands up: as tall as fits beside the transcript, centered */
+.vframe.tall{aspect-ratio:9/16;width:auto;height:min(64vh,640px);max-width:100%;margin:0 auto}
+.vframe.tall video,.vframe.wide video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.vframe.wide{max-height:64vh}
+.vframe .vwait{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;padding:24px;text-align:center;color:#ddd;font-size:14px;line-height:1.5}
+.vframe .vwait a{color:#fff}
+@media (max-width:700px){ .vframe.tall{height:46vh} }
 .vctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .body .tl{display:grid;grid-template-columns:54px minmax(0,1fr);gap:8px;align-items:baseline;border-radius:8px;padding:2px 6px}
 .body .tl.now{background:var(--speak)}

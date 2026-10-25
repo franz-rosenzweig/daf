@@ -2,7 +2,7 @@
 
 # Videos and podcasts
 
-This page covers the things you watch and listen to: YouTube videos saved to the Library, podcasts from AntennaPod, and audiobook bookmarks. Daf doesn't try to be a video app or a podcast app. What it adds is the text, so a good minute of a talk can become a highlight like any line in a book.
+This page covers the things you watch and listen to: YouTube videos and Instagram reels saved to the Library, podcasts from AntennaPod, and audiobook bookmarks. Daf doesn't try to be a video app or a podcast app. What it adds is the text, so a good minute of a talk can become a highlight like any line in a book.
 
 ## Videos
 
@@ -15,6 +15,18 @@ The transcript comes from YouTube's own captions when there are any. When there 
 Keys: Space plays and pauses, c clips, and ← → move ten seconds. The player is YouTube's privacy-mode embed, and **Watch on Invidious** opens it there instead.
 
 Video time doesn't count toward the hour unless you switch on **Videos** in **Preferences → What counts toward the goal**. I keep it off, because watching isn't what Year 30 is about.
+
+## Instagram reels
+
+A reel worth keeping goes to Daf the same way a link does: **Share → Daf** in the Instagram app on the phone, the toolbar button or a highlight in the browser, or its link pasted into Daf. A minute later it's under **Videos** with everything that matters about it: the video itself, kept on my server (a reel can vanish from Instagram, so Daf doesn't count on it), its picture, the account it's from, the caption, and below the caption a transcript of what's said, with the time beside each line.
+
+It plays standing up in Daf, and the rest works like a YouTube video: click a line to jump there, **Follow along**, **Clip 30s**, and highlights that go to the review and to the vault, in `Reference/instagram`. A reel with no speech, just words on the screen, has the caption and no transcript.
+
+Instagram shows almost nothing to someone who isn't signed in, so Daf uses my own sign-in, which it keeps on the server and nowhere else. **Preferences → Instagram** has it:
+
+- **Keep Daf signed in from my browser.** With that on, the [browser extension](browser-extension.md) sends instagram.com's cookies to Daf whenever I'm on instagram.com and they've changed. That's how Daf's sign-in never runs out: as long as I'm signed in to Instagram in Zen, so is Daf. Only Instagram's cookies, only to my Daf, and only when the switch is on.
+- If Instagram does turn Daf's sign-in away, the reel waits instead of failing, the card says so, and so does the reel's page and the Sources page. Visiting instagram.com in Zen renews it, and every reel that waited comes in by itself.
+- **Forget it** removes the sign-in from the server.
 
 ## Podcasts
 

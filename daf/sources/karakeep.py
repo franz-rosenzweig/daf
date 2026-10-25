@@ -57,6 +57,9 @@ def kind_of(url, ctype):
     u = (url or "").lower()
     if "youtube.com/watch" in u or "youtu.be/" in u or "/watch?v=" in u:
         return "video"
+    from .. import social
+    if social.is_reel(url):
+        return "video"
     if re.search(r"//(www\.)?(x|twitter)\.com/", u):
         return "tweet"
     if ctype == "asset" or u.endswith(".pdf"):
