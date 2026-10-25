@@ -1,45 +1,23 @@
-/* Ink: writing on an article with a pen (an S Pen, an Apple Pencil), as in a paper book's margins.
-   The pen, the highlighter and the eraser, in the text and beside it. Over words the highlighter
-   makes a highlight, as selecting them does (it's in Highlights and the review); anywhere else it
-   leaves a marker's stroke. The pen's button (or an eraser end) erases while it's held. Fingers
-   still scroll and select, and a hand resting on the screen while the pen writes doesn't scroll.
-   With the tools put away the pen is a finger again. Each stroke keeps its paragraph and the letter
-   it started on (daf/ink.py), so it stays with its words when the type size or the column changes.
-   Nothing shows until a pen has touched the screen on this device. */
+/* Ink on an article: what's written on it with a pen (the pens themselves are pens.js), in the text
+   and beside it, as in a paper book's margins. Over words the highlighter makes a highlight, as
+   selecting them does (it's in Highlights and the review); anywhere else it leaves its stroke.
+   Each stroke keeps its paragraph and the letter it started on (daf/ink.py), so it stays with its
+   words when the type size or the column changes; a note in the margin keeps its distance from the
+   column's edge. Margin moves the column over to leave room on the right. */
 (function(){
 'use strict';
-const C = window.DafCore, H = C.HL;
-const { api, toast, esc } = C;
+const C = window.DafCore, Pens = C.Pens;
+const { api, toast } = C;
 const NS = 'http://www.w3.org/2000/svg';
 const store = { get(k, d){ try { const v = localStorage.getItem('daf.ink.' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
                 set(k, v){ try { localStorage.setItem('daf.ink.' + k, JSON.stringify(v)); } catch(e){} } };
-// 'ink' is the text's own colour, so it's light on a dark theme. The highlighter's are the highlights'.
-const PENS = { ink: 'Black', blue: 'Blue', red: 'Red', green: 'Green' };
-const MARKERS = { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink', purple: 'Purple' };
-const SIZES = { pen: [1.6, 2.6, 4.2], marker: [14, 20, 28] };
 const K = {
   doc: null, strokes: [], geo: new Map(), done: [], undone: [], q: { doc: null, add: new Map(), remove: new Set() },
-  tool: store.get('tool', 'pen'), pen: store.get('pen', 'ink'), size: store.get('size', { pen: 1, marker: 1 }),
-  on: store.get('on', true), seen: store.get('seen', false), margin: store.get('margin', false),
-  layer: null, wrap: null, body: null, pal: null, live: null, near: 0, lastPen: 0, penUp: 0, armed: false,
+  margin: store.get('margin', false), mOn: false, layer: null, svg: null, wrap: null, body: null,
 };
-const marker = () => (H && H.color()) || 'yellow';     // Daf's highlight colour: one choice for both
-const setMarker = c => { try { localStorage.setItem('daf.hlColor', JSON.stringify(c)); } catch(e){} };
-const live = () => !!(K.layer && K.layer.isConnected);
-const writing = () => K.on && live();
+const live = () => !!(K.svg && K.svg.isConnected);
 const r1 = v => Math.round(v * 10) / 10;
 const newId = () => { const b = new Uint8Array(10); crypto.getRandomValues(b); return 'k' + Array.from(b, x => x.toString(16).padStart(2, '0')).join(''); };
-const sizeOf = tool => SIZES[tool][K.size[tool] != null ? K.size[tool] : 1] || SIZES[tool][1];
-
-const IC = {
-  pen: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l.9-3.6 8.4-8.4a1.9 1.9 0 0 1 2.7 2.7l-8.4 8.4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12.2 5.1l2.7 2.7" stroke="currentColor" stroke-width="1.6"/></svg>',
-  marker: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 16.5h13" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity=".35"/><path d="M5 12.5 12.5 5l2.5 2.5L7.5 15H5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
-  eraser: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.8 16 3.6 11.8a1.4 1.4 0 0 1 0-2l6.3-6.3a1.4 1.4 0 0 1 2 0l4.2 4.2a1.4 1.4 0 0 1 0 2L10 16z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6.6 8.8l4.6 4.6M7.8 16h8.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
-  undo: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 4 8l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 8H12a4 4 0 0 1 0 8H9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
-  redo: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 16 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.5 8H8a4 4 0 0 0 0 8h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
-  margin: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 7h4.5M5.5 10h4.5M5.5 13h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12.6 7.2c1.5.4.2 1.6 1.6 2s.1 1.7 1.4 2.3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
-  away: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-};
 
 /* ---------- where a stroke goes ---------- */
 const blocks = () => K.body ? [...K.body.querySelectorAll('[data-i], figure[data-img]')] : [];
@@ -90,15 +68,16 @@ function charAt(el, x, y){
   if (!r || y < r.top - r.height || y > r.bottom + r.height) return null;
   return { c, r };
 }
-// A stroke as it's kept: its place, and its points from where it started (k=1: as written).
+// A stroke as it's kept: the pen it was written with, its place, and its points from where it
+// started (as written: k = 1).
 function make(L){
   const [x0, y0] = L.pts[0], el = blockNear(x0, y0); if (!el) return null;
-  const br = el.getBoundingClientRect();
+  const br = el.getBoundingClientRect(), b = L.brush;
   const at = { b: idx(el), q: el.textContent.trim().slice(0, 40), w: r1(br.width), h: r1(br.height), f: fontOf(el) };
   const ch = x0 >= br.left && x0 <= br.right && y0 >= br.top - 4 && y0 <= br.bottom + 4 ? charAt(el, x0, y0) : null;
   if (ch) { at.c = ch.c; at.x = r1(x0 - ch.r.left); at.y = r1(y0 - ch.r.top); }
   else { at.x = r1(x0 - br.left); at.y = r1(y0 - br.top); }
-  return { id: newId(), tool: L.tool, color: L.tool === 'marker' ? marker() : K.pen, size: sizeOf(L.tool), at,
+  return { id: newId(), v: 2, tool: b.pen, color: b.color, size: r1(b.w), o: Math.round(b.opacity * 100) / 100, at,
            pts: L.pts.map(p => [r1(p[0] - x0), r1(p[1] - y0), Math.round(p[2] * 100) / 100]) };
 }
 // Where a stroke's first point is now, in the layer, and how much bigger the type is than it was.
@@ -118,136 +97,26 @@ function place(s, Lr){
 }
 
 /* ---------- drawing ---------- */
-const width = (tool, size, p) => tool === 'marker' ? size : size * (0.55 + 0.9 * p);
-// A pen stroke's outline, thicker where it was pressed harder, with round ends.
-function outline(P, size){
-  const q = [];
-  for (const p of P) {                                    // smoothed a little toward each new point
-    const l = q[q.length - 1];
-    if (l && Math.hypot(p[0] - l[0], p[1] - l[1]) < 0.5) continue;
-    q.push(l ? [l[0] + (p[0] - l[0]) * 0.65, l[1] + (p[1] - l[1]) * 0.65, p[2]] : p.slice());
-  }
-  const last = P[P.length - 1]; if (q.length > 1) q.push(last.slice());
-  const n = q.length, rad = i => width('pen', size, q[i][2]) / 2 * (n > 6 ? Math.min(1, 0.55 + 0.15 * Math.min(i, n - 1 - i)) : 1);
-  if (n === 1 || (n === 2 && Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) < 1)) {
-    const r = rad(0), [x, y] = q[0];
-    return 'M' + r1(x - r) + ' ' + r1(y) + 'a' + r1(r) + ' ' + r1(r) + ' 0 1 0 ' + r1(2 * r) + ' 0a' + r1(r) + ' ' + r1(r) + ' 0 1 0 ' + r1(-2 * r) + ' 0Z';
-  }
-  const Lf = [], Rt = [];
-  for (let i = 0; i < n; i++) {
-    const a = q[Math.max(0, i - 1)], b = q[Math.min(n - 1, i + 1)];
-    let tx = b[0] - a[0], ty = b[1] - a[1]; const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;
-    const r = rad(i);
-    Lf.push([q[i][0] - ty * r, q[i][1] + tx * r]); Rt.push([q[i][0] + ty * r, q[i][1] - tx * r]);
-  }
-  const pt = p => r1(p[0]) + ' ' + r1(p[1]);
-  const side = S => { let d = ''; for (let i = 1; i < S.length - 1; i++) d += 'Q' + pt(S[i]) + ' ' + pt([(S[i][0] + S[i + 1][0]) / 2, (S[i][1] + S[i + 1][1]) / 2]); return d + 'L' + pt(S[S.length - 1]); };
-  const re = rad(n - 1), rs = rad(0);
-  return 'M' + pt(Lf[0]) + side(Lf) + 'A' + r1(re) + ' ' + r1(re) + ' 0 0 0 ' + pt(Rt[n - 1]) + side(Rt.slice().reverse()) + 'A' + r1(rs) + ' ' + r1(rs) + ' 0 0 0 ' + pt(Lf[0]) + 'Z';
-}
-function line(P){
-  if (P.length === 1) return 'M' + r1(P[0][0]) + ' ' + r1(P[0][1]) + 'l0.1 0';
-  let d = 'M' + r1(P[0][0]) + ' ' + r1(P[0][1]);
-  for (let i = 1; i < P.length - 1; i++) d += 'Q' + r1(P[i][0]) + ' ' + r1(P[i][1]) + ' ' + r1((P[i][0] + P[i + 1][0]) / 2) + ' ' + r1((P[i][1] + P[i + 1][1]) / 2);
-  const z = P[P.length - 1]; return d + 'L' + r1(z[0]) + ' ' + r1(z[1]);
-}
 function draw(s, Lr){
-  Lr = Lr || K.layer.getBoundingClientRect();
+  Lr = Lr || K.svg.getBoundingClientRect();
   const o = place(s, Lr); if (!o) return;
-  const [ox, oy, k] = o, pts = s.pts.map(p => [ox + p[0] * k, oy + p[1] * k, p[2]]), size = s.size * k;
-  const el = document.createElementNS(NS, 'path');
-  el.setAttribute('class', s.tool + ' c-' + s.color); el.dataset.k = s.id;
-  if (s.tool === 'marker') { el.setAttribute('d', line(pts)); el.setAttribute('stroke-width', r1(size)); K.gm.appendChild(el); }
-  else { el.setAttribute('d', outline(pts, size)); K.gp.appendChild(el); }
+  const [ox, oy, k] = o, pts = s.pts.map(p => [ox + p[0] * k, oy + p[1] * k, p[2]]);
+  K.layer.add(s, pts, k);
   let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
   for (const p of pts) { if (p[0] < x1) x1 = p[0]; if (p[0] > x2) x2 = p[0]; if (p[1] < y1) y1 = p[1]; if (p[1] > y2) y2 = p[1]; }
-  K.geo.set(s.id, { pts, r: s.tool === 'marker' ? size / 2 : size * 0.72, box: [x1, y1, x2, y2] });
+  K.geo.set(s.id, { pts, r: (s.size || 2.5) * k / 2, box: [x1, y1, x2, y2] });
 }
 function render(){
   if (!live()) return;
-  K.geo.clear(); K.gm.textContent = ''; K.gp.textContent = '';
-  const Lr = K.layer.getBoundingClientRect(); K.cache = new Map();
+  K.geo.clear(); K.layer.clear();
+  K.layer.hl.style.mixBlendMode = document.documentElement.dataset.mode === 'dark' ? 'screen' : 'multiply';
+  const Lr = K.svg.getBoundingClientRect(); K.cache = new Map();
   for (const s of K.strokes) { try { draw(s, Lr); } catch(e){} }
   K.cache = null;
 }
 const later = () => { cancelAnimationFrame(K.raf); K.raf = requestAnimationFrame(render); };
-function unpaint(id){ K.geo.delete(id); const el = K.layer && K.layer.querySelector('[data-k="' + id + '"]'); if (el) el.remove(); }
-
-// The stroke being written, on a canvas over the window: drawn as fast as the pen moves.
-function wet(L, p){
-  let cv = K.cv;
-  if (!cv || !cv.isConnected) { cv = K.cv = document.createElement('canvas'); cv.className = 'inkwet'; cv.setAttribute('aria-hidden', 'true'); document.body.appendChild(cv); }
-  if (!L.ctx) {
-    const dpr = window.devicePixelRatio || 1, w = window.innerWidth, h = window.innerHeight;
-    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
-    L.ctx = cv.getContext('2d', { desynchronized: true });
-    L.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); L.ctx.clearRect(0, 0, w, h);
-    L.ctx.lineCap = 'round'; L.ctx.lineJoin = 'round'; L.ctx.strokeStyle = colorOf(L.tool);
-    cv.style.opacity = L.tool === 'marker' ? '0.38' : '1'; cv.hidden = false;
-  }
-  const a = L.pts[L.pts.length - 2] || p;
-  L.ctx.lineWidth = width(L.tool, L.size, p[2]);
-  L.ctx.beginPath(); L.ctx.moveTo(a[0], a[1]); L.ctx.lineTo(p[0] + (a === p ? 0.01 : 0), p[1]); L.ctx.stroke();
-}
-function dry(){ if (K.cv) { const c = K.cv.getContext('2d'); c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, K.cv.width, K.cv.height); c.restore(); K.cv.hidden = true; } }
-function colorOf(tool){
-  const probe = document.createElementNS(NS, 'path'); probe.setAttribute('class', tool + ' c-' + (tool === 'marker' ? marker() : K.pen));
-  K.gp.appendChild(probe); const cs = getComputedStyle(probe), c = tool === 'marker' ? cs.stroke : cs.fill; probe.remove();
-  return c && c !== 'none' ? c : '#333';
-}
-
-/* ---------- the pen ---------- */
-const SKIP = 'input, textarea, select, [contenteditable="true"], .inkpal, .inkpop, #selbar, .menu, .modal';
-function mine(e){
-  if (e.pointerType !== 'pen' || !writing()) return false;
-  const t = e.target;
-  return t instanceof Element && K.wrap.contains(t) && !t.closest(SKIP);
-}
-function feed(e){
-  const L = K.live, evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
-  for (const v of (evs.length ? evs : [e])) {
-    const p = [v.clientX, v.clientY, v.pressure > 0 ? Math.min(1, v.pressure) : 0.5], last = L.pts[L.pts.length - 1];
-    if (last && Math.hypot(p[0] - last[0], p[1] - last[1]) < 0.7) continue;
-    L.pts.push(p);
-    if (!L.moved && Math.hypot(p[0] - L.x0, p[1] - L.y0) > 6) L.moved = true;
-    if (L.tool === 'eraser') eraseAt(p[0], p[1]); else wet(L, p);
-  }
-}
-function down(e){
-  if (e.pointerType === 'pen') { K.lastPen = Date.now(); if (!K.seen) { K.seen = true; store.set('seen', true); arm(); drawPal(); } }
-  if (!mine(e)) return;
-  e.preventDefault(); e.stopPropagation();
-  closePop();
-  // The pen's button (2 when it's held) or an eraser end (32) erases, whatever tool is chosen.
-  const erase = K.tool === 'eraser' || !!(e.buttons & 34) || e.button === 2 || e.button === 5;
-  const tool = erase ? 'eraser' : K.tool;
-  K.live = { id: e.pointerId, tool, size: tool === 'eraser' ? 0 : sizeOf(tool), pts: [], t0: Date.now(), x0: e.clientX, y0: e.clientY, moved: false, erased: [], hls: new Set() };
-  try { K.wrap.setPointerCapture(e.pointerId); } catch(_){}
-  feed(e);
-}
-function move(e){
-  if (e.pointerType === 'pen') K.near = Date.now();
-  if (!K.live || e.pointerId !== K.live.id) return;
-  e.preventDefault(); feed(e);
-}
-function up(e){
-  if (!K.live || e.pointerId !== K.live.id) return;
-  const L = K.live; K.live = null; K.penUp = Date.now(); K.near = Date.now();
-  e.preventDefault(); dry();
-  if (!live()) return;
-  if (!L.moved && Date.now() - L.t0 < 450) { if (L.tool !== 'eraser') tap(L.x0, L.y0); return; }
-  if (L.tool === 'eraser') { erased(L); return; }
-  if (e.type === 'pointercancel' && L.pts.length < 3) return;
-  if (L.tool === 'marker' && toHighlight(L)) return;
-  const s = make(L); if (!s) return;
-  K.strokes.push(s); draw(s); act({ add: [s] });
-}
-// A tap with the pen is a tap: on a link, a picture, a highlight, a timestamp.
-function tap(x, y){
-  const el = document.elementFromPoint(x, y); if (!el) return;
-  K.tapping = true;
-  try { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, detail: 1 })); } finally { K.tapping = false; }
-}
+function unpaint(id){ K.geo.delete(id); if (K.layer) K.layer.remove(id); }
+function paint(s){ if (live()) draw(s); }
 
 /* ---------- the eraser ---------- */
 function near(pts, x, y, r){
@@ -258,32 +127,43 @@ function near(pts, x, y, r){
   }
   return false;
 }
-function eraseAt(x, y){
-  const Lr = K.layer.getBoundingClientRect(), px = x - Lr.left, py = y - Lr.top, R = 9;
-  for (const [id, g] of K.geo) {
-    const b = g.box, m = R + g.r;
+// Whole strokes, or only what's within r of (x, y): the stroke breaks there, into strokes of its own.
+function erase(x, y, mode, r, L){
+  const Lr = K.svg.getBoundingClientRect(), px = x - Lr.left, py = y - Lr.top;
+  for (const [id, g] of [...K.geo]) {
+    const b = g.box, m = r + g.r;
     if (px < b[0] - m || px > b[2] + m || py < b[1] - m || py > b[3] + m || !near(g.pts, px, py, m)) continue;
     const s = K.strokes.find(t => t.id === id); if (!s) continue;
-    K.strokes = K.strokes.filter(t => t !== s); unpaint(id); K.live.erased.push(s);
+    K.strokes = K.strokes.filter(t => t !== s); unpaint(id);
+    // a piece made a moment ago by this same eraser just goes; what was there before is kept for Undo
+    const mine = L.added.indexOf(s);
+    if (mine >= 0) L.added.splice(mine, 1); else L.erased.push(s);
+    if (mode !== 'area') continue;
+    let run = [];
+    const flush = () => { if (run.length >= 2) { const piece = Object.assign({}, s, { id: newId(), pts: run }); K.strokes.push(piece); L.added.push(piece); draw(piece, Lr); } run = []; };
+    g.pts.forEach((p, i) => { if (Math.hypot(p[0] - px, p[1] - py) <= m) flush(); else run.push(s.pts[i]); });
+    flush();
   }
   const el = document.elementFromPoint(x, y), mk = el && el.closest && el.closest('#docbody mark[data-h]');
-  if (mk) K.live.hls.add(mk.dataset.h);
+  if (mk) L.hls.add(mk.dataset.h);
 }
 async function erased(L){
   const a = {};
   if (L.erased.length) a.del = L.erased;
+  if (L.added.length) a.add = L.added;
   if (L.hls.size && C.Reader) {
     // Highlights the eraser went over go too; Undo brings them back.
     a.unhl = [];
     for (const id of L.hls) { const back = await C.Reader.removeHl(id, true); if (back) a.unhl.push({ id, back }); }
     if (!a.unhl.length) delete a.unhl;
   }
-  if (a.del || a.unhl) act(a);
+  if (a.del || a.add || a.unhl) act(a);
 }
+function eraseAll(){ if (!K.strokes.length) return; const all = K.strokes.slice(); K.strokes = []; render(); act({ del: all }); toast('Everything written here is erased. Undo brings it back.'); }
 
 /* ---------- the highlighter over words ---------- */
 // Along a line: the words between its ends. Down several lines: from where it started to where
-// it stopped, as a selection would be. A ring drawn round something stays a marker's ring.
+// it stopped, as a selection would be. A ring drawn round something stays a stroke.
 function toHighlight(L){
   if (!C.Reader || !L.pts.length) return false;
   const P = L.pts, s = P[0], z = P[P.length - 1];
@@ -307,25 +187,25 @@ function toHighlight(L){
   const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
   const info = C.Reader.getSel();
   if (!info) { sel.removeAllRanges(); return false; }
-  const color = marker();
+  const color = L.brush.color;
   C.Reader.highlight(info, false, true).then(h => { if (h) act({ hl: { id: h.id, info, color } }); });
   return true;
 }
 
 /* ---------- undo, and sending ---------- */
-function act(a){ K.done.push(a); if (K.done.length > 200) K.done.shift(); K.undone = []; apply(a, false); drawPal(); }
+function act(a){ K.done.push(a); if (K.done.length > 200) K.done.shift(); K.undone = []; apply(a, false); Pens.redraw(); }
 // Does what a records (back = false) or takes it back (true); a highlight's own way for those.
 async function apply(a, back, again){
   const add = back ? a.del : a.add, rm = back ? a.add : a.del;
   if (again || back) {
     if (rm) { const ids = new Set(rm.map(s => s.id)); K.strokes = K.strokes.filter(s => !ids.has(s.id)); rm.forEach(s => unpaint(s.id)); }
-    if (add) { const Lr = K.layer.getBoundingClientRect(); add.forEach(s => { if (!K.strokes.some(t => t.id === s.id)) { K.strokes.push(s); draw(s, Lr); } }); }
+    if (add) add.forEach(s => { if (!K.strokes.some(t => t.id === s.id)) { K.strokes.push(s); paint(s); } });
   }
   send(add || [], rm || []);
   if (K.doc) K.doc.ink = K.strokes;
   if (a.hl && (back || again) && C.Reader) {
     if (back) await C.Reader.removeHl(a.hl.id, true);
-    else { setMarker(a.hl.color); const h = await C.Reader.highlight(a.hl.info, false, true); if (h) a.hl.id = h.id; }
+    else { try { localStorage.setItem('daf.hlColor', JSON.stringify(a.hl.color)); } catch(e){} const h = await C.Reader.highlight(a.hl.info, false, true); if (h) a.hl.id = h.id; }
   }
   if (a.unhl && (back || again) && C.Reader) {
     for (const u of a.unhl) {
@@ -334,8 +214,8 @@ async function apply(a, back, again){
     }
   }
 }
-function undo(){ const a = K.done.pop(); if (!a) return; K.undone.push(a); apply(a, true); drawPal(); }
-function redo(){ const a = K.undone.pop(); if (!a) return; K.done.push(a); apply(a, false, true); drawPal(); }
+function undo(){ const a = K.done.pop(); if (!a) return; K.undone.push(a); apply(a, true); Pens.redraw(); }
+function redo(){ const a = K.undone.pop(); if (!a) return; K.done.push(a); apply(a, false, true); Pens.redraw(); }
 function send(add, rm){
   if (!K.doc || (!add.length && !rm.length)) return;
   if (K.q.doc && K.q.doc !== K.doc) flush();
@@ -357,65 +237,30 @@ async function flush(){
   } catch(e){ toast(e.message); }
 }
 
-/* ---------- the tools ---------- */
-function drawPal(){
-  if (!K.seen || !live()) { if (K.pal) K.pal.remove(); K.pal = null; return; }
-  let p = K.pal;
-  if (!p || !p.isConnected) {
-    p = K.pal = document.createElement('div'); p.className = 'inkpal'; p.setAttribute('role', 'toolbar'); p.setAttribute('aria-label', 'Pen');
-    p.addEventListener('click', onPal);
-    (K.wrap.closest('.rv') || document.body).appendChild(p);
-  }
-  p.classList.toggle('away', !K.on);
-  if (!K.on) { p.innerHTML = '<button data-ink="on" title="Write with the pen" aria-label="Write with the pen">' + IC.pen + '</button>'; return; }
-  const b = (k, label, on, dis) => '<button data-ink="' + k + '" title="' + label + '" aria-label="' + label + '"' + (on != null ? ' aria-pressed="' + on + '"' : '') + (dis ? ' disabled' : '') + '>' + IC[k] + '</button>';
-  const tool = K.tool === 'marker' ? 'marker' : 'pen', c = tool === 'marker' ? marker() : K.pen;
-  p.innerHTML = b('pen', 'Pen', K.tool === 'pen') + b('marker', 'Highlighter', K.tool === 'marker') + b('eraser', 'Eraser (or hold the pen’s button)', K.tool === 'eraser') +
-    '<span class="sep"></span><button data-ink="pick" title="Colour and size" aria-label="Colour and size" aria-haspopup="true"><span class="dot ' + tool + ' c-' + c + '" style="--s:' + (6 + 4 * (K.size[tool] != null ? K.size[tool] : 1)) + 'px"></span></button>' +
-    '<span class="sep"></span>' + b('undo', 'Undo', null, !K.done.length) + b('redo', 'Redo', null, !K.undone.length) +
-    '<span class="sep"></span>' + (window.innerWidth >= 700 ? b('margin', 'Room to write in the margin', !!K.mOn) : '') + b('away', 'Put the pen tools away (the pen scrolls and selects)', null);
-}
-function onPal(e){
-  const t = e.target.closest('[data-ink]'); if (!t) return;
-  const k = t.dataset.ink;
-  if (k === 'pen' || k === 'marker' || k === 'eraser') { K.tool = k; store.set('tool', k); closePop(); }
-  else if (k === 'pick') { if (K.popEl) closePop(); else openPop(t); return; }
-  else if (k === 'undo') undo();
-  else if (k === 'redo') redo();
-  else if (k === 'margin') { const on = !K.mOn; K.margin = on; store.set('margin', on); setMargin(on); }
-  else if (k === 'away' || k === 'on') { K.on = k === 'on'; store.set('on', K.on); closePop(); }
-  drawPal();
-}
-function openPop(anchor){
-  closePop();
-  const tool = K.tool === 'marker' ? 'marker' : 'pen', cur = tool === 'marker' ? marker() : K.pen, list = tool === 'marker' ? MARKERS : PENS;
-  const sz = K.size[tool] != null ? K.size[tool] : 1;
-  const el = K.popEl = document.createElement('div'); el.className = 'inkpop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', tool === 'marker' ? 'Highlighter colour and size' : 'Pen colour and size');
-  el.innerHTML = '<div class="row">' + Object.entries(list).map(([c, name]) => '<button data-c="' + c + '" aria-label="' + esc(name) + '" title="' + esc(name) + '" aria-pressed="' + (c === cur) + '"><span class="dot ' + tool + ' c-' + c + '"></span></button>').join('') + '</div>' +
-    '<div class="row">' + SIZES[tool].map((s, i) => '<button data-s="' + i + '" aria-label="' + ['Fine', 'Medium', 'Bold'][i] + '" title="' + ['Fine', 'Medium', 'Bold'][i] + '" aria-pressed="' + (i === sz) + '"><span class="dot ' + tool + ' c-' + cur + '" style="--s:' + (6 + 4 * i) + 'px"></span></button>').join('') + '</div>';
-  el.addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.c) { if (tool === 'marker') setMarker(b.dataset.c); else { K.pen = b.dataset.c; store.set('pen', K.pen); } }
-    if (b.dataset.s) { K.size = Object.assign({}, K.size, { [tool]: +b.dataset.s }); store.set('size', K.size); }
-    closePop(); drawPal();
-  });
-  document.body.appendChild(el);
-  const r = anchor.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
-  if (window.innerWidth <= 640) { el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px'; el.style.top = (r.top - h - 10) + 'px'; }
-  else { el.style.left = (r.left - w - 12) + 'px'; el.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, r.top + r.height / 2 - h / 2)) + 'px'; }
-  setTimeout(() => document.addEventListener('pointerdown', K.popOff = ev => { if (!ev.target.closest('.inkpop, [data-ink="pick"]')) closePop(); }, true), 0);
-}
-function closePop(){ if (K.popEl) { K.popEl.remove(); K.popEl = null; } if (K.popOff) { document.removeEventListener('pointerdown', K.popOff, true); K.popOff = null; } }
 // The column moves over to leave room on the right (on a screen wide enough for it).
 function setMargin(on){ K.mOn = !!on; if (K.wrap) K.wrap.classList.toggle('inkmargin', K.mOn && window.innerWidth >= 700); later(); }
+
+/* ---------- the article, as a surface for the pens ---------- */
+const surface = {
+  live,
+  takes: el => !!K.wrap && K.wrap.contains(el),
+  off: () => [0, 0],
+  stroke(L){ const s = make(L); if (!s) return; K.strokes.push(s); draw(s); act({ add: [s] }); },
+  erase, erased, eraseAll,
+  highlight: toHighlight,
+  palHost: () => (K.wrap && K.wrap.closest('.rv')) || document.body,
+  canUndo: () => K.done.length > 0, canRedo: () => K.undone.length > 0, undo, redo,
+  extras: () => window.innerWidth >= 700 ? [{ k: 'margin', label: 'Room to write in the margin', on: K.mOn }] : [],
+  extra(k){ if (k === 'margin') { const on = !K.mOn; K.margin = on; store.set('margin', on); setMargin(on); } },
+};
 
 /* ---------- an article opens ---------- */
 function open(d){
   flush();
   if (K.ro) K.ro.disconnect();
   const body = document.getElementById('docbody');
-  K.doc = d; K.done = []; K.undone = []; K.layer = null; K.body = body;
-  if (!body || !d) { drawPal(); return; }
+  K.doc = d; K.done = []; K.undone = []; K.svg = null; K.body = body;
+  if (!body || !d) { Pens.use(null); return; }
   // What's waiting in the outbox (written offline) is shown as if it had gone.
   let list = (d.ink || []).slice();
   const path = '/api/docs/' + encodeURIComponent(d.id) + '/ink';
@@ -427,39 +272,20 @@ function open(d){
   K.strokes = d.ink = list;
   K.wrap = body.closest('.docwrap') || body.parentNode;
   K.wrap.classList.add('inkable');
-  const svg = K.layer = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'inklayer'); svg.setAttribute('aria-hidden', 'true');
-  K.gm = document.createElementNS(NS, 'g'); K.gm.setAttribute('class', 'mk'); K.gp = document.createElementNS(NS, 'g');
-  svg.append(K.gm, K.gp); K.wrap.appendChild(svg);
+  const svg = K.svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'inklayer'); svg.setAttribute('aria-hidden', 'true');
+  K.layer = Pens.layer(svg, document.documentElement.dataset.mode === 'dark');
+  K.wrap.appendChild(svg);
   const inMargin = list.some(s => s.at && s.at.c == null && (s.at.x > s.at.w || s.at.x < -24));
-  setMargin((K.margin && K.seen) || inMargin);
+  setMargin((K.margin && Pens.seen()) || inMargin);
   K.ro = new ResizeObserver(later); K.ro.observe(body); K.ro.observe(K.wrap);
-  drawPal(); render();
+  Pens.use(surface);
+  render();
 }
-
-// Only on a device a pen has touched: the touch listeners can't be passive, so a browser waits
-// for them before it scrolls.
-function arm(){
-  if (K.armed) return; K.armed = true;
-  const stylus = e => [...e.changedTouches].some(t => t.touchType === 'stylus');
-  document.addEventListener('touchstart', e => {
-    if (!writing()) return;
-    if (stylus(e)) { if (K.live) e.preventDefault(); return; }
-    if (K.live || Date.now() - K.near < 350) e.preventDefault();        // a hand on the screen while the pen writes
-  }, { capture: true, passive: false });
-  document.addEventListener('touchmove', e => { if (writing() && K.live) e.preventDefault(); }, { capture: true, passive: false });
-}
-document.addEventListener('pointerdown', down, true);
-document.addEventListener('pointermove', move, true);
-document.addEventListener('pointerup', up, true);
-document.addEventListener('pointercancel', up, true);
-// A pen that's just written doesn't also click what it wrote on (a mouse-like pen sends one), nor
-// open a menu with its button.
-document.addEventListener('click', e => { if (e.isTrusted && !K.tapping && Date.now() - K.penUp < 500 && mine({ pointerType: 'pen', target: e.target })) { e.preventDefault(); e.stopPropagation(); } }, true);
-document.addEventListener('contextmenu', e => { if (Date.now() - K.lastPen < 800 && writing()) e.preventDefault(); }, true);
+Pens.listen(document, surface);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
 window.addEventListener('pagehide', flush);
-window.addEventListener('resize', () => { if (live()) { setMargin(K.mOn); drawPal(); } });
-if (K.seen) arm();
+window.addEventListener('resize', () => { if (live()) { setMargin(K.mOn); Pens.redraw(); } });
+window.addEventListener('daf-theme', later);                 // the text's colour and the highlighter's blend
 
-C.Ink = { open, flush, undo, redo, state: () => ({ strokes: K.strokes.length, tool: K.tool, on: K.on, seen: K.seen, margin: !!(K.wrap && K.wrap.classList.contains('inkmargin')), queued: K.q.add.size + K.q.remove.size, done: K.done.length }) };
+C.Ink = { open, flush, undo, redo, state: () => Object.assign(Pens.state(), { strokes: K.strokes.length, margin: !!(K.wrap && K.wrap.classList.contains('inkmargin')), queued: K.q.add.size + K.q.remove.size, done: K.done.length }) };
 })();

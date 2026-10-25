@@ -1,13 +1,19 @@
-"""Ink: what's written on an article with a pen (web/ink.js). Each stroke keeps the place it was
-written (a paragraph, the letter it started on, and where it sat beside it), so it follows the text
-when the type or the column changes, and its points with the pen's pressure. The page makes each
-stroke's id, so a stroke written offline and sent twice is kept once, and undo removes it by its id."""
+"""Ink: what's written with a pen on an article (web/ink.js) or a book (web/book.js), the pens being
+web/pens.js. Each stroke keeps the place it was written (an article's paragraph, or a book's CFI; the
+letter it started on, and where it sat beside it), so it follows the text when the type or the column
+changes, and its points with the pen's pressure. The page makes each stroke's id, so a stroke written
+offline and sent twice is kept once, and undo removes it by its id.
+
+A stroke is {id, v, tool: the pen (fountain, calligraphy, pen, pencil, brush, marker, highlighter),
+color ("ink", a highlight colour or #rrggbb), size (its width in px as written), o (opacity), at, pts}.
+Round one's (no v) were tool "pen" or "marker" (the highlighter) with a named colour."""
 import json
 import re
 import time
 
-TOOLS = ("pen", "marker")
+TOOLS = ("fountain", "calligraphy", "pen", "pencil", "brush", "marker", "highlighter")
 COLORS = ("ink", "blue", "red", "green", "yellow", "pink", "purple")
+HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 ID = re.compile(r"^k[0-9a-z]{8,32}$")
 MAX_POINTS = 4000
 
@@ -19,7 +25,10 @@ def strokes(conn, doc):
             data = json.loads(r["data"])
         except ValueError:
             continue
-        out.append({"id": r["id"], "tool": r["tool"], "color": r["color"], "size": r["size"], "at": data.get("at"), "pts": data.get("pts"), "created": r["created"]})
+        s = {"id": r["id"], "tool": r["tool"], "color": r["color"], "size": r["size"], "at": data.get("at"), "pts": data.get("pts"), "created": r["created"]}
+        if data.get("v"):
+            s["v"], s["o"] = data["v"], data.get("o", 1)
+        out.append(s)
     return out
 
 
@@ -34,14 +43,19 @@ def _clean(s):
     """A stroke as the page sent it, checked: ValueError if it isn't one."""
     if not isinstance(s, dict) or not ID.match(str(s.get("id") or "")):
         raise ValueError("Bad stroke id")
+    v = 2 if s.get("v") else None
     tool = s.get("tool") if s.get("tool") in TOOLS else "pen"
-    color = s.get("color") if s.get("color") in COLORS else "ink"
+    if not v and tool not in ("pen", "marker"):
+        tool = "pen"
+    color = s.get("color") if s.get("color") in COLORS or HEX.match(str(s.get("color") or "")) else "ink"
     a = s.get("at") if isinstance(s.get("at"), dict) else {}
-    at = {"b": int(a.get("b") or 0), "q": str(a.get("q") or "")[:40],
-          "w": _num(a.get("w") or 1, 1, 10000), "h": _num(a.get("h") or 1, 1, 100000), "f": _num(a.get("f") or 16, 4, 200),
-          "x": round(_num(a.get("x") or 0, -10000, 10000), 1), "y": round(_num(a.get("y") or 0, -100000, 100000), 1)}
-    if a.get("c") is not None:
-        at["c"] = int(a["c"])
+    at = {"f": _num(a.get("f") or 16, 4, 200), "x": round(_num(a.get("x") or 0, -10000, 10000), 1), "y": round(_num(a.get("y") or 0, -100000, 100000), 1)}
+    if a.get("cfi"):                            # a book's: the letter it started on, as a CFI, in its section
+        at.update(cfi=str(a["cfi"])[:2000], s=int(a.get("s") or 0))
+    else:                                       # an article's: its paragraph, and the letter in it
+        at.update(b=int(a.get("b") or 0), q=str(a.get("q") or "")[:40], w=_num(a.get("w") or 1, 1, 10000), h=_num(a.get("h") or 1, 1, 100000))
+        if a.get("c") is not None:
+            at["c"] = int(a["c"])
     pts = s.get("pts")
     if not isinstance(pts, list) or not pts or len(pts) > MAX_POINTS:
         raise ValueError("Bad points")
@@ -51,7 +65,10 @@ def _clean(s):
             raise ValueError("Bad point")
         clean.append([round(_num(p[0], -10000, 10000), 1), round(_num(p[1], -100000, 100000), 1),
                       round(_num(p[2] if len(p) > 2 else 0.5, 0, 1), 2)])
-    return {"id": s["id"], "tool": tool, "color": color, "size": round(_num(s.get("size") or 2.5, 0.5, 60), 1), "at": at, "pts": clean}
+    out = {"id": s["id"], "tool": tool, "color": color, "size": round(_num(s.get("size") or 2.5, 0.3, 80), 1), "at": at, "pts": clean}
+    if v:
+        out["v"], out["o"] = v, round(_num(s.get("o") if s.get("o") is not None else 1, 0.05, 1), 2)
+    return out
 
 
 def change(conn, doc, add=(), remove=(), at=None):
@@ -61,8 +78,11 @@ def change(conn, doc, add=(), remove=(), at=None):
     added = 0
     for s in list(add)[:500]:
         s = _clean(s)
+        data = {"at": s["at"], "pts": s["pts"]}
+        if s.get("v"):
+            data.update(v=s["v"], o=s["o"])
         conn.execute("INSERT OR REPLACE INTO ink (id, doc, tool, color, size, data, created) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                     (s["id"], doc, s["tool"], s["color"], s["size"], json.dumps({"at": s["at"], "pts": s["pts"]}, separators=(",", ":")), created))
+                     (s["id"], doc, s["tool"], s["color"], s["size"], json.dumps(data, separators=(",", ":")), created))
         added += 1
     ids = [str(i) for i in list(remove)[:2000] if ID.match(str(i))]
     removed = 0

@@ -69,7 +69,7 @@ window.addEventListener('unhandledrejection', e => noteErr('unhandled: ' + ((e.r
 // made offline keeps its id and can be changed again before it's sent.
 // Articles too: their highlights (the id is the server's own hash, as for books), status, progress,
 // star, note, tags and title; reading time; the daily review and cards; paper minutes; reading notes.
-const OUTBOX = /^\/api\/(ebooks\/[^/?]+\/(position|highlights|bookmarks(\/[^/?]+)?)|highlights\/[^/?]+(\/(color|note|fav|tags|restore))?|manga\/books\/[^/?]+\/progress|manga\/beat|docs\/[^/?]+\/(highlights|status|progress|star|note|tags|meta|ink)|docs\/bulk|read\/beat|review\/[^/?]+|cards\/[^/?]+\/grade|paper|notes|feedback|tips|books\/[^/?]+\/review)$/;
+const OUTBOX = /^\/api\/(ebooks\/[^/?]+\/(position|highlights|bookmarks(\/[^/?]+)?|ink)|highlights\/[^/?]+(\/(color|note|fav|tags|restore))?|manga\/books\/[^/?]+\/progress|manga\/beat|docs\/[^/?]+\/(highlights|status|progress|star|note|tags|meta|ink)|docs\/bulk|read\/beat|review\/[^/?]+|cards\/[^/?]+\/grade|paper|notes|feedback|tips|books\/[^/?]+\/review)$/;
 // The day of a moment in Daf's own time zone (home_tz), as the server counts it, whatever this device is set to.
 const dayIn = at => { const tz = (S.data && S.data.settings && S.data.settings.home_tz) || (S.settings && S.settings.home_tz);
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz || undefined, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at * 1000)); } catch(e){ return isoOf(new Date(at * 1000)); } };
@@ -681,16 +681,16 @@ async function renderPrefs(){
   S.settings = s;
   const sw = (k, label, desc, locked) => '<div class="prow"><div class="d"><b>' + label + '</b><span>' + desc + '</span></div><input type="checkbox" class="sw" id="c-' + k + '" data-count="' + k + '"' + (s.count[k] ? ' checked' : '') + (locked ? ' disabled' : '') + ' aria-label="' + esc(label) + '"></div>';
   let zones = []; try { zones = Intl.supportedValuesOf('timeZone'); } catch(e) {} if (zones.indexOf('UTC') < 0) zones.unshift('UTC'); if (s.home_tz && zones.indexOf(s.home_tz) < 0) zones.push(s.home_tz);
-  $('#main').innerHTML = '<div class="top"><h1>Preferences</h1></div><div class="page"><section class="card" id="goalscard"><h2>Goals</h2><span class="mute">Loading…</span></section><section class="card" id="appearcard"></section><section class="card"><h2>What counts toward the goal</h2><div>' +
+  $('#main').innerHTML = '<div class="top"><h1>Preferences</h1></div><div class="page"><section class="card" id="goalscard"><h2>Goals</h2><span class="mute">Loading…</span></section><section class="card" id="appearcard"></section><section class="card" id="countcard"><h2>What counts toward the goal</h2><div>' +
     sw('kindle','Books on the Kindle','KOReader reading time') + sw('manga','Manga in Daf','Time in Daf’s manga reader') + sw('audio','Audiobooks','Listening time from Audiobookshelf') + sw('article','Articles in Daf','Time with an article open in Daf') +
     sw('paper','Paper books','Minutes you log here or with Ezer') + sw('video','Videos','Time with a video open in Daf') + sw('podcast','Podcasts','Never counted', true) + '</div></section>' +
-    '<section class="card"><h2>Daily review</h2><div class="prow"><div class="d"><b>Highlights per day</b><span>Ezer sends the first one in the morning. Takes effect tomorrow.</span></div><select class="field" id="revsize" style="width:auto">' + [3,5,8,12].map(n => '<option' + (n === s.review_size ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div></section>' +
-    '<section class="card"><h2>Reader</h2><div class="prow"><div class="d"><b>Read-aloud voice</b><span>Kokoro on the server. The voice button in the read-aloud bar changes it too, with a line in each voice.</span></div><select class="field" id="ttsvoice" style="width:auto"><option value="' + esc(s.tts_voice || 'af_heart') + '">' + esc(Voices.label(s.tts_voice || 'af_heart')) + '</option></select><button class="btn sm" id="ttshear">Hear it</button></div>' +
+    '<section class="card" id="reviewcard"><h2>Daily review</h2><div class="prow"><div class="d"><b>Highlights per day</b><span>Ezer sends the first one in the morning. Takes effect tomorrow.</span></div><select class="field" id="revsize" style="width:auto">' + [3,5,8,12].map(n => '<option' + (n === s.review_size ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div></section>' +
+    '<section class="card" id="readercard"><h2>Reader</h2><div class="prow"><div class="d"><b>Read-aloud voice</b><span>Kokoro on the server. The voice button in the read-aloud bar changes it too, with a line in each voice.</span></div><select class="field" id="ttsvoice" style="width:auto"><option value="' + esc(s.tts_voice || 'af_heart') + '">' + esc(Voices.label(s.tts_voice || 'af_heart')) + '</option></select><button class="btn sm" id="ttshear">Hear it</button></div>' +
     '<div class="prow"><div class="d"><b>Read-aloud speed</b></div><select class="field" id="ttsspeed" style="width:auto">' + [0.9, 1, 1.1, 1.25, 1.5].map(n => '<option value="' + n + '"' + (n === (s.tts_speed || 1) ? ' selected' : '') + '>' + n + '×</option>').join('') + '</select></div>' +
     (document.documentElement.classList.contains('shell-android') ? '<div class="prow"><div class="d"><b>Volume buttons turn pages</b><span>In books and manga. While music or read-aloud plays they change the volume. On this device.</span></div><input type="checkbox" class="sw" id="volkeys"' + (lsGet('volumeKeys', false) ? ' checked' : '') + ' aria-label="Volume buttons turn pages"></div>' : '') +
     '<div class="prow"><div class="d"><b>After Done or Later, open the next one</b><span>In an article, archiving it or moving it to Later opens the next item in the list instead of going back to the list. On this device.</span></div><input type="checkbox" class="sw" id="autoadv"' + (lsGet('autoAdvance', false) ? ' checked' : '') + ' aria-label="Open the next one"></div>' +
     '<div class="prow"><div class="d"><b>The Feed lets go after</b><span>Unseen items older than this move to Seen, so the Feed never becomes a pile. A longer time brings back the unread ones FreshRSS still has.</span></div><select class="field" id="expire" style="width:auto">' + FEED_WINDOWS.concat(FEED_WINDOWS.some(w => w[0] === (s.feed_expire_days || 30)) ? [] : [[s.feed_expire_days, s.feed_expire_days + ' days']]).map(w => '<option value="' + w[0] + '"' + (w[0] === (s.feed_expire_days || 30) ? ' selected' : '') + '>' + w[1] + '</option>').join('') + '</select></div></section>' +
-    '<section class="card"><h2>Days</h2><div class="prow"><div class="d"><b>Home time zone</b><span>Decides when a day starts and ends. Switch it when you travel.</span></div><select class="field" id="tz" style="width:auto">' + zones.map(z => '<option' + (z === s.home_tz ? ' selected' : '') + '>' + esc(z) + '</option>').join('') + '</select></div></section>' +
+    '<section class="card" id="dayscard"><h2>Days</h2><div class="prow"><div class="d"><b>Home time zone</b><span>Decides when a day starts and ends. Switch it when you travel.</span></div><select class="field" id="tz" style="width:auto">' + zones.map(z => '<option' + (z === s.home_tz ? ' selected' : '') + '>' + esc(z) + '</option>').join('') + '</select></div></section>' +
     '<section class="card" id="phonecard"><h2>Phone</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="podcard"><h2>Podcasts</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="hccard"><h2>Hardcover</h2><span class="mute">Loading…</span></section>' +
@@ -702,7 +702,7 @@ async function renderPrefs(){
     '<section class="card" id="fbcard"><h2>Feedback</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="tagscard"><h2>Library tags</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="tipscard"><h2>Tips</h2><span class="mute">Loading…</span></section>' +
-    '<section class="card"><h2>Account</h2>' +
+    '<section class="card" id="acctcard"><h2>Account</h2>' +
     '<form id="acctf" class="acct"><div class="prow"><div class="d"><b>Username</b><span>You sign in as <b>' + esc(S.user || '') + '</b>.</span></div><input class="field" id="au" autocomplete="username" autocapitalize="none" spellcheck="false" value="' + esc(S.user || '') + '"></div>' +
     '<div class="prow"><div class="d"><b>New password</b><span>Optional. At least 10 characters. Changing it signs out every other browser.</span></div><input class="field" id="anp" type="password" autocomplete="new-password"></div>' +
     '<div class="prow"><div class="d"><b>Current password</b><span>Needed for either change.</span></div><input class="field" id="acp" type="password" autocomplete="current-password" required></div>' +
@@ -710,6 +710,50 @@ async function renderPrefs(){
     '<div class="prow"><div class="d"><b>Other browsers</b><span>Signs out every browser except this one. The Kindle, the phone, the apps and AntennaPod use their own tokens and stay connected.</span></div><button class="btn sm" data-act="signoutothers">Sign them out</button></div>' +
     '<div id="devlist"></div>' +
     '<div class="prow"><div class="d"><b>Sign out</b><span>On this device</span></div><button class="btn sm" data-act="logout">Sign out</button></div></section></div>';
+  organizePrefs();
+}
+// Preferences in groups, each under its heading and a line, and a list of them to go to: beside the
+// cards on a wide screen, a row across the top on a narrow one. The one being read is marked.
+const PREF_GROUPS = [
+  ['Reading', [['goalscard', 'Goals'], ['countcard', 'What counts'], ['reviewcard', 'Daily review'], ['readercard', 'Reader'], ['dayscard', 'Days']]],
+  ['Look', [['appearcard', 'Appearance'], ['keyscard', 'Keyboard']]],
+  ['Connections', [['phonecard', 'Phone'], ['podcard', 'Podcasts'], ['hccard', 'Hardcover'], ['nlcard', 'Newsletters'], ['digestcard', 'Morning email']]],
+  ['AI', [['aicard', 'AI']]],
+  ['Library', [['tagscard', 'Library tags'], ['importcard', 'Import']]],
+  ['Help', [['tipscard', 'Tips'], ['fbcard', 'Feedback']]],
+  ['Account', [['acctcard', 'Account']]],
+];
+function organizePrefs(){
+  const page = $('#main .page'); if (!page) return;
+  page.classList.add('prefspage');
+  const placed = new Set(); let nav = '';
+  for (const [group, cards] of PREF_GROUPS) {
+    const here = cards.filter(([id]) => $('#' + id)); if (!here.length) continue;
+    const head = document.createElement('div'); head.className = 'pgroup'; head.textContent = group;
+    page.appendChild(head);
+    for (const [id] of here) { page.appendChild($('#' + id)); placed.add(id); }
+    nav += '<div class="pnavg">' + esc(group) + '</div>' + here.map(([id, label]) => '<button data-pjump="' + id + '">' + esc(label) + '</button>').join('');
+  }
+  // a card that's in no group yet keeps its place at the end
+  [...page.querySelectorAll(':scope > .card')].filter(c => !placed.has(c.id)).forEach(c => page.appendChild(c));
+  const grid = document.createElement('div'); grid.className = 'prefsgrid';
+  page.parentNode.insertBefore(grid, page);
+  grid.innerHTML = '<nav class="prefsnav" aria-label="Preferences">' + nav + '</nav>';
+  grid.appendChild(page);
+  const main = $('#main'), links = [...grid.querySelectorAll('[data-pjump]')];
+  grid.querySelector('.prefsnav').addEventListener('click', e => {
+    const b = e.target.closest('[data-pjump]'); if (!b) return;
+    const c = $('#' + b.dataset.pjump); if (c) c.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+  const mark = () => {
+    if (!grid.isConnected) { main.removeEventListener('scroll', mark); return; }
+    const top = main.getBoundingClientRect().top + 130;
+    let cur = links[0];
+    for (const l of links) { const c = $('#' + l.dataset.pjump); if (c && c.getBoundingClientRect().top <= top) cur = l; }
+    links.forEach(l => l.classList.toggle('on', l === cur));
+    if (cur && innerWidth < 900) { const nv = cur.parentNode; if (cur.offsetLeft < nv.scrollLeft || cur.offsetLeft + cur.offsetWidth > nv.scrollLeft + nv.clientWidth) nv.scrollTo({ left: cur.offsetLeft - 16, behavior: 'smooth' }); }
+  };
+  main.addEventListener('scroll', mark, { passive: true }); mark();
 }
 async function drawDevices(token){
   const box = $('#devlist'); if (!box) return;

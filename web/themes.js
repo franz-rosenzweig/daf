@@ -64,6 +64,9 @@ const FAMILIES = [
   { id: 'oled', name: 'Black', note: 'Pure black for OLED screens; Daf’s light by day',
     light: { bg: '#ffffff', side: '#f7f7f8', fg: '#1d2127', accent: '#1a7da4' },
     dark: { bg: '#000000', side: '#0b0b0c', fg: '#e8e6e1', read: '#d6d3cc', accent: '#62b6da' } },
+  { id: 'absolute', name: 'Absolute', note: 'Pure black on white and pure white on black, nothing grey',
+    light: { bg: '#ffffff', side: '#ffffff', fg: '#000000', accent: '#000000', ok: '#000000', bad: '#000000', pure: true },
+    dark: { bg: '#000000', side: '#000000', fg: '#ffffff', accent: '#ffffff', ok: '#ffffff', bad: '#ffffff', pure: true } },
 ];
 T.FAMILIES = FAMILIES;
 const byId = id => FAMILIES.find(f => f.id === id) || FAMILIES[0];
@@ -93,6 +96,14 @@ T.vars = (p, dark) => {
   };
   const hls = Object.assign({}, HUES, p.hls || {});
   for (const [k, h] of Object.entries(hls)) { v['--hl-' + k] = mix(bg, h, dark ? 0.26 : 0.3); v['--hl-' + k + '-line'] = mix(bg, h, dark ? 0.72 : 0.85); }
+  // Absolute: the text, the quiet text and every line in the one colour; only what's under the
+  // pointer or chosen gets a tint, and highlights stay strong enough to read through.
+  if (p.pure) {
+    Object.assign(v, { '--panel': bg, '--fg-2': fg, '--fg-3': fg, '--line': fg, '--line-2': fg, '--read-fg': fg, '--accent-2': fg,
+      '--hover': mix(bg, fg, 0.14), '--active': mix(bg, fg, 0.24), '--accent-weak': mix(bg, fg, 0.18), '--shadow': '0 0 0 1px ' + fg,
+      '--g1': mix(bg, fg, 0.25), '--g2': mix(bg, fg, 0.5), '--g3': mix(bg, fg, 0.75), '--speak': mix(bg, fg, 0.16), '--speak-line': fg });
+    for (const [k, h] of Object.entries(hls)) { v['--hl-' + k] = mix(bg, h, dark ? 0.42 : 0.5); v['--hl-' + k + '-line'] = h; }
+  }
   v['--hl'] = v['--hl-yellow']; v['--hl-2'] = v['--hl-yellow-line'];
   return v;
 };

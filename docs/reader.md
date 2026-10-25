@@ -44,7 +44,7 @@ Whether the time counts toward your hour isn't shown over the text any more; Tod
 
 **Preferences → Appearance** picks the colours for all of Daf:
 
-- **The themes:** Daf, Paper (sepia), Nord, GitHub, GitHub dimmed, Cupertino, Solarized, Gruvbox, Catppuccin, Rosé Pine, Tokyo Night, One, Dracula, Everforest, E-ink, High contrast and Black (for OLED screens). Each one has a light and a dark version, and the card shows both.
+- **The themes:** Daf, Paper (sepia), Nord, GitHub, GitHub dimmed, Cupertino, Solarized, Gruvbox, Catppuccin, Rosé Pine, Tokyo Night, One, Dracula, Everforest, E-ink, High contrast, Black (for OLED screens) and Absolute: pure black on white, or pure white on black, with no grey text or lines anywhere. Each one has a light and a dark version, and the card shows both. Choose Absolute for light, for dark, or both.
 - **Light or dark:** Match the system (light by day, dark at night, as the device is set), Always light, or Always dark.
 - **A different theme for dark:** for example GitHub by day and Nord at night.
 - **Your own fonts:** add a TTF, OTF or WOFF file you have, such as Bookerly from a Kindle. Bookerly is Amazon's, so Daf can't ship it, but a copy you add stays on the server and your devices. It then appears under **Yours** in Aa, for articles and books alike.
@@ -73,18 +73,30 @@ The article **…** menu has **Add a document note**, **Read aloud from here**, 
 
 ## Writing with a pen
 
-On a tablet with a pen (the S Pen on a Galaxy Tab, or an Apple Pencil on an iPad) you can write straight on an article, the way you'd write in the margins of a paper book. The pen writes and your fingers scroll and select, so there's no mode to switch. It works in the Android app and in the browser. The pen's tools show on the right of the screen the first time the pen touches an article:
+On a tablet with a pen (the S Pen on a Galaxy Tab, or an Apple Pencil on an iPad) you can write straight on an article or a book, the way you'd write in the margins of a paper one. The pen writes and your fingers scroll and select, so there's no mode to switch. It works in the Android app and in the browser. The pen's tools show on the right of the screen the first time the pen touches the page:
 
-- **Pen**, in black (white on a dark theme), blue, red or green, fine, medium or bold. The line gets thicker the harder you press.
-- **Highlighter.** Drawn along a line of text, it highlights those words, as selecting them does, so the highlight is in the Notebook, Highlights and the review like any other. Drawn down a few lines, it highlights from where you started to where you stopped. Anywhere else, like a ring around a paragraph or a stroke in the margin, it stays a marker's stroke. Its colour is your highlight colour.
-- **Eraser**, or hold the S Pen's button while you write. It takes away whole strokes, and any highlight it passes over.
+- **The pen.** Seven kinds, as in Samsung Notes: fountain pen, calligraphy pen, pen, pencil, calligraphy brush and marker. Tap the pen again for its kinds, its size (1 to 100), its opacity and its colour: the text's own colour (white on a dark theme), fifteen others, or any colour at all. Each kind keeps its own size, colour and opacity, and the line gets thicker the harder you press.
+- **Highlighter.** Drawn along a line of text, it highlights those words, as selecting them does, so the highlight is in the Notebook, Highlights and the review like any other. Drawn down a few lines, it highlights from where you started to where you stopped. Anywhere else, like a ring around a paragraph or a stroke in the margin, it stays a highlighter's stroke. Its colour is your highlight colour.
+- **Eraser.** Tap it again to choose whether it takes whole strokes or only what it passes over, and how big it is. It also takes away any highlight it passes over. **Erase everything written here** is there too, with Undo.
 - **Undo** and **Redo**.
-- **Margin** moves the text over to leave room on the right for notes. It comes on by itself in an article that already has notes in its margin.
+- **Margin** (articles) moves the text over to leave room on the right for notes. It comes on by itself in an article that already has notes in its margin.
 - **›** puts the tools away, and then the pen scrolls and selects like a finger. The pen button brings them back.
 
-A hand resting on the screen while you write doesn't scroll the page. What you write is kept on the server, so it's there on every device, and each stroke stays with the words it was written on: change the font size or the line width and it moves with them, and a note in the margin stays beside its paragraph. Written with no signal, it waits on the device and goes when you're back online, as highlights do. Writing on a Feed item saves it to the Library, as a highlight does.
+**The S Pen's button.** Press it with the pen just over the screen, not touching, and the round menu opens where the pen is, as in Samsung Notes. The pen you're holding is in the middle (tap it for the other kinds, the highlighter and the eraser), its size is on the left, its colour on the right, Undo and Redo are at the top, and your favourite pens are at the bottom, with **+** to keep the pen you're holding as a favourite. Hold the button while you write and the pen erases.
 
-For now it's articles. Books are next.
+**Shapes.** Draw a line, a circle, a rectangle or a triangle and hold the pen still for a moment at the end, and it comes out clean.
+
+While the pen is over the screen, a small ring shows where it'll write and how wide. A hand resting on the screen while you write doesn't scroll the page or turn it. What you write is kept on the server, so it's there on every device, and each stroke stays with the words it was written on: change the font size or the line width and it moves with them, and a note in the margin stays beside its paragraph. Written with no signal, it waits on the device and goes when you're back online, as highlights do. Writing on a Feed item saves it to the Library, as a highlight does.
+
+## Focus mode
+
+The **[ ]** button in the bar of an article, a book or a PDF puts it on the whole screen: the sidebar, the bar and the book's footer go, and in the Android app the status and navigation bars go too and the screen stays on. In a browser the window goes full screen. The edges bring back what you need:
+
+- **The top or bottom edge:** the bar (and a book's footer), with Aa, the contents, the side panel and the rest. It goes again after a few seconds, or when you touch the page. In a book, a tap in the middle of the page does the same.
+- **The left edge:** the contents.
+- **The right edge:** the side panel, with Info, the Notebook and Ask.
+
+Focus mode stays on for the next thing you open until you leave it with the **[ ]** button, Esc, or F (Shift F in an article). The pen's tools are hidden while you're in it; the S Pen's button still opens the round menu.
 
 ## PDFs
 
@@ -111,6 +123,7 @@ Select a single word and the bar shows **Define**: Hebrew words come from Sefari
 | / | search in the book | o | open the original |
 | ] | side panel | [ / ] | contents / side panel |
 | l | listen | Shift L | read aloud |
+| f | focus mode | Shift F | focus mode |
 | Esc | close | Shift J / K | next / previous in the list |
 | | | d / z | delete / undo |
 | | | t | tags |

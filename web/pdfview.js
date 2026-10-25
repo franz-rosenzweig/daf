@@ -21,7 +21,7 @@ C.views.pdf = async args => {
     '<h1 id="ptitle">PDF</h1><span class="spacer"></span><span class="mute tiny" id="ppg"></span>' +
     '<button class="btn sm" data-pv="out" aria-label="Smaller" title="Smaller (−)">−</button><button class="btn sm" data-pv="in" aria-label="Larger" title="Larger (+)">+</button>' +
     '<a class="btn sm" href="#read/' + encodeURIComponent(id) + '" title="The text, reflowed">Text</a>' +
-    '<a class="btn sm" href="/api/docs/' + encodeURIComponent(id) + '/pdf" download title="The PDF file">Download</a></div>' +
+    '<a class="btn sm" href="/api/docs/' + encodeURIComponent(id) + '/pdf" download title="The PDF file">Download</a>' + (C.Focus ? C.Focus.button('article') : '') + '</div>' +
     '<div class="pdfpages" id="pdfpages"><span class="mute" style="padding:24px">Opening the PDF…</span></div></div>';
   try { P.d = await api('/api/docs/' + encodeURIComponent(id) + '?prefetch=1'); } catch(e){ $('#pdfpages').innerHTML = '<p class="mute" style="padding:24px">' + esc(e.message) + '</p>'; return; }
   if (P.id !== id) return;

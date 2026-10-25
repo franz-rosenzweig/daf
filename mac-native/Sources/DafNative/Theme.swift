@@ -13,6 +13,8 @@ struct Palette: Sendable {
     var read: String? = nil
     var accent: String
     var hls: [String: String] = [:]
+    /// Absolute's: the quiet text and the cards in the text's and the page's own colours, nothing grey.
+    var pure = false
 }
 
 struct Family: Identifiable, Sendable {
@@ -79,7 +81,11 @@ final class Theme {
                dark: Palette(bg: "#000000", side: "#0c0c0c", fg: "#ffffff", accent: "#7ab8ff")),
         Family(id: "oled", name: "Black", note: "Pure black for OLED screens; Daf’s light by day",
                light: Palette(bg: "#ffffff", side: "#f7f7f8", fg: "#1d2127", accent: "#1a7da4"),
-               dark: Palette(bg: "#000000", side: "#0b0b0c", fg: "#e8e6e1", read: "#d6d3cc", accent: "#62b6da")),    ]
+               dark: Palette(bg: "#000000", side: "#0b0b0c", fg: "#e8e6e1", read: "#d6d3cc", accent: "#62b6da")),
+        Family(id: "absolute", name: "Absolute", note: "Pure black on white and pure white on black, nothing grey",
+               light: Palette(bg: "#ffffff", side: "#ffffff", fg: "#000000", accent: "#000000", pure: true),
+               dark: Palette(bg: "#000000", side: "#000000", fg: "#ffffff", accent: "#ffffff", pure: true)),
+    ]
 
     var mode = "system"        // system, light, dark
     var light = "daf"
@@ -166,10 +172,10 @@ final class Theme {
     nonisolated static func make() {
         nsBG = dynamic { p, _ in rgb(p.bg) }
         nsSide = dynamic { p, dark in p.side.map(rgb) ?? mix(rgb(p.bg), rgb(p.fg), dark ? 0.04 : 0.025) }
-        nsCard = dynamic { p, dark in mix(rgb(p.bg), rgb(p.fg), dark ? 0.06 : 0.04) }
+        nsCard = dynamic { p, dark in p.pure ? rgb(p.bg) : mix(rgb(p.bg), rgb(p.fg), dark ? 0.06 : 0.04) }
         nsFG = dynamic { p, _ in rgb(p.fg) }
         nsRead = dynamic { p, _ in rgb(p.read ?? p.fg) }
-        nsQuiet = dynamic { p, _ in mix(rgb(p.fg), rgb(p.bg), 0.34) }
+        nsQuiet = dynamic { p, _ in p.pure ? rgb(p.fg) : mix(rgb(p.fg), rgb(p.bg), 0.34) }
         nsAccent = dynamic { p, _ in rgb(p.accent) }
     }
 
@@ -178,7 +184,7 @@ final class Theme {
     /// A highlight's colour on this theme's page, as the page mixes it.
     nonisolated static func highlight(_ c: String?) -> NSColor {
         let k = c == "red" ? "pink" : (c.flatMap { hues[$0] != nil ? $0 : nil } ?? "yellow")
-        return dynamic { p, dark in mix(rgb(p.bg), rgb(p.hls[k] ?? hues[k]!), dark ? 0.32 : 0.38) }
+        return dynamic { p, dark in mix(rgb(p.bg), rgb(p.hls[k] ?? hues[k]!), p.pure ? (dark ? 0.42 : 0.5) : dark ? 0.32 : 0.38) }
     }
 
     // SwiftUI's, read through `revision` so a change draws them again

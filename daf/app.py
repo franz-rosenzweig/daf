@@ -1809,7 +1809,22 @@ def get_ebook(book_id: str, c=Depends(conn)):
     if not d or not d["format"]:
         raise HTTPException(404, "No readable file for this book in Calibre")
     d["questions"] = ai.questions(book=True)
+    from . import ink
+    d["ink"] = ink.strokes(c, book_id)
     return d
+
+
+@app.post("/api/ebooks/{book_id}/ink", dependencies=[Depends(user)])
+def post_ebook_ink(book_id: str, b=Depends(json_body), c=Depends(conn)):
+    """Strokes written with a pen on a book's pages (add) and erased (remove: their ids), in one go (web/book.js)."""
+    from . import ink
+    if not isinstance(b, dict):
+        raise HTTPException(400, "Bad stroke")
+    try:
+        added, removed = ink.change(c, book_id, b.get("add") or [], b.get("remove") or [], b.get("at"))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e) or "Bad stroke")
+    return {"added": added, "removed": removed}
 
 
 @app.get("/api/ebooks/{book_id}/file", dependencies=[Depends(user)])
