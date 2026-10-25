@@ -124,3 +124,38 @@ if (X.commands) X.commands.onCommand.addListener(async (name, tab) => {
   if (name === 'highlight-selection') tell(tab, { type: 'hl-selection' }).catch(() => {});
   else if (name === 'save-page') savePage(tab).catch(() => {});
 });
+
+/* ---------- Instagram's sign-in, for Daf's reels (Daf: Preferences → Instagram) ---------- */
+// Only when Daf asks for it (that switch): instagram.com's cookies go to Daf when the session in this
+// browser isn't the one Daf has, on a visit to instagram.com, when Instagram renews it, and at start.
+// Daf answers with a hash of its session, never the session itself, so only a change is sent.
+let igBusy = false;
+async function sha16(s){
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 16);
+}
+async function igCookies(){
+  try { return await X.cookies.getAll({ domain: 'instagram.com' }); }
+  catch (e) { return X.cookies.getAll({ domain: 'instagram.com', firstPartyDomain: null }); }   // first-party isolation on
+}
+async function syncInstagram(){
+  if (igBusy || !X.cookies) return;
+  igBusy = true;
+  try {
+    if (!(await conf()).token) return;
+    const all = await igCookies();
+    const sid = all.find(k => k.name === 'sessionid' && k.value);
+    if (!sid) return;                                    // not signed in to Instagram here
+    const daf = await call('/api/web/instagram');
+    if (!daf || !daf.want) return;
+    if (daf.hash === await sha16(sid.value) && !daf.expired) return;
+    await call('/api/web/instagram', 'POST', { cookies: all.map(k => ({ name: k.name, value: k.value, domain: k.domain, path: k.path, expires: k.expirationDate, secure: k.secure })) });
+  } catch (e) { /* the next visit tries again */ }
+  finally { igBusy = false; }
+}
+if (X.cookies && X.cookies.onChanged) X.cookies.onChanged.addListener(ch => {
+  if (ch.cookie && ch.cookie.name === 'sessionid' && /(^|\.)instagram\.com$/.test(ch.cookie.domain.replace(/^\./, '')) && !ch.removed) syncInstagram();
+});
+X.runtime.onInstalled.addListener(() => { syncInstagram(); });
+if (X.runtime.onStartup) X.runtime.onStartup.addListener(() => { syncInstagram(); });
+handlers.instagram = () => { syncInstagram(); return true; };

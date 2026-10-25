@@ -147,6 +147,20 @@ def check_podcasts(conn):
             "detail": f"{subs} subscriptions, last sync {_age(last)}" if last else "not connected (Preferences → Podcasts)"}
 
 
+def check_instagram(conn):
+    """Only once a reel has been saved: whether Daf's Instagram sign-in still works."""
+    from .. import social
+    if not conn.execute("SELECT 1 FROM docs WHERE kind = 'video' AND url LIKE '%instagram.com/%' LIMIT 1").fetchone():
+        return None
+    st = social.status(conn)
+    wait = f" · {st['waiting']} reel{'s' if st['waiting'] != 1 else ''} waiting" if st["waiting"] else ""
+    if st["expired"]:
+        return {"name": "Instagram", "ok": False, "phase": 5, "detail": f"Instagram turned the sign-in away {_age(st['expired'])}: visit instagram.com in Zen to renew it{wait}"}
+    if not st["signed_in"]:
+        return {"name": "Instagram", "ok": False, "phase": 5, "detail": "not signed in (Preferences → Instagram)" + wait}
+    return {"name": "Instagram", "ok": True, "phase": 5, "detail": f"signed in, renewed {_age(st['updated'])}{wait}"}
+
+
 def check_karakeep():
     from . import karakeep
     m = karakeep.mode()
@@ -192,4 +206,4 @@ def check_tools():
 def run_all(conn):
     return [x for x in [check_kindle(conn), check_koinsight(), check_abs(conn), check_vault(), check_calibre(),
             check_karakeep(), check_freshrss(conn), check_kokoro(), check_sefaria(conn), check_podcasts(conn),
-            check_jobs(conn), check_tools()] if x]
+            check_instagram(conn), check_jobs(conn), check_tools()] if x]

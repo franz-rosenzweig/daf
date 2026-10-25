@@ -954,7 +954,8 @@ async function readView(id){
   if (d.kind === 'video') h += videoHead(d);
   if (tweetParts(d).lead) h += '<p class="tweetlead">' + esc(tweetParts(d).lead) + '</p>';
   if (d.kind === 'tweet') { const seen = {}; d.blocks.forEach(b => { if (b.t === 'img') seen[b.src] = (seen[b.src] || 0) + 1; }); R.avatars = new Set(Object.keys(seen).filter(k => seen[k] > 1)); } else R.avatars = null;
-  if (!d.blocks.length && d.kind === 'video') h += '<div class="placeholder" id="trstatus">No transcript yet. <button class="btn sm" data-tr="captions">Get YouTube’s captions</button> <button class="btn sm" data-tr="whisper">Transcribe on the server (slow)</button></div>';
+  if (!d.blocks.length && d.reel) { /* reelHead says where it is */ }
+  else if (!d.blocks.length && d.kind === 'video') h += '<div class="placeholder" id="trstatus">No transcript yet. <button class="btn sm" data-tr="captions">Get YouTube’s captions</button> <button class="btn sm" data-tr="whisper">Transcribe on the server (slow)</button></div>';
   else if (!d.blocks.length && d.kind === 'pdf') h += '<div class="placeholder">' + (d.preparing ? '<span id="trstatus">Reading the PDF on the server. The text appears here in a moment.</span>' : 'Couldn’t read this PDF: ' + esc(d.content_error || '') + '.') + ' <a href="/api/docs/' + encodeURIComponent(d.id) + '/pdf" target="_blank" rel="noopener">Open the original layout</a></div>';
   else if (!d.blocks.length && d.preparing) h += '<div class="placeholder"><span id="trstatus">Reading the page on the server. The text appears here in a moment.</span> <a href="' + esc(d.url || '#') + '" target="_blank" rel="noopener">Open the original</a></div>';
   else if (!d.blocks.length) h += '<div class="placeholder">' + (d.content_error ? (/^Daf /.test(d.content_error) ? esc(d.content_error) : 'Karakeep didn’t answer: ' + esc(d.content_error)) : d.kind === 'pdf' ? 'PDFs open in the reader in a later round. For now, open the original.' : d.kind === 'podcast' ? 'A podcast episode. Listen in AntennaPod, and share it to Ezer with its position to clip the minute before.' : 'There’s no saved text for this one.') + (d.url ? ' <a href="' + esc(d.url) + '" target="_blank" rel="noopener">Open the original</a>' : '') + '</div>';
@@ -1032,7 +1033,35 @@ function setFocus(i, scroll){
 /* ---------- video (YouTube's privacy-mode player, synced to the transcript) ---------- */
 const V = { player: null, playing: false, follow: true, timer: null, cur: -1 };
 const ytId = u => (String(u || '').match(/(?:v=|youtu\.be\/|\/shorts\/|\/embed\/)([A-Za-z0-9_-]{11})/) || [])[1];
+// A reel (social.py): Daf's own copy, standing up, in a <video>; V.player speaks the YouTube player's
+// few words (getCurrentTime, seekTo, playVideo, pauseVideo), so the transcript, Clip and the keys
+// work the same.
+function reelHead(d){
+  const wait = d.preparing ? 'Getting the reel from Instagram. It plays here in a moment.'
+    : d.content_error ? esc(d.content_error) : 'Daf doesn’t have this video yet.';
+  const signIn = /sign in again/.test(d.content_error || '') ? ' <a href="#prefs/instagram">Instagram in Preferences</a>' : '';
+  return '<div class="vhead"><div class="vframe tall">' + (d.media
+      ? '<video id="lvp" controls playsinline preload="metadata"' + (d.thumb ? ' poster="' + esc(d.thumb) + '"' : '') + ' src="' + esc(d.media) + '"></video>'
+      : '<div class="vwait"><span id="trstatus">' + wait + '</span>' + signIn + '</div>') + '</div><div class="vctl">' +
+    (d.media ? '<button class="btn sm" data-vclip="30" title="Highlight the last 30 seconds (c)">Clip 30s</button>' +
+      '<label class="tiny mute" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="vfollow" checked> Follow along</label>' : '') +
+    '<span class="spacer"></span><a class="tiny" href="' + esc(d.url) + '" target="_blank" rel="noopener">Open on Instagram</a></div></div>';
+}
+function startReel(){
+  const el = $('#lvp'); if (!el) return;
+  V.player = { getCurrentTime: () => el.currentTime || 0, seekTo: t => { el.currentTime = t; },
+               playVideo: () => { const p = el.play(); if (p && p.catch) p.catch(() => {}); }, pauseVideo: () => el.pause() };
+  const on = () => { V.playing = !el.paused && !el.ended; R.lastActive = Date.now(); };
+  ['play', 'playing', 'pause', 'ended'].forEach(ev => el.addEventListener(ev, on));
+  // a post that's square or wide (Instagram's feed has both) gets a frame its own shape
+  el.addEventListener('loadedmetadata', () => {
+    const f = el.parentNode, w = el.videoWidth, h = el.videoHeight;
+    if (w && h && w > h * 0.9) { f.classList.remove('tall'); f.classList.add('wide'); f.style.aspectRatio = w + '/' + h; }
+  });
+  V.timer = setInterval(syncCue, 500);
+}
 function videoHead(d){
+  if (d.reel) return reelHead(d);
   const id = ytId(d.url);
   return '<div class="vhead"><div class="vframe"><div id="ytp"></div></div><div class="vctl">' +
     '<button class="btn sm" data-vclip="30" title="Highlight the last 30 seconds (c)">Clip 30s</button>' +
@@ -1040,8 +1069,9 @@ function videoHead(d){
     (id ? '<a class="tiny" href="https://yt.tiresia.xyz/watch?v=' + id + '" target="_blank" rel="noopener">Watch on Invidious</a>' : '') + '</div></div>';
 }
 function startPlayer(d){
+  clearInterval(V.timer); V.player = null; V.cur = -1; V.playing = false;
+  if (d.reel) { startReel(); return; }
   const id = ytId(d.url); if (!id) return;
-  clearInterval(V.timer); V.player = null; V.cur = -1;
   const make = () => {
     V.player = new YT.Player('ytp', { videoId: id, host: 'https://www.youtube-nocookie.com', width: '100%', height: '100%',
       playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
@@ -1612,7 +1642,7 @@ function pollTranscript(id){
   setTimeout(async () => {
     if (!R.doc || R.doc.id !== id) return;
     try { const st = await api('/api/docs/' + encodeURIComponent(id) + '/transcript');
-      if (st.ready || (st.page && ['done', 'failed'].includes(st.page.status) && !st.pdf)) { readView(id); return; }
+      if (st.ready || (st.page && ['done', 'failed'].includes(st.page.status) && !st.pdf) || (st.reel && ['done', 'failed'].includes(st.reel.status))) { readView(id); return; }
       const j = st.pdf || st.whisper || st.captions;
       if (j && j.status === 'failed') { $('#trstatus').innerHTML = 'That didn’t work: ' + esc(j.error || '') + ' <button class="btn sm" data-tr="whisper">Transcribe on the server instead</button>'; return; }
     } catch(e){}

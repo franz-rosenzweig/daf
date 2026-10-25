@@ -149,7 +149,8 @@ def run():
             log.exception("karakeep")
         conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
         try:
-            for (did,) in conn.execute("SELECT id FROM docs WHERE kind = 'video' AND where_ = 'library' AND status != 'deleted' AND id NOT IN "
+            for (did,) in conn.execute("SELECT id FROM docs WHERE kind = 'video' AND where_ = 'library' AND status != 'deleted' "
+                                       "AND url NOT LIKE '%instagram.com/%' AND id NOT IN "
                                        "(SELECT id FROM doc_content) AND id NOT IN (SELECT ref FROM jobs WHERE kind = 'captions')").fetchall():
                 media.queue(conn, "captions", did)
             media.queue_bookmarks(conn)

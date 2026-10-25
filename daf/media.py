@@ -63,7 +63,10 @@ def _run_one(quick=False):
         j = dict(j)
     try:
         detail = json.loads(j["detail"]) if j["detail"] else {}
-        if j["kind"] == "captions":
+        if j["kind"] == "reel":
+            from . import social
+            social.fetch(j["ref"])
+        elif j["kind"] == "captions":
             video_transcript(j["ref"], use_whisper=False)
         elif j["kind"] == "whisper":
             video_transcript(j["ref"], use_whisper=True)
@@ -195,6 +198,9 @@ def video_transcript(doc_id, use_whisper=False):
         d = conn.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
     if not d:
         raise KeyError(doc_id)
+    from . import social
+    if social.is_reel(d["url"]):
+        return social.fetch(doc_id)              # a reel: kept whole, transcribed from Daf's copy
     vid = youtube_id(d["url"])
     if not vid:
         raise ValueError("Not a YouTube link")
@@ -277,6 +283,8 @@ def abs_bookmark(bm_id):
 
 def prune(conn, days=14):
     conn.execute("DELETE FROM jobs WHERE status IN ('done', 'failed') AND finished < ?", (int(time.time()) - days * 86400,))
+    from . import social
+    social.prune(conn)
 
 
 def queue_bookmarks(conn):

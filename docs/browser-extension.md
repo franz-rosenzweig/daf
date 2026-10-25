@@ -16,6 +16,10 @@ It works in Firefox and Zen, in Chrome and Arc, and in Safari through the Mac ap
 - Click a highlight to change the color (the same five as Daf), add a note and tags, or remove it. Removing it gives you an Undo for a few seconds.
 - Tags are chips under the note, like in Daf: type one and press Enter, or pick one of your tags from the suggestions. ".tag" in the note works too.
 
+## Instagram
+
+If **Preferences → Instagram → Keep Daf signed in from my browser** is on in Daf, the extension keeps Daf's Instagram sign-in fresh, which is what lets Daf save reels (see [Videos and podcasts](videos-and-podcasts.md#instagram-reels)). When you're on instagram.com and signed in, it checks whether Daf has this browser's session and sends instagram.com's cookies if it doesn't. Daf only ever tells it a fingerprint of its session, never the session itself, and with the switch off nothing is sent. It needs the "cookies" permission, which came with version 0.6.
+
 ## The page panel
 
 **Alt+Shift+H**, the list button on a highlight's bar, or "Show my highlights on the page" in the toolbar button opens a panel down the right side with every highlight on the page, in order, with notes and tags. Click one to jump to it, edit the note and tags right there, or remove it. Esc closes it.

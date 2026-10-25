@@ -258,6 +258,56 @@ def user_or_device(request: Request, c=Depends(conn)):
         device(request, c)
 
 
+# ---- reels: Daf's copy of the video, and the Instagram sign-in it's fetched with (social.py) ----
+
+@app.get("/api/media/{doc_id}", dependencies=[Depends(user_or_device)])
+def get_media(doc_id: str):
+    """A reel's video, kept on the server. FileResponse answers Range requests, so it seeks."""
+    from . import social
+    p = social.media_path(doc_id)
+    if not p.exists():
+        raise HTTPException(404, "Daf doesn't have this video")
+    return FileResponse(p, media_type="video/mp4", headers={"Cache-Control": "private, max-age=604800"})
+
+
+@app.get("/api/instagram", dependencies=[Depends(user)])
+def get_instagram(c=Depends(conn)):
+    from . import social
+    return social.status(c)
+
+
+@app.put("/api/instagram", dependencies=[Depends(user)])
+async def put_instagram(request: Request, c=Depends(conn)):
+    """{from_browser}: whether the extension keeps Daf signed in to Instagram."""
+    from . import social
+    b = await _body(request)
+    s = config.load_settings()
+    if "from_browser" in b:
+        s["instagram"] = {"from_browser": bool(b["from_browser"])}
+        config.save_settings(s)
+    return social.status(c)
+
+
+@app.post("/api/instagram/cookies")
+async def post_instagram_cookies(request: Request, c=Depends(conn)):
+    """An Instagram session for the reels: {cookies: [{name, value, domain, path, expires, secure}]}
+    from a browser, or {cookie_header: "a=1; b=2"} from an app's sign-in. Signed in, or a device."""
+    from . import social
+    by = "web"
+    if not auth.check_cookie(request.cookies.get(auth.COOKIE)):
+        by = device(request, c)
+    try:
+        return social.save_cookies(c, await _body(request), by)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/instagram/cookies", dependencies=[Depends(user)])
+def delete_instagram_cookies(c=Depends(conn)):
+    from . import social
+    return social.forget(c)
+
+
 @app.get("/api/thumb/{name}", dependencies=[Depends(user_or_device)])
 def get_thumb(name: str):
     """A saved page's picture, kept on the server (pages.keep_thumb). The name is its content's hash."""
@@ -2052,7 +2102,7 @@ def get_transcript_status(doc_id: str, c=Depends(conn)):
     row = c.execute("SELECT blocks FROM doc_content WHERE id = ?", (doc_id,)).fetchone()
     return {"captions": media.job_status(c, "captions", doc_id), "whisper": media.job_status(c, "whisper", doc_id),
             "pdf": media.job_status(c, "pdf", doc_id), "page": media.job_status(c, "page", doc_id),
-            "ready": bool(row and row[0] not in ("[]", ""))}
+            "reel": media.job_status(c, "reel", doc_id), "ready": bool(row and row[0] not in ("[]", ""))}
 
 
 @app.get("/api/docs/{doc_id}/pdf", dependencies=[Depends(user)])
@@ -2325,6 +2375,12 @@ async def device_save(request: Request, name=Depends(device), c=Depends(conn)):
     if not url.startswith(("http://", "https://")):
         raise HTTPException(400, "A link, please")
     saved = phone.save_shared(c, url, str(b.get("title") or ""), str(b.get("text") or ""))
+    from .sources import karakeep
+    if not karakeep.writes():                    # Daf keeps the Library: in it now, not at the next sync (a reel starts downloading)
+        try:
+            reader.push_inbox(c)
+        except Exception:  # noqa: BLE001 - the sync tries again
+            log.exception("push_inbox")
     return {"ok": True, "saved": saved}
 
 

@@ -806,6 +806,7 @@ const watchT = setInterval(() => { if (!stopped && location.href.split('#')[0] !
 function start(){
   mo.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   load();
+  if (/(^|\.)instagram\.com$/.test(location.hostname)) send({ type: 'instagram' }).catch(() => {});   // keeps Daf's Instagram sign-in fresh, if Daf asks
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
 })();

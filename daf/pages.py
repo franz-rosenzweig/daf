@@ -96,6 +96,9 @@ def save_page(c, url, title=None, added=None):
     one deleted a while ago comes back, and an archived one comes back to the top of the Inbox, as
     saving it again does in Karakeep. Returns (doc id, saved). With Karakeep keeping the Library,
     raises karakeep.KarakeepError."""
+    from . import social
+    if social.is_reel(url):
+        url = social.canonical(url)                  # however it was shared: one doc per reel
     d, gone, back = find_doc(c, url), None, False
     own = not karakeep.writes()
     if d and d["status"] == "deleted":
@@ -119,7 +122,7 @@ def save_page(c, url, title=None, added=None):
                   "VALUES (?, ?, 'library', 'inbox', ?, '', ?, '', ?, ?)",
                   (new_id_, karakeep.kind_of(url, None), title or url, host(url), url, int(added or time.time())))
         from . import media
-        media.queue(c, "page", new_id_)
+        media.queue(c, "reel" if social.is_reel(url) else "page", new_id_)
     else:
         b = karakeep.save(url, title)
         if not b.get("id"):

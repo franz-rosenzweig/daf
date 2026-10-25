@@ -49,7 +49,8 @@ def save_page(c, url, title=None, html=None):
         doc_id, saved = pages.save_page(c, url, title)
     except Exception as e:  # noqa: BLE001 - Karakeep said no
         raise HTTPException(502, f"The Library didn't take the page: {e}")
-    words = pages.keep_text(c, doc_id, html, url) if isinstance(html, str) and html else None
+    from . import social
+    words = pages.keep_text(c, doc_id, html, url) if isinstance(html, str) and html and not social.is_reel(url) else None
     return doc_id, saved, words
 
 
@@ -128,6 +129,28 @@ def _own(c, hl_id):
     if not h:
         raise HTTPException(404, "That highlight isn't in Daf any more")
     return h
+
+
+@router.get("/instagram")
+def get_instagram(c=Depends(conn)):
+    """Whether this browser should keep Daf signed in to Instagram (Preferences → Instagram), and
+    which session Daf has: a hash of it, never the session itself."""
+    from . import social
+    st = social.status(c)
+    return {"want": st["from_browser"], "hash": st["hash"], "expired": bool(st["expired"])}
+
+
+@router.post("/instagram")
+def post_instagram(b=Depends(_body), c=Depends(conn), name=Depends(device)):
+    """{cookies}: instagram.com's cookies from the browser, for the reels (social.py)."""
+    from . import social
+    if not social.status(c)["from_browser"]:
+        raise HTTPException(403, "Daf isn't taking Instagram's sign-in from the browser (Preferences → Instagram)")
+    try:
+        st = social.save_cookies(c, b, name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "restarted": st.get("restarted", 0), "same": bool(st.get("same"))}
 
 
 @router.get("/tags")
