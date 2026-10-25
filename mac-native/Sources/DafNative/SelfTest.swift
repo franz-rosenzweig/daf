@@ -154,6 +154,27 @@ enum SelfTest {
         guard let r = m.reader, let tv = r.textView else { return finish("the reader didn't open") }
         check(!r.blocks.isEmpty, "its blocks are laid out", "\(r.blocks.count) blocks")
 
+        // focus mode (Focus.swift): the article on the whole screen, the toolbar away until the top
+        if let w = main {
+            // the panes the window shows, by the split view's subviews wider than nothing
+            func panes() -> Int {
+                func split(_ v: NSView) -> NSSplitView? { (v as? NSSplitView) ?? v.subviews.lazy.compactMap(split).first }
+                return w.contentView.flatMap(split)?.arrangedSubviews.filter { !$0.isHidden && $0.frame.width > 2 }.count ?? -1
+            }
+            let panesBefore = panes(), textView = r.textView
+            Focus.shared.enter(w)
+            let full = await until(10) { w.styleMask.contains(.fullScreen) }
+            await pause(1.5)
+            check(full && Focus.shared.main && Focus.shared.barTucked(w), "focus mode puts the article on the whole screen, the toolbar hidden till the top",
+                  "full screen \(full), options \(NSApp.presentationOptions.rawValue), toolbar shown \(w.toolbar?.isVisible ?? false)")
+            check(panes() == 1 && m.reader?.textView === textView, "with only the article, the sidebar and the list gone, and the same reader still open", "panes \(panesBefore) → \(panes())")
+            capture("70-focus")
+            Focus.shared.leave(w)
+            let back = await until(10) { !w.styleMask.contains(.fullScreen) }
+            await pause(1.5)
+            check(back && !Focus.shared.main && w.toolbar?.isVisible != false, "and leaving it gives the window back as it was")
+        }
+
         // a highlight from a selection
         let before = r.highlights.count
         // a paragraph with no highlight yet (a highlight over one would merge into it)

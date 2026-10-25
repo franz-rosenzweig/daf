@@ -1167,7 +1167,7 @@ async function highlight(info, withNote, quiet){
   }
   if (merged.length === 1) {
     const p = merged[0].pos;
-    if (p.b === b && p.s === s && (p.be != null ? p.be : p.b) === be && p.e === e) { showHlBar(merged[0]); return; }   // inside one already
+    if (p.b === b && p.s === s && (p.be != null ? p.be : p.b) === be && p.e === e) { if (!quiet) showHlBar(merged[0]); return merged[0]; }   // inside one already
   }
   const text = merged.length ? spanText(b, s, be, e) : info.text;
   try {
@@ -1370,7 +1370,8 @@ function palGo(i){ const x = palItems[i]; closePalette(); if (!x) return; if (x.
 
 /* ---------- views ---------- */
 C.sendBeat = sendBeat; C.openAa = openAa;
-C.Reader = { getSel, highlight, removeHl, moved: movedToLibrary };   // for the pen (ink.js)
+C.Reader = { getSel, highlight, removeHl, moved: movedToLibrary,   // for the pen (ink.js)
+  remark: h => { unmark(h.id); markHl(h); drawPanel(); } };
 C.views.podcasts = async () => {
   R.doc = null;
   $('#main').innerHTML = '<div class="top"><h1>Podcasts</h1><span class="spacer"></span><span class="mute tiny">From AntennaPod · never counted toward the hour</span></div><div class="page" id="podpage"><span class="mute">Loading…</span></div>';

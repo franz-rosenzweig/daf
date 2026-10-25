@@ -78,6 +78,7 @@ struct RouteView: View {
         .frame(minWidth: 640, minHeight: 520)
         .themed()
         .tint(Theme.shared.accent)
+        .toolbar { if ["read", "pdf"].contains(parts.first ?? "") { ToolbarItem { FocusButton() } } }
         .navigationTitle(reader?.title ?? "Daf")
         .task(id: route) {
             guard parts.first == "read", parts.count > 1 else { return }

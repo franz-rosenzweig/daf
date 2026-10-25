@@ -886,6 +886,7 @@ final class BookPagesView: NSView, NSTextViewDelegate {
             Task { @MainActor in await model?.highlight(sel) }
             return true
         case "b": Task { @MainActor in await model?.toggleBookmark() }; return true
+        case "f": let w = window; MainActor.assumeIsolated { Focus.shared.toggle(w) }; return true      // focus mode (Focus.swift)
         default: break
         }
         switch event.characters {
@@ -1026,6 +1027,7 @@ struct BookPages: NSViewRepresentable {
 struct BookReaderView: View {
     @Environment(AppModel.self) private var app
     @State private var m: BookModel
+    @State private var window: NSWindow?
     @State private var showLook = false
     @State private var showPercent = false
     @State private var percent = ""
@@ -1065,6 +1067,8 @@ struct BookReaderView: View {
             }
         }
         .background(Color(nsColor: m.look.background))
+        .background(WindowFinder { window = $0 })
+        .onChange(of: Focus.shared.started) { _, _ in if Focus.shared.isOn(window) { m.showContents = false } }
         .navigationTitle(m.title)
         .navigationSubtitle(m.chapter)
         .toolbar {
@@ -1088,6 +1092,7 @@ struct BookReaderView: View {
                     .popover(isPresented: $showLook, arrowEdge: .bottom) { LookPanel(m: m) }
                 Button { Task { await m.toggleBookmark() } } label: { Label(m.marked ? "Remove the Bookmark" : "Bookmark", systemImage: m.marked ? "bookmark.fill" : "bookmark") }
                     .help(m.marked ? "Remove the bookmark (B)" : "Bookmark this page (B)")
+                FocusButton()
                 Menu {
                     Button("Go to the Beginning") { m.goToBeginning() }
                     Button("Go to the Kindle's Page") { m.goToKindle() }.disabled(m.details?.o("kindle") == nil)

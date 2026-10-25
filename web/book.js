@@ -698,7 +698,7 @@ async function highlightSel(withNote, quiet){
   let cfi = s.cfi, text = s.text;
   if (merged.length === 1 && merged[0].pos.cfi === (() => { try { return B.view.getCFI(s.index, range); } catch(e){ return null; } })()) {
     s.doc.getSelection()?.removeAllRanges(); B.sel = null;   // the selection was inside a highlight: show that one
-    if (!quiet) H.show(H.hlBar(merged[0]), s.rect, { h: merged[0], cfi: merged[0].pos.cfi }); return null;
+    if (!quiet) H.show(H.hlBar(merged[0]), s.rect, { h: merged[0], cfi: merged[0].pos.cfi }); return merged[0];
   }
   if (merged.length) { try { cfi = B.view.getCFI(s.index, range); text = range.toString().trim(); } catch(e){ merged.length = 0; } }
   const chapter = B.loc?.tocItem?.label || null, fraction = B.loc ? B.loc.fraction : null;
@@ -777,16 +777,20 @@ function inkDraw(rects, o){
   const g = document.createElementNS(NS, 'g'), list = INK.by.get(o.cfi) || [], r = rects[0];
   if (!r || !list.length) return g;
   const doc = o.range.startContainer.ownerDocument, win = doc.defaultView;
-  const el = o.range.startContainer.nodeType === 1 ? o.range.startContainer : o.range.startContainer.parentElement;
-  const f = parseFloat(win.getComputedStyle(el).fontSize) || 16;
+  const f = fontAt(doc, o.range);
   const layer = Pens.layer(g, lightText(win.getComputedStyle(doc.body).color));
   for (const s of list) {
     const k = f / (s.at.f || 16), x0 = r.left + s.at.x * k, y0 = r.top + s.at.y * k;
     const pts = s.pts.map(p => [x0 + p[0] * k, y0 + p[1] * k, p[2]]);
-    layer.add(s, pts, k);
+    const el = layer.add(s, pts, k);
+    if (Pens.kindOf(s) === 'text') {     // typed: its box
+      const n = String(s.text || '').split('\n').length, fs = (s.fs || 16) * k;
+      INK.geo.set(s.id, { pts, r: 0, box: [x0, y0, x0 + (s.w || 120) * k, y0 + n * fs * 1.3 + fs * 0.3], doc, text: true, el });
+      continue;
+    }
     let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
     for (const p of pts) { if (p[0] < x1) x1 = p[0]; if (p[0] > x2) x2 = p[0]; if (p[1] < y1) y1 = p[1]; if (p[1] > y2) y2 = p[1]; }
-    INK.geo.set(s.id, { pts, r: (s.size || 2.5) * k / 2, box: [x1, y1, x2, y2], doc });
+    INK.geo.set(s.id, { pts, r: (s.size || 2.5) * k / 2, box: [x1, y1, x2, y2], doc, el });
   }
   return g;
 }
@@ -809,6 +813,19 @@ function letterAt(doc, x, y){
   const r = doc.createRange(); r.setStart(node, off); r.setEnd(node, off + 1);
   return r;
 }
+// Where a stroke is kept: the letter at the point, or, where there's none (a picture with no
+// words in it), the nearest letter before it in the text (else after it), which foliate can find again.
+function placeAt(doc, x, y){
+  const r = letterAt(doc, x, y); if (r) return r;
+  const w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT), from = doc.elementFromPoint(x, y) || doc.body;
+  w.currentNode = from;
+  let t = w.previousNode(); while (t && !t.data.trim()) t = w.previousNode();
+  if (!t) { w.currentNode = from; t = w.nextNode(); while (t && !t.data.trim()) t = w.nextNode(); }
+  if (!t) return null;
+  const off = Math.max(0, t.data.trimEnd().length - 1), rr = doc.createRange(); rr.setStart(t, off); rr.setEnd(t, off + 1);
+  return rr;
+}
+const fontAt = (doc, range) => { const n = range.startContainer, el = n.nodeType === 1 ? (n.childNodes[range.startOffset] || n) : n.parentElement; return parseFloat(doc.defaultView.getComputedStyle(el.nodeType === 1 ? el : el.parentElement).fontSize) || 16; };
 function inkAdd(list){ const cfis = new Set(); for (const s of list) { inkGroup(s.at.cfi).push(s); cfis.add(s.at.cfi); } inkRedraw(cfis); }
 function inkTake(list){
   const ids = new Set(list.map(s => s.id)), cfis = new Set(list.map(s => s.at.cfi));
@@ -820,12 +837,13 @@ const inkAll = () => [...INK.by.values()].flat();
 function inkStroke(L){
   const doc = L.doc, index = secOf(doc), fr = frameOf(doc); if (index == null || !fr) return;
   const [wx, wy] = L.pts[0], x0 = wx - fr.left, y0 = wy - fr.top;
-  const range = letterAt(doc, x0, y0); if (!range) return;
+  const range = placeAt(doc, x0, y0); if (!range) return;
   let cfi; try { cfi = B.view.getCFI(index, range); } catch(e){ return; }
   const r = range.getClientRects()[0] || range.getBoundingClientRect();
-  const f = parseFloat(doc.defaultView.getComputedStyle(range.startContainer.parentElement).fontSize) || 16, b = L.brush;
+  const f = fontAt(doc, range), b = L.brush;
   const s = { id: inkId(), v: 2, tool: b.pen, color: b.color, size: r1(b.w), o: Math.round(b.opacity * 100) / 100,
     at: { cfi, s: index, f, x: r1(x0 - r.left), y: r1(y0 - r.top) }, pts: L.pts.map(p => [r1(p[0] - wx), r1(p[1] - wy), Math.round(p[2] * 100) / 100]) };
+  if (L.snapped) s.sh = 1;           // a clean shape, which isn't read as writing
   inkAdd([s]); inkAct({ add: [s] });
 }
 function inkNear(pts, x, y, r){
@@ -841,12 +859,12 @@ function inkErase(x, y, mode, r, L){
   for (const [id, g] of [...INK.geo]) {
     const fr = frameOf(g.doc); if (!fr) { INK.geo.delete(id); continue; }
     const px = x - fr.left, py = y - fr.top, b = g.box, m = r + g.r;
-    if (px < b[0] - m || px > b[2] + m || py < b[1] - m || py > b[3] + m || !inkNear(g.pts, px, py, m)) continue;
+    if (px < b[0] - m || px > b[2] + m || py < b[1] - m || py > b[3] + m || (!g.text && !inkNear(g.pts, px, py, m))) continue;
     const s = inkAll().find(t => t.id === id); if (!s) { INK.geo.delete(id); continue; }
     const mine = L.added.indexOf(s);
     if (mine >= 0) L.added.splice(mine, 1); else L.erased.push(s);
     const pieces = [];
-    if (mode === 'area') {
+    if (mode === 'area' && !g.text) {
       let run = [];
       const flush = () => { if (run.length >= 2) pieces.push(Object.assign({}, s, { id: inkId(), pts: run })); run = []; };
       g.pts.forEach((p, i) => { if (Math.hypot(p[0] - px, p[1] - py) <= m) flush(); else run.push(s.pts[i]); });
@@ -944,6 +962,64 @@ async function inkFlush(){
   INK.q = { book: null, add: new Map(), remove: new Set() };
   try { await api('/api/ebooks/' + encodeURIComponent(id) + '/ink', { method: 'POST', body: JSON.stringify(body) }); } catch(e){ toast(e.message); }
 }
+// Handwriting read as text (pens.js's lasso): what's inside its loop, marked; typed text in its
+// place; a note on the passage beside it.
+function inkInside(poly, x, y){
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c;
+  }
+  return c;
+}
+function inkSelect(loop){
+  return inkAll().filter(s => {
+    const g = INK.geo.get(s.id), fr = g && frameOf(g.doc); if (!fr) return false;
+    const poly = loop.map(p => [p[0] - fr.left, p[1] - fr.top]);
+    if (g.text) return inkInside(poly, (g.box[0] + g.box[2]) / 2, (g.box[1] + g.box[3]) / 2);
+    return g.pts.filter(p => inkInside(poly, p[0], p[1])).length >= g.pts.length * 0.6;
+  });
+}
+function inkMark(list, on){ for (const s of list) { const g = INK.geo.get(s.id); if (g && g.el) g.el.classList.toggle('held', !!on); } }
+// Their box in their chapter's frame, and that chapter.
+function inkBox(list){
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity, doc = null;
+  for (const s of list) { const g = INK.geo.get(s.id); if (!g) continue; doc = doc || g.doc; x1 = Math.min(x1, g.box[0]); y1 = Math.min(y1, g.box[1]); x2 = Math.max(x2, g.box[2]); y2 = Math.max(y2, g.box[3]); }
+  return { x1, y1, x2, y2, doc };
+}
+function inkTyped(list, text){
+  const b = inkBox(list), doc = b.doc, index = doc && secOf(doc); if (index == null) throw new Error('That page has gone; turn back to it.');
+  const range = placeAt(doc, b.x1, b.y1); if (!range) throw new Error('There are no words here to keep it by.');
+  const cfi = B.view.getCFI(index, range), r = range.getClientRects()[0] || range.getBoundingClientRect();
+  const f = fontAt(doc, range), lines = text.split('\n').length;
+  const first = list.find(Pens.writingOf) || list[0];
+  const t = { id: inkId(), v: 2, tool: 'text', text, fs: Math.round(Math.max(12, Math.min(30, (b.y2 - b.y1) / lines * 0.62))), w: r1(Math.max(60, b.x2 - b.x1)),
+    color: first.color || 'ink', size: 1, o: 1, at: { cfi, s: index, f, x: r1(b.x1 - r.left), y: r1(b.y1 - r.top) }, pts: [[0, 0, 0.5]] };
+  inkTake(list); inkAdd([t]); inkAct({ add: [t], del: list });
+}
+async function inkNote(list, text){
+  const b = inkBox(list), doc = b.doc, index = doc && secOf(doc); if (index == null) throw new Error('That page has gone; turn back to it.');
+  const letter = letterAt(doc, (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2); if (!letter) throw new Error('There’s no passage beside it to keep the note with.');
+  const block = letter.startContainer.parentElement.closest('p, li, blockquote, dd, td, h1, h2, h3, h4, div') || letter.startContainer.parentElement;
+  // the sentence round that letter (a short paragraph whole)
+  const full = block.textContent, pre = doc.createRange(); pre.selectNodeContents(block); pre.setEnd(letter.startContainer, letter.startOffset);
+  const at = pre.toString().length; let s = 0, e = full.length;
+  if (full.length > 280) {
+    const ends = /[.!?…:;](?:["”’)\]]*)\s+/g; let m;
+    while ((m = ends.exec(full))) { const end = m.index + m[0].length; if (end <= at) s = end; else { e = end; break; } }
+  }
+  const pos = c => { const w = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT); let n, sum = 0; while ((n = w.nextNode())) { if (c <= sum + n.data.length) return [n, c - sum]; sum += n.data.length; } return null; };
+  const a = pos(s), z = pos(e); if (!a || !z) throw new Error('That passage couldn’t be found.');
+  const range = doc.createRange(); range.setStart(a[0], a[1]); range.setEnd(z[0], z[1]); snapRange(range);
+  const words = range.toString().trim(); if (words.length < 2) throw new Error('There’s no passage beside it to keep the note with.');
+  B.sel = { doc, index, range, text: words, cfi: B.view.getCFI(index, range), rect: rectFor(doc, range), sentence: full };
+  const h = await highlightSel(false, true); if (!h) throw new Error('That passage couldn’t be highlighted.');
+  const note = [h.user_note, text].filter(x => (x || '').trim()).join('\n\n');
+  await api('/api/highlights/' + encodeURIComponent(h.id) + '/note', { method: 'PUT', body: JSON.stringify({ note }) });
+  h.user_note = note;
+  try { await B.view.addAnnotation({ value: h.pos.cfi }); } catch(e){}
+  drawPanel();
+}
 const INKSURF = {
   live: () => !!(B.view && B.d && document.body.dataset.view === 'ebook'),
   takes: (el, doc) => doc !== document,
@@ -951,6 +1027,10 @@ const INKSURF = {
   stroke: inkStroke, erase: inkErase, erased: inkErased, eraseAll: inkEraseAll, highlight: inkHighlight,
   palHost: () => document.querySelector('.rv.ebook') || document.body,
   canUndo: () => INK.done.length > 0, canRedo: () => INK.undone.length > 0, undo: inkUndo, redo: inkRedo,
+  select: inkSelect, mark: inkMark, typed: inkTyped, noteOnPassage: inkNote,
+  remove: list => { inkTake(list); inkAct({ del: list }); },
+  all: () => inkAll().filter(s => Pens.writingOf(s) && INK.geo.has(s.id)),
+  inkOf: list => list.map(s => (INK.geo.get(s.id) || {}).pts).filter(Boolean),
 };
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') inkFlush(); });
 window.addEventListener('pagehide', inkFlush);
