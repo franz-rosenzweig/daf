@@ -2,6 +2,7 @@
 Ask, and read-aloud. The Feed is FreshRSS, the Library is Karakeep (sources/)."""
 import hashlib
 import json
+import logging
 import re
 import subprocess
 import time
@@ -12,6 +13,7 @@ from pathlib import Path
 from . import config, today as T, vaultnotes
 from .sources import freshrss, karakeep
 
+log = logging.getLogger("daf.reader")
 KIND_LABEL = {"article": "Article", "video": "Video", "tweet": "Tweet", "pdf": "PDF", "podcast": "Podcast"}
 TTS_DIR = config.STATE / "tts"
 
@@ -439,8 +441,11 @@ def save_to_library(conn, doc_id):
     conn.execute("UPDATE highlights SET book_id = ? WHERE book_id = ?", (new_id, doc_id))
     conn.execute("UPDATE ink SET doc = ? WHERE doc = ?", (new_id, doc_id))
     # Its note in the vault goes with it, unless the Library copy has one already.
+    conn.execute("UPDATE books SET vault_path = (SELECT vault_path FROM books WHERE id = ?) WHERE id = ? AND vault_path IS NULL",
+                 (doc_id, new_id))
     conn.execute("UPDATE OR IGNORE books SET id = ? WHERE id = ?", (new_id, doc_id))
     conn.execute("DELETE FROM books WHERE id = ?", (doc_id,))
+    conn.execute("UPDATE OR IGNORE kv SET k = ? WHERE k = ?", ("vault_note:" + new_id, "vault_note:" + doc_id))
     conn.execute("UPDATE sessions SET item = ? WHERE item = ? AND source = 'article'", (new_id, doc_id))
     # Sent to the Kindle before it was saved: what comes back from the Kindle goes to the saved copy.
     conn.execute("UPDATE OR REPLACE kindle_sent SET doc_id = ? WHERE doc_id = ?", (new_id, doc_id))
@@ -451,6 +456,10 @@ def save_to_library(conn, doc_id):
     except Exception:  # noqa: BLE001 - saved is what matters
         pass
     conn.execute("UPDATE docs SET status = 'seen' WHERE id = ?", (doc_id,))
+    try:                                        # the note now points at the Library copy, with its text
+        vaultnotes.write_for(conn, config.load_settings(), new_id)
+    except Exception:  # noqa: BLE001 - saved is what matters
+        log.exception("vault note after saving %s", new_id)
     return new_id
 
 

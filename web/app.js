@@ -607,7 +607,7 @@ async function renderSources(){
     'Karakeep':'Library', 'FreshRSS':'Feed', 'Kokoro voice':'read-aloud', 'Sefaria':'Torah shelf', 'AntennaPod':'podcasts', 'Transcripts':'videos, clips, pages', 'Host tools':'Ask, transcripts' };
   $('#main .page').innerHTML = '<section class="card"><div class="srcs">' + r.checks.map(c =>
     '<div class="src"><span class="dot' + (c.ok ? '' : ' bad') + '" aria-label="' + (c.ok ? 'Working' : 'Not working') + '"></span><b>' + esc(c.name) + '</b><span class="dt mute">' + esc(c.detail) + '</span><span class="mute tiny">' + esc(USE[c.name] || '') + '</span></div>'
-  ).join('') + '</div></section><p class="mute tiny" style="margin:0">Daf only reads these. In the vault it writes the reading log, a “From Daf” section at the end of book notes, and notes for what you highlight in Daf (Reference/clippings, youtube, podcasts, torah). Nothing else.</p>';
+  ).join('') + '</div></section><p class="mute tiny" style="margin:0">Daf only reads these. In the vault it writes the reading log, a “From Daf” section at the end of book notes, and notes for what you highlight or write a note on in Daf, with the full text (Reference/clippings, youtube, podcasts, instagram, torah). Nothing else.</p>';
 }
 /* ---------- read-aloud voices (Kokoro on the server) ---------- */
 // Kokoro's voice names start with two letters for the accent and whose voice it is (af_heart: an

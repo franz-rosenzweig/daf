@@ -53,6 +53,9 @@ def job_status(conn, kind, ref):
 QUICK = ("page",)                 # reading a saved page: its own worker, never behind a long transcript
 
 
+TEXT_JOBS = ("reel", "captions", "whisper", "pdf", "page")     # jobs that bring a document's text
+
+
 def _run_one(quick=False):
     with db.session() as conn:
         j = conn.execute(f"SELECT * FROM jobs WHERE status = 'queued' AND kind {'' if quick else 'NOT '}IN ({','.join('?' * len(QUICK))}) "
@@ -103,6 +106,13 @@ def _run_one(quick=False):
         status, err = "failed", str(e)[:400]
     with db.session() as conn:
         conn.execute("UPDATE jobs SET status = ?, error = ?, finished = ? WHERE id = ?", (status, err, int(time.time()), j["id"]))
+    if status == "done" and j["kind"] in TEXT_JOBS:
+        try:                                     # its note in the vault, if it has one, gets the text that just came
+            from . import vaultnotes
+            with db.session() as conn:
+                vaultnotes.refresh(conn, config.load_settings(), j["ref"])
+        except Exception:  # noqa: BLE001
+            log.exception("vault note after job %s", j["id"])
     return True
 
 

@@ -99,7 +99,8 @@ def _link(url, title=None, **kw):
         return None
     return {"url": url, "title": " ".join(str(title or "").split())[:300] or None, "tags": kw.get("tags") or [],
             "status": kw.get("status") or "inbox", "starred": bool(kw.get("starred")), "added": kw.get("added"),
-            "highlights": [h for h in kw.get("highlights") or [] if (h.get("text") or "").strip()], "html": kw.get("html") or None}
+            "highlights": [h for h in kw.get("highlights") or [] if (h.get("text") or "").strip()], "html": kw.get("html") or None,
+            "note": str(kw.get("note") or "").strip()[:10000] or None}
 
 
 def _hl(text, note=None, created=None):
@@ -162,7 +163,7 @@ def _raindrop(rows):
         if folder.lower() == "trash":
             continue
         out.append(_link(r.get("url"), r.get("title"), tags=tags, starred=(r.get("favorite") or "").lower() == "true",
-                         added=_epoch(r.get("created")), highlights=hls))
+                         added=_epoch(r.get("created")), highlights=hls, note=r.get("note")))
     return out
 
 
@@ -182,7 +183,8 @@ def _generic(rows):
         out.append(_link(pick(r, "url", "link", "href", "uri"), pick(r, "title", "name"), tags=_tags(pick(r, "tags", "labels", "tag")),
                          status="archive" if st and STATUS_WORDS.search(st) and not unread else "later" if re.search("later", st, re.I) else "inbox",
                          starred=str(pick(r, "starred", "favorite", "favourite", "is_starred") or "").lower() in ("1", "true", "yes"),
-                         added=_epoch(pick(r, "time_added", "added", "saved", "saved date", "created", "created_at", "date", "timestamp"))))
+                         added=_epoch(pick(r, "time_added", "added", "saved", "saved date", "created", "created_at", "date", "timestamp")),
+                         note=pick(r, "note", "notes", "document note")))
     return out
 
 
@@ -463,13 +465,31 @@ def _add_highlights(c, settings, doc_id, hls):
     return n
 
 
+def _add_note(c, settings, doc_id, note, write=True):
+    """A link's own note from the export, unless the document has one in Daf already."""
+    if not note:
+        return False
+    d = c.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
+    if not d or (d["note"] or "").strip():
+        return False
+    c.execute("UPDATE docs SET note = ? WHERE id = ?", (note, doc_id))
+    reader._ensure_book(c, d)
+    if write:
+        vaultnotes.write_article(c, settings, doc_id)
+    return True
+
+
 def _one_link(c, settings, x, opts):
     """Returns (what happened, highlights added): added | had | skipped."""
     if x["status"] == "archive" and not opts.get("archived"):
         return "skipped", 0
     d = pages.find_doc(c, x["url"])
     if d and d["status"] != "deleted" and d["where_"] != "feed":
-        return "had", _add_highlights(c, settings, d["id"], x["highlights"])
+        noted = _add_note(c, settings, d["id"], x.get("note"), write=False)
+        n = _add_highlights(c, settings, d["id"], x["highlights"])
+        if noted and not n:
+            vaultnotes.write_article(c, settings, d["id"])
+        return "had", n
     doc_id, _ = pages.save_page(c, x["url"], x["title"], added=x["added"])
     row = c.execute("SELECT ext_id, where_ FROM docs WHERE id = ?", (doc_id,)).fetchone()
     own = not karakeep.writes()                   # Daf keeps the Library: status, star and tags are Daf's alone
@@ -489,7 +509,11 @@ def _one_link(c, settings, x, opts):
         c.execute("UPDATE docs SET tags = ? WHERE id = ?", (json.dumps(x["tags"]), doc_id))
     if x["html"]:
         pages.keep_text(c, doc_id, x["html"], x["url"], whole_page=False)
-    return "added", _add_highlights(c, settings, doc_id, x["highlights"])
+    noted = _add_note(c, settings, doc_id, x.get("note"), write=False)
+    n = _add_highlights(c, settings, doc_id, x["highlights"])
+    if noted and not n:
+        vaultnotes.write_article(c, settings, doc_id)
+    return "added", n
 
 
 _feeds_have = {}

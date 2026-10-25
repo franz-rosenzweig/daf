@@ -73,6 +73,19 @@ Some highlights are facts I want to actually remember, and for those there are f
 
 ## Into the vault
 
-Daf writes highlights and notes into my Obsidian vault, which is the real record. A book's highlights go into its note, between two markers that are Daf's alone, and an article's go into a note in `Reference/clippings`, in the same format my Readwise clippings already had. If I edit that part in Obsidian, my edit wins. Basically, Daf is the reading room and the vault is the library, and none of my highlights or notes live only in Daf.
+Daf writes highlights and notes into my Obsidian vault, which is the real record. A book's highlights go into its note, between two markers that are Daf's alone. If I edit that part in Obsidian, my edit wins. Basically, Daf is the reading room and the vault is the library, and none of my highlights or notes live only in Daf.
+
+Anything else I highlight or write a note on gets a note of its own, the way Readwise's Obsidian export does it: an article from the Feed or the Library, something I imported, a tweet, a PDF, a YouTube video, a podcast episode, an Instagram reel or a Torah reading. Articles, tweets and PDFs go to `Reference/clippings`, videos to `Reference/youtube`, reels to `Reference/instagram`, podcasts to `Reference/podcasts` and the parasha to `Reference/torah`.
+
+Each note has:
+
+- **The properties** my clippings use: the title, the author as a link, the original address, a `daf` link that opens it in Daf, the site, the kind of thing it is ("article", "video", "podcast", "reel", "tweet", "pdf" or "torah"), when it was published and when I saved it, the word count, the cover for a video, and `categories` so it shows up in my Clippings, YouTube Clippings or Podcast episodes views. It's marked `#ai-assisted-note` like everything a script writes.
+- **My note** on the whole thing, if I wrote one.
+- **My highlights**, each with its note and tags, and a link to its place in the text (for a video, the link is the time).
+- **The FULL text**: headings, lists, quotes, links and pictures (from the web, nothing downloaded), with the words I highlighted marked in yellow. A video or a reel gets its transcript with the times, and a YouTube time opens the video right there. A podcast episode gets its show notes, and the minutes I clipped are its highlights. A Torah reading has the Hebrew and the English, verse by verse. A very long text (over about 150,000 characters) stops there, keeping only the paragraphs I highlighted after that point, with a link to the rest in Daf.
+
+All of that sits between Daf's two markers, so it stays up to date as I highlight more, and whatever I write above or below them is mine and stays as it is. A note I edit there, on a highlight or on the whole thing, goes back into Daf. A transcript or a full page that arrives later (a video's captions, say) fills in the note by itself.
+
+Notes that weren't made by Daf only get the highlights, never the text. That covers my Readwise clippings, the Karakeep notes from before Daf kept the Library (in `Reference/karakeep`, which already have the text), and the Torah essays in my vault that I read in Daf.
 
 <sub>Next: [Books and shelves](books-and-shelves.md) →</sub>

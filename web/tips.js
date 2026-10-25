@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-10-25-vault-text', date: 'Oct 25', title: 'The whole text in the vault', text: 'Highlight an article, video or podcast and its note in Obsidian gets the full text or transcript, your highlights marked in it.', go: '#highlights' },
   { id: '2026-10-25-add-book', date: 'Oct 25', title: 'Add a book', text: 'Find it on Hardcover, give it its file, and Calibre, Hardcover and the Kindle all get it.', go: '#books' },
   { id: '2026-10-25-reels', date: 'Oct 25', title: 'Save Instagram reels', text: 'Share a reel to Daf: it keeps the video, the caption and a transcript you can highlight.', go: '#prefs/instagram' },
   { id: '2026-10-21-kindle-covers', date: 'Oct 21', title: 'Covers come fast on the Kindle', text: 'Shelves open with every cover at once, and the next page is ready before you swipe.' },

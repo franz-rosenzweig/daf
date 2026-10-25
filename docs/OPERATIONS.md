@@ -24,7 +24,7 @@ messages use settings `public_url` (now https://daf.tiresia.xyz). The Kindle kee
 | Code | `/srv/dev/daf` (Python package `daf/`, web app `web/`, Kindle plugin `kindle/`) |
 | Service | systemd user unit `daf.service` (copy in `systemd/`): web app + API on :8440, sync every 5 min |
 | State | `/srv/docker/daf`: `daf.db` (index, rebuildable), `auth.json`, `settings.json`, `kindle-token` |
-| Vault | Daf writes `Reference/reading/Reading Log YYYY.md` (paper minutes) and, in book notes, only the region between `<!-- daf -->` and `<!-- daf-end -->` (notes added in Daf, voice and text reading notes). Edits made in Obsidian inside that region win. |
+| Vault | Daf writes `Reference/reading/Reading Log YYYY.md` (paper minutes), in book notes only the region between `<!-- daf -->` and `<!-- daf-end -->` (notes added in Daf, voice and text reading notes), and a note per highlighted article, video, podcast, tweet, PDF, reel or Torah reading in `Reference/clippings`, `youtube`, `podcasts`, `instagram` and `torah`, with the full text inside its region (see "Vault notes with the full text" below). Edits made in Obsidian inside a region win. |
 | Logs | `journalctl --user -u daf -f` |
 
 After changing code: `systemctl --user restart daf`. The web app has no build step.
@@ -46,6 +46,7 @@ After changing code: `systemctl --user restart daf`. The web app has no build st
     daf paper-page PHOTO [--caption "page 112 middlemarch"]   a marked paper page -> highlights
     daf clip "TEXT"                     a podcast link with a time: transcribe the minute before it
     daf jobs                            transcripts and clips, waiting or done
+    daf vault-backfill [--dry-run DIR]  rewrite Daf's article notes the current way (DIR: copies there, the vault untouched)
 
 Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call):
 - `read 40 paper`, `paper 40`, `shabbat 60`: paper minutes.
@@ -84,7 +85,7 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
 - **Reading view** (`web/reader.js`): highlight by selection or `h`, notes (`n`), Ask (Claude CLI,
   `secrets.claude_model()`), read-aloud through Kokoro (`/api/tts`, cached in `/srv/docker/daf/tts`),
   progress, Aa (theme, typeface, size, width), `[` `]` panels, ⌘K search. Highlights write a clipping
-  note in `Reference/clippings` (the Readwise-era format) with Daf's region.
+  note in `Reference/clippings` with Daf's region (the full text since 2026-10-25, below).
 - **Reading time**: the open reading view sends a 15-second beat while you're active (or while
   read-aloud plays). Each article is one session per day; finished days go into the vault reading log.
   Beats made offline wait in localStorage (`daf.beatq`) and are sent with their own time (`at`).
@@ -772,3 +773,17 @@ before 3.5 → 0.8 s):
   - A book waiting for its file keeps `kindle_shelf` on book_files/book_adds, and `follow_up()` (end of rebuild) queues it once Calibre has it.
   - Send to Kindle's EPUBs are queued too (shelf "Daf").
   - The plugin side is the Kindle session's job (briefed 10-25).
+
+## Vault notes with the full text (`daf/vaultnotes.py`, `daf/vaultmd.py`, 2026-10-25)
+
+What I highlight or write a note on outside a book now lands in the vault the way Readwise's Obsidian export does it, text and all.
+
+- **Which notes:** `write_article` makes a note for any document in `docs` (Feed, Library, imports, tweets, PDFs, videos, podcasts, reels, Torah readings) and for a podcast clip's `pod:` books row, once it has a highlight (sources `daf`, `clip`, `kindle`, `karakeep`) or a document note. Folders: `Reference/clippings`, `youtube`, `podcasts`, `torah`, and `instagram` for reels.
+- **The head** is written once, for a new note: frontmatter `title`, `author` (one `"[[Name]]"` per person, affiliations after a comma dropped, none for Torah), `url`, `daf` (`<public_url>/#read/<id>`, or `#book/<id>` for a clip), `source`, `category` (article, video, podcast, reel, tweet, pdf, torah), `published`, `saved`, `words`, `cover` (YouTube's, or a picture on the web), `categories` (`[[Clippings]]`, `[[Youtube Clippings]]`, `[[Podcast episodes]]` with `show`, which is what the vault's Bases filter on), `tags`, `datasource: daf`; then `#ai-assisted-note` and the title. Never `created`/`updated` (Obsidian adds those, the linter strips them) or the keys hardcover-sync and koreader-merge own (`NOT_DAFS`). After that only the `daf:` line changes, when a Feed item moves to the Library.
+- **The region** (`<!-- daf -->` … `<!-- daf-end -->`): Source/Author/Published lines and an "In Daf" link (Source and Published left out when an older Daf's `## Data` head already says them), `## Notes` (the document note, ending `^daf-note`), `## Highlights` (quote, then `([[#^daf-b<block>|in the text]])` or the time or verse as the label, tags, the note, `^daf-h<id>`), and the text under `## Full text`, `## Transcript`, `## Show notes` (a podcast's), or `## Caption` + `## Transcript` (a reel's).
+- **The text** (`vaultmd.Doc`): blocks → Markdown, h2/h3 → `###`/`####` (no bold inside), lists, quotes, pictures by address, PDF page marks, cues with `[m:ss](youtube…&t=Ns)` or `**m:ss**` and the speaker, verses as `**n** Hebrew` + English. Plain text is escaped so a `#`, `$`, `[[`, `==`, `^` or a leading `1.` in an article never becomes a tag, math, a link, a mark, a block id or a list. Highlights are placed by `pos` (b/s/e/be) when the words there still match (offsets counted without whitespace, since the reader counts over the page and the Kindle over the block's plain text), otherwise by their words (`pre` picks between repeats; long Kindle quotes by their ends). Marked words get `==…==` (trimmed off punctuation that would stop the mark closing), and each highlighted block gets `^daf-b<i>`. Past `FULL_TEXT_MAX` (150,000 characters), only highlighted blocks follow, with "…" between and a link to Daf.
+- **Only Daf's own notes** (frontmatter `datasource: daf`) get the text. A Readwise note, a vault essay (`ve:`) or a karakeep-sync note (`Reference/karakeep`, linked by its `id:` for a `kk:` document that has no note yet) only gets highlights, without its `karakeep`-source ones and without a document note it already contains. A note Daf never wrote in doesn't get an empty region.
+- **Vault wins**, as in book notes: an edited highlight note (`review_state.vault_hash`) or document note (kv `vault_note:<doc>`) is taken back into Daf before rewriting. Only the part above the text is read for that.
+- **When:** every highlight change (`write_for`), a document note, an import (also a link's own note: Raindrop's `note`, a CSV's `note`/`notes`), `save_to_library` (the note follows, its `vault_path` carried over even when the Library copy had a books row), and after a `reel`, `captions`, `whisper`, `pdf` or `page` job (`vaultnotes.refresh`), so text that comes later fills the note in.
+- **Backfill:** `daf vault-backfill --dry-run DIR` copies each affected note to DIR as it would be and rolls the database back; without it, it rewrites for real. It covers notes Daf made (`datasource: daf`), links Karakeep-era documents to their karakeep-sync note, and makes notes for documents that have highlights or a note and never got one. An older Daf's note keeps its head; the keys it lacks are added at the end of its frontmatter, and nothing already there changes.
+

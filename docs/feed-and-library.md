@@ -52,7 +52,7 @@ Files work too, dropped on the dialog or anywhere on the page, several at once i
 
 ## Bringing a library over
 
-**Preferences → Import** takes the export file from another app. Drop it there and Daf works out which app it came from and shows what's in it (how many links, how many you'd read, starred, tagged, with highlights) before anything happens. **Bring it in** then saves them to the Library in the background, a few a second, keeping when you saved each one, whether you'd read it (into the Archive, if you tick that), the stars (the Shortlist) and the tags. Highlights come along where the app exports them, and land in the review and the vault like any other. Links already in Daf are left as they are, so running the same file twice does no harm.
+**Preferences → Import** takes the export file from another app. Drop it there and Daf works out which app it came from and shows what's in it (how many links, how many you'd read, starred, tagged, with highlights) before anything happens. **Bring it in** then saves them to the Library in the background, a few a second, keeping when you saved each one, whether you'd read it (into the Archive, if you tick that), the stars (the Shortlist) and the tags. Highlights come along where the app exports them, and so does a link's own note (Raindrop's, or a "note" column in a CSV), and they land in the review and the vault like any other. Links already in Daf are left as they are, so running the same file twice does no harm.
 
 What it reads:
 

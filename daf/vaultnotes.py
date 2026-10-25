@@ -11,8 +11,9 @@ import hashlib
 import json
 import re
 from datetime import datetime
+from urllib.parse import quote, urlparse
 
-from . import config, today as T
+from . import config, today as T, vaultmd
 
 START, END = "<!-- daf -->", "<!-- daf-end -->"
 REGION = re.compile(re.escape(START) + r".*?" + re.escape(END), re.S)
@@ -212,86 +213,326 @@ def _ts(t):
 
 
 FOLDERS = {"video": "Reference/youtube", "podcast": "Reference/podcasts", "torah": "Reference/torah"}
+CATEGORY = {"video": "video", "podcast": "podcast", "tweet": "tweet", "pdf": "pdf", "torah": "torah"}
+# The vault's Bases list clippings by these (Templates/Bases/Clippings.base, Youtube Clippings.base, Podcast episodes.base).
+CATEGORIES = {"video": "Youtube Clippings", "podcast": "Podcast episodes"}
+TAGS = {"video": ["clippings", "youtube", "videos"], "podcast": ["clippings", "podcasts"], "torah": ["clippings", "torah"],
+        "reel": ["clippings", "instagram", "videos"]}
+# Frontmatter keys Daf never writes: hardcover-sync and koreader-merge keep these in book notes, and
+# Obsidian adds created/updated itself (the vault's linter strips them).
+NOT_DAFS = {"status", "rating", "read", "consuming", "progress", "review", "created", "updated"}
+SOURCES = ("daf", "clip", "kindle", "karakeep")
+# Where the text starts in Daf's region; the notes and highlights above it are what flows back from the vault.
+TEXT_HEADS = re.compile(r"(?m)^## (?:Full text|Transcript|Caption|Show notes)$")
+DOCNOTE = re.compile(r"(?ms)^## Notes\n\n(?P<body>.*?)\s\^daf-note[ \t]*$")
 
 
-def write_article(conn, settings, doc_id):
-    """Create or update the note for an article, video or podcast episode with highlights in Daf.
-    Daf owns its region; the head is written once."""
+def daf_link(settings, doc_id, doc=True):
+    """The document in Daf (the reading view), or a podcast clip's page."""
+    return f"{config.public_url(settings)}/#{'read' if doc else 'book'}/{quote(doc_id, safe='')}"
+
+
+def _tweet_title(title):
+    """'Name on X: "the post…" / X' (as X titles its pages) → 'Name on X: the post…', shorter."""
+    m = re.match(r'^(?:\(\d+\)\s*)?(.+?) on X:\s*["“]([\s\S]*?)(?:["”]\s*/\s*X)?$', title or "")
+    if not m:
+        return title
+    lead = re.sub(r"\s+", " ", m.group(2)).strip()
+    if len(lead) > 80:
+        lead = lead[:80].rsplit(" ", 1)[0] + "…"
+    return f"{m.group(1)} on X: {lead}" if lead else f"{m.group(1)} on X"
+
+
+def _authors(author, category=None):
+    """The names in an author line, one [[link]] each, as the Web Clipper writes them. A Torah
+    reading's "author" (Torah, Haftarah) isn't a person."""
+    a = re.sub(r"^(by|von|par)\s+", "", (author or "").strip(), flags=re.I)
+    if not a or category == "torah":
+        return []
+    parts = [p.strip() for p in re.split(r"\s*(?:;|&|\band\b)\s*", a) if p.strip()]
+    out = []
+    for p in parts:
+        bits = [x.strip() for x in p.split(",") if x.strip()]
+        if len(bits) > 1 and any(len(x.split()) < 2 for x in bits):
+            out.append(p)                          # "Doe, Jane" or "Smith, Jr.": one name
+        elif len(bits) > 1 and any(AFFIL.search(x) for x in bits[1:]):
+            out.append(bits[0])                    # "Jane Doe, Professor of History, Some University"
+        else:
+            out += bits
+    return [n for n in (re.sub(r"[\[\]|#^]+", "", p).strip() for p in out[:6]) if n]
+
+
+AFFIL = re.compile(r"\b(of|at|for|the|University|College|Institute|School|Professor|Lecturer|Fellow|Editor|Reporter|"
+                   r"Correspondent|Staff|Writer|Contributor|Director|Researcher|Candidate|Student)\b")
+
+
+def _date(ts, settings):
+    return datetime.fromtimestamp(ts, T.tz_of(settings)).strftime("%Y-%m-%d") if ts else ""
+
+
+def _article(conn, settings, doc_id):
+    """What a note says about a document (or a podcast clip's episode, which is only a books row)."""
     d = conn.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
     b = conn.execute("SELECT * FROM books WHERE id = ?", (doc_id,)).fetchone()
     if not d and not b:
+        return None
+    from . import media, social
+    r = d or b
+    kind, url = r["kind"], r["url"]
+    reel = kind == "video" and social.is_reel(url)
+    title = (r["title"] or "").strip() or url or "Untitled"
+    if kind == "tweet":
+        title = _tweet_title(title)
+    yt = media.youtube_id(url) if kind == "video" and url and not reel else None
+    thumb = d["thumb"] if d and (d["thumb"] or "").startswith(("http://", "https://")) else None
+    return {"id": doc_id, "doc": bool(d), "title": title, "url": url or "", "kind": kind,
+            "author": (d["author"] if d else b["author"]) or "", "source": (d["source"] if d else b["author"]) or "",
+            "published": d["published"] if d else None, "saved": d["added"] if d else None, "words": d["words"] if d else None,
+            "category": "reel" if reel else CATEGORY.get(kind, "article"), "note": d["note"] if d else None,
+            "cover": f"https://i.ytimg.com/vi/{yt}/maxresdefault.jpg" if yt else thumb,
+            "daf": daf_link(settings, doc_id, bool(d)), "summary": d["summary"] if d else None}
+
+
+def _fm(m, settings):
+    """Daf's frontmatter keys for a note, in order: [(key, YAML value)]."""
+    out = [("title", _yaml(m["title"]))]
+    names = _authors(m["author"], m["category"])
+    if names:
+        out.append(("author", "".join(f'\n  - "[[{n}]]"' for n in names)))
+    out += [("url", _yaml(m["url"])), ("daf", _yaml(m["daf"])), ("source", _yaml(m["source"])), ("category", m["category"])]
+    if m["published"]:
+        out.append(("published", _date(m["published"], settings)))
+    if m["saved"]:
+        out.append(("saved", _date(m["saved"], settings)))
+    if m["words"]:
+        out.append(("words", str(int(m["words"]))))
+    if m["cover"]:
+        out.append(("cover", _yaml(m["cover"])))
+    out.append(("categories", f'\n  - "[[{CATEGORIES.get(m["category"], "Clippings")}]]"'))
+    show = re.sub(r"[\[\]|#^]+", "", m["source"]).strip()
+    if m["category"] == "podcast" and show:
+        out.append(("show", f'"[[{show}]]"'))
+    return [(k, v) for k, v in out if k not in NOT_DAFS]
+
+
+def _fm_text(pairs):
+    return "".join(f"{k}:{v if v.startswith(chr(10)) else ' ' + v}\n" for k, v in pairs)
+
+
+def _new_note(m, settings):
+    tags = "".join(f"  - {t}\n" for t in TAGS.get(m["category"], ["clippings"]))
+    return ("---\n" + _fm_text(_fm(m, settings)) + "tags:\n" + tags + "datasource: daf\n---\n#ai-assisted-note\n"
+            f"# {vaultmd._esc(m['title'])}\n\n" + START + "\n" + END + "\n")
+
+
+def _frontmatter(text):
+    """(start, end) of the frontmatter's lines, or None."""
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---\n", 4)
+    return (4, end + 1) if end >= 0 else None
+
+
+def _own(text):
+    """A note Daf made (the full text goes only into those, never into a Readwise note or a vault essay)."""
+    f = _frontmatter(text)
+    return bool(f) and re.search(r"(?m)^datasource: daf\s*$", text[f[0]:f[1]]) is not None
+
+
+def _fill_head(text, m, settings):
+    """A note an older Daf made: the keys it lacks are added. Nothing already there changes."""
+    f = _frontmatter(text)
+    if not f:
+        return text
+    have = set(re.findall(r"(?m)^([A-Za-z_][\w-]*):", text[f[0]:f[1]]))
+    add = _fm_text([(k, v) for k, v in _fm(m, settings) if k not in have])
+    return text[:f[1]] + add + text[f[1]:] if add else text
+
+
+def _keep_daf_link(text, m, settings):
+    """The `daf:` address follows the document (a Feed item saved to the Library gets a new id)."""
+    f = _frontmatter(text)
+    if not f:
+        return text
+    fm = text[f[0]:f[1]]
+    new = re.sub(r'(?m)^daf: "?' + re.escape(config.public_url(settings)) + r'/#[^"\n]*"?$', lambda _: "daf: " + _yaml(m["daf"]), fm, count=1)
+    return text[:f[0]] + new + text[f[1]:]
+
+
+def _quote(h, loc, anchor):
+    text = (h["text"] or "").strip()
+    if not re.match(r"^!\[[^\]]*\]\(\S+\)$", text):         # a picture's highlight is its Markdown already
+        text = vaultmd._esc(text)
+    q = "\n".join("> " + vaultmd._line_start(line) for line in text.splitlines())
+    if anchor is not None:
+        q += f" ([[#^daf-b{anchor}|{loc or 'in the text'}]])"
+    elif loc:
+        q += f" ({loc})"
+    return _tagged(q, h.get("tags"))
+
+
+def _text_sections(m, doc):
+    cues = any(b.get("t") == "cue" for b in doc.blocks)
+    if m["category"] == "reel":                   # the caption, then "Transcript" and its lines (social.fetch)
+        k = next((i for i, b in enumerate(doc.blocks) if b.get("t") == "h3" and b.get("x") == "Transcript"), len(doc.blocks))
+        cap, tr = doc.markdown(m["daf"], hi=k), doc.markdown(m["daf"], lo=k + 1)
+        return (["## Caption", "", cap, ""] if cap else []) + (["## Transcript", "", tr, ""] if tr else [])
+    md = doc.markdown(m["daf"])
+    head = "## Transcript" if cues else "## Show notes" if m["category"] == "podcast" else "## Full text"
+    return [head, "", md, ""] if md else []
+
+
+KARAKEEP_DIR = "Reference/karakeep"              # karakeep-sync.py's notes, from before Daf kept the Library
+
+
+def _karakeep_note(doc_id):
+    """The note karakeep-sync.py made for a bookmark (`id:` in its frontmatter), so a Karakeep-era
+    article gets Daf's region there instead of a second note."""
+    root = config.VAULT / KARAKEEP_DIR
+    if not doc_id.startswith("kk:") or not root.is_dir():
+        return None
+    want = re.compile(r"(?m)^id: " + re.escape(doc_id[3:]) + r"\s*$")
+    for p in sorted(root.rglob("*.md")):
+        try:
+            if want.search(p.read_text(encoding="utf-8")[:2000]):
+                return str(p.relative_to(config.VAULT))
+        except (OSError, UnicodeDecodeError):
+            continue
+    return None
+
+
+def write_article(conn, settings, doc_id, backfill=False):
+    """Create or update the note for an article, video, podcast episode, tweet, PDF, reel or Torah
+    reading with highlights or a note in Daf. Daf owns its region (where the full text goes, in notes
+    it made itself); the head is written once, and only the `daf:` link follows the document after
+    that. backfill: a note an older Daf made also gets the frontmatter keys it lacks."""
+    m_ = _article(conn, settings, doc_id)
+    if not m_:
         return "no doc"
-    m_ = {"title": (d or b)["title"], "url": d["url"] if d else b["url"], "author": (d["author"] if d else b["author"]) or "",
-          "source": d["source"] if d else (b["author"] or ""), "published": d["published"] if d else None,
-          "kind": d["kind"] if d else b["kind"], "note": d["note"] if d else None}
     hls = [dict(r) for r in conn.execute(
-        "SELECT h.id, h.text, h.pos, CASE WHEN h.source = 'kindle' THEN COALESCE(s.user_note, h.note) ELSE s.user_note END AS user_note, "
+        "SELECT h.id, h.text, h.pos, h.created, h.source, CASE WHEN h.source = 'kindle' THEN COALESCE(s.user_note, h.note) ELSE s.user_note END AS user_note, "
         "s.vault_hash, s.tags FROM highlights h LEFT JOIN review_state s ON s.hl_id = h.id "
-        "WHERE h.book_id = ? AND h.deleted = 0 AND h.source IN ('daf', 'clip', 'kindle') ORDER BY h.created", (doc_id,))]
+        "WHERE h.book_id = ? AND h.deleted = 0 AND h.source IN (%s) ORDER BY h.created" % ",".join("?" * len(SOURCES)), (doc_id, *SOURCES))]
+    b = conn.execute("SELECT vault_path FROM books WHERE id = ?", (doc_id,)).fetchone()
+    if not b and m_["doc"]:
+        from . import reader
+        reader._ensure_book(conn, conn.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone())
     rel = b["vault_path"] if b and b["vault_path"] else None
     if rel and not (config.VAULT / rel).exists():
         rel = None
     if not hls and not m_["note"] and not rel:       # a note already written still loses its last highlight
         return "nothing to write"
-    from . import social
-    reel = m_["kind"] == "video" and social.is_reel(m_["url"])     # an Instagram reel: beside the YouTube notes, its own folder
+    if not rel and (rel := _karakeep_note(doc_id)):
+        conn.execute("UPDATE books SET vault_path = ? WHERE id = ?", (rel, doc_id))
     if not rel:
-        folder = "Reference/instagram" if reel else FOLDERS.get(m_["kind"], CLIP_DIR)
+        folder = "Reference/instagram" if m_["category"] == "reel" else FOLDERS.get(m_["kind"], CLIP_DIR)
         base = _clip_name(m_["title"])
         rel = f"{folder}/{base}.md"
         n = 2
         while (config.VAULT / rel).exists():
             rel = f"{folder}/{base} ({n}).md"
             n += 1
-        published = datetime.fromtimestamp(m_["published"]).strftime("%Y-%m-%d") if m_["published"] else ""
-        tags = {"video": "  - clippings\n  - youtube\n  - videos\n", "podcast": "  - clippings\n  - podcasts\n",
-                "torah": "  - clippings\n  - torah\n"}.get(m_["kind"], "  - clippings\n")
-        if reel:
-            tags = "  - clippings\n  - instagram\n  - videos\n"
-        head = ("---\ntags:\n" + tags + "datasource: daf\n"
-                f"url: {_yaml(m_['url'])}\nauthor: {_yaml(m_['author'])}\nsource: {_yaml(m_['source'])}\n"
-                + (f"published: {published}\n" if published else "") + "---\n#ai-assisted-note\n"
-                f"# {m_['title']}\n\n## Data\n- SOURCE: {m_['url'] or ''}\n" + (f"- Published: {published}\n" if published else "")
-                + "\n---\n\n")
         (config.VAULT / folder).mkdir(parents=True, exist_ok=True)
-        (config.VAULT / rel).write_text(head + START + "\n" + END + "\n", encoding="utf-8")
+        (config.VAULT / rel).write_text(_new_note(m_, settings), encoding="utf-8")
         conn.execute("UPDATE books SET vault_path = ? WHERE id = ?", (rel, doc_id))
     path = config.VAULT / rel
     text = path.read_text(encoding="utf-8")
     m = REGION.search(text)
+    own = _own(text)
+    note = m_["note"]
+    if not own:
+        # A note from before Daf kept the Library (Karakeep's) has their highlights and note already.
+        hls = [h for h in hls if h["source"] != "karakeep"]
+        outside = text[:m.start()] + text[m.end():] if m else text
+        if note and note.strip() in outside:
+            note = None
+    if not m and not hls and not note:                # a note of yours Daf has never written in (a vault essay opened in Daf)
+        return "nothing to write"
+    kept_note = conn.execute("SELECT v FROM kv WHERE k = ?", ("vault_note:" + doc_id,)).fetchone()
     if m:
-        current = _existing_entries(m.group(0))
+        # Vault wins: a note on a highlight, or the document's note, edited in Obsidian since Daf wrote it.
+        top = m.group(0)
+        t = TEXT_HEADS.search(top)
+        top = top[:t.start()] if t else top
+        current = _existing_entries(top)
         for h in hls:
             v = current.get("h" + _short(h["id"]))
             if v and h["vault_hash"] and _h(v) != h["vault_hash"] and _h(v) != _h(h["user_note"]):
                 h["user_note"] = v
                 conn.execute("UPDATE review_state SET user_note = ? WHERE hl_id = ?", (v, h["id"]))
-    verses, book = {}, None
-    if m_["kind"] == "torah" and d:
+        dn = DOCNOTE.search(top)
+        if dn and m_["doc"] and kept_note:
+            v = dn.group("body").strip()
+            if v and _h(v) != kept_note[0] and _h(v) != _h(note):
+                note = v
+                conn.execute("UPDATE docs SET note = ? WHERE id = ?", (v, doc_id))
+    full = own and bool(hls or note)
+    blocks = []
+    if m_["doc"] and (full or m_["kind"] == "torah"):
         row = conn.execute("SELECT blocks FROM doc_content WHERE id = ?", (doc_id,)).fetchone()
-        verses = {i: b.get("n") for i, b in enumerate(json.loads(row[0]))} if row else {}
-        mb = re.match(r"^(.*?)\s+\d", d["summary"] or "")
+        try:
+            blocks = json.loads(row[0]) if row and row[0] else []
+        except ValueError:
+            blocks = []
+    doc = vaultmd.Doc(blocks, m_["kind"], m_["url"]) if full and blocks else None
+    book = None
+    if m_["kind"] == "torah":
+        d = conn.execute("SELECT summary FROM docs WHERE id = ?", (doc_id,)).fetchone()
+        mb = re.match(r"^(.*?)\s+\d", (d["summary"] if d else "") or "")
         book = mb.group(1) if mb else None
-    parts = [START]
-    if m_["note"]:
-        parts += [f"**Notes:** {m_['note'].strip()}", ""]
-    parts += ["## Highlights", ""]
     for h in hls:
         try:
-            pos = json.loads(h["pos"]) if h["pos"] else {}
+            h["p"] = json.loads(h["pos"]) if h["pos"] else {}
         except ValueError:
-            pos = {}
-        when = f" ({_ts(pos['t'])})" if isinstance(pos, dict) and pos.get("t") is not None else ""
-        if verses and isinstance(pos, dict) and verses.get(pos.get("b")):
-            when = f" ({book + ' ' if book else ''}{verses[pos['b']]})"
-        quote = _tagged("\n".join("> " + line for line in (h["text"] or "").strip().splitlines()) + when, h.get("tags"))
+            h["p"] = {}
+        if not isinstance(h["p"], dict):
+            h["p"] = {}
+        h["at"] = doc.place(h["id"], h["text"], h["p"]) if doc else None
+        if h["at"] is not None and doc.blocks[h["at"]].get("t") in ("h2", "h3"):
+            h["at"] = None                         # a heading has no block id to link to
+    from . import jump
+    hls.sort(key=lambda h: (0, *doc.start[h["id"]]) if doc and h["id"] in doc.start
+             else (1, jump.order({"pos": h["p"]}) or 0, h["created"] or 0))
+
+    parts = [START]
+    if full:
+        legacy = "\n## Data\n- SOURCE:" in text[:m.start() if m else len(text)]     # an older Daf's head says where it's from
+        lines = []
+        if not legacy:
+            if m_["url"]:
+                site = m_["source"] or urlparse(m_["url"]).netloc
+                lines.append(f"**Source:** [{vaultmd._esc(site)}]({vaultmd._url(m_['url'])})")
+            names = _authors(m_["author"], m_["category"])
+            if names:
+                lines.append("**Author:** " + ", ".join(f"[[{n}]]" for n in names))
+            if m_["published"]:
+                lines.append("**Published:** " + _date(m_["published"], settings))
+        lines.append(f"**In Daf:** [Open]({m_['daf']})")
+        parts += ["\n".join(lines), ""]
+    if note:
+        parts += ["## Notes", "", note.strip() + " ^daf-note", ""]
+    if hls or not full:                     # a note with only your note on it has no Highlights heading
+        parts += ["## Highlights", ""]
+    for h in hls:
+        p = h["p"]
+        loc = _ts(p["t"]) if p.get("t") is not None else None
+        bi = h["at"] if h["at"] is not None else p.get("b")
+        if m_["kind"] == "torah" and isinstance(bi, int) and 0 <= bi < len(blocks) and isinstance(blocks[bi], dict) and blocks[bi].get("n"):
+            loc = f"{book + ' ' if book else ''}{blocks[bi]['n']}"
+        quote_ = _quote(h, loc, h["at"])
         if h["user_note"]:
-            parts += [quote, "", f"{h['user_note'].strip()} ^daf-h{_short(h['id'])}", ""]
+            parts += [quote_, "", f"{h['user_note'].strip()} ^daf-h{_short(h['id'])}", ""]
         else:
-            parts += [quote + f" ^daf-h{_short(h['id'])}", ""]
+            parts += [quote_ + f" ^daf-h{_short(h['id'])}", ""]
+    if doc:
+        parts += _text_sections(m_, doc)
     parts.append(END)
     region = "\n".join(parts)
     new = text[:m.start()] + region + text[m.end():] if m else text.rstrip("\n") + "\n\n" + region + "\n"
+    if own:
+        new = _keep_daf_link(new, m_, settings)
+        if backfill and full:
+            new = _fill_head(new, m_, settings)
     if new != text:
         tmp = path.with_name(f".{path.name}.daf-tmp")
         tmp.write_text(new, encoding="utf-8")
@@ -299,4 +540,45 @@ def write_article(conn, settings, doc_id):
     for h in hls:
         if h["user_note"]:
             conn.execute("UPDATE review_state SET vault_hash = ? WHERE hl_id = ?", (_h(h["user_note"]), h["id"]))
+    if m_["doc"] and note:
+        conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", ("vault_note:" + doc_id, _h(note)))
     return "written" if new != text else "unchanged"
+
+
+def refresh(conn, settings, doc_id):
+    """A document's text arrived or changed (a transcript, the whole page, a PDF read): its note, if it has one."""
+    b = conn.execute("SELECT vault_path FROM books WHERE id = ?", (doc_id,)).fetchone()
+    return write_article(conn, settings, doc_id) if b and b["vault_path"] else "no note"
+
+
+def backfill(conn, settings, dry=None):
+    """Every note Daf has written for a document or a podcast clip, rewritten the current way, and any
+    document with highlights or a note that never got one (`daf vault-backfill`); a Karakeep-era one is
+    linked to karakeep-sync's note for it, which stays as it is. Only Daf's region
+    changes, and the frontmatter keys an older Daf didn't write are added. dry: a folder that gets a
+    copy of each note as it would be (same paths); the vault stays as it is. Returns {doc id: (what
+    happened, the note's path)}."""
+    ids = [r[0] for r in conn.execute(
+        "SELECT id FROM books WHERE vault_path IS NOT NULL AND (id IN (SELECT id FROM docs) OR kind = 'podcast') "
+        "UNION SELECT DISTINCT book_id FROM highlights WHERE deleted = 0 AND source IN (%s) AND book_id IN (SELECT id FROM docs) "
+        "UNION SELECT id FROM docs WHERE note IS NOT NULL" % ",".join("?" * len(SOURCES)), SOURCES)]
+    out, real = {}, config.VAULT
+    for doc_id in ids:
+        b = conn.execute("SELECT vault_path FROM books WHERE id = ?", (doc_id,)).fetchone()
+        rel = b["vault_path"] if b and b["vault_path"] else None
+        if rel and (real / rel).exists() and not _own((real / rel).read_text(encoding="utf-8")):
+            continue                              # a Readwise note or a vault essay: its region changes with its next highlight
+        if dry:
+            for r in (rel, None if rel else _karakeep_note(doc_id)):
+                if r and (real / r).exists():
+                    (dry / r).parent.mkdir(parents=True, exist_ok=True)
+                    (dry / r).write_bytes((real / r).read_bytes())
+            config.VAULT = dry
+        try:
+            what = write_article(conn, settings, doc_id, backfill=True)
+        finally:
+            config.VAULT = real
+        b = conn.execute("SELECT vault_path FROM books WHERE id = ?", (doc_id,)).fetchone()
+        after = b["vault_path"] if b else None
+        out[doc_id] = ("new" if not rel and after and what == "written" else "linked" if not rel and after else what, after)
+    return out

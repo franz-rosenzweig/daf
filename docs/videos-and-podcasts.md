@@ -20,7 +20,7 @@ Video time doesn't count toward the hour unless you switch on **Videos** in **Pr
 
 A reel worth keeping goes to Daf the same way a link does: **Share → Daf** in the Instagram app on the phone, the toolbar button or a highlight in the browser, or its link pasted into Daf. A minute later it's under **Videos** with everything that matters about it: the video itself, kept on my server (a reel can vanish from Instagram, so Daf doesn't count on it), its picture, the account it's from, the caption, and below the caption a transcript of what's said, with the time beside each line.
 
-It plays standing up in Daf, and the rest works like a YouTube video: click a line to jump there, **Follow along**, **Clip 30s**, and highlights that go to the review and to the vault, in `Reference/instagram`. A reel with no speech, just words on the screen, has the caption and no transcript.
+It plays standing up in Daf, and the rest works like a YouTube video: click a line to jump there, **Follow along**, **Clip 30s**, and highlights that go to the review and to the vault, in `Reference/instagram`, with the caption and the whole transcript. A reel with no speech, just words on the screen, has the caption and no transcript.
 
 Instagram shows almost nothing to someone who isn't signed in, so Daf uses my own sign-in, which it keeps on the server and nowhere else. **Preferences → Instagram** has it:
 

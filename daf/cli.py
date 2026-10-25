@@ -15,6 +15,7 @@
     daf paper-page PHOTO [--caption "page 112 middlemarch"]   read a marked page into highlights
     daf clip TEXT              a podcast link with a time (shared from AntennaPod): transcribe the minute before it
     daf jobs                   transcripts and clips waiting or done
+    daf vault-backfill [--dry-run DIR]   rewrite Daf's article notes in the vault the current way
 """
 import argparse
 import getpass
@@ -317,6 +318,27 @@ def cmd_podcasts_import(a):
     print(f"From Nextcloud: {r['subs']} subscriptions, {r['removed']} unsubscribed, {r['actions']} episodes' listening.")
 
 
+def cmd_vault_backfill(a):
+    """Daf's notes on articles, videos and podcasts, rewritten with the full text (vaultnotes.backfill).
+    --dry-run DIR: copies of the notes as they'd be go there; the vault and Daf's data stay as they are."""
+    from pathlib import Path
+    from . import vaultnotes
+    dry = Path(a.dry_run).resolve() if a.dry_run else None
+    if dry and (dry == config.VAULT.resolve() or config.VAULT.resolve() in dry.parents):
+        print("--dry-run needs a folder outside the vault", file=sys.stderr)
+        return 2
+    conn = db.connect()
+    try:
+        res = vaultnotes.backfill(conn, config.load_settings(), dry=dry)
+        conn.rollback() if dry else conn.commit()
+    finally:
+        conn.close()
+    for doc_id, (what, rel) in sorted(res.items(), key=lambda kv: (kv[1][0], kv[1][1] or "")):
+        print(f"{what:18} {rel or doc_id}")
+    print(("Dry run: the notes as they'd be are in " + str(dry)) if dry else "Done.")
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="daf", description="Daf: reading time, highlights and review.")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -346,6 +368,8 @@ def main(argv=None):
     x.add_argument("photo"); x.add_argument("--caption", default=""); x.set_defaults(f=cmd_paper_page)
     x = sub.add_parser("clip", help="transcribe a podcast clip"); x.add_argument("text"); x.set_defaults(f=cmd_clip)
     x = sub.add_parser("jobs", help="transcripts and clips"); x.set_defaults(f=cmd_jobs)
+    x = sub.add_parser("vault-backfill", help="rewrite Daf's article notes in the vault with the full text")
+    x.add_argument("--dry-run", metavar="DIR", help="write copies there instead; the vault stays as it is"); x.set_defaults(f=cmd_vault_backfill)
     a = p.parse_args(argv)
     return a.f(a)
 
