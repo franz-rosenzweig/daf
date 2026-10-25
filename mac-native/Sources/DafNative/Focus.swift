@@ -127,16 +127,18 @@ final class Focus {
     func barTucked(_ w: NSWindow) -> Bool { NSApp.presentationOptions.contains(.autoHideToolbar) || tucked.contains(w.windowNumber) }
 }
 
-/// The [ ] button in a reader's toolbar: focus mode for its window.
+/// The [ ] button in a reader's toolbar: focus mode for the window it's pressed in (the key one).
+/// It holds no window of its own: a toolbar item that looked for its window set its state over and
+/// over (the window there, then not), and the window redrew without end, which broke scrolling.
 struct FocusButton: View {
-    @State private var window: NSWindow?
+    @MainActor static var drawn = 0          // for the self-test: how often it's drawn
 
     var body: some View {
-        let on = Focus.shared.isOn(window)
-        Button { Focus.shared.toggle(window ?? NSApp.keyWindow) } label: {
+        let _ = Self.drawn += 1
+        let on = !Focus.shared.on.isEmpty && Focus.shared.isOn(NSApp.keyWindow)
+        Button { Focus.shared.toggle() } label: {
             Label(on ? "Leave Focus Mode" : "Focus Mode", systemImage: on ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
         }
         .help(on ? "Leave focus mode (Esc)" : "Focus mode: only what you're reading, on the whole screen (⇧⌘F)")
-        .background(WindowFinder { window = $0 })
     }
 }

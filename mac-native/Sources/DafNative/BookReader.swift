@@ -1067,7 +1067,7 @@ struct BookReaderView: View {
             }
         }
         .background(Color(nsColor: m.look.background))
-        .background(WindowFinder { window = $0 })
+        .background(WindowFinder { if let w = $0, w !== window { window = w } })
         .onChange(of: Focus.shared.started) { _, _ in if Focus.shared.isOn(window) { m.showContents = false } }
         .navigationTitle(m.title)
         .navigationSubtitle(m.chapter)
