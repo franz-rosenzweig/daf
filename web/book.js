@@ -91,6 +91,7 @@ async function openBook(id, at){
   catch(e){ $('#bstage').innerHTML = '<div class="placeholder">' + esc(e.message) + ' <a href="#book/' + encodeURIComponent(id) + '">Back to the book</a></div>'; return; }
   if (B.id !== id) return;
   B.d = d;
+  inkLoad(d);
   d.highlights.forEach(h => { h.source = 'epub'; B.byCfi.set(h.pos.cfi, h); });
   d.other_highlights.forEach(h => { h.sec = xpIndex(h.xp); });
   drawTop(); drawPanel();
@@ -120,9 +121,11 @@ async function openBook(id, at){
     const { index } = e.detail;
     for (const h of d.highlights) if (h.index === index) view.addAnnotation({ value: h.pos.cfi });
     markKindle(index);
+    inkSection(index);
   });
   view.addEventListener('draw-annotation', e => {
     const { draw, annotation, range } = e.detail, v = annotation.value;
+    if (INK.by.has(v)) { draw(inkDraw, { cfi: v, range }); return; }
     const h = B.kindleByCfi.get(v) || B.byCfi.get(v);
     draw(H.draw, { range, color: (h && h.color) || 'yellow', note: !!(h && (h.user_note || h.note)), flash: B.flash === v, soft: !h && B.temp.has(v) });
   });
@@ -138,6 +141,7 @@ async function openBook(id, at){
   try { B.secFrac = view.getSectionFractions(); } catch(e){ B.secFrac = []; }
   applyBookType();
   drawToc();
+  Pens.use(INKSURF);
   // Where to start: a highlight we were sent to, else the newest of here / this device / the Kindle.
   const local = store.get('bookpos.' + id, null);
   const server = d.position;
@@ -278,6 +282,7 @@ function redrawAll(){
   const loaded = new Set(B.view.renderer.getContents().map(c => c.index));
   for (const h of B.d ? B.d.highlights : []) if (loaded.has(h.index)) B.view.addAnnotation({ value: h.pos.cfi }).catch(() => {});
   for (const [cfi, h] of B.kindleByCfi) if (loaded.has(h.index)) B.view.addAnnotation({ value: cfi }).catch(() => {});
+  for (const i of loaded) inkSection(i);
 }
 
 /* ---------- footnotes: shown in a popover by the link, not by jumping away ---------- */
@@ -384,6 +389,7 @@ function drawPlayer(){
     '<button class="btn sm" data-bt="rate">' + T.rate + '×</button><button class="btn sm" data-bt="voice" aria-label="Voice: ' + esc(C.Voices.cur ? C.Voices.label(C.Voices.cur) : 'choose one') + '">' + esc(C.Voices.cur ? C.Voices.name(C.Voices.cur) : 'Voice') + '</button><button class="btn sm" data-bt="sleep">' + (T.sleepAt ? 'Sleep in ' + left + ' min' : 'Sleep timer') + '</button><span class="spacer"></span><span class="mute tiny">Kokoro · counts as reading</span><button class="ib" data-bt="stop" aria-label="Stop">×</button>';
 }
 function cleanup(){
+  inkFlush();
   if (B.tts && B.tts.on) stopListen();
   closeNote(); wake(false); H.hide();
   if (B.view) { try { savePosition(true); } catch(e){} try { B.view.close(); } catch(e){} B.view.remove(); }
@@ -402,6 +408,7 @@ function offerKindle(mine){
 /* ---------- each section as it loads ---------- */
 function onSectionLoad(e){
   const { doc, index } = e.detail;
+  Pens.listen(doc, INKSURF);
   const active = () => { B.lastActive = Date.now(); };
   ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(ev => doc.addEventListener(ev, active, { passive: true }));
   doc.addEventListener('keydown', onKey);
@@ -429,7 +436,7 @@ function onSectionLoad(e){
     if (ev.target.closest('a[href]') || !doc.getSelection()?.isCollapsed) return;
     // (foliate shows a tapped highlight's bar from its own click: a new bar stays)
     if (bar !== undefined || sel) { setTimeout(() => { if (H.ctx === bar) H.hide(); }, 0); return; }
-    if (window.innerWidth >= 1000) return;
+    if (window.innerWidth >= 1000 && !(C.Focus && C.Focus.on())) return;
     // the sides turn the page, in Scroll too (a screen at a time, then on into the next chapter);
     // not when the tap was on a highlight and opened its bar
     const fx = (doc.defaultView.frameElement.getBoundingClientRect().left + ev.clientX) / window.innerWidth;
@@ -467,7 +474,8 @@ function drawNextChapter(l){
   b.innerHTML = '<span class="mute">Next</span><b' + (next && isRtlText(next.label) ? ' dir="rtl"' : '') + '>' + esc(next ? (next.label || '').trim() : 'Go on') + '</b><span aria-hidden="true">›</span>';
   b.hidden = false;
 }
-function toggleChrome(){ B.chrome = !B.chrome; document.body.classList.toggle('bookbare', !B.chrome); }
+// (in focus mode, the bar comes and goes instead: focus.js)
+function toggleChrome(){ if (C.Focus && C.Focus.on()) { C.Focus.bar(); return; } B.chrome = !B.chrome; document.body.classList.toggle('bookbare', !B.chrome); }
 
 // Pages for page goals: a page counts once it has been on screen for five seconds, the way
 // KOReader counts the Kindle's. The printed page when the book has one, else foliate's location.
@@ -561,6 +569,7 @@ function drawTop(){
     '<button class="ib" data-bk="bookmark" title="Bookmark this page' + C.Keys.tip('book', 'bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' +
     '<button class="btn sm" data-bk="listen" title="Read aloud from here">Listen</button>' +
     '<button class="ib" data-bk="more" title="More" aria-label="More">' + ICON.more + '</button>' +
+    (C.Focus ? C.Focus.button('book') : '') +
     '<button class="ib' + (B.panelOpen && window.innerWidth > 1000 ? ' on' : '') + '" data-bk="panel" aria-label="Show or hide the side panel">' + ICON.panel + '</button>';
 }
 function tocHTML(items, depth){
@@ -671,8 +680,8 @@ function checkSelection(doc, index, ev){
   H.show(H.selBar({ text }), B.sel.rect, { kind: 'sel', text });
 }
 const before = (doc, n1, o1, n2, o2) => { const r = doc.createRange(); r.setStart(n1, o1); r.collapse(true); return r.comparePoint(n2, o2) === 1; };
-async function highlightSel(withNote){
-  const s = B.sel; if (!s || !B.d) return;
+async function highlightSel(withNote, quiet){
+  const s = B.sel; if (!s || !B.d) return null;
   H.hide();
   // Overlapping highlights merge into one, as in Readwise; their notes and tags come along.
   const range = s.range.cloneRange(), merged = [];
@@ -689,7 +698,7 @@ async function highlightSel(withNote){
   let cfi = s.cfi, text = s.text;
   if (merged.length === 1 && merged[0].pos.cfi === (() => { try { return B.view.getCFI(s.index, range); } catch(e){ return null; } })()) {
     s.doc.getSelection()?.removeAllRanges(); B.sel = null;   // the selection was inside a highlight: show that one
-    H.show(H.hlBar(merged[0]), s.rect, { h: merged[0], cfi: merged[0].pos.cfi }); return;
+    if (!quiet) H.show(H.hlBar(merged[0]), s.rect, { h: merged[0], cfi: merged[0].pos.cfi }); return null;
   }
   if (merged.length) { try { cfi = B.view.getCFI(s.index, range); text = range.toString().trim(); } catch(e){ merged.length = 0; } }
   const chapter = B.loc?.tocItem?.label || null, fraction = B.loc ? B.loc.fraction : null;
@@ -706,29 +715,262 @@ async function highlightSel(withNote){
     if (withNote) openNote(h);
     else {
       const rr = (() => { try { return rectFor(s.doc, range); } catch(e){ return s.rect; } })();
-      H.show(H.hlBar(h), rr, { h, cfi });
+      if (!quiet) H.show(H.hlBar(h), rr, { h, cfi });
       if (B.panelOpen && B.panel === 'notebook') drawPanel();
     }
     const tab = $('[data-bpt="notebook"] .c'); if (tab) tab.textContent = allHighlights().length;
-  } catch(e){ toast(e.message); }
+    return h;
+  } catch(e){ toast(e.message); return null; }
 }
 function openNote(h){
   B.panel = 'notebook'; openPanel();
   setTimeout(() => { const row = $('.hrow[data-h="' + CSS.escape(h.id) + '"]'); if (!row) return; row.scrollIntoView({ block: 'center' }); const n = row.querySelector('[data-hra="note"]'); if (n) n.click(); }, 60);
 }
-async function removeHighlight(id){
-  const h = B.d.highlights.find(x => x.id === id); if (!h) return;
+// quiet: no Undo toast (the pen's eraser has its own Undo); either way it answers with the way back.
+async function removeHighlight(id, quiet){
+  const h = B.d.highlights.find(x => x.id === id); if (!h) return null;
   await api('/api/highlights/' + encodeURIComponent(id), { method: 'DELETE' });
   B.d.highlights = B.d.highlights.filter(x => x.id !== id); B.byCfi.delete(h.pos.cfi);
   try { await B.view.deleteAnnotation({ value: h.pos.cfi }); } catch(e){}
   drawPanel();
-  H.undo('Highlight deleted', async () => {
+  const back = async () => {
     await api('/api/highlights/' + encodeURIComponent(id) + '/restore', { method: 'POST' });
+    if (!B.d) return;
     B.d.highlights.push(h); B.byCfi.set(h.pos.cfi, h);
     try { await B.view.addAnnotation({ value: h.pos.cfi }); } catch(e){}
     drawPanel();
-  });
+  };
+  if (!quiet) H.undo('Highlight deleted', back);
+  return back;
 }
+
+/* ---------- ink: writing on the pages with a pen (the pens are pens.js; ink.py keeps it) ---------- */
+// Each stroke keeps the letter it started on, as a CFI in its chapter, and where it sat beside it,
+// so it goes with its words when the type or the page changes. It's drawn on foliate's overlay of
+// the chapter, as the highlights are; the strokes that start on the same letter are drawn together.
+const Pens = C.Pens, NS = 'http://www.w3.org/2000/svg';
+const INK = { by: new Map(), geo: new Map(), done: [], undone: [], q: { book: null, add: new Map(), remove: new Set() } };
+const r1 = v => Math.round(v * 10) / 10;
+const inkId = () => { const b = new Uint8Array(10); crypto.getRandomValues(b); return 'k' + Array.from(b, x => x.toString(16).padStart(2, '0')).join(''); };
+const inkGroup = cfi => { let g = INK.by.get(cfi); if (!g) INK.by.set(cfi, g = []); return g; };
+const secOf = doc => { const c = B.view && B.view.renderer.getContents().find(x => x.doc === doc); return c ? c.index : null; };
+const frameOf = doc => { try { return doc.defaultView.frameElement.getBoundingClientRect(); } catch(e){ return null; } };
+const lightText = c => { const m = /(\d+)\D+(\d+)\D+(\d+)/.exec(c || ''); return !!m && (+m[1] + +m[2] + +m[3]) / 3 > 140; };
+function inkLoad(d){
+  INK.by = new Map(); INK.geo = new Map(); INK.done = []; INK.undone = [];
+  // what's waiting in the outbox (written offline) is shown as if it had gone
+  let list = (d.ink || []).slice();
+  const path = '/api/ebooks/' + encodeURIComponent(d.id) + '/ink';
+  for (const x of C.outbox.get()) {
+    if (x.path !== path || !x.body) continue;
+    for (const s of x.body.add || []) if (!list.some(t => t.id === s.id)) list.push(s);
+    const rm = new Set(x.body.remove || []); list = list.filter(t => !rm.has(t.id));
+  }
+  d.ink = list;
+  for (const s of list) if (s.at && s.at.cfi) inkGroup(s.at.cfi).push(s);
+}
+// A chapter's overlay is there: its strokes on it.
+function inkSection(index){ for (const [cfi, g] of INK.by) if (g.length && g[0].at.s === index) B.view.addAnnotation({ value: cfi }).catch(() => {}); }
+function inkRedraw(cfis){ for (const cfi of cfis) { const g = INK.by.get(cfi); if (g && g.length) B.view.addAnnotation({ value: cfi }).catch(() => {}); else { INK.by.delete(cfi); B.view.deleteAnnotation({ value: cfi }).catch(() => {}); } } }
+// foliate's draw: the strokes on one letter, from that letter's box (rects, in the chapter's frame).
+function inkDraw(rects, o){
+  const g = document.createElementNS(NS, 'g'), list = INK.by.get(o.cfi) || [], r = rects[0];
+  if (!r || !list.length) return g;
+  const doc = o.range.startContainer.ownerDocument, win = doc.defaultView;
+  const el = o.range.startContainer.nodeType === 1 ? o.range.startContainer : o.range.startContainer.parentElement;
+  const f = parseFloat(win.getComputedStyle(el).fontSize) || 16;
+  const layer = Pens.layer(g, lightText(win.getComputedStyle(doc.body).color));
+  for (const s of list) {
+    const k = f / (s.at.f || 16), x0 = r.left + s.at.x * k, y0 = r.top + s.at.y * k;
+    const pts = s.pts.map(p => [x0 + p[0] * k, y0 + p[1] * k, p[2]]);
+    layer.add(s, pts, k);
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const p of pts) { if (p[0] < x1) x1 = p[0]; if (p[0] > x2) x2 = p[0]; if (p[1] < y1) y1 = p[1]; if (p[1] > y2) y2 = p[1]; }
+    INK.geo.set(s.id, { pts, r: (s.size || 2.5) * k / 2, box: [x1, y1, x2, y2], doc });
+  }
+  return g;
+}
+function caretIn(doc, x, y){
+  if (doc.caretPositionFromPoint) { const p = doc.caretPositionFromPoint(x, y); return p && { node: p.offsetNode, off: p.offset }; }
+  if (doc.caretRangeFromPoint) { const r = doc.caretRangeFromPoint(x, y); return r && { node: r.startContainer, off: r.startOffset }; }
+  return null;
+}
+// The letter at (or nearest) a point in a chapter's frame, as a range of one letter.
+function letterAt(doc, x, y){
+  const p = caretIn(doc, x, y); if (!p || !p.node) return null;
+  let node = p.node, off = p.off;
+  if (node.nodeType !== 3) {
+    const w = doc.createTreeWalker(node, NodeFilter.SHOW_TEXT); let t;
+    while ((t = w.nextNode()) && !t.data.trim());
+    if (!t) return null; node = t; off = 0;
+  }
+  if (!node.data.length) return null;
+  off = Math.min(off, node.data.length - 1);
+  const r = doc.createRange(); r.setStart(node, off); r.setEnd(node, off + 1);
+  return r;
+}
+function inkAdd(list){ const cfis = new Set(); for (const s of list) { inkGroup(s.at.cfi).push(s); cfis.add(s.at.cfi); } inkRedraw(cfis); }
+function inkTake(list){
+  const ids = new Set(list.map(s => s.id)), cfis = new Set(list.map(s => s.at.cfi));
+  for (const cfi of cfis) { const g = INK.by.get(cfi); if (g) INK.by.set(cfi, g.filter(s => !ids.has(s.id))); }
+  for (const id of ids) INK.geo.delete(id);
+  inkRedraw(cfis);
+}
+const inkAll = () => [...INK.by.values()].flat();
+function inkStroke(L){
+  const doc = L.doc, index = secOf(doc), fr = frameOf(doc); if (index == null || !fr) return;
+  const [wx, wy] = L.pts[0], x0 = wx - fr.left, y0 = wy - fr.top;
+  const range = letterAt(doc, x0, y0); if (!range) return;
+  let cfi; try { cfi = B.view.getCFI(index, range); } catch(e){ return; }
+  const r = range.getClientRects()[0] || range.getBoundingClientRect();
+  const f = parseFloat(doc.defaultView.getComputedStyle(range.startContainer.parentElement).fontSize) || 16, b = L.brush;
+  const s = { id: inkId(), v: 2, tool: b.pen, color: b.color, size: r1(b.w), o: Math.round(b.opacity * 100) / 100,
+    at: { cfi, s: index, f, x: r1(x0 - r.left), y: r1(y0 - r.top) }, pts: L.pts.map(p => [r1(p[0] - wx), r1(p[1] - wy), Math.round(p[2] * 100) / 100]) };
+  inkAdd([s]); inkAct({ add: [s] });
+}
+function inkNear(pts, x, y, r){
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1] || a, dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy;
+    const t = l ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l)) : 0;
+    if (Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) <= r) return true;
+  }
+  return false;
+}
+// Whole strokes, or only what's within r of (x, y) (in the window); and the highlights it passes over.
+function inkErase(x, y, mode, r, L){
+  for (const [id, g] of [...INK.geo]) {
+    const fr = frameOf(g.doc); if (!fr) { INK.geo.delete(id); continue; }
+    const px = x - fr.left, py = y - fr.top, b = g.box, m = r + g.r;
+    if (px < b[0] - m || px > b[2] + m || py < b[1] - m || py > b[3] + m || !inkNear(g.pts, px, py, m)) continue;
+    const s = inkAll().find(t => t.id === id); if (!s) { INK.geo.delete(id); continue; }
+    const mine = L.added.indexOf(s);
+    if (mine >= 0) L.added.splice(mine, 1); else L.erased.push(s);
+    const pieces = [];
+    if (mode === 'area') {
+      let run = [];
+      const flush = () => { if (run.length >= 2) pieces.push(Object.assign({}, s, { id: inkId(), pts: run })); run = []; };
+      g.pts.forEach((p, i) => { if (Math.hypot(p[0] - px, p[1] - py) <= m) flush(); else run.push(s.pts[i]); });
+      flush();
+    }
+    inkTake([s]);
+    if (pieces.length) { L.added.push(...pieces); inkAdd(pieces); }
+  }
+  if (!L.hlr) {   // the highlights on the pages now, once a stroke, in the window
+    L.hlr = [];
+    for (const c of B.view.renderer.getContents()) {
+      const fr = frameOf(c.doc); if (!fr) continue;
+      for (const h of B.d.highlights) {
+        if (h.index !== c.index) continue;
+        try { const rg = B.view.resolveCFI(h.pos.cfi).anchor(c.doc); for (const q of rg.getClientRects()) L.hlr.push({ id: h.id, l: fr.left + q.left, t: fr.top + q.top, r: fr.left + q.right, b: fr.top + q.bottom }); } catch(e){}
+      }
+    }
+  }
+  for (const q of L.hlr) if (x >= q.l && x <= q.r && y >= q.t && y <= q.b) L.hls.add(q.id);
+}
+async function inkErased(L){
+  const a = {};
+  if (L.erased.length) a.del = L.erased;
+  if (L.added.length) a.add = L.added;
+  if (L.hls.size) {
+    a.unhl = [];
+    for (const id of L.hls) { const back = await removeHighlight(id, true); if (back) a.unhl.push({ id, back }); }
+    if (!a.unhl.length) delete a.unhl;
+  }
+  if (a.del || a.add || a.unhl) inkAct(a);
+}
+// Everything written in the chapter that's open.
+function inkEraseAll(){
+  const at = B.loc && B.loc.section != null ? B.loc.section.current : null;
+  const list = inkAll().filter(s => at == null || s.at.s === at); if (!list.length) return;
+  inkTake(list); inkAct({ del: list }); toast('Everything written in this chapter is erased. Undo brings it back.');
+}
+// The highlighter along a line (or down a few) makes a highlight of the words, as selecting them does.
+function inkHighlight(L){
+  const doc = L.doc, index = secOf(doc), fr = frameOf(doc); if (index == null || !fr) return false;
+  const P = L.pts.map(p => [p[0] - fr.left, p[1] - fr.top]), s = P[0], z = P[P.length - 1];
+  let x1 = Infinity, x2 = -Infinity, y1 = Infinity, y2 = -Infinity;
+  for (const p of P) { x1 = Math.min(x1, p[0]); x2 = Math.max(x2, p[0]); y1 = Math.min(y1, p[1]); y2 = Math.max(y2, p[1]); }
+  const first = letterAt(doc, s[0], s[1]); if (!first) return false;
+  const el = first.startContainer.parentElement, cs = doc.defaultView.getComputedStyle(el);
+  const lh = parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 16) * 1.5, tall = y2 - y1 > 1.6 * lh;
+  if (tall && Math.hypot(z[0] - s[0], z[1] - s[1]) < 0.35 * Math.max(x2 - x1, y2 - y1)) return false;
+  let a, b;
+  if (!tall) { const ys = P.map(p => p[1]).sort((m, n) => m - n), y = ys[ys.length >> 1]; a = caretIn(doc, x1 + 2, y); b = caretIn(doc, x2 - 2, y); }
+  else { a = caretIn(doc, s[0], s[1]); b = caretIn(doc, z[0], z[1]); }
+  if (!a || !b || !a.node || !b.node) return false;
+  const range = doc.createRange();
+  try {
+    range.setStart(a.node, a.off); range.setEnd(a.node, a.off);
+    if (before(doc, a.node, a.off, b.node, b.off)) range.setEnd(b.node, b.off); else { range.setStart(b.node, b.off); range.setEnd(a.node, a.off); }
+  } catch(e){ return false; }
+  snapRange(range);
+  const text = range.toString().trim(); if (text.replace(/\s/g, '').length < 2) return false;
+  let cfi; try { cfi = B.view.getCFI(index, range); } catch(e){ return false; }
+  const block = range.startContainer.parentElement?.closest('p, li, blockquote, div') || range.startContainer.parentElement;
+  B.sel = { doc, index, range, text, cfi, rect: rectFor(doc, range), sentence: block ? block.textContent : text };
+  highlightSel(false, true).then(h => { if (h) inkAct({ hl: h.id }); });
+  return true;
+}
+function inkAct(a){ INK.done.push(a); if (INK.done.length > 200) INK.done.shift(); INK.undone = []; inkApply(a, false); Pens.redraw(); }
+// Does what a records (back = false) or takes it back (true); a highlight's own way for those.
+async function inkApply(a, back, again){
+  const add = back ? a.del : a.add, rm = back ? a.add : a.del;
+  if (again || back) { if (rm) inkTake(rm); if (add) inkAdd(add.filter(s => !inkAll().some(t => t.id === s.id))); }
+  inkSend(add || [], rm || []);
+  if (B.d) B.d.ink = inkAll();
+  if (a.hl && (back || again)) {
+    if (back) a.hlBack = await removeHighlight(a.hl, true);
+    else if (a.hlBack) await a.hlBack();
+  }
+  if (a.unhl && (back || again)) {
+    for (const u of a.unhl) { if (back) await u.back(); else { const b2 = await removeHighlight(u.id, true); if (b2) u.back = b2; } }
+  }
+}
+function inkUndo(){ const a = INK.done.pop(); if (!a) return; INK.undone.push(a); inkApply(a, true); Pens.redraw(); }
+function inkRedo(){ const a = INK.undone.pop(); if (!a) return; INK.done.push(a); inkApply(a, false, true); Pens.redraw(); }
+function inkSend(add, rm){
+  if (!B.d || (!add.length && !rm.length)) return;
+  if (INK.q.book && INK.q.book !== B.d.id) inkFlush();
+  INK.q.book = B.d.id;
+  for (const s of add) { INK.q.remove.delete(s.id); INK.q.add.set(s.id, s); }
+  for (const s of rm) { INK.q.add.delete(s.id); INK.q.remove.add(s.id); }
+  clearTimeout(INK.qT); INK.qT = setTimeout(inkFlush, 1200);
+}
+// What's been written in the last moment goes in one request; offline it waits in the outbox.
+async function inkFlush(){
+  clearTimeout(INK.qT);
+  const id = INK.q.book; if (!id || (!INK.q.add.size && !INK.q.remove.size)) return;
+  const body = { add: [...INK.q.add.values()], remove: [...INK.q.remove] };
+  INK.q = { book: null, add: new Map(), remove: new Set() };
+  try { await api('/api/ebooks/' + encodeURIComponent(id) + '/ink', { method: 'POST', body: JSON.stringify(body) }); } catch(e){ toast(e.message); }
+}
+const INKSURF = {
+  live: () => !!(B.view && B.d && document.body.dataset.view === 'ebook'),
+  takes: (el, doc) => doc !== document,
+  off: doc => { const r = frameOf(doc); return r ? [r.left, r.top] : [0, 0]; },
+  stroke: inkStroke, erase: inkErase, erased: inkErased, eraseAll: inkEraseAll, highlight: inkHighlight,
+  palHost: () => document.querySelector('.rv.ebook') || document.body,
+  canUndo: () => INK.done.length > 0, canRedo: () => INK.undone.length > 0, undo: inkUndo, redo: inkRedo,
+};
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') inkFlush(); });
+window.addEventListener('pagehide', inkFlush);
+// For the checks (android/check.py, the browser's): what's written, and a line of text on the page now, in the window.
+C.BookInk = {
+  state: () => Object.assign(Pens.state(), { strokes: inkAll().length, drawn: INK.geo.size, done: INK.done.length, queued: INK.q.add.size + INK.q.remove.size, highlights: B.d ? B.d.highlights.length : 0 }),
+  line(){
+    for (const c of (B.view ? B.view.renderer.getContents() : [])) {
+      const fr = frameOf(c.doc); if (!fr) continue;
+      const w = c.doc.createTreeWalker(c.doc.body, NodeFilter.SHOW_TEXT); let n;
+      while ((n = w.nextNode())) {
+        if (n.data.trim().length < 60) continue;
+        const r0 = c.doc.createRange(); r0.selectNodeContents(n);
+        const q = [...r0.getClientRects()].map(r => ({ l: fr.left + r.left, t: fr.top + r.top, r: fr.left + r.right, b: fr.top + r.bottom })).find(r => r.l >= 0 && r.r <= window.innerWidth && r.r - r.l > 200 && r.t > 90 && r.b < window.innerHeight - 140);
+        if (q) { const lh = parseFloat(c.doc.defaultView.getComputedStyle(n.parentElement).lineHeight) || 24; return Object.assign(q, { lh }); }
+      }
+    }
+    return null;
+  },
+};
 function openPanel(){
   B.panelOpen = true; store.set('bookPanel', true);
   const g = $('#bgrid'); if (g) g.classList.add('withpanel');
@@ -805,6 +1047,8 @@ function onKey(e){
   else if (k === '?') showKeys();
   else if (is('search')) { e.preventDefault(); if (!B.tocOpen) click('toc'); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
   else if (is('panel')) click('panel');
+  else if (is('focus') && C.Focus) C.Focus.toggle();
+  else if (k === 'Escape' && C.Focus && C.Focus.escape()) {}
   else if (k === 'Escape') { if (H.visible()) H.hide(); else if (!$('#pop').hidden) $('#pop').hidden = true; else location.hash = '#book/' + encodeURIComponent(B.d.id); }
   B.lastActive = Date.now();
 }

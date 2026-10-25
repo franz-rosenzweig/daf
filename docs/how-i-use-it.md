@@ -42,7 +42,7 @@ Shabbat is a good time for paper books, with a pencil for the lines worth keepin
 
 Today and the review are the everyday pages. **Stats** is for now and then, mostly the streak and "Waiting for you", which lists the books you started and left, because one sitting is often all it takes to get one moving again.
 
-Settings don't need much fiddling. The goal is an hour a day, and the **Year 30** preset in Preferences does the rest. Some books can be kept private: they count toward the hour, but their titles never show up in the review, the morning message, the widget or on the Kindle.
+Settings don't need much fiddling. The goal is an hour a day, and the **Year 30** preset in Preferences does the rest. Preferences is in groups (Reading, Look, Connections, AI, Library, Help and Account), and the list of them sits beside the cards, or across the top on a phone or a tablet, so you can go straight to one. Some books can be kept private: they count toward the hour, but their titles never show up in the review, the morning message, the widget or on the Kindle.
 
 Basically, Daf isn't another app to remember to open. It sits in the places you already are, the Kindle, the phone, the menu bar and Signal, and it keeps the hour in front of you. If you're setting it up for yourself, start with [Install](install.md), and feel free to ask me anything that isn't clear.
 

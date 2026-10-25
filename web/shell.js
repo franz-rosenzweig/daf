@@ -139,6 +139,7 @@ function closeFront(){
   if (shown('#modal')) { C().closeModal(); return true; }
   if (shown('#pop')) { $('#pop').hidden = true; return true; }
   if (shown('#selbar') && C().HL) { C().HL.hide(); return true; }
+  if (C().Focus && C().Focus.close()) return true;          // focus mode's drawer or bar (focus.js)
   const b = document.body.classList;
   if (b.contains('btocsheet') || b.contains('bpanelsheet')) { b.remove('btocsheet', 'bpanelsheet'); return true; }
   if (sheetPanel()) { press('#rtop [data-ract=panel]'); return true; }

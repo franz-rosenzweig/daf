@@ -17,7 +17,7 @@ Sign in once inside the app, and it connects itself: the widget, the share sheet
 
 On a tablet the sidebar folds into a narrow rail of icons, and on a wide enough screen a book in **Pages** layout shows two columns side by side once the side panel is closed.
 
-With an S Pen you can write on articles, highlight with the pen and take notes in the margin: see [Writing with a pen](reader.md#writing-with-a-pen).
+With an S Pen you can write on articles and books, highlight with the pen and take notes in the margin, and the pen's button opens the round menu of pens: see [Writing with a pen](reader.md#writing-with-a-pen). **[ ]** in a reader's bar puts it on the whole screen, with the status and navigation bars gone and the screen kept on: see [Focus mode](reader.md#focus-mode).
 
 ![A book on a tablet-sized screen](images/tablet.webp)
 *A book in Pages layout and the Paper theme, at tablet size.*

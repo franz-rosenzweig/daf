@@ -22,11 +22,11 @@ const DEFS = {
     ['listen', 'Listen, or pause', ['p']], ['aloud', 'Read aloud from here', ['L']], ['toc', 'Contents', ['[']], ['panel', 'Side panel', [']']],
     ['more', 'The … menu', ['m']], ['nextdoc', 'Next in the list', ['J']], ['prevdoc', 'Previous in the list', ['K']],
     ['docnote', 'Document note', ['N']], ['reset', 'Reset reading progress', ['R']], ['copy', 'Copy the link', ['C']],
-    ['meta', 'Edit title and author', ['M']]]],
+    ['meta', 'Edit title and author', ['M']], ['focus', 'Focus mode', ['F']]]],
   book: ['Books', [
     ['next', 'Next page', ['ArrowRight']], ['prev', 'Previous page', ['ArrowLeft']], ['highlight', 'Highlight the selection', ['h']],
     ['note', 'Highlight with a note', ['n']], ['bookmark', 'Bookmark this page', ['b']], ['toc', 'Contents', ['t']],
-    ['search', 'Search in the book', ['/']], ['panel', 'Side panel', [']']], ['listen', 'Listen', ['l']]]],
+    ['search', 'Search in the book', ['/']], ['panel', 'Side panel', [']']], ['listen', 'Listen', ['l']], ['focus', 'Focus mode', ['f']]]],
   review: ['Daily review', [
     ['keep', 'Keep', ['k', 'ArrowRight']], ['less', 'Less often', ['l']], ['note', 'Note', ['n']], ['open', 'Open at its spot', ['o']],
     ['never', 'Not in review', ['x']], ['fav', 'Favorite', ['f']]]],

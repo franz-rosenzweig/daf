@@ -861,6 +861,7 @@ function drawReaderTop(){
     (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
     (d.url ? '<a class="ib" href="' + esc(d.url) + '" target="_blank" rel="noopener" title="Open original" aria-label="Open original">' + ICON.ext + '</a>' : '') +
     '<button class="ib" data-ract="more" title="More actions (m)" aria-label="More actions"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg></button>' +
+    (C.Focus ? C.Focus.button('article') : '') +
     '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" aria-label="Show or hide the side panel">' + ICON.panel + '</button>';
 }
 // The … menu (Readwise's "More actions"): everything the bar doesn't show, with its key.
@@ -1675,6 +1676,7 @@ document.addEventListener('keydown', e => {
     const more = ['aloud', 'docnote', 'reset', 'copy', 'meta'].find(a => is('article', a));
     if (more) { e.preventDefault(); moreAct({ aloud:'listen', docnote:'note', reset:'reset', copy:'copy', meta:'meta' }[more]); return; }
     if (k === '?') { e.preventDefault(); showKeys(); return; }
+    if (is('article', 'focus') && C.Focus) { e.preventDefault(); C.Focus.toggle(); return; }
     if (k === 'Escape' && !$('#pop').hidden) { $('#pop').hidden = true; return; }
     if (k === 'Escape') { if (!$('#selbar').hidden) { stopSel(); return; } leaveDoc(d); return; }
     if (is('article', 'star') && lib) { e.preventDefault(); docAct('star', d.id); }

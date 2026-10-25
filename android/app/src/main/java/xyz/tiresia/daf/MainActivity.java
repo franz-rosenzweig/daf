@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Message;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -83,6 +84,7 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);
 
         web = new DafWebView(this);
+        stylus = new StylusButton(web);
         volumeKeys = getSharedPreferences("reading", MODE_PRIVATE).getBoolean("volumeKeys", false);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -162,6 +164,26 @@ public class MainActivity extends Activity {
         Uri d = intent == null ? null : intent.getData();
         String c = d != null && "daf".equals(d.getScheme()) ? d.getQueryParameter("command") : null;
         return c != null ? c : intent == null ? null : intent.getStringExtra(EXTRA_COMMAND);
+    }
+
+    // ---- the S Pen's button (StylusButton): the WebView doesn't pass it on ----
+
+    private StylusButton stylus;
+
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent ev) {
+        if (stylus != null && stylus.hover(ev)) return true;
+        return super.dispatchGenericMotionEvent(ev);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        MotionEvent e = stylus != null ? stylus.touch(ev) : ev;
+        try {
+            return super.dispatchTouchEvent(e);
+        } finally {
+            if (e != ev) e.recycle();
+        }
     }
 
     @Override
