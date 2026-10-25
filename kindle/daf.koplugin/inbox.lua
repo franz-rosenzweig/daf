@@ -11,9 +11,10 @@ the same name at another size is left alone and Daf is told why.
 The downloads run in a background process, so a big one never holds up the screen. Each streams
 straight into the shelf under a hidden name (.<name>.daf-part), stops past the size Daf gave (and
 200 MB at most), is checked against that size, renamed, and reported done to Daf
-(POST /api/kindle/inbox/<id>/done, with {error} when it couldn't be). When they're over, the
-shelves and the file browser show the new books, their covers are made, and one message says how
-many came.
+(POST /api/kindle/inbox/<id>/done, with {error} when it couldn't be, which takes it off the list
+until it's sent again; a broken connection is only reported on the third try in a row). When
+they're over, the shelves and the file browser show the new books, their covers are made, and
+one message says how many came.
 ]]
 local FFIUtil = require("ffi/util")
 local InfoMessage = require("ui/widget/infomessage")
@@ -56,7 +57,8 @@ end
 
 -- ---------------------------------------------------------------- in the background process
 
--- One file into its shelf. Returns what went wrong, or nil.
+-- One file into its shelf. Returns what went wrong, or nil; and true when it was the connection
+-- (worth trying again) rather than the file.
 local function download(it, url, token)
     local http = require("socket.http")
     local socketutil = require("socketutil")
@@ -84,21 +86,25 @@ local function download(it, url, token)
     }
     socketutil:reset_timeout()
     pcall(fh.close, fh)
-    local err
+    local err, again
     if too_big then err = "The file was bigger than Daf said"
-    elseif not ok then err = "The download stopped (" .. tostring(code) .. ")"
-    elseif code ~= 200 then err = "Daf answered " .. tostring(code)
-    elseif it.size and lfs.attributes(tmp, "size") ~= it.size then err = "The file came in short"
+    elseif not ok then err, again = "The download stopped (" .. tostring(code) .. ")", true
+    elseif code ~= 200 then err, again = "Daf answered " .. tostring(code), true
+    elseif it.size and lfs.attributes(tmp, "size") ~= it.size then err, again = "The file came in short", true
     elseif not os.rename(tmp, it.dest) then err = "Couldn't put it on the shelf" end
     if err then os.remove(tmp) end
-    return err
+    return err, again
 end
 
+-- Daf drops a file it's told about, until it's sent again; so a broken connection isn't told,
+-- and the file comes again on the next sync, until its third try in a row (it.last).
 local function fetchAll(todo, url, token, request)
     for _i, it in ipairs(todo) do
-        local ok, err = pcall(download, it, url, token)
-        if not ok then err = "Something went wrong: " .. tostring(err) end
-        request("POST", url .. "/api/kindle/inbox/" .. it.q .. "/done", token, err and { error = err } or {})
+        local ok, err, again = pcall(download, it, url, token)
+        if not ok then err, again = "Something went wrong: " .. tostring(err), false end
+        if not (err and again and not it.last) then
+            request("POST", url .. "/api/kindle/inbox/" .. it.q .. "/done", token, err and { error = err } or {})
+        end
     end
 end
 
@@ -133,10 +139,18 @@ local function start(daf, todo, url, token, request)
         end
         UIManager:allowStandby()
         local came = 0
+        local tries = daf.settings:readSetting("inbox_tries") or {}
         for _i, it in ipairs(job.todo) do
             local size = lfs.attributes(it.dest, "size")
-            if size and (not it.size or size == it.size) then came = came + 1 end
+            if size and (not it.size or size == it.size) then
+                came = came + 1
+                tries[it.id] = nil
+            else
+                tries[it.id] = (tries[it.id] or 0) + 1
+            end
         end
+        daf.settings:saveSetting("inbox_tries", tries)
+        daf.settings:flush()
         logger.info(string.format("[Daf] inbox: %d of %d files came in %.0f s", came, #job.todo, time.to_s(time.since(job.started))))
         job = nil
         if came > 0 then landed(daf, came) end
@@ -155,6 +169,12 @@ function Inbox.sync(daf, request)
     local files = res and res.files
     if type(files) ~= "table" or #files == 0 then return end
     local free = (util.diskUsage(home) or {}).available
+    -- how many times in a row each one didn't come (only those still waiting)
+    local was, tries = daf.settings:readSetting("inbox_tries") or {}, {}
+    for _i, f in ipairs(files) do
+        if f.id and was[f.id] then tries[f.id] = was[f.id] end
+    end
+    daf.settings:saveSetting("inbox_tries", tries)
     local todo = {}
     for _i, f in ipairs(files) do
         local name, shelf, size = clean(f.name), clean(f.shelf) or "Books", tonumber(f.size)
@@ -181,7 +201,7 @@ function Inbox.sync(daf, request)
                 done("There isn't room for it on the Kindle")
             else
                 if free and size then free = free - size end
-                table.insert(todo, { q = q, dest = dest, size = size })
+                table.insert(todo, { id = f.id, q = q, dest = dest, size = size, last = (tries[f.id] or 0) >= 2 })
             end
         end
     end
