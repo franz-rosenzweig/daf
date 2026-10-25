@@ -46,7 +46,8 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: highlights in the PDF view (as you select, H or N, right-click), the text view's found on the page, its zoom keys (− +), its reading time and the page read
 - here: Torah's verses in Hebrew and English, or one of them (the toolbar, or Article › Torah)
 - not yet: what's written on an article with a pen (ink.js, /api/docs/{id}/ink), shown over the text and in the margin, in the pens' kinds (pens.js)
-- not yet: focus mode (focus.js): the reader on the whole screen, the bar and the side panels from the edges
+- here: focus mode (Focus.swift, as focus.js): full screen, only what's open, the toolbar and menu bar hidden till the top; ⇧⌘F, [ ], F in a book, ⇧F in an article, Esc
+- not needed: the pens (pens.js), the lasso and handwriting into text are the tablet's; a note on the passage made from handwriting shows here as any highlight's note
 
 ## Lists
 

@@ -19,6 +19,9 @@ struct DafNativeApp: App {
         .commands {
             SidebarCommands()
             InspectorCommands()
+            CommandGroup(after: .toolbar) {
+                Button("Focus Mode") { Focus.shared.toggle() }.keyboardShortcut("f", modifiers: [.command, .shift])
+            }
             CommandGroup(after: .appSettings) {
                 Button("Daf for Safari…") { Task { await Safari.setUp() } }
             }

@@ -778,6 +778,7 @@ final class ReaderTextView: NSTextView {
         case "R": Task { await m?.resetProgress() }
         case "c": if m?.video != nil { Task { await m?.clip(30) } } else { return false }
         case "M": app.editMeta = true
+        case "F": Focus.shared.toggle(window)                               // focus mode (Focus.swift)
         default: return false
         }
         return true

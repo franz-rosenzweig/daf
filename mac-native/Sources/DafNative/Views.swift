@@ -10,6 +10,29 @@ struct MainView: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(\.undoManager) private var undoManager
 
+    /// A place that's a page across the window (Today, Review, Stats…).
+    @ViewBuilder private var page: some View {
+        switch model.place {
+        case .today: TodayView()
+        case .review: ReviewView()
+        case .home: HomeView()
+        case .recovery: RecoveryView()
+        case .podcasts: PodcastsView()
+        case .sources: SourcesView()
+        default: StatsView()
+        }
+    }
+
+    /// What's open from a list.
+    @ViewBuilder private var opened: some View {
+        if model.place == .highlights {
+            if let g = model.highlights.group { HighlightGroupView(group: g).id(HighlightsModel.key(g)) }
+            else { ContentUnavailableView("No highlights", systemImage: "highlighter") }
+        } else {
+            Detail()
+        }
+    }
+
     var body: some View {
         @Bindable var model = model
         Group {
@@ -17,19 +40,9 @@ struct MainView: View {
                 NavigationSplitView {
                     Sidebar().navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
                 } detail: {
-                    Group {
-                    switch model.place {
-                    case .today: TodayView()
-                    case .review: ReviewView()
-                    case .home: HomeView()
-                    case .recovery: RecoveryView()
-                    case .podcasts: PodcastsView()
-                    case .sources: SourcesView()
-                    default: StatsView()
-                    }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .themed()
+                    page
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .themed()
                 }
             } else {
                 NavigationSplitView {
@@ -45,16 +58,9 @@ struct MainView: View {
                     .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 520)
                     .themed()
                 } detail: {
-                    Group {
-                    if model.place == .highlights {
-                        if let g = model.highlights.group { HighlightGroupView(group: g).id(HighlightsModel.key(g)) }
-                        else { ContentUnavailableView("No highlights", systemImage: "highlighter") }
-                    } else {
-                        Detail()
-                    }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .themed()
+                    opened
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .themed()
                 }
             }
         }
@@ -515,6 +521,7 @@ struct Detail: View {
                         .help("The Shortlist (F)")
                     }
                 }
+                ToolbarItem { FocusButton() }
                 ToolbarItem {
                     Button { model.showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.right") }
                         .keyboardShortcut("i", modifiers: [.command, .option])
