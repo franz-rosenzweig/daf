@@ -3,7 +3,8 @@
    selecting them does (it's in Highlights and the review); anywhere else it leaves its stroke.
    Each stroke keeps its paragraph and the letter it started on (daf/ink.py), so it stays with its
    words when the type size or the column changes; a note in the margin keeps its distance from the
-   column's edge. Margin moves the column over to leave room on the right. */
+   column's edge. Margin moves the column over to leave room on the right. Handwriting read as text
+   (pens.js's lasso) becomes a note on the passage beside it, or typed text in its place. */
 (function(){
 'use strict';
 const C = window.DafCore, Pens = C.Pens;
@@ -68,17 +69,24 @@ function charAt(el, x, y){
   if (!r || y < r.top - r.height || y > r.bottom + r.height) return null;
   return { c, r };
 }
-// A stroke as it's kept: the pen it was written with, its place, and its points from where it
-// started (as written: k = 1).
-function make(L){
-  const [x0, y0] = L.pts[0], el = blockNear(x0, y0); if (!el) return null;
-  const br = el.getBoundingClientRect(), b = L.brush;
+// The place of a point in the window: its paragraph, and the letter it's on or beside.
+function anchorAt(x0, y0){
+  const el = blockNear(x0, y0); if (!el) return null;
+  const br = el.getBoundingClientRect();
   const at = { b: idx(el), q: el.textContent.trim().slice(0, 40), w: r1(br.width), h: r1(br.height), f: fontOf(el) };
   const ch = x0 >= br.left && x0 <= br.right && y0 >= br.top - 4 && y0 <= br.bottom + 4 ? charAt(el, x0, y0) : null;
   if (ch) { at.c = ch.c; at.x = r1(x0 - ch.r.left); at.y = r1(y0 - ch.r.top); }
   else { at.x = r1(x0 - br.left); at.y = r1(y0 - br.top); }
-  return { id: newId(), v: 2, tool: b.pen, color: b.color, size: r1(b.w), o: Math.round(b.opacity * 100) / 100, at,
-           pts: L.pts.map(p => [r1(p[0] - x0), r1(p[1] - y0), Math.round(p[2] * 100) / 100]) };
+  return at;
+}
+// A stroke as it's kept: the pen it was written with, its place, and its points from where it
+// started (as written: k = 1). sh: a clean shape, which isn't read as writing.
+function make(L){
+  const [x0, y0] = L.pts[0], at = anchorAt(x0, y0), b = L.brush; if (!at) return null;
+  const s = { id: newId(), v: 2, tool: b.pen, color: b.color, size: r1(b.w), o: Math.round(b.opacity * 100) / 100, at,
+              pts: L.pts.map(p => [r1(p[0] - x0), r1(p[1] - y0), Math.round(p[2] * 100) / 100]) };
+  if (L.snapped) s.sh = 1;
+  return s;
 }
 // Where a stroke's first point is now, in the layer, and how much bigger the type is than it was.
 // On a letter it goes with the letter. Elsewhere in its paragraph it keeps its share of the
@@ -101,10 +109,15 @@ function draw(s, Lr){
   Lr = Lr || K.svg.getBoundingClientRect();
   const o = place(s, Lr); if (!o) return;
   const [ox, oy, k] = o, pts = s.pts.map(p => [ox + p[0] * k, oy + p[1] * k, p[2]]);
-  K.layer.add(s, pts, k);
+  const el = K.layer.add(s, pts, k);
+  if (Pens.kindOf(s) === 'text') {     // typed: its box
+    const n = String(s.text || '').split('\n').length, fs = (s.fs || 16) * k;
+    K.geo.set(s.id, { pts, r: 0, box: [pts[0][0], pts[0][1], pts[0][0] + (s.w || 120) * k, pts[0][1] + n * fs * 1.3 + fs * 0.3], text: true, el });
+    return;
+  }
   let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
   for (const p of pts) { if (p[0] < x1) x1 = p[0]; if (p[0] > x2) x2 = p[0]; if (p[1] < y1) y1 = p[1]; if (p[1] > y2) y2 = p[1]; }
-  K.geo.set(s.id, { pts, r: (s.size || 2.5) * k / 2, box: [x1, y1, x2, y2] });
+  K.geo.set(s.id, { pts, r: (s.size || 2.5) * k / 2, box: [x1, y1, x2, y2], el });
 }
 function render(){
   if (!live()) return;
@@ -132,13 +145,13 @@ function erase(x, y, mode, r, L){
   const Lr = K.svg.getBoundingClientRect(), px = x - Lr.left, py = y - Lr.top;
   for (const [id, g] of [...K.geo]) {
     const b = g.box, m = r + g.r;
-    if (px < b[0] - m || px > b[2] + m || py < b[1] - m || py > b[3] + m || !near(g.pts, px, py, m)) continue;
+    if (px < b[0] - m || px > b[2] + m || py < b[1] - m || py > b[3] + m || (!g.text && !near(g.pts, px, py, m))) continue;
     const s = K.strokes.find(t => t.id === id); if (!s) continue;
     K.strokes = K.strokes.filter(t => t !== s); unpaint(id);
     // a piece made a moment ago by this same eraser just goes; what was there before is kept for Undo
     const mine = L.added.indexOf(s);
     if (mine >= 0) L.added.splice(mine, 1); else L.erased.push(s);
-    if (mode !== 'area') continue;
+    if (mode !== 'area' || g.text) continue;
     let run = [];
     const flush = () => { if (run.length >= 2) { const piece = Object.assign({}, s, { id: newId(), pts: run }); K.strokes.push(piece); L.added.push(piece); draw(piece, Lr); } run = []; };
     g.pts.forEach((p, i) => { if (Math.hypot(p[0] - px, p[1] - py) <= m) flush(); else run.push(s.pts[i]); });
@@ -240,6 +253,70 @@ async function flush(){
 // The column moves over to leave room on the right (on a screen wide enough for it).
 function setMargin(on){ K.mOn = !!on; if (K.wrap) K.wrap.classList.toggle('inkmargin', K.mOn && window.innerWidth >= 700); later(); }
 
+/* ---------- handwriting read as text (pens.js's lasso) ---------- */
+function inside(poly, x, y){
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c;
+  }
+  return c;
+}
+// The strokes the lasso went round (most of their points inside its loop, in the window).
+function select(loop){
+  const Lr = K.svg.getBoundingClientRect(), poly = loop.map(p => [p[0] - Lr.left, p[1] - Lr.top]);
+  return K.strokes.filter(s => {
+    const g = K.geo.get(s.id); if (!g) return false;
+    if (g.text) return inside(poly, (g.box[0] + g.box[2]) / 2, (g.box[1] + g.box[3]) / 2);
+    const n = g.pts.filter(p => inside(poly, p[0], p[1])).length;
+    return n >= g.pts.length * 0.6;
+  });
+}
+function mark(list, on){ for (const s of list) { const g = K.geo.get(s.id); if (g && g.el) g.el.classList.toggle('held', !!on); } }
+// Their box, in the window.
+function boxOf(list){
+  const Lr = K.svg.getBoundingClientRect(); let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const s of list) { const g = K.geo.get(s.id); if (!g) continue; x1 = Math.min(x1, g.box[0]); y1 = Math.min(y1, g.box[1]); x2 = Math.max(x2, g.box[2]); y2 = Math.max(y2, g.box[3]); }
+  return { x1: x1 + Lr.left, y1: y1 + Lr.top, x2: x2 + Lr.left, y2: y2 + Lr.top };
+}
+function removeAll(list){ const ids = new Set(list.map(s => s.id)); K.strokes = K.strokes.filter(s => !ids.has(s.id)); list.forEach(s => unpaint(s.id)); act({ del: list }); }
+// The handwriting swapped for typed text saying the same, where it began, about its size.
+function typed(list, text){
+  const b = boxOf(list), at = anchorAt(b.x1, b.y1); if (!at) throw new Error('There’s no paragraph here to keep it by.');
+  const lines = text.split('\n').length, fs = Math.round(Math.max(13, Math.min(30, (b.y2 - b.y1) / lines * 0.62)));
+  const first = list.find(Pens.writingOf) || list[0];
+  const t = { id: newId(), v: 2, tool: 'text', text, fs, w: r1(Math.max(60, b.x2 - b.x1)), color: first.color || 'ink', size: 1, o: 1, at, pts: [[0, 0, 0.5]] };
+  const ids = new Set(list.map(s => s.id));
+  K.strokes = K.strokes.filter(s => !ids.has(s.id)).concat(t); list.forEach(s => unpaint(s.id)); draw(t);
+  act({ add: [t], del: list });
+}
+// A note on the passage beside the handwriting: the sentence level with it is highlighted (or the
+// highlight already there is used), and what was read becomes its note, in the Notebook and the vault.
+async function noteOnPassage(list, text){
+  if (!C.Reader) throw new Error('Not in an article');
+  const b = boxOf(list), cy = (b.y1 + b.y2) / 2;
+  const el = blockNear((b.x1 + b.x2) / 2, cy); if (!el || !el.matches('[data-i]')) throw new Error('There’s no passage beside it to keep the note with.');
+  const br = el.getBoundingClientRect(), full = el.textContent;
+  const p = caret(Math.max(br.left + 4, Math.min(br.right - 4, (b.x1 + b.x2) / 2)), Math.max(br.top + 2, Math.min(br.bottom - 2, cy)));
+  let at = 0;
+  if (p && el.contains(p.node)) { const pre = document.createRange(); pre.selectNodeContents(el); pre.setEnd(p.node, p.off); at = pre.toString().length; }
+  // the sentence round that letter (a short paragraph whole)
+  let s = 0, e = full.length;
+  if (full.length > 280) {
+    const ends = /[.!?…:;](?:["”’)\]]*)\s+/g; let m;
+    while ((m = ends.exec(full))) { const end = m.index + m[0].length; if (end <= at) s = end; else { e = m.index + m[0].length; break; } }
+  }
+  const range = document.createRange(), pos = c => { const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n, sum = 0; while ((n = w.nextNode())) { if (c <= sum + n.data.length) return [n, c - sum]; sum += n.data.length; } return null; };
+  const a = pos(s), z = pos(e); if (!a || !z) throw new Error('That passage couldn’t be found.');
+  range.setStart(a[0], a[1]); range.setEnd(z[0], z[1]);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  const info = C.Reader.getSel(); if (!info) { sel.removeAllRanges(); throw new Error('That passage couldn’t be highlighted.'); }
+  const h = await C.Reader.highlight(info, false, true); if (!h) throw new Error('That passage couldn’t be highlighted.');
+  const note = [h.user_note, text].filter(x => (x || '').trim()).join('\n\n');
+  await api('/api/highlights/' + encodeURIComponent(h.id) + '/note', { method: 'PUT', body: JSON.stringify({ note }) });
+  h.user_note = note; C.Reader.remark(h);
+}
+
 /* ---------- the article, as a surface for the pens ---------- */
 const surface = {
   live,
@@ -252,6 +329,9 @@ const surface = {
   canUndo: () => K.done.length > 0, canRedo: () => K.undone.length > 0, undo, redo,
   extras: () => window.innerWidth >= 700 ? [{ k: 'margin', label: 'Room to write in the margin', on: K.mOn }] : [],
   extra(k){ if (k === 'margin') { const on = !K.mOn; K.margin = on; store.set('margin', on); setMargin(on); } },
+  select, mark, typed, noteOnPassage, remove: removeAll,
+  all: () => K.strokes.filter(s => Pens.writingOf(s) && K.geo.has(s.id)),
+  inkOf: list => list.map(s => (K.geo.get(s.id) || {}).pts).filter(Boolean),
 };
 
 /* ---------- an article opens ---------- */

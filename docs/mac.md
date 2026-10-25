@@ -10,6 +10,10 @@ The window looks like Readwise Reader's Mac app: a plain title bar with the traf
 
 Only Daf loads in the window. Any other link opens in your browser, `obsidian://` links open in Obsidian, and Daf's own files, like a PDF as printed, open in a window of their own. When the window is minimized, hidden or covered, the page knows it's hidden, so it never counts minutes nobody read.
 
+## Focus mode
+
+**Focus Mode** (⇧⌘F, the **[ ]** button in a reader's toolbar, F in a book and Shift F in an article) puts what you're reading on the whole screen, as the page's does: the window goes full screen, the sidebar and the list go, the side panels close, and the menu bar and the toolbar hide until the pointer goes to the top of the screen. The same again, or Esc, leaves it.
+
 ## With no connection
 
 The app keeps its OWN copy of Daf on the Mac, which means it opens and works with no connection at all, on a plane or when the server is down. While it's online it saves Daf's screens and fonts, your lists, the articles you're reading with their pictures and the books you're reading, and it only fetches a file again when it changes. When Daf doesn't answer, the window moves to that copy on the same page, and what you do there (your place, highlights, notes) waits and goes to Daf when it's back. The app looks for Daf every 30 seconds and when the Mac wakes, and then goes back to the live site by itself, which is also where videos play.
@@ -22,7 +26,7 @@ Every menu item calls the same command as the page's own buttons, and items that
 
 - **Daf:** **Settings…** (⌘,), **Reading Goals…** and **Safari Extension…**.
 - **File:** **New Window** (⌘N), **Add to Daf…** (⌘O), **Save a Link…** (⇧⌘S), **Log Paper Minutes…** (⇧⌘P) and **Export Highlights…** (⇧⌘E).
-- **View:** Today ⌘1, Review ⌘2, Library ⌘3, Feed ⌘4, Highlights ⌘5, Books ⌘6 and Stats ⌘7, then **Shortlist**, **Torah**, **Paper Pages**, **Hide Sidebar** (⌃⌘S), **Contents**, **Side Panel**, **Typography**, zoom, **Reload Page** (⌘R) and full screen.
+- **View:** Today ⌘1, Review ⌘2, Library ⌘3, Feed ⌘4, Highlights ⌘5, Books ⌘6 and Stats ⌘7, then **Shortlist**, **Torah**, **Paper Pages**, **Hide Sidebar** (⌃⌘S), **Contents**, **Side Panel**, **Typography**, zoom, **Reload Page** (⌘R), full screen and **Focus Mode** (⇧⌘F).
 - **Go:** **Back** (⌘[), **Forward** (⌘]) and **Search** (⌘K).
 - **Reader:** **Highlight**, **Highlight with a Note**, **Bookmark This Page**, **Listen**, **Add to Shortlist**, **Tags…**, **Delete**, **Next** and **Previous**, and **Next in the List** and **Previous in the List**.
 - **Help:** **Keyboard Shortcuts** and **Send Feedback…**.

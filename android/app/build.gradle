@@ -14,10 +14,13 @@ android {
         // 31: the widget's wallpaper colours and its two sizes from one provider
         minSdk 31
         targetSdk 36
-        versionCode 19
-        versionName '0.5.1'
+        versionCode 20
+        versionName '0.5.2'
         resValue 'string', 'app_name', 'Daf'
         manifestPlaceholders = [shareAuthority: 'xyz.tiresia.daf.share']
+        // 64-bit ARM only (every phone and tablet on Android 12 and up): the handwriting reader's
+        // native library (InkReader) is 10 MB for each kind of processor
+        ndk { abiFilters 'arm64-v8a' }
     }
 
     // The signing key's properties: android/keystore.properties (never in git), or the
@@ -62,6 +65,12 @@ android {
     lint {
         checkReleaseBuilds false
     }
+}
+
+dependencies {
+    // Hebrew handwriting read as text, on the device (InkReader), as Moshe reads it. Not free
+    // software: the licence's additional permission for it is in README.md
+    implementation 'com.google.mlkit:digital-ink-recognition:18.1.0'
 }
 
 // say which deprecated call it is, rather than "uses or overrides a deprecated API"
