@@ -99,7 +99,8 @@ function kindleSection(b){
   let state, acts = '';
   if (k && k.delivered) { state = 'On the Kindle, in ' + esc(k.shelf) + ', since ' + esc(C.ago(k.delivered)) + '.'; acts = '<button class="btn sm" data-kput="' + esc(b.id) + '" data-again="' + esc(k.shelf) + '">Send it again</button>'; }
   else if (k && k.after_file) { state = 'Goes to the Kindle, in ' + esc(k.shelf) + ', once Calibre has the file.'; acts = '<button class="btn sm" data-kcancel="' + esc(b.id) + '">Don’t</button>'; }
-  else if (k) { state = (k.error ? 'The Kindle couldn’t take it: ' + esc(k.error) + '. ' : '') + 'Waiting for the Kindle’s next Wi-Fi sync; it goes in ' + esc(k.shelf) + '.'; acts = '<button class="btn sm" data-kcancel="' + esc(b.id) + '">Cancel</button>'; }
+  else if (k && k.error) { state = 'The Kindle couldn’t take it: ' + esc(k.error) + '.'; acts = '<button class="btn sm" data-kput="' + esc(b.id) + '" data-again="' + esc(k.shelf) + '">Try again</button><button class="btn sm" data-kcancel="' + esc(b.id) + '">Forget it</button>'; }
+  else if (k) { state = 'Waiting for the Kindle’s next Wi-Fi sync; it goes in ' + esc(k.shelf) + '.'; acts = '<button class="btn sm" data-kcancel="' + esc(b.id) + '">Cancel</button>'; }
   else { state = 'Put it on the Kindle: it downloads on the Kindle’s next Wi-Fi sync, into the shelf you pick.';
     acts = '<select class="field" id="kshelf" style="width:auto"><option>Books</option></select><button class="btn sm primary" data-kput="' + esc(b.id) + '">Put it on the Kindle</button>';
     kindleShelves().then(list => { const sel = $('#kshelf'); if (sel) sel.innerHTML = shelfOptions(list, list.includes('Books') ? 'Books' : list[0]); }); }

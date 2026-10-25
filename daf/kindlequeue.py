@@ -65,7 +65,7 @@ def queue_file(conn, path, shelf="Daf"):
 
 
 def cancel(conn, book_id):
-    conn.execute("DELETE FROM kindle_queue WHERE id = ? AND delivered IS NULL", (f"book:{book_id}",))
+    conn.execute("DELETE FROM kindle_queue WHERE id = ? AND (delivered IS NULL OR error IS NOT NULL)", (f"book:{book_id}",))
 
 
 def state(conn, book_id):
@@ -74,9 +74,11 @@ def state(conn, book_id):
 
 
 def inbox(conn):
-    """For the plugin: what to download, oldest first."""
+    """For the plugin: what to download, oldest first. One the plugin turned down (a different file by
+    that name on the Kindle, too big, no room) isn't offered again until it's sent again from Daf: a
+    download that failed on the way never reaches /done, so an error here is always a refusal."""
     out = []
-    for r in conn.execute("SELECT * FROM kindle_queue WHERE delivered IS NULL ORDER BY requested").fetchall():
+    for r in conn.execute("SELECT * FROM kindle_queue WHERE delivered IS NULL AND error IS NULL ORDER BY requested").fetchall():
         if not Path(r["path"]).exists():
             conn.execute("UPDATE kindle_queue SET error = ? WHERE id = ?", ("The file isn't on the server any more", r["id"]))
             continue

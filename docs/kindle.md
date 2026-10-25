@@ -88,9 +88,17 @@ Highlights you make in Daf's reader are added to the book on the Kindle as KORea
 
 Highlights you make on the Kindle come into Daf, into the review, the book's Notebook and the vault. A voice note or a "n:" text to my Signal bot while I'm reading goes under the book that's open on the Kindle, at the page I'm on.
 
+## Books from Daf
+
+Syncthing is off on the Kindle, so the Kindle picks up new books from Daf by itself. When I put a book on the Kindle from Daf, it waits there until the next time the Kindle syncs over Wi-Fi: when Wi-Fi comes on, when I close a book, when Home refreshes, or when I press **Send reading time and highlights now** in Tools → Daf. Then the Kindle downloads it into the shelf I picked, makes that shelf if it isn't there yet, and a short message says "Daf put 2 books on your Kindle." Any shelf I have open updates by itself, and the new book gets its cover a moment later.
+
+The download happens in the background, which means I can keep reading or tapping around while a big file comes in, and it never downloads while the Kindle is going to sleep. If the book is already on that shelf, the Kindle just tells Daf it's there. If a DIFFERENT file by that name is already there, it leaves the one on the Kindle alone, and the same goes for a file over 200 MB, one there isn't room for, or one that comes in broken: Daf gets told why, and the book's page in Daf has **Try again**. If the Wi-Fi just drops in the middle, the Kindle quietly tries again on the next sync, and only tells Daf if it fails three times in a row.
+
+The Kindle also tells Daf which shelves it has, so the shelf list in Daf is the Kindle's real one.
+
 ## Articles on the Kindle
 
-**Send to the Kindle** in Daf makes an EPUB of one article or a digest of several, and it shows up in a "Daf" folder on the Kindle (see [The Feed and the Library](feed-and-library.md#send-to-kindle)). Reading it counts as reading those articles, and highlights come back to them.
+**Send to the Kindle** in Daf makes an EPUB of one article or a digest of several, and it comes in with the Kindle's next Wi-Fi sync, into a "Daf" shelf (see [The Feed and the Library](feed-and-library.md#send-to-kindle)). Reading it counts as reading those articles, and highlights come back to them.
 
 If something seems stuck, wake the Kindle with Wi-Fi on, open **Tools → Daf**, and press **Send reading time now**.
 
