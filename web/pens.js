@@ -11,6 +11,10 @@
    pen writes, and a hand resting on the screen while the pen is near doesn't scroll. With the tools
    put away the pen is a finger again. Nothing shows until a pen has touched the screen on this device.
 
+   The lasso holds the handwriting it's drawn round: To text reads it (English with Grape, in a
+   worker, on any device; Hebrew with Google's reader in the Android app, as Moshe reads it) into a
+   card to fix, then makes it a note on the passage beside it, or typed text in its place.
+
    A surface is where the strokes go and are kept (an article's text, a book's pages). This file is
    the pen in the hand, the stroke being written, and the tools; each surface says where a stroke
    belongs, draws the ones it has, and takes away what the eraser passes over. */
@@ -43,7 +47,7 @@ const DEF = { fountain: { size: 25, color: 'ink', opacity: 100 }, calligraphy: {
   highlighter: { size: 40, color: 'yellow', opacity: 50 } };
 const saved = get('tools', null) || {};
 const T = {
-  tool: saved.tool || ({ marker: 'highlighter', eraser: 'eraser' })[old('tool')] || 'pen',     // pen | highlighter | eraser
+  tool: saved.tool || ({ marker: 'highlighter', eraser: 'eraser' })[old('tool')] || 'pen',     // pen | highlighter | eraser | lasso
   pen: KINDS[saved.pen] && saved.pen !== 'highlighter' ? saved.pen : 'fountain',
   pens: Object.fromEntries(Object.entries(DEF).map(([k, v]) => [k, Object.assign({}, v, (saved.pens || {})[k] || {})])),
   eraser: Object.assign({ mode: 'stroke', size: 24 }, saved.eraser || {}),                       // mode: stroke | area
@@ -59,7 +63,7 @@ const setHl = c => { try { localStorage.setItem('daf.hlColor', JSON.stringify(c)
 // The pen in hand, as it writes now: its kind, colour, width (px) and opacity (0 to 1); none for the eraser.
 function brush(tool){
   tool = tool || T.tool;
-  if (tool === 'eraser') return null;
+  if (tool === 'eraser' || tool === 'lasso') return null;
   const pen = tool === 'highlighter' ? 'highlighter' : T.pen, p = T.pens[pen];
   return { pen, color: pen === 'highlighter' ? hlColor() : p.color, w: across(pen, p.size), opacity: Math.max(0.05, Math.min(1, p.opacity / 100)) };
 }
@@ -98,7 +102,8 @@ function colorOf(c, doc){
 }
 // What a kept stroke is: its kind, width (px, as written) and opacity. Round one's strokes (no v)
 // were 'pen' (a pen) and 'marker' (the highlighter), with their width in size.
-const kindOf = s => s.v ? (KINDS[s.tool] ? s.tool : 'pen') : s.tool === 'marker' ? 'highlighter' : 'pen';
+const kindOf = s => s.v ? (KINDS[s.tool] || s.tool === 'text' ? s.tool : 'pen') : s.tool === 'marker' ? 'highlighter' : 'pen';
+const writingOf = s => !['highlighter', 'text'].includes(kindOf(s)) && !s.sh;      // what the reader reads: not the highlighter, typed text or a clean shape
 const opacityOf = s => s.v ? (s.o != null ? s.o : 1) : s.tool === 'marker' ? 0.38 : 1;
 const sine = t => Math.sin(t * Math.PI / 2);
 const med = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
@@ -158,10 +163,27 @@ function layer(svg, dark){
   hl.setAttribute('class', 'dafhl'); hl.style.mixBlendMode = dark ? 'screen' : 'multiply';
   svg.append(defs, hl, ink);
   const groups = new Map();
+  // Handwriting made typed text (To text): its lines from where the handwriting began, in the
+  // reading face, a Hebrew line from the right.
+  function text(s, pts, k){
+    const t = doc.createElementNS(NS, 'text'), fs = (s.fs || 16) * k, x = pts[0][0], w = (s.w || 120) * k;
+    t.setAttribute('fill', colorOf(s.color, doc)); t.setAttribute('font-size', r1(fs)); t.dataset.k = s.id;
+    let face = ''; try { face = getComputedStyle(doc.body).fontFamily; } catch(e){}
+    t.setAttribute('font-family', face || 'serif');
+    String(s.text || '').split('\n').forEach((line, i) => {
+      const sp = doc.createElementNS(NS, 'tspan'), rtl = /[\u0590-\u05FF]/.test(line);
+      sp.setAttribute('x', r1(rtl ? x + w : x)); sp.setAttribute('y', r1(pts[0][1] + fs * (1 + i * 1.3)));
+      if (rtl) { sp.setAttribute('text-anchor', 'end'); sp.setAttribute('direction', 'rtl'); }
+      sp.textContent = line; t.appendChild(sp);
+    });
+    ink.appendChild(t);
+    return t;
+  }
   return {
     svg, hl, ink,
     // s: the stroke; pts: its points where they go; k: how much bigger the type is than when written
     add(s, pts, k){
+      if (kindOf(s) === 'text') return text(s, pts, k);
       const pen = kindOf(s), op = opacityOf(s), el = doc.createElementNS(NS, 'path'), color = colorOf(s.color, doc);
       el.setAttribute('d', shape(pen, pts, (s.size || 2.5) * k));
       el.setAttribute('fill', color); el.dataset.k = s.id;
@@ -258,6 +280,12 @@ function wet(L){
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
   const x = cv.getContext('2d', { desynchronized: true });
   x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
+  if (L.tool === 'lasso' && L.pts.length > 1) {
+    cv.hidden = false; cv.style.opacity = '1';
+    x.setLineDash([6, 5]); x.lineWidth = 1.5; x.strokeStyle = cssVar('--accent') || '#1a7da4';
+    x.beginPath(); x.moveTo(L.pts[0][0], L.pts[0][1]); for (const p of L.pts) x.lineTo(p[0], p[1]); x.closePath(); x.stroke(); x.setLineDash([]);
+    return;
+  }
   if (!L.brush || !L.pts.length) return;
   cv.hidden = false; cv.style.opacity = r1(L.brush.opacity);
   x.fillStyle = L.wetColor || (L.wetColor = colorOf(L.brush.color, L.doc));
@@ -278,7 +306,7 @@ function ring(x, y){
   clearTimeout(P.ringT); P.ringT = setTimeout(() => { el.hidden = true; }, 700);
 }
 
-const SKIP = 'input, textarea, select, [contenteditable="true"], .inkpal, .inkpop, .penround, #selbar, .menu, .modal, #fedges';
+const SKIP = 'input, textarea, select, [contenteditable="true"], .inkpal, .inkpop, .penround, .penheld, .readout, #selbar, .menu, .modal, #fedges';
 const writing = () => P.on && !!(P.surface && P.surface.live());
 // A pen down where a surface takes ink. doc: the document the event is in; off: its corner in the window.
 function mine(e, doc, surf){
@@ -297,6 +325,7 @@ function feed(e, off){
     if (!L.moved && Math.hypot(p[0] - L.x0, p[1] - L.y0) > 6) L.moved = true;
     if (L.tool === 'eraser') L.surf.erase(p[0], p[1], T.eraser.mode, T.eraser.size / 2, L);
   }
+  if (L.tool === 'lasso') { wet(L); return; }
   if (L.tool !== 'eraser') {
     wet(L);
     // held still at the end: a clean line, circle, rectangle or triangle
@@ -312,6 +341,7 @@ function listen(doc, surf){
   doc.__dafPens = true; P.docs.add(doc);
   const off = () => surf.off ? surf.off(doc) : [0, 0];
   doc.addEventListener('pointerdown', e => {
+    if (doc !== document && e.pointerType !== 'pen') { closePop(); closeRound(); }   // a book's page: its own window, where the page's never hears a tap
     if (e.pointerType !== 'pen') return;
     seenPen();
     const o = off(), x = e.clientX + o[0], y = e.clientY + o[1];
@@ -320,7 +350,7 @@ function listen(doc, surf){
     if (P.button) P.button.touched = true;
     if (!mine(e, doc, surf)) return;
     e.preventDefault(); e.stopPropagation();
-    closePop(); closeRound(); ring(null);
+    closePop(); closeRound(); ring(null); unhold();
     // the pen's button held (2) or an eraser end (32) erases, whatever tool is chosen
     const tool = T.tool === 'eraser' || (e.buttons & 34) || e.button === 2 || e.button === 5 ? 'eraser' : T.tool;
     P.live = { id: e.pointerId, surf, doc, tool, brush: tool === 'eraser' ? null : brush(tool), pts: [], t0: Date.now(), x0: x, y0: y, moved: false, erased: [], added: [], hls: new Set() };
@@ -346,6 +376,7 @@ function listen(doc, surf){
     if (!surf.live()) return;
     if (!L.moved && Date.now() - L.t0 < 450) { if (L.tool !== 'eraser') tap(doc, e.clientX, e.clientY); return; }
     if (L.tool === 'eraser') { surf.erased(L); return; }
+    if (L.tool === 'lasso') { hold(surf, surf.select(L.pts), L.pts); return; }
     if (e.type === 'pointercancel' && L.pts.length < 3) return;
     if (L.tool === 'highlighter' && !L.snapped && surf.highlight && surf.highlight(L)) return;
     if (L.brush && L.brush.pen !== 'highlighter') used(L.brush.color);
@@ -392,6 +423,8 @@ const IC = {
   margin: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 7h4.5M5.5 10h4.5M5.5 13h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12.6 7.2c1.5.4.2 1.6 1.6 2s.1 1.7 1.4 2.3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
   away: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   plus: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  lasso: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10.5" cy="8" rx="6.5" ry="4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.6 2.2"/><path d="M6 11.5c-1.6 1.2-1.4 3 .3 3.4 1.2.3 1.6 1.4.9 2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  text: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M10 5v11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
 };
 const dot = (c, s, pale) => '<span class="pdot" style="--c:' + esc(colorOf(c)) + ';--s:' + s + 'px"' + (pale ? ' data-pale' : '') + '></span>';
 const isPale = c => { const v = colorOf(c); return v === '#ffffff' || /^#f[0-9a-f]f[0-9a-f]/i.test(v); };
@@ -413,7 +446,8 @@ function drawPal(){
   const extra = s.extras ? s.extras() : [];
   p.innerHTML = b('pen', KINDS[T.pen] + ' (tap again for its kinds, size and colour)', T.tool === 'pen', false, penButton()) +
     b('highlighter', 'Highlighter (tap again for its colour and size)', T.tool === 'highlighter') + b('eraser', 'Eraser (tap again for how it erases; or hold the pen’s button)', T.tool === 'eraser') +
-    '<span class="sep"></span>' + (T.tool === 'eraser' ? '' : b('panel', 'Colour and size', null, false, dot(cur, 18, isPale(cur)))) +
+    b('lasso', 'Lasso: draw round handwriting to read it as text or erase it (tap again to read all of it)', T.tool === 'lasso') +
+    '<span class="sep"></span>' + (T.tool === 'eraser' || T.tool === 'lasso' ? '' : b('panel', 'Colour and size', null, false, dot(cur, 18, isPale(cur)))) +
     '<span class="sep"></span>' + b('undo', 'Undo', null, !s.canUndo()) + b('redo', 'Redo', null, !s.canRedo()) +
     (extra.length ? '<span class="sep"></span>' + extra.map(x => b(x.k, x.label, x.on, false, IC[x.k])).join('') : '') +
     b('away', 'Put the pen tools away (the pen scrolls and selects)', null);
@@ -421,7 +455,7 @@ function drawPal(){
 function onPal(e){
   const t = e.target.closest('[data-ink]'); if (!t) return;
   const k = t.dataset.ink, s = P.surface;
-  if (k === 'pen' || k === 'highlighter' || k === 'eraser') {
+  if (k === 'pen' || k === 'highlighter' || k === 'eraser' || k === 'lasso') {
     if (T.tool === k) { if (P.popEl && P.popFor === k) closePop(); else openPop(t, k); return; }
     choose(k); closePop();
   }
@@ -438,6 +472,7 @@ const KIND_ROW = (cur, size) => WRITING.map(k => '<button class="kind" data-kind
 function panelHTML(tool, parts){
   parts = parts || ['kinds', 'size', 'opacity', 'colors', 'fav'];
   let h = '';
+  if (tool === 'lasso') return '<div class="pnrow">Draw round handwriting with the lasso to read it as text or erase it.</div><div class="pnrow"><button class="linkbtn" data-hw="all">' + IC.text + 'Read all the handwriting here</button></div>';
   if (tool === 'eraser') {
     h += '<div class="pnrow seg2">' + [['stroke', 'Whole strokes'], ['area', 'What it passes over']].map(m => '<button data-er="' + m[0] + '" aria-pressed="' + (T.eraser.mode === m[0]) + '">' + m[1] + '</button>').join('') + '</div>';
     h += '<label class="pnrow"><span>Size</span><input type="range" min="8" max="80" value="' + T.eraser.size + '" data-set="esize" aria-label="Eraser size"><b>' + T.eraser.size + '</b></label>';
@@ -459,6 +494,7 @@ function panelHTML(tool, parts){
 function wirePanel(el, after){
   el.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.hw === 'all') { closePop(); closeRound(); const s = P.surface; if (s) { const all = s.all(); if (all.length) readout(s, all); else C.toast('There’s no handwriting here to read.'); } return; }
     if (b.dataset.kind) choose('pen', b.dataset.kind);
     else if (b.dataset.c) setColor(b.dataset.c);
     else if (b.dataset.er === 'all') { if (P.surface && P.surface.eraseAll) P.surface.eraseAll(); }
@@ -507,12 +543,12 @@ function openRound(x, y){
   el.className = 'penround'; el.setAttribute('role', 'menu'); el.setAttribute('aria-label', 'Pens');
   el.style.left = cx + 'px'; el.style.top = cy + 'px';
   const fill = () => {
-    const tool = T.tool, b = brush(tool === 'eraser' ? 'pen' : tool), cur = tool === 'highlighter' ? hlColor() : T.pens[T.pen].color;
-    const mid = tool === 'eraser' ? IC.eraser : sample(b.pen, b.color, b.w, b.opacity, 56, 34);
+    const tool = T.tool, b = brush(tool === 'eraser' || tool === 'lasso' ? 'pen' : tool), cur = tool === 'highlighter' ? hlColor() : T.pens[T.pen].color;
+    const mid = tool === 'eraser' ? IC.eraser : tool === 'lasso' ? IC.lasso : sample(b.pen, b.color, b.w, b.opacity, 56, 34);
     const favs = T.favorites.slice(-3).map((f, i) => '<button class="pr fav" data-pr="fav" data-i="' + (T.favorites.length - Math.min(3, T.favorites.length) + i) + '" title="' + KINDS[f.pen] + '" aria-label="Favourite pen: ' + KINDS[f.pen] + '">' + sample(f.pen, f.color, across(f.pen, f.size), f.opacity / 100, 30, 20) + '</button>').join('');
     const sz = tool === 'eraser' ? T.eraser.size : T.pens[tool === 'highlighter' ? 'highlighter' : T.pen].size;
     el.innerHTML = '<div class="prdisc" aria-hidden="true"></div>' +
-      '<button class="pr mid" data-pr="kinds" title="' + (tool === 'eraser' ? 'Eraser' : KINDS[b.pen]) + ': tap for the other pens" aria-label="The pens">' + mid + '</button>' +
+      '<button class="pr mid" data-pr="kinds" title="' + (tool === 'eraser' ? 'Eraser' : tool === 'lasso' ? 'Lasso' : KINDS[b.pen]) + ': tap for the other pens" aria-label="The pens">' + mid + '</button>' +
       '<button class="pr undo" data-pr="undo" aria-label="Undo" title="Undo"' + (P.surface.canUndo() ? '' : ' disabled') + '>' + IC.undo + '</button>' +
       '<button class="pr redo" data-pr="redo" aria-label="Redo" title="Redo"' + (P.surface.canRedo() ? '' : ' disabled') + '>' + IC.redo + '</button>' +
       '<button class="pr size" data-pr="size" aria-label="Size ' + sz + '" title="Size">' + '<span class="pdot" style="--c:currentColor;--s:' + Math.max(4, Math.min(26, tool === 'eraser' ? sz / 3 : across(b.pen, sz))) + 'px"></span></button>' +
@@ -526,7 +562,8 @@ function openRound(x, y){
     s.dataset.what = what;
     if (what === 'kinds') s.innerHTML = '<div class="pnrow kinds">' + KIND_ROW(T.tool === 'pen' ? T.pen : '') +
       '<button class="kind" data-tool="highlighter" aria-pressed="' + (T.tool === 'highlighter') + '">' + sample('highlighter', hlColor(), across('highlighter', T.pens.highlighter.size), T.pens.highlighter.opacity / 100, 46, 24) + '<span>Highlighter</span></button>' +
-      '<button class="kind" data-tool="eraser" aria-pressed="' + (T.tool === 'eraser') + '">' + IC.eraser + '<span>Eraser</span></button></div>';
+      '<button class="kind" data-tool="eraser" aria-pressed="' + (T.tool === 'eraser') + '">' + IC.eraser + '<span>Eraser</span></button>' +
+      '<button class="kind" data-tool="lasso" aria-pressed="' + (T.tool === 'lasso') + '">' + IC.lasso + '<span>Lasso</span></button></div>';
     else if (what === 'color') s.innerHTML = panelHTML(T.tool, ['colors']);
     else if (what === 'size') s.innerHTML = panelHTML(T.tool, T.tool === 'eraser' ? null : ['size', 'opacity']);
     else if (what === 'eraser') s.innerHTML = panelHTML('eraser');
@@ -555,20 +592,141 @@ function openRound(x, y){
 }
 function closeRound(){ if (P.roundEl) { P.roundEl.remove(); P.roundEl = null; } if (P.roundOff) { document.removeEventListener('pointerdown', P.roundOff, true); P.roundOff = null; } }
 
+/* ---------- handwriting read as text (Moshe's lib/hwr/read.js) ---------- */
+// English with Grape, in a worker (hwr-worker.js) on any device, offline once its model is fetched;
+// Hebrew with Google's reader in the Android app (Shell.java's ink), a line at a time, the lines
+// found here.
+let hwr = null, hwrSeq = 0;
+const hwrWait = new Map();
+function hwrAsk(msg){
+  if (!hwr) {
+    const v = (document.querySelector('meta[name="daf-version"]') || {}).content || '';
+    hwr = new Worker('/hwr-worker.js' + (v ? '?v=' + v : ''), { type: 'module' });
+    hwr.onmessage = e => { const w = hwrWait.get(e.data.id); if (!w) return; hwrWait.delete(e.data.id); if (e.data.error) w[1](new Error(e.data.error)); else w[0](e.data.result); };
+    hwr.onerror = e => { for (const w of hwrWait.values()) w[1](new Error(e.message || 'the handwriting reader stopped')); hwrWait.clear(); hwr = null; };
+  }
+  return new Promise((ok, no) => { const id = ++hwrSeq; hwrWait.set(id, [ok, no]); hwr.postMessage(Object.assign({ id, url: new URL('/vendor/hwr/grape-2.0.bin', location.href).href }, msg)); });
+}
+const hebrew = () => { try { return !!(window.dafShell && dafShell.can && dafShell.can('ink')); } catch(e){ return false; } };
+const languages = () => hebrew() ? ['en', 'he'] : ['en'];
+// Strokes ([[x, y, pressure], …] each, in one surface's pixels) read as lines of text, top to bottom.
+async function readInk(strokes, lang){
+  const ink = strokes.filter(s => s && s.length).map((pts, i) => ({ id: 's' + i, tool: 'pen', pts: pts.flat() }));
+  if (!ink.length) return [];
+  if (lang !== 'he') return (await hwrAsk({ type: 'read', ink })).map(l => l.text).filter(t => t.trim());
+  if (!hebrew()) throw new Error('Hebrew handwriting is read in the Android app');
+  const lines = await hwrAsk({ type: 'lines', ink }), out = [];
+  for (const line of lines) {
+    const xy = line.strokes.map(pts => { const a = []; for (let i = 0; i + 1 < pts.length; i += 3) a.push([pts[i], pts[i + 1]]); return a; });
+    const r = await dafShell.ink({ op: 'read', lang, strokes: xy });
+    if (r && r.text && r.text.trim()) out.push(r.text);
+  }
+  return out;
+}
+// the Android app says how it's going while it fetches a language's reader (once)
+window.__dafInkStatus = t => { if (P.ro) { P.ro.note = t; drawReadout(); } };
+
+// What the lasso holds, marked, with what can be done with it beside it.
+function hold(surf, strokes, loop){
+  unhold();
+  if (!strokes.length) { C.toast('There’s no writing inside that.'); return; }
+  surf.mark(strokes, true);
+  let x2 = -Infinity, y1 = Infinity, y2 = -Infinity;
+  for (const p of loop) { x2 = Math.max(x2, p[0]); y1 = Math.min(y1, p[1]); y2 = Math.max(y2, p[1]); }
+  const el = document.createElement('div'); el.className = 'penheld'; el.setAttribute('role', 'toolbar'); el.setAttribute('aria-label', 'What the lasso holds');
+  el.innerHTML = (strokes.some(writingOf) ? '<button data-held="text">' + IC.text + 'To text</button>' : '') + '<button data-held="erase">' + IC.eraser + 'Erase</button><button data-held="close" aria-label="Let go">×</button>';
+  document.body.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x2 - w)) + 'px';
+  el.style.top = (y2 + h + 14 < window.innerHeight ? y2 + 10 : Math.max(8, y1 - h - 10)) + 'px';
+  P.held = { surf, strokes, el };
+  el.addEventListener('click', e => {
+    const b = e.target.closest('[data-held]'), held = P.held; if (!b || !held) return;
+    const k = b.dataset.held;
+    if (k === 'text') readout(held.surf, held.strokes);
+    else if (k === 'erase') { held.surf.remove(held.strokes); unhold(); }
+    else unhold();
+  });
+}
+function unhold(){ const h = P.held; if (!h) return; P.held = null; try { h.surf.mark(h.strokes, false); } catch(e){} h.el.remove(); }
+
+// The card: what the handwriting says, to fix, then a note on the passage beside it, typed text
+// in its place, or copied.
+function readout(surf, strokes){
+  const pen = strokes.filter(writingOf);
+  if (!pen.length) { C.toast('There’s no handwriting there to read.'); return; }
+  closeReadout();
+  const langs = languages(), want = get('readLang', 'en'), lang = langs.includes(want) ? want : 'en';
+  const r = P.ro = { surf, strokes: pen, lang, status: 'reading', text: '', note: '' };
+  r.el = document.createElement('div'); r.el.className = 'readout'; r.el.setAttribute('role', 'dialog'); r.el.setAttribute('aria-label', 'Handwriting as text');
+  document.body.appendChild(r.el);
+  r.el.addEventListener('click', onReadout);
+  r.el.addEventListener('input', e => { if (e.target.matches('textarea') && P.ro) P.ro.text = e.target.value; });
+  drawReadout(); read();
+}
+async function read(){
+  const r = P.ro; if (!r) return;
+  const lang = r.lang, still = () => P.ro === r && r.lang === lang;
+  try {
+    const lines = await readInk(r.surf.inkOf(r.strokes), lang);
+    if (!still()) return;
+    Object.assign(r, { status: 'done', text: lines.join('\n'), note: lines.length ? '' : 'Nothing could be read there.' });
+  } catch(e){ if (still()) Object.assign(r, { status: 'failed', note: 'It couldn’t be read: ' + e.message }); }
+  drawReadout();
+}
+function drawReadout(){
+  const r = P.ro; if (!r || !r.el) return;
+  const langs = languages(), has = !!r.text.trim(), dis = has ? '' : ' disabled';
+  r.el.innerHTML = '<div class="rohead"><b>Handwriting as text</b>' +
+    (langs.length > 1 ? '<span class="seg sm" role="radiogroup" aria-label="Language">' + langs.map(l => '<button type="button" role="radio" data-lang="' + l + '" class="' + (r.lang === l ? 'on' : '') + '" aria-checked="' + (r.lang === l) + '">' + (l === 'he' ? 'עברית' : 'English') + '</button>').join('') + '</span>' : '') +
+    '<span class="spacer"></span><button class="ib" data-ro="close" aria-label="Close">×</button></div>' +
+    (r.status === 'reading' ? '<div class="ronote mute">' + esc(r.note || 'Reading…') + '</div>' :
+      (r.note ? '<div class="ronote mute">' + esc(r.note) + '</div>' : '') +
+      '<textarea class="field" rows="' + Math.min(8, Math.max(2, r.text.split('\n').length + 1)) + '" aria-label="The text"' + (r.lang === 'he' ? ' dir="rtl"' : '') + '>' + esc(r.text) + '</textarea>' +
+      '<div class="roacts"><button class="btn primary" data-ro="note"' + dis + '>Note on the passage</button><button class="btn" data-ro="typed"' + dis + '>Typed, in its place</button><button class="btn" data-ro="copy"' + dis + '>Copy</button></div>' +
+      '<div class="mute tiny">A note on the passage goes with the words beside it, as a highlight’s note, in the Notebook and the vault, and the handwriting stays. Typed, in its place, the handwriting goes.</div>');
+}
+async function onReadout(e){
+  const b = e.target.closest('[data-ro], [data-lang]'), r = P.ro; if (!b || !r) return;
+  if (b.dataset.lang) { if (b.dataset.lang === r.lang) return; r.lang = b.dataset.lang; put('readLang', r.lang); Object.assign(r, { status: 'reading', text: '', note: '' }); drawReadout(); read(); return; }
+  const k = b.dataset.ro, text = r.text.trim();
+  if (k === 'close') { closeReadout(); return; }
+  if (k === 'copy') { copy(text); return; }
+  if (!text) return;
+  b.disabled = true;
+  try {
+    if (k === 'note') { await r.surf.noteOnPassage(r.strokes, text); C.toast('A note on the passage, in the Notebook and the vault'); }
+    else if (k === 'typed') r.surf.typed(r.strokes, text);
+    closeReadout(); unhold();
+  } catch(err){ b.disabled = false; C.toast(err.message); }
+}
+function closeReadout(){ if (P.ro && P.ro.el) P.ro.el.remove(); P.ro = null; }
+async function copy(text){
+  try { await navigator.clipboard.writeText(text); C.toast('Copied'); return; } catch(e){}
+  const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+  try { document.execCommand('copy'); C.toast('Copied'); } catch(e){ C.toast('It couldn’t be copied here.'); }
+  t.remove();
+}
+
 function redraw(){ drawPal(); }
 // The app's own word that the button was clicked, since Android's WebView doesn't say (StylusButton.java).
 window.dafStylusButton = (x, y) => { seenPen(); if (writing() && Date.now() - (P.roundAt || 0) > 500) openRound(x, y); };
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && P.roundEl) { e.preventDefault(); e.stopPropagation(); closeRound(); } }, true);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (P.roundEl) { e.preventDefault(); e.stopPropagation(); closeRound(); }
+  else if (P.ro) { e.preventDefault(); e.stopPropagation(); closeReadout(); }
+  else if (P.held) { e.preventDefault(); e.stopPropagation(); unhold(); }
+}, true);
 window.addEventListener('resize', () => { closeRound(); closePop(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { closeRound(); ring(null); } });
 
 C.Pens = {
-  T, KINDS, COLORS, HLS, across, brush, colorOf, kindOf, opacityOf, shape, layer, sample, snapShape,
+  T, KINDS, COLORS, HLS, across, brush, colorOf, kindOf, opacityOf, writingOf, shape, layer, sample, snapShape, readInk, languages,
   listen, arm,
   // the surface the tools belong to now (an article, a book), or none
-  use(s){ P.surface = s; closePop(); closeRound(); drawPal(); },
+  use(s){ P.surface = s; closePop(); closeRound(); unhold(); closeReadout(); drawPal(); },
   surface: () => P.surface,
   redraw, closeRound, openRound, writing, on: () => P.on, seen: () => P.seen,
-  state: () => ({ tool: T.tool, pen: T.pen, on: P.on, seen: P.seen, round: !!P.roundEl, eraser: T.eraser.mode }),
+  state: () => ({ tool: T.tool, pen: T.pen, on: P.on, seen: P.seen, round: !!P.roundEl, eraser: T.eraser.mode, held: P.held ? P.held.strokes.length : 0, readout: P.ro ? { status: P.ro.status, text: P.ro.text, note: P.ro.note, lang: P.ro.lang } : null }),
 };
 })();

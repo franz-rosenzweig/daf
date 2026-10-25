@@ -1360,7 +1360,19 @@ label.pnrow span{width:56px} label.pnrow input[type=range]{flex:1;accent-color:v
   .inkpal .sep{width:1px;height:24px;margin:0 3px}
   .rv:has(.rvgrid.withpanel) .inkpal{right:50%}
 }
-@media print{.inkpal,.inkwet,.penring,.penround{display:none}}
+/* the lasso's hold, and handwriting read as text (pens.js) */
+.inklayer .held,svg .held{filter:drop-shadow(0 0 1.5px var(--accent)) drop-shadow(0 0 1.5px var(--accent))}
+.penheld{position:fixed;z-index:62;display:flex;gap:2px;padding:4px;border-radius:12px;background:var(--side);box-shadow:0 4px 18px rgba(0,0,0,.2),0 0 0 1px color-mix(in srgb,var(--fg) 10%,transparent)}
+.penheld button{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:0;border-radius:9px;background:none;color:var(--fg);font:inherit;font-size:14px;cursor:pointer}
+.penheld button:hover{background:var(--hover)}
+.readout{position:fixed;z-index:63;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(520px,calc(100vw - 24px));display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:16px;
+  background:var(--side);box-shadow:0 8px 30px rgba(0,0,0,.25),0 0 0 1px color-mix(in srgb,var(--fg) 10%,transparent)}
+.readout .rohead{display:flex;align-items:center;gap:10px}
+.readout .rohead .spacer{flex:1}
+.readout textarea{width:100%;box-sizing:border-box;font-family:var(--read);font-size:16px;line-height:1.45;resize:vertical}
+.readout .roacts{display:flex;gap:8px;flex-wrap:wrap}
+.readout .ronote{font-size:14px}
+@media print{.inkpal,.inkwet,.penring,.penround,.penheld,.readout{display:none}}
 
 /* ---------- focus mode: the reader on the whole screen (focus.js) ---------- */
 html.focus .side,html.focus .mobbar{display:none!important}

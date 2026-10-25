@@ -193,6 +193,9 @@ Start with [Getting started](docs/what-is-daf.md).
 
 - [foliate-js](https://github.com/johnfactotum/foliate-js), the reader inside Foliate, MIT, vendored in `web/vendor/foliate-js` (with fflate, MIT, and zip.js, BSD-3-Clause).
 - [pdf.js](https://github.com/mozilla/pdf.js) 4.10.38, Apache 2.0, vendored in `web/vendor/pdfjs`.
+- [perfect-freehand](https://github.com/steveruizok/perfect-freehand) 1.2.3, MIT, which draws what's written with a pen, vendored in `web/vendor/freehand.js`.
+- [Grape](https://github.com/Joost-8/Grape), Apache 2.0 (its NOTICE is beside it in `web/vendor/hwr`), which reads English handwriting, with the reader for it from [FineNotes](https://github.com/joost-8/FineNotes), GPL-3.0-or-later, as Moshe has them.
+- Google's [ML Kit Digital Ink Recognition](https://developers.google.com/ml-kit/vision/digital-ink-recognition), in the Android app only, for Hebrew handwriting. It's under Google's own terms and isn't free software, so it has an exception of its own (below).
 - [FastAPI](https://github.com/fastapi/fastapi), MIT, and [Uvicorn](https://github.com/encode/uvicorn), BSD-3-Clause.
 - [python-multipart](https://github.com/Kludex/python-multipart), Apache 2.0, [pypdf](https://github.com/py-pdf/pypdf), BSD-3-Clause, [Pillow](https://github.com/python-pillow/Pillow), MIT-CMU, and [Trafilatura](https://github.com/adbar/trafilatura), Apache 2.0.
 - [KOReader](https://github.com/koreader/koreader), AGPL-3.0, which the Kindle plugin runs inside.
@@ -204,3 +207,5 @@ Start with [Getting started](docs/what-is-daf.md).
 ## License
 
 Daf is free software under the [GNU General Public License, version 3](LICENSE). I built it for my own reading on my own server, so in places it assumes my setup: the apps above, a Tailscale network and a systemd user service. [Your own server](docs/server.md) says what to change. The vendored libraries and the fonts keep their own licenses, listed above.
+
+**One exception, for the Android app.** The Android app reads Hebrew handwriting with Google's ML Kit, which isn't free software. So, as an additional permission under section 7 of the GNU GPL version 3, the copyright holders of Daf give you permission to combine Daf's Android app with Google's ML Kit Digital Ink Recognition library (`com.google.mlkit:digital-ink-recognition`) and to convey the result. The GPL still applies to all of Daf's own code, and the permission covers nothing else. If you change Daf, you may keep this permission for your version or drop it; to leave the library out, remove it from `android/app/build.gradle` along with `InkReader.java` and the `ink` call in `Shell.java`.

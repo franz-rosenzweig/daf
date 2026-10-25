@@ -5,13 +5,15 @@ changes, and its points with the pen's pressure. The page makes each stroke's id
 offline and sent twice is kept once, and undo removes it by its id.
 
 A stroke is {id, v, tool: the pen (fountain, calligraphy, pen, pencil, brush, marker, highlighter),
-color ("ink", a highlight colour or #rrggbb), size (its width in px as written), o (opacity), at, pts}.
+color ("ink", a highlight colour or #rrggbb), size (its width in px as written), o (opacity), at, pts},
+and sh when it's a shape held still and made clean (not read as writing). Handwriting read as text
+and put in its place is tool "text", with text, fs (its type size, px) and w (its width, px).
 Round one's (no v) were tool "pen" or "marker" (the highlighter) with a named colour."""
 import json
 import re
 import time
 
-TOOLS = ("fountain", "calligraphy", "pen", "pencil", "brush", "marker", "highlighter")
+TOOLS = ("fountain", "calligraphy", "pen", "pencil", "brush", "marker", "highlighter", "text")
 COLORS = ("ink", "blue", "red", "green", "yellow", "pink", "purple")
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 ID = re.compile(r"^k[0-9a-z]{8,32}$")
@@ -28,6 +30,9 @@ def strokes(conn, doc):
         s = {"id": r["id"], "tool": r["tool"], "color": r["color"], "size": r["size"], "at": data.get("at"), "pts": data.get("pts"), "created": r["created"]}
         if data.get("v"):
             s["v"], s["o"] = data["v"], data.get("o", 1)
+        for k in ("sh", "text", "fs", "w"):
+            if data.get(k) is not None:
+                s[k] = data[k]
         out.append(s)
     return out
 
@@ -68,6 +73,13 @@ def _clean(s):
     out = {"id": s["id"], "tool": tool, "color": color, "size": round(_num(s.get("size") or 2.5, 0.3, 80), 1), "at": at, "pts": clean}
     if v:
         out["v"], out["o"] = v, round(_num(s.get("o") if s.get("o") is not None else 1, 0.05, 1), 2)
+    if s.get("sh"):
+        out["sh"] = 1
+    if tool == "text":
+        text = str(s.get("text") or "").strip()[:5000]
+        if not v or not text:
+            raise ValueError("No text")
+        out.update(text=text, fs=round(_num(s.get("fs") or 16, 6, 120), 1), w=round(_num(s.get("w") or 120, 1, 5000), 1))
     return out
 
 
@@ -81,6 +93,7 @@ def change(conn, doc, add=(), remove=(), at=None):
         data = {"at": s["at"], "pts": s["pts"]}
         if s.get("v"):
             data.update(v=s["v"], o=s["o"])
+        data.update({k: s[k] for k in ("sh", "text", "fs", "w") if k in s})
         conn.execute("INSERT OR REPLACE INTO ink (id, doc, tool, color, size, data, created) VALUES (?, ?, ?, ?, ?, ?, ?)",
                      (s["id"], doc, s["tool"], s["color"], s["size"], json.dumps(data, separators=(",", ":")), created))
         added += 1

@@ -275,6 +275,9 @@ if (!mac && !window.dafShell) {
   });
   const call = (op, args) => new Promise((ok, no) => { const id = ++seq; waiting.set(id, [ok, no]); send({ id, op, args: args || {} }); });
   const caps = ['share', 'download', 'openExternal', 'haptic', 'media', 'offline', 'screen', 'alerts', 'bars', 'reading'];
+  // ink (Google's handwriting reader, for Hebrew) came with 0.5.2
+  const since = w => { const a = ua[1].split('.').map(Number), b = w.split('.').map(Number); for (let i = 0; i < 3; i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); return true; };
+  if (since('0.5.2')) caps.push('ink');
   const s = v => v == null ? '' : String(v);
   window.dafShell = Object.freeze({
     platform: 'android', version: ua[1],
@@ -295,6 +298,8 @@ if (!mac && !window.dafShell) {
     // books on the phone: {op: 'list' | 'has' | 'keep' | 'sync', id?, on?}
     // and manga volumes: {op: 'manga', id, size (the long side this screen's reader asks for), on}
     offline: a => call('offline', { op: s(a && a.op) || 'list', id: s(a && a.id), on: !(a && a.on === false), size: +(a && a.size) || 0 }),
+    // handwriting read as text by Google's reader on the device (pens.js, for Hebrew): {op: 'has' | 'read', lang, strokes: [[[x, y], …], …]}
+    ink: a => call('ink', { op: s(a && a.op) || 'read', lang: s(a && a.lang), strokes: a && a.strokes ? JSON.stringify(a.strokes) : '' }),
   });
 }
 

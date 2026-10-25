@@ -18,7 +18,8 @@ import java.util.UUID;
 
 /**
  * window.dafShell's Android half (docs/SHELL.md §2): share, download, openExternal, haptic,
- * media (what read-aloud is doing, for listening with the screen off: Listen.java), offline
+ * ink (handwriting read as text by Google's reader: InkReader.java), media (what read-aloud is
+ * doing, for listening with the screen off: Listen.java), offline
  * (books kept on the phone: Offline.java), screen (the manga reader's whole screen), and alerts
  * (notifications for new posts: FeedNews.java).
  *
@@ -122,12 +123,29 @@ final class Shell {
                 case "openExternal":
                     reply(p, id, activity.outside(Uri.parse(a.optString("url"))));
                     break;
+                case "ink":
+                    ink(p, id, a);
+                    break;
                 default:
                     fail(p, id, "no such shell call: " + m.optString("op"));
             }
         } catch (Exception e) {
             fail(p, id, String.valueOf(e.getMessage()));
         }
+    }
+
+    /** Handwriting read as text on the device (InkReader, for Hebrew): {op: has, lang} answers
+     *  whether it can, {op: read, lang, strokes} answers {text} for one line. */
+    private InkReader inkReader;
+
+    private void ink(WebMessagePort p, int id, JSONObject a) {
+        if (inkReader == null) inkReader = new InkReader(web);
+        String lang = a.optString("lang");
+        if ("has".equals(a.optString("op"))) { reply(p, id, inkReader.has(lang)); return; }
+        inkReader.read(lang, a.optString("strokes"), (text, error) -> {
+            if (error != null) { fail(p, id, error); return; }
+            send(p, "{\"id\":" + id + ",\"ok\":true,\"value\":{\"text\":" + JSONObject.quote(text) + "}}");
+        });
     }
 
     /** A tap felt in the hand, the way native apps answer: confirm (Keep), reject (Less often,
