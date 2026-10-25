@@ -108,6 +108,7 @@ Chrome and a photo of a marked page, and switch on the nudge and press Show one 
 | --- | --- |
 | `MainActivity.java` | the WebView, Back, the volume keys, downloads, pages opened from the widget and shortcuts |
 | `Shell.java` | `window.dafShell` over a message port: share, download, openExternal |
+| `StylusButton.java` | the S Pen's button, which the WebView doesn't pass on: a click over the glass opens the page's round pen menu (`window.dafStylusButton`), held while writing it erases (the stroke goes to the page as the eraser end's) |
 | `Server.java` | the base URL, the token in the keystore, and the endpoints |
 | `ShareActivity.java` | Save to Daf in the share sheet: links and photos |
 | `Widget.java` | the widget in both sizes, its refresh, and the long-press shortcuts |

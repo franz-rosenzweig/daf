@@ -131,6 +131,12 @@ sheet in the book reader). If nothing is open it goes back in history, if there'
 to go back to. It answers `false` when there's nowhere to go, so Android can leave the app
 and the Mac can beep.
 
+`window.dafStylusButton(x, y)` (Android): the S Pen's button pressed and let go with the pen
+over the glass, at (x, y) in the page's pixels. The page (`pens.js`) opens its round pen menu
+there. Android's WebView doesn't pass the button on to the page, so the app hears it itself
+(`StylusButton.java`). Held while the pen writes, the app sends that stroke to the page as the
+eraser end's (`pointerType` "pen", `buttons` 32), and the page erases with it.
+
 ## 5. What the shell does on its own
 
 - **Only Daf in the window:** the base URL's origin. Any other address, including

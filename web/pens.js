@@ -50,7 +50,7 @@ const T = {
   favorites: saved.favorites || [],                                                                // [{pen, size, color, opacity}]
   recent: saved.recent || ['ink', '#1971c2', '#e03131'],
 };
-const P = { on: get('on', old('on') !== false), seen: get('seen', !!old('seen')), surface: null, live: null, near: 0, lastPen: 0, penUp: 0, tapping: false, docs: new Set(), button: false };
+const P = { on: get('on', old('on') !== false), seen: get('seen', !!old('seen')), surface: null, live: null, near: 0, lastPen: 0, penUp: 0, tapping: false, docs: new Set(), button: null };
 let keepT = 0;
 const keep = () => { clearTimeout(keepT); keepT = setTimeout(() => put('tools', T), 300); };
 // The highlighter's colour is Daf's highlight colour, one choice for both.
@@ -315,8 +315,9 @@ function listen(doc, surf){
     if (e.pointerType !== 'pen') return;
     seenPen();
     const o = off(), x = e.clientX + o[0], y = e.clientY + o[1];
-    // the button pressed with the pen over the glass: the round menu
-    if (!(e.buttons & 1) && (e.button === 2 || (e.buttons & 2)) && writing()) { e.preventDefault(); e.stopPropagation(); P.button = true; openRound(x, y); return; }
+    // the button pressed with the pen over the glass: the round menu once it's let go (a click)
+    if (!(e.buttons & 1) && (e.button === 2 || (e.buttons & 2)) && writing()) { e.preventDefault(); e.stopPropagation(); P.button = { x, y, t: Date.now() }; return; }
+    if (P.button) P.button.touched = true;
     if (!mine(e, doc, surf)) return;
     e.preventDefault(); e.stopPropagation();
     closePop(); closeRound(); ring(null);
@@ -331,14 +332,14 @@ function listen(doc, surf){
     P.near = Date.now();
     const o = off();
     if (P.live && e.pointerId === P.live.id) { e.preventDefault(); feed(e, o); return; }
-    // over the glass: the ring, and the button pressed there (when no pointerdown said so)
+    // over the glass: the ring, and the button pressed and let go there (when no pointerdown said so)
     const pressed = !!(e.buttons & 2) && !(e.buttons & 1);
-    if (pressed && !P.button && writing()) { P.button = true; openRound(e.clientX + o[0], e.clientY + o[1]); }
-    else if (!pressed) P.button = false;
+    if (pressed && !P.button && writing()) P.button = { x: e.clientX + o[0], y: e.clientY + o[1], t: Date.now() };
+    else if (!pressed && P.button && !(e.buttons & 1)) clicked();
     if (writing() && !(e.buttons & 1) && !P.roundEl && e.target && e.target.closest && !e.target.closest(SKIP) && surf.takes(e.target, doc)) ring(e.clientX + o[0], e.clientY + o[1]);
   }, true);
   const up = e => {
-    if (e.pointerType === 'pen' && !(e.buttons & 2)) P.button = false;
+    if (e.pointerType === 'pen' && !(e.buttons & 2) && P.button && !P.live) { clicked(); return; }
     const L = P.live; if (!L || e.pointerId !== L.id) return;
     P.live = null; P.penUp = Date.now(); P.near = Date.now(); clearTimeout(L.stillT);
     e.preventDefault(); dry();
@@ -357,6 +358,9 @@ function listen(doc, surf){
   doc.addEventListener('contextmenu', e => { if (Date.now() - P.lastPen < 800 && writing()) e.preventDefault(); }, true);
   if (P.seen) arm(doc);
 }
+// The button let go: a click opens the round menu where it was pressed, unless the pen came down
+// in between (it was erasing) or it was held a while.
+function clicked(){ const b = P.button; P.button = null; if (b && !b.touched && Date.now() - b.t < 1500 && writing()) openRound(b.x, b.y); }
 // A tap with the pen is a tap: a link, a picture, a highlight, a timestamp.
 function tap(doc, x, y){
   const el = doc.elementFromPoint(x, y); if (!el) return;
@@ -552,7 +556,7 @@ function openRound(x, y){
 function closeRound(){ if (P.roundEl) { P.roundEl.remove(); P.roundEl = null; } if (P.roundOff) { document.removeEventListener('pointerdown', P.roundOff, true); P.roundOff = null; } }
 
 function redraw(){ drawPal(); }
-// The shell's own word that the button was pressed, for a WebView that doesn't say (Android: Shell).
+// The app's own word that the button was clicked, since Android's WebView doesn't say (StylusButton.java).
 window.dafStylusButton = (x, y) => { seenPen(); if (writing() && Date.now() - (P.roundAt || 0) > 500) openRound(x, y); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && P.roundEl) { e.preventDefault(); e.stopPropagation(); closeRound(); } }, true);
 window.addEventListener('resize', () => { closeRound(); closePop(); });
