@@ -14,6 +14,8 @@ Daf for KOReader.
   * The Daf tab (dafscreen.lua): today, the day's review with Keep and Less often, the
     nightstand, and opening a book from it. From the bar, Tools → Daf → Open Daf, or a
     gesture. Works offline from the last answer; taps are queued.
+  * Books from Daf (inbox.lua): on the Wi-Fi sync, what Daf has waiting for the Kindle goes into
+    its shelf, downloaded in the background.
   * Home (home.lua) and the shelves (shelf.lua), drawn with canvas.lua, with book covers from
     covers.lua (made ahead for the whole library after Home appears); and outside a book,
     the book's global settings in KOReader's menu too (readerprefs.lua).
@@ -27,6 +29,7 @@ local Covers = require("covers")
 local DataStorage = require("datastorage")
 local DafScreen = require("dafscreen") -- must load here, while the plugin folder is on package.path
 local Home = require("home")
+local Inbox = require("inbox")
 local ReaderPrefs = require("readerprefs")
 local Shelf = require("shelf")
 local Dispatcher = require("dispatcher")
@@ -211,7 +214,8 @@ function Daf:pendingPages()
     end)
 end
 
-function Daf:send(quiet)
+-- no_books: the sync as the Kindle goes to sleep, which doesn't wait for downloads.
+function Daf:send(quiet, no_books)
     if not self:configured() then
         if not quiet then UIManager:show(InfoMessage:new{ text = _("Daf isn't set up on this Kindle yet."), timeout = 4 }) end
         return false
@@ -237,6 +241,10 @@ function Daf:send(quiet)
     if not ok_h then logger.warn("[Daf] highlights:", books); books = 0 end
     self:fetchToday()
     self:refreshSleepMessage(true)
+    if not no_books then
+        local ok_b, err_b = pcall(Inbox.sync, self, request)
+        if not ok_b then logger.warn("[Daf] inbox:", err_b) end
+    end
     if not quiet then
         local text = sent > 0 and string.format(_("Sent %d page turns to Daf."), sent) or _("Daf is up to date.")
         if books > 0 then text = text .. " " .. string.format(_("Highlights from %d books too."), books) end
@@ -780,7 +788,7 @@ end
 function Daf:onSuspend()
     flushStatistics()
     self:refreshSleepMessage(true)
-    if online() then pcall(function() self:flushReview(); self:send(true) end) end
+    if online() then pcall(function() self:flushReview(); self:send(true, true) end) end
 end
 
 function Daf:onCloseDocument()

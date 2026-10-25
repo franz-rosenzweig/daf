@@ -182,6 +182,7 @@ local function refreshShown()
         end
     end
 end
+C.refreshShown = refreshShown
 
 function C.watchFiles()
     if C.watching then return end
