@@ -698,6 +698,7 @@ async function renderPrefs(){
     '<section class="card" id="nlcard"><h2>Newsletters</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="digestcard"><h2>Morning email</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="igcard"><h2>Instagram</h2><span class="mute">Loading…</span></section>' +
+    '<section class="card" id="alcard"><h2>AniList</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="aicard"><h2>AI</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="keyscard"><h2>Keyboard</h2></section>' +
     '<section class="card" id="importcard"><h2>Import</h2><span class="mute">Loading…</span></section>' +
@@ -719,7 +720,7 @@ async function renderPrefs(){
 const PREF_GROUPS = [
   ['Reading', [['goalscard', 'Goals'], ['countcard', 'What counts'], ['reviewcard', 'Daily review'], ['readercard', 'Reader'], ['dayscard', 'Days']]],
   ['Look', [['appearcard', 'Appearance'], ['keyscard', 'Keyboard']]],
-  ['Connections', [['phonecard', 'Phone'], ['podcard', 'Podcasts'], ['hccard', 'Hardcover'], ['nlcard', 'Newsletters'], ['digestcard', 'Morning email'], ['igcard', 'Instagram']]],
+  ['Connections', [['phonecard', 'Phone'], ['podcard', 'Podcasts'], ['hccard', 'Hardcover'], ['nlcard', 'Newsletters'], ['digestcard', 'Morning email'], ['igcard', 'Instagram'], ['alcard', 'AniList']]],
   ['AI', [['aicard', 'AI']]],
   ['Library', [['tagscard', 'Library tags'], ['importcard', 'Import']]],
   ['Help', [['tipscard', 'Tips'], ['fbcard', 'Feedback']]],
@@ -915,7 +916,7 @@ function show(quiet){
 
 // The cards from their own files, and #prefs/<card> scrolls to one.
 function prefsMore(){
-  const D = window.DafCore, cards = { keys: [D.Keys, 'keyscard'], ai: [D.AI, 'aicard'], digest: [D.Digest, 'digestcard'], import: [D.Imports, 'importcard'], feedback: [D.Feedback, 'fbcard'], tags: [D.TagMan, 'tagscard'], tips: [D.Tips, 'tipscard'], instagram: [D.Social, 'igcard'] };
+  const D = window.DafCore, cards = { keys: [D.Keys, 'keyscard'], ai: [D.AI, 'aicard'], digest: [D.Digest, 'digestcard'], import: [D.Imports, 'importcard'], feedback: [D.Feedback, 'fbcard'], tags: [D.TagMan, 'tagscard'], tips: [D.Tips, 'tipscard'], instagram: [D.Social, 'igcard'], anilist: [D.AniList, 'alcard'] };
   for (const [name, [mod, id]] of Object.entries(cards)) {
     const card = $('#' + id); if (!mod || !card) continue;
     // The cards above it are still loading and push it down: once more after they've come.
@@ -1126,6 +1127,13 @@ window.addEventListener('daf-hl-changed', () => { if (S.route[0] === 'review' &&
 async function start(){
   const me = await fetch('/api/me', { credentials:'same-origin' }).then(r => r.json()).catch(() => ({}));
   if (!me.signed_in) { renderLogin(); return; }
+  // AniList's sign-in coming back (anilist.py), when an older offline copy of Daf answered /anilist
+  if (/access_token=/.test(location.hash)) {
+    const p = new URLSearchParams(location.hash.slice(1));
+    history.replaceState(null, '', '/#prefs/anilist');
+    try { await api('/api/anilist/token', { method: 'POST', body: JSON.stringify({ access_token: p.get('access_token'), expires_in: p.get('expires_in') }) }); }
+    catch(e){ toast('AniList: ' + e.message); }
+  }
   S.user = me.user;
   S.route = route(); renderSide(); show(); await load();
   clearInterval(S.timer);

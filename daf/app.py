@@ -308,6 +308,48 @@ def delete_instagram_cookies(c=Depends(conn)):
     return social.forget(c)
 
 
+# ---- AniList: the sign-in manga-track.py sets manga progress with (anilist.py) ----
+
+@app.get("/api/anilist", dependencies=[Depends(user)])
+def get_anilist():
+    from . import anilist
+    return anilist.status() | {"authorize": anilist.authorize_url()}
+
+
+@app.put("/api/anilist", dependencies=[Depends(user)])
+async def put_anilist(request: Request):
+    """{client_id}: the API client made on AniList for Daf."""
+    from . import anilist
+    b = await _body(request)
+    cid = str(b.get("client_id") or "").strip()
+    if cid and not cid.isdigit():
+        raise HTTPException(400, "AniList's client ids are numbers")
+    anilist.set_client_id(cid)
+    return anilist.status() | {"authorize": anilist.authorize_url()}
+
+
+@app.post("/api/anilist/token", dependencies=[Depends(user)])
+async def post_anilist_token(request: Request):
+    from . import anilist
+    b = await _body(request)
+    try:
+        return await asyncio.to_thread(anilist.save_token, b.get("access_token"), b.get("expires_in"))
+    except Exception as e:  # noqa: BLE001 - AniList said no, or didn't answer
+        raise HTTPException(400, f"AniList didn't take it: {e}")
+
+
+@app.delete("/api/anilist", dependencies=[Depends(user)])
+def delete_anilist():
+    from . import anilist
+    return anilist.forget()
+
+
+@app.get("/anilist")
+def anilist_callback():
+    from . import anilist
+    return HTMLResponse(anilist.CALLBACK_PAGE, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
 @app.get("/api/thumb/{name}", dependencies=[Depends(user_or_device)])
 def get_thumb(name: str):
     """A saved page's picture, kept on the server (pages.keep_thumb). The name is its content's hash."""

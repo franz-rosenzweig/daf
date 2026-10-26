@@ -165,7 +165,7 @@ def load_settings():
         s["appearance"] = clean_appearance(a)
     if isinstance(saved.get("fonts"), list):            # your own font files (STATE/fonts), for the reading views
         s["fonts"] = [f for f in saved["fonts"] if isinstance(f, dict) and isinstance(f.get("file"), str)][:30]
-    for k in ("ai", "digest", "keys", "tips", "library", "instagram"):   # Preferences → AI (ai.py), the morning email (digest.py), key bindings, tips (app.py), who keeps the Library (karakeep.mode)
+    for k in ("ai", "digest", "keys", "tips", "library", "instagram", "anilist"):   # Preferences → AI (ai.py), the morning email (digest.py), key bindings, tips (app.py), who keeps the Library (karakeep.mode)
         if isinstance(saved.get(k), dict):
             s[k] = saved[k]
     if isinstance(saved.get("vault_search_exclude"), list):   # vault folders ⌘K never searches (vaultsearch.py)

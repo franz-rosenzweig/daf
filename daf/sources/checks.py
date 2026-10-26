@@ -161,6 +161,23 @@ def check_instagram(conn):
     return {"name": "Instagram", "ok": True, "phase": 5, "detail": f"signed in, renewed {_age(st['updated'])}{wait}"}
 
 
+def check_anilist():
+    """The sign-in manga-track.py sets manga progress on AniList with (anilist.py)."""
+    from .. import anilist
+    st = anilist.status()
+    run = st.get("last_run") or {}
+    last = f" · last update {_age(run['at'])}: {run.get('summary', '')}" if run.get("at") else ""
+    if not st["connected"]:
+        return {"name": "AniList", "ok": False, "phase": 5, "detail": "not connected (Preferences → AniList)" + last}
+    if st["expired"]:
+        return {"name": "AniList", "ok": False, "phase": 5, "detail": "the sign-in ran out: Preferences → AniList → Connect again" + last}
+    left = (st["expires_at"] - time.time()) / 86400
+    if run.get("error"):
+        return {"name": "AniList", "ok": False, "phase": 5, "detail": f"the last update failed: {run['error']}"}
+    return {"name": "AniList", "ok": left > 14, "phase": 5,
+            "detail": f"connected as {(st.get('user') or {}).get('name', '?')}" + (f", runs out in {int(left)} days" if left <= 30 else "") + last}
+
+
 def check_karakeep():
     from . import karakeep
     m = karakeep.mode()
@@ -206,4 +223,4 @@ def check_tools():
 def run_all(conn):
     return [x for x in [check_kindle(conn), check_koinsight(), check_abs(conn), check_vault(), check_calibre(),
             check_karakeep(), check_freshrss(conn), check_kokoro(), check_sefaria(conn), check_podcasts(conn),
-            check_instagram(conn), check_jobs(conn), check_tools()] if x]
+            check_instagram(conn), check_anilist(), check_jobs(conn), check_tools()] if x]
