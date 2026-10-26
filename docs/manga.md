@@ -50,4 +50,10 @@ Time in the reader is "Manga in Daf" on Today, one sitting per series a day, and
 
 Pages come from Komga shrunk to fit your screen and are kept on the server for next time, and on the device too, so turning pages is quick even on a phone.
 
+## AniList
+
+Once an hour a script on the server works out how far I've read each series, on the Kindle, in Daf or in Komga, and sets that on AniList. My files are mostly whole volumes and AniList counts chapters, so it turns "volume 5" into the chapter volume 5 ends on. It never lowers what AniList already has.
+
+It signs in with Daf's AniList connection. To set it up, go to **Preferences → AniList**, make a client on AniList once (its Redirect URL is `https://<your Daf>/anilist`, no secret needed), paste its Client ID and press **Connect AniList**. The sign-in lasts a year, and the same button renews it. The card shows when the last update ran and what it set.
+
 <sub>Next: [The Kindle](kindle.md) →</sub>

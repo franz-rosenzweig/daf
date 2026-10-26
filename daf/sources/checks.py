@@ -166,7 +166,7 @@ def check_anilist():
     from .. import anilist
     st = anilist.status()
     run = st.get("last_run") or {}
-    last = f" · last update {_age(run['at'])}: {run.get('summary', '')}" if run.get("at") else ""
+    last = f" · last update {_age(run['at'])}: {run['summary']}" if run.get("at") and run.get("summary") else ""
     if not st["connected"]:
         return {"name": "AniList", "ok": False, "phase": 5, "detail": "not connected (Preferences → AniList)" + last}
     if st["expired"]:

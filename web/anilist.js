@@ -12,7 +12,10 @@ async function prefs(card){
   const state = s.expired ? '<b style="color:var(--bad)">The AniList sign-in ran out</b> on ' + esc(day(s.expires_at)) + '. Connect again to renew it.'
     : s.connected ? 'Connected as <b>' + esc((s.user || {}).name || '') + '</b>, until ' + esc(day(s.expires_at)) + '.' + (soon ? ' <b>Renew it soon.</b>' : '')
     : 'Not connected yet.';
-  const run = s.last_run ? '<div class="prow"><div class="d"><b>Last update</b><span>' + esc(C.ago(s.last_run.at)) + ': ' + esc(s.last_run.summary || '') + '</span></div></div>' : '';
+  // the tracker's last run (manga-track.py's last-run.json); a run that couldn't sign in says so here
+  const lr = s.last_run, failed = lr && lr.error && s.connected && !s.expired;
+  const run = lr && (lr.summary || failed) ? '<div class="prow"><div class="d"><b>Last update</b><span>' + esc(C.ago(lr.at)) + ': ' +
+    (failed ? '<b style="color:var(--bad)">' + esc(lr.error) + '</b>' : esc(lr.summary)) + '</span></div></div>' : '';
   card.innerHTML = '<h2>AniList</h2>' +
     '<p class="mute" style="margin-top:0">Every hour Daf’s manga tracker works out how far you’ve read each series (on the Kindle, in Daf, in Komga) and sets it on AniList, turning volumes into chapters. It never lowers what AniList has.</p>' +
     '<div class="prow"><div class="d"><b>Sign-in</b><span>' + state + '</span></div>' +

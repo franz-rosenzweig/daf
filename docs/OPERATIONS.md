@@ -433,6 +433,12 @@ Komga is the library and Daf is where it's read; nothing is copied out of Komga.
   by md5, by file name, or by `series-map.json` and the volume number. Those rows leave Books, their Kindle
   time is titled by series, and the books goal leaves them out unless manga counts.
 - **Keys:** `/srv/docker/manga-import/komga.json` (mode 600, manga-track's), read in place.
+- **AniList (`daf/anilist.py`, `web/anilist.js`, 2026-10-26):** `manga-track.py` (cron, :25 every hour) sets
+  progress on AniList with the sign-in Daf keeps in `STATE/anilist/token.json` (mode 600; AniList's implicit
+  grant, a year at a time: the client id is in settings, the redirect is `/anilist`, which `sw.js` lets
+  through). The script leaves `{at, summary, error}` in `/srv/docker/manga-import/last-run.json` for the
+  Preferences card and the Sources check. It used Suwayomi's tracker until Suwayomi was retired the same day;
+  what Suwayomi's reader had marked read is kept in `suwayomi-snapshot.json` and still counts.
 
 ## Offline
 
