@@ -21,12 +21,13 @@ from . import config
 DIR = config.STATE / "anilist"
 TOKEN = DIR / "token.json"
 API = "https://graphql.anilist.co"
+UA = "Daf/1.0 (personal reading app)"      # AniList's front door turns Python's own User-Agent away (403)
 
 
 def _gql(token, query, variables=None):
     req = urllib.request.Request(API, data=json.dumps({"query": query, "variables": variables or {}}).encode(),
                                  headers={"Content-Type": "application/json", "Accept": "application/json",
-                                          "Authorization": "Bearer " + token})
+                                          "Authorization": "Bearer " + token, "User-Agent": UA})
     with urllib.request.urlopen(req, timeout=20) as r:
         d = json.load(r)
     if d.get("errors"):
