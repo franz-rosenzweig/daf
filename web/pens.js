@@ -346,10 +346,12 @@ function listen(doc, surf){
     seenPen();
     const o = off(), x = e.clientX + o[0], y = e.clientY + o[1];
     // the button pressed with the pen over the glass: the round menu once it's let go (a click)
-    if (!(e.buttons & 1) && (e.button === 2 || (e.buttons & 2)) && writing()) { e.preventDefault(); e.stopPropagation(); P.button = { x, y, t: Date.now() }; return; }
+    if (!(e.buttons & 1) && (e.button === 2 || (e.buttons & 2)) && writing()) { e.preventDefault(); e.stopPropagation(); P.button = pressButton(x, y); return; }
     if (P.button) P.button.touched = true;
     if (!mine(e, doc, surf)) return;
     e.preventDefault(); e.stopPropagation();
+    // a tap while the round menu or a pen panel is open only closes it: no mark on the page
+    if (P.roundEl || P.popEl) { closePop(); closeRound(); ring(null); return; }
     closePop(); closeRound(); ring(null); unhold();
     // the pen's button held (2) or an eraser end (32) erases, whatever tool is chosen
     const tool = T.tool === 'eraser' || (e.buttons & 34) || e.button === 2 || e.button === 5 ? 'eraser' : T.tool;
@@ -364,7 +366,7 @@ function listen(doc, surf){
     if (P.live && e.pointerId === P.live.id) { e.preventDefault(); feed(e, o); return; }
     // over the glass: the ring, and the button pressed and let go there (when no pointerdown said so)
     const pressed = !!(e.buttons & 2) && !(e.buttons & 1);
-    if (pressed && !P.button && writing()) P.button = { x: e.clientX + o[0], y: e.clientY + o[1], t: Date.now() };
+    if (pressed && !P.button && writing()) P.button = pressButton(e.clientX + o[0], e.clientY + o[1]);
     else if (!pressed && P.button && !(e.buttons & 1)) clicked();
     if (writing() && !(e.buttons & 1) && !P.roundEl && e.target && e.target.closest && !e.target.closest(SKIP) && surf.takes(e.target, doc)) ring(e.clientX + o[0], e.clientY + o[1]);
   }, true);
@@ -391,7 +393,9 @@ function listen(doc, surf){
 }
 // The button let go: a click opens the round menu where it was pressed, unless the pen came down
 // in between (it was erasing) or it was held a while.
-function clicked(){ const b = P.button; P.button = null; if (b && !b.touched && Date.now() - b.t < 1500 && writing()) openRound(b.x, b.y); }
+// The button pressed over the glass: with the round menu open it closes it, and its click opens nothing.
+function pressButton(x, y){ const closed = !!P.roundEl; if (closed) { closeRound(); P.roundAt = Date.now(); } return { x, y, t: Date.now(), closed }; }
+function clicked(){ const b = P.button; P.button = null; if (b && !b.touched && !b.closed && Date.now() - b.t < 1500 && writing()) openRound(b.x, b.y); }
 // A tap with the pen is a tap: a link, a picture, a highlight, a timestamp.
 function tap(doc, x, y){
   const el = doc.elementFromPoint(x, y); if (!el) return;
@@ -710,7 +714,13 @@ async function copy(text){
 
 function redraw(){ drawPal(); }
 // The app's own word that the button was clicked, since Android's WebView doesn't say (StylusButton.java).
-window.dafStylusButton = (x, y) => { seenPen(); if (writing() && Date.now() - (P.roundAt || 0) > 500) openRound(x, y); };
+// A click opens the round menu, and the next one closes it.
+window.dafStylusButton = (x, y) => {
+  seenPen();
+  if (Date.now() - (P.roundAt || 0) < 500) return;
+  if (P.roundEl) { closeRound(); P.roundAt = Date.now(); return; }
+  if (writing()) openRound(x, y);
+};
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (P.roundEl) { e.preventDefault(); e.stopPropagation(); closeRound(); }
