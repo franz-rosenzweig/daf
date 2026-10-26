@@ -23,8 +23,8 @@ async function prefs(card){
         '<a class="btn sm primary" href="' + esc(s.authorize) + '">' + (s.connected ? 'Connect again' : 'Connect AniList') + '</a></div>' : '') + '</div>' + run +
     '<details class="steps"' + (s.client_id ? '' : ' open') + '><summary>The AniList client (once)</summary><ol>' +
       '<li>On AniList, open <a href="https://anilist.co/settings/developer" target="_blank" rel="noopener">Settings → Developer</a> and press <b>Create New Client</b>.</li>' +
-      '<li>Name it <b>Daf</b>, and for the Redirect URL paste <code>' + esc(s.redirect) + '</code> <button class="linkbtn" data-al="copy" data-v="' + esc(s.redirect) + '">Copy</button></li>' +
-      '<li>Save, then paste its <b>Client ID</b> (a number) here:</li></ol>' +
+      '<li>Name it <b>Daf</b>, and for the Redirect URL paste <code>' + esc(s.redirect) + '</code> <button class="linkbtn" data-al="copy" data-v="' + esc(s.redirect) + '">Copy</button> exactly as it is. If Connect doesn’t bring you back here, this is usually why.</li>' +
+      '<li>Save, then paste its <b>Client ID</b> (a number) here. Daf doesn’t need the secret.</li></ol>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap"><input class="field" id="alcid" inputmode="numeric" placeholder="Client ID" value="' + esc(s.client_id || '') + '" style="width:12em"><button class="btn sm" data-al="save">Save</button></div></details>';
 }
 
