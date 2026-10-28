@@ -475,7 +475,8 @@ struct VideoArticle: View {
     private func transcribe() async {
         do {
             let r = J(try await API.shared.send("POST", "/api/podcasts/transcribe", ["doc": model.id]))
-            if r?.s("status") == "done" { podtr = nil; await model.load() } else { podtr = J(["status": "queued"]) }
+            let queued: J = J(["status": "queued"])
+            if r?.s("status") == "done" { podtr = nil; await model.load() } else { podtr = queued }
         } catch { app.error = error.localizedDescription }
     }
 
