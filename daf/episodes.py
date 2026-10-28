@@ -363,7 +363,7 @@ def _cue_items_vtt(text):
 
 def _speakers(items):
     """"Name: words" lines: a label before a colon that comes back again and again is a speaker
-    (Buzzsprout's are "Liza Love: …", decorations and all), not a "Note:" in passing."""
+    (Buzzsprout's are "Jane Doe: …", emoji and all), not a "Note:" in passing."""
     label = re.compile(r"^([^:\n]{2,60}?):\s+(.+)$", re.S)
     counts = {}
     for _, spk, body in items:
