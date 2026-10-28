@@ -171,8 +171,8 @@ final class VideoPlayer {
         Task { _ = try? await API.shared.send("POST", "/api/podcasts/position", body) }
     }
 
-    /// A time picked (a timestamp, a chapter, −15 or +30) plays from there.
-    func seek(_ t: Double) {
+    /// A time picked (a timestamp, a chapter, −15 or +30) plays from there; the slider only moves it.
+    func seek(_ t: Double, play: Bool = true) {
         guard let p = av else { web?.evaluateJavaScript("dafSeek(\(t))"); return }
         if let s = seg { send(s, time) }
         seg = nil
@@ -181,7 +181,7 @@ final class VideoPlayer {
         time = to
         last = to
         lastTick = Date()
-        if p.timeControlStatus == .paused { p.play() } else { seg = to }
+        if p.timeControlStatus != .paused { seg = to } else if play { p.play() }
     }
 
     func skip(_ s: Double) { seek(max(0, time + s)) }
@@ -292,6 +292,34 @@ struct MediaView: NSViewRepresentable {
     func updateNSView(_ v: AVPlayerView, context: Context) {}
 
     static func dismantleNSView(_ v: AVPlayerView, coordinator: ()) { v.player = nil }
+}
+
+/// An episode's own bar, in the theme's colours: play and pause, where it is, and the rest to go.
+struct AudioBar: View {
+    let player: VideoPlayer
+    /// Where the slider is while it's dragged; the audio goes there when it's let go.
+    @State private var dragging: Double?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button { player.toggle() } label: {
+                Image(systemName: player.playing ? "pause.fill" : "play.fill").font(.title2).frame(width: 28, height: 28)
+            }
+            .buttonStyle(.borderless)
+            .help(player.playing ? "Pause (P)" : "Play (P)")
+            Text(VideoPlayer.clock(dragging ?? player.time)).monospacedDigit().foregroundStyle(.secondary)
+            Slider(value: Binding(get: { dragging ?? player.time }, set: { dragging = $0 }), in: 0...max(1, player.duration), onEditingChanged: { editing in
+                if !editing, let t = dragging {
+                    player.seek(t, play: false)
+                    dragging = nil
+                }
+            })
+            .disabled(player.duration == 0)
+            Text(player.duration > 0 ? "−" + VideoPlayer.clock(max(0, player.duration - (dragging ?? player.time))) : "–:––")
+                .monospacedDigit().foregroundStyle(.secondary)
+        }
+        .onAppear { player.start() }
+    }
 }
 
 /// A video's or an episode's page: the player and its bar above the transcript (or the way to get one).
@@ -427,7 +455,7 @@ struct VideoArticle: View {
                     .frame(width: 56, height: 56)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                MediaView(player: v).frame(height: 46)
+                AudioBar(player: v)
             }
             HStack(spacing: 10) {
                 Button("−15") { v.skip(-15) }.help("Back 15 seconds (←)")

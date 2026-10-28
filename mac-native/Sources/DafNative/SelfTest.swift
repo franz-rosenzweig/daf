@@ -262,7 +262,8 @@ enum SelfTest {
         check(clean?.s("note") == nil && clean?.strings("tags") == oldTags, "and both go again", "\(clean?.s("note") ?? "-") / \(clean?.strings("tags") ?? [])")
 
         // overlapping highlights merge into one, as the page merges them
-        if let blk2 = r.blocks.first(where: { $0.range.length > 80 }) {
+        let hlBlocks = Set(r.highlights.compactMap { $0.o("pos")?.i("b") })     // a paragraph no highlight is in yet
+        if let blk2 = r.blocks.first(where: { $0.range.length > 80 && !hlBlocks.contains($0.i) }) {
             let before2 = r.highlights.count
             tv.setSelectedRange(NSRange(location: blk2.range.location + 2, length: 20))
             await r.highlightSelection()
@@ -368,7 +369,7 @@ enum SelfTest {
         // read aloud: Daf's speech for each paragraph, the paragraph marked (with the sound off)
         let sp = Speaker.shared
         sp.volume = 0
-        sp.start(r)
+        sp.start(r, at: 0)                       // from the top: the place test leaves it near the end
         let spoke = await until(90) { sp.started >= 1 }
         check(spoke && sp.playing, "Listen reads the article aloud in Daf's voice", "paragraph \(sp.index + 1) of \(sp.paragraphs.count)")
         var marked = false
@@ -701,8 +702,9 @@ enum SelfTest {
             }
         }
 
-        // Torah: the week's readings, opened in the native reader
+        // Torah: the week's readings, opened in the native reader (a fresh sandbox fetches the week first, slowly)
         await go(m, .torah)
+        for _ in 0..<3 where m.torah == nil { await go(m, .torah) }
         check(m.torah?.o("parasha") != nil && !m.items.isEmpty, "Torah has this week's parasha and readings", m.torah?.o("parasha")?.s("name") ?? "")
         if let reading = m.items.first {
             m.selection = reading.id
@@ -801,7 +803,9 @@ enum SelfTest {
         // a podcast episode's page (episodes.py): from where it was left, +30, the speed, where it stops
         // sent back in stretches; its chapters, its transcript marked as it plays, Clip 30s
         var epID: String?
-        let feedItems = (try? await API.shared.json("/api/docs?where=feed&tab=unseen&limit=400"))?.a("items") ?? []
+        // in the Feed, or in the Library once a clip on it saved it there
+        let feedItems = ((try? await API.shared.json("/api/docs?where=library&tab=inbox&limit=200"))?.a("items") ?? [])
+            + ((try? await API.shared.json("/api/docs?where=feed&tab=unseen&limit=400"))?.a("items") ?? [])
         for x in feedItems.filter({ $0.s("kind") == "podcast" }).prefix(12) {
             if let id = x.s("id"), let d = try? await API.shared.json("/api/docs/" + API.enc(id) + "?prefetch=1"),
                d.o("episode")?.o("transcript")?.s("status") == "done" { epID = id; break }
@@ -847,7 +851,7 @@ enum SelfTest {
                       "\(chapters) chapters, \(r.highlights.count - before) clipped")
                 for h in r.highlights.dropFirst(before) { if let hid = h.s("id") { await r.remove(highlight: hid) } }
             } else { check(false, "an episode opens natively", m.reader?.error ?? "not ready: \(m.reader?.video?.duration ?? -1)") }
-        } else { log("INFO  no episode with a transcript in the sandbox's Feed (sandbox_more.py makes one)") }
+        } else { log("INFO  no episode with a transcript in the sandbox (sandbox_more.py makes one)") }
 
         // the Podcasts page, and a show's episodes
         await go(m, .podcasts)

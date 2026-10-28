@@ -326,7 +326,7 @@ final class ReaderModel {
         // the head: title, then where it's from
         out.append(NSAttributedString(string: d.s("title") ?? "Untitled", attributes: [.font: bold(serif, 30), .foregroundColor: ink, .paragraphStyle: para(8, line: 1.15)]))
         out.append(NSAttributedString(string: "\n"))
-        let by = [d.s("source"), d.s("author"), d.i("mins").map { "\($0) min" }].compactMap { $0 }.joined(separator: " · ")
+        let by = [d.s("source"), d.s("author"), d.s("kind") == "podcast" ? "episode" : d.i("mins").map { "\($0) min" }].compactMap { $0 }.joined(separator: " · ")
         out.append(NSAttributedString(string: by, attributes: [.font: NSFont.systemFont(ofSize: 13), .foregroundColor: quiet, .paragraphStyle: para(26, line: 1.2)]))
 
         var map: [(Int, NSRange)] = []
