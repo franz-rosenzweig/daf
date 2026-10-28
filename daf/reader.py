@@ -264,10 +264,15 @@ def get_doc(conn, doc_id, prefetch=False):
                     d["preparing"] = True
                 elif st.get("error"):
                     d["content_error"] = st["error"]
+    if d["kind"] == "podcast" and d.get("enclosure"):
+        from . import episodes                       # its transcript in front of the show notes, and its player's details
+        blocks = episodes.blocks(conn, d, blocks)
+        d["episode"] = episodes.state(conn, d, opening=not prefetch)
+        d["duration"] = d.get("duration") or d["episode"]["duration"]
     d["has_pdf"] = d["kind"] == "pdf"
     d["blocks"] = blocks
     d["mins"] = round(d["duration"] / 60) if d.get("duration") else max(1, round((d["words"] or 0) / 238)) if d["words"] else None
-    d["counted"] = bool(config.load_settings()["count"].get("video" if d["kind"] == "video" else "article"))
+    d["counted"] = bool(config.load_settings()["count"].get(d["kind"] if d["kind"] in ("video", "podcast") else "article"))
     d["highlights"] = [dict(r) for r in conn.execute(
         "SELECT h.id, h.text, h.pos, h.created, h.color, h.source, "
         "CASE WHEN h.source = 'kindle' THEN COALESCE(s.user_note, h.note) ELSE s.user_note END AS user_note "
@@ -416,17 +421,21 @@ def save_to_library(conn, doc_id):
             conn.execute("INSERT OR REPLACE INTO doc_content (id, blocks, fetched) VALUES (?, ?, ?)", (new_id, blocks[0], int(time.time())))
     else:
         conn.execute(
-            "INSERT INTO docs (id, kind, where_, status, title, author, source, category, url, published, added, words, summary, ext_id, progress, note, opened) "
-            "VALUES (?, ?, 'library', 'inbox', ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO docs (id, kind, where_, status, title, author, source, category, url, published, added, words, summary, ext_id, progress, note, opened, "
+            "enclosure, duration) VALUES (?, ?, 'library', 'inbox', ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (new_id, d["kind"], d["title"], d["author"], d["source"], d["url"], d["published"], int(time.time()), d["words"],
-             d["summary"], b["id"], d["progress"], d["note"], d["opened"]))
+             d["summary"], b["id"], d["progress"], d["note"], d["opened"], d["enclosure"], d["duration"]))   # an episode keeps its audio
         if blocks:
             conn.execute("INSERT OR REPLACE INTO doc_content (id, blocks, fetched) VALUES (?, ?, ?)", (new_id, blocks[0], int(time.time())))
+        if d["kind"] == "podcast":
+            from . import episodes
+            episodes.index(conn, new_id)           # its transcript too, for search
         if own:
             if d["thumb"]:
                 conn.execute("UPDATE docs SET thumb = ? WHERE id = ?", (d["thumb"], new_id))
             from . import media
-            media.queue(conn, "page", new_id)   # its picture kept, and the whole page when the feed gave a summary
+            if d["kind"] != "podcast":          # an episode's text is its show notes and transcript, not its web page
+                media.queue(conn, "page", new_id)   # its picture kept, and the whole page when the feed gave a summary
     tags = json.loads(d["tags"]) if d["tags"] else []
     if tags and own:
         old = json.loads(had["tags"]) if had and had["tags"] else []
@@ -593,7 +602,7 @@ def beat(conn, settings, doc_id, seconds, at=None):
     if not seconds:
         return
     d = conn.execute("SELECT title, source, kind FROM docs WHERE id = ?", (doc_id,)).fetchone()
-    if not d:
+    if not d or d["kind"] == "podcast":            # an episode's time is its listening (gpodder.py), which never counts
         return
     src = "video" if d["kind"] == "video" else "article"
     now = int(time.time())

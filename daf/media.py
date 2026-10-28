@@ -5,7 +5,8 @@
   headings, so the reader's highlighting works on them unchanged.
 - Audiobookshelf bookmarks: the minute before the bookmark, transcribed into a highlight.
 - Podcast clips: a shared link with a time (from AntennaPod) becomes the transcript of
-  the minute before that point.
+  the minute before that point, on the episode's page (episodes.py), whose whole transcript is the
+  "podtr" job.
 
 Everything slow runs as a job in a background thread (the `jobs` table).
 """
@@ -51,15 +52,17 @@ def job_status(conn, kind, ref):
 
 
 QUICK = ("page",)                 # reading a saved page: its own worker, never behind a long transcript
+LONG = ("podtr",)                 # a whole podcast episode through whisper: its own worker too, so a reel doesn't wait an hour
 
 
 TEXT_JOBS = ("reel", "captions", "whisper", "pdf", "page")     # jobs that bring a document's text
 
 
-def _run_one(quick=False):
+def _run_one(lane="main"):
+    kinds = QUICK if lane == "quick" else LONG if lane == "long" else QUICK + LONG
     with db.session() as conn:
-        j = conn.execute(f"SELECT * FROM jobs WHERE status = 'queued' AND kind {'' if quick else 'NOT '}IN ({','.join('?' * len(QUICK))}) "
-                         "ORDER BY id LIMIT 1", QUICK).fetchone()
+        j = conn.execute(f"SELECT * FROM jobs WHERE status = 'queued' AND kind {'NOT ' if lane == 'main' else ''}IN ({','.join('?' * len(kinds))}) "
+                         "ORDER BY id LIMIT 1", kinds).fetchone()
         if not j:
             return False
         conn.execute("UPDATE jobs SET status = 'running', started = ? WHERE id = ?", (int(time.time()), j["id"]))
@@ -77,6 +80,9 @@ def _run_one(quick=False):
             abs_bookmark(j["ref"])
         elif j["kind"] == "clip":
             podcast_clip(detail)
+        elif j["kind"] == "podtr":
+            from . import episodes
+            episodes.transcribe(j["ref"])
         elif j["kind"] == "pdf":
             from . import pdfdoc
             with db.session() as conn:
@@ -116,10 +122,10 @@ def _run_one(quick=False):
     return True
 
 
-def worker(stop, quick=False):
+def worker(stop, lane="main"):
     while not stop.is_set():
         try:
-            busy = _run_one(quick)
+            busy = _run_one(lane)
         except Exception:  # noqa: BLE001
             log.exception("worker")
             busy = False
@@ -132,7 +138,8 @@ def start_worker():
         conn.execute("UPDATE jobs SET status = 'queued' WHERE status = 'running'")
     stop = threading.Event()
     threading.Thread(target=worker, args=(stop,), name="daf-media", daemon=True).start()
-    threading.Thread(target=worker, args=(stop, True), name="daf-pages", daemon=True).start()
+    threading.Thread(target=worker, args=(stop, "quick"), name="daf-pages", daemon=True).start()
+    threading.Thread(target=worker, args=(stop, "long"), name="daf-podcasts", daemon=True).start()
     return stop
 
 
@@ -331,30 +338,59 @@ def parse_share(text):
 
 
 def podcast_clip(detail):
-    url, pos, title = detail.get("url"), detail.get("pos"), detail.get("title")
+    """The stretch before a point in an episode as a highlight on the episode's page: its transcript's
+    lines when it has one, else that stretch through whisper (and the whole episode is transcribed)."""
+    from . import episodes, reader, vaultnotes
+    url, pos, title, sec = detail.get("url"), detail.get("pos"), detail.get("title"), int(detail.get("sec") or 60)
+    base = url.split("#")[0]
     with db.session() as conn:
-        ep = conn.execute("SELECT * FROM gp_episodes WHERE url = ? OR link = ?", (url.split("#")[0], url.split("#")[0])).fetchone()
-        audio = ep["url"] if ep else url.split("#")[0]
-        title = (ep["title"] if ep else None) or title or "Podcast episode"
-        podcast = ep["podcast_title"] if ep and "podcast_title" in ep.keys() else None
+        ep = conn.execute("SELECT * FROM gp_episodes WHERE url = ? OR link = ?", (base, base)).fetchone()
+        audio = ep["url"] if ep else base
+        if detail.get("doc") and conn.execute("SELECT 1 FROM docs WHERE id = ?", (detail["doc"],)).fetchone():
+            doc_id = detail["doc"]
+            audio = conn.execute("SELECT enclosure FROM docs WHERE id = ?", (doc_id,)).fetchone()[0] or audio
+        else:
+            doc_id = episodes.doc_for(conn, audio)
         if pos is None:
-            a = conn.execute("SELECT position FROM gp_actions WHERE episode = ? AND action = 'play' ORDER BY timestamp DESC LIMIT 1", (audio,)).fetchone()
-            pos = a[0] if a else None
+            p = episodes.position(conn, audio)
+            pos = p["t"] if p else None
+        tr = episodes.transcript(conn, audio)
     if pos is None:
         raise ValueError("no time in the shared text, and AntennaPod hasn't reported a position for it")
-    res = whisper(audio, start=max(0.0, pos - 60), duration=60)
-    text = " ".join(s["text"] for s in res["segments"]).strip()
+    s = config.load_settings()
+    if tr:
+        with db.session() as conn:
+            cues = [(i, b) for i, b in enumerate(tr[0]) if b.get("t") == "cue" and pos - sec <= b["ts"] <= pos]
+            if not cues:                         # a long line that started before the stretch
+                cues = [max(((i, b) for i, b in enumerate(tr[0]) if b.get("t") == "cue" and b["ts"] <= pos), key=lambda x: x[1]["ts"], default=None)]
+                cues = [c for c in cues if c]
+            for i, b in cues:
+                reader.add_highlight(conn, s, doc_id, i, 0, len(b["x"]), b["x"], t=b["ts"])
+            _keep(conn, doc_id)
+        return title, pos, " ".join(b["x"] for _, b in cues)
+    res = whisper(audio, start=max(0.0, pos - sec), duration=sec)
+    text = " ".join(x["text"] for x in res["segments"]).strip()
     if not text:
-        raise RuntimeError("nothing intelligible in that minute")
-    bid = "pod:" + hashlib.sha1(audio.encode()).hexdigest()[:16]
+        raise RuntimeError("nothing intelligible in that stretch")
     with db.session() as conn:
-        page = (ep["link"] if ep and ep["link"] else None) or audio
-        conn.execute("INSERT INTO books (id, kind, title, author, url, private) VALUES (?, 'podcast', ?, ?, ?, 0) "
-                     "ON CONFLICT(id) DO UPDATE SET title = excluded.title, url = excluded.url", (bid, title, podcast, page))
+        d = conn.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
+        reader._ensure_book(conn, d)
         hid = "pc" + hashlib.sha1(f"{audio}|{int(pos)}".encode()).hexdigest()[:16]
         conn.execute("INSERT OR REPLACE INTO highlights (id, book_id, source, text, note, chapter, page, created, pos, seen, deleted) "
                      "VALUES (?, ?, 'clip', ?, NULL, NULL, NULL, ?, ?, ?, 0)",
-                     (hid, bid, text, int(time.time()), json.dumps({"t": pos}), int(time.time())))
-        from . import vaultnotes
-        vaultnotes.write_article(conn, config.load_settings(), bid)
-    return title, pos, text
+                     (hid, doc_id, text, int(time.time()), json.dumps({"t": pos}), int(time.time())))
+        vaultnotes.write_article(conn, s, doc_id)
+        episodes.want(conn, audio, "clip")
+        _keep(conn, doc_id)
+    return d["title"] if d else title, pos, text
+
+
+def _keep(conn, doc_id):
+    """A Feed episode you clip is one you want to keep: to the Library, as a highlight takes any Feed item."""
+    from . import reader
+    d = conn.execute("SELECT where_ FROM docs WHERE id = ?", (doc_id,)).fetchone()
+    if d and d["where_"] == "feed":
+        try:
+            reader.save_to_library(conn, doc_id)
+        except Exception:  # noqa: BLE001 - the clip stands on the Feed item
+            log.exception("keeping %s", doc_id)

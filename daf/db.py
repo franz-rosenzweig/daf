@@ -247,6 +247,8 @@ CREATE TABLE IF NOT EXISTS gp_subs (url TEXT PRIMARY KEY, title TEXT, added INTE
 CREATE TABLE IF NOT EXISTS gp_actions (id INTEGER PRIMARY KEY AUTOINCREMENT, podcast TEXT, episode TEXT, action TEXT, position INTEGER,
   started INTEGER, total INTEGER, timestamp INTEGER, device TEXT, guid TEXT, received INTEGER);
 CREATE TABLE IF NOT EXISTS gp_episodes (url TEXT PRIMARY KEY, link TEXT, title TEXT, podcast TEXT, podcast_title TEXT, published INTEGER);
+CREATE TABLE IF NOT EXISTS episode_text (    -- a podcast episode's transcript (episodes.py), by its audio's address
+  audio TEXT PRIMARY KEY, blocks TEXT NOT NULL, chapters TEXT, source TEXT, lang TEXT, made INTEGER);
 CREATE TABLE IF NOT EXISTS nudges (at INTEGER NOT NULL, app TEXT, shown INTEGER NOT NULL, reason TEXT, minutes_left INTEGER);
 CREATE TABLE IF NOT EXISTS inbox (           -- links shared to Daf from the phone, until Karakeep has them
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -293,7 +295,11 @@ MIGRATIONS = [("books", "hc_id", "INTEGER"), ("docs", "duration", "INTEGER"), ("
               ("docs", "tags", "TEXT"), ("docs", "ai_summary", "TEXT"),
               ("docs", "starred", "INTEGER"), ("sessions", "pages", "INTEGER"),
               ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("docs", "full", "INTEGER"),
-              ("docs", "deleted", "INTEGER")]
+              ("docs", "deleted", "INTEGER"),
+              # what a feed says about an episode (episodes.parse_feed)
+              ("gp_episodes", "guid", "TEXT"), ("gp_episodes", "author", "TEXT"), ("gp_episodes", "image", "TEXT"),
+              ("gp_episodes", "duration", "INTEGER"), ("gp_episodes", "notes", "TEXT"), ("gp_episodes", "transcript_url", "TEXT"),
+              ("gp_episodes", "transcript_type", "TEXT"), ("gp_episodes", "chapters_url", "TEXT"), ("gp_episodes", "checked", "INTEGER")]
 
 
 @contextmanager

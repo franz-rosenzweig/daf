@@ -8,10 +8,7 @@ time. Podcasts never count toward the hour; they show as their own line.
 import json
 import re
 import time
-import urllib.request
-import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 
 from . import config
 
@@ -88,28 +85,15 @@ def actions_upload(conn, actions):
 
 
 def refresh_feeds(conn, limit=15):
-    """Titles and episodes for subscribed feeds, so clips and listening have names."""
+    """Titles and episodes for subscribed feeds, so clips and listening have names, and episode pages
+    their show notes, transcripts and chapters (episodes.read_feed)."""
+    from . import episodes
     day = int(time.time()) - 86400
     for (url,) in conn.execute("SELECT url FROM gp_subs WHERE removed IS NULL AND (checked IS NULL OR checked < ?) LIMIT ?", (day, limit)).fetchall():
-        try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Daf/1.0"}), timeout=15) as r:
-                root = ET.fromstring(r.read())
-            ch = root.find("channel")
-            if ch is None:
-                raise ValueError("not RSS")
-            ptitle = (ch.findtext("title") or "").strip()
-            for it in ch.findall("item")[:200]:
-                enc = it.find("enclosure")
-                if enc is None or not enc.get("url"):
-                    continue
-                try:
-                    pub = int(parsedate_to_datetime(it.findtext("pubDate")).timestamp())
-                except (TypeError, ValueError):
-                    pub = None
-                conn.execute("INSERT OR REPLACE INTO gp_episodes (url, link, title, podcast, podcast_title, published) VALUES (?, ?, ?, ?, ?, ?)",
-                             (enc.get("url"), (it.findtext("link") or "").strip(), (it.findtext("title") or "").strip(), url, ptitle, pub))
+        ptitle = episodes.read_feed(conn, url, max_age=3600)
+        if ptitle is not None:
             conn.execute("UPDATE gp_subs SET title = ?, checked = ? WHERE url = ?", (ptitle, int(time.time()), url))
-        except Exception:  # noqa: BLE001 - a dead feed shouldn't stop the others
+        else:                                    # a dead feed shouldn't stop the others
             conn.execute("UPDATE gp_subs SET checked = ? WHERE url = ?", (int(time.time()), url))
     # Name listening sessions that arrived before their feed was read.
     conn.execute("UPDATE sessions SET title = (SELECT title FROM gp_episodes e WHERE e.url = sessions.item), "
@@ -118,13 +102,26 @@ def refresh_feeds(conn, limit=15):
 
 
 def overview(conn):
-    subs = [dict(r) for r in conn.execute("SELECT url, title, added FROM gp_subs WHERE removed IS NULL ORDER BY COALESCE(title, url)")]
-    recent = [dict(r) for r in conn.execute(
-        "SELECT title, author, start, seconds FROM sessions WHERE origin = 'gpodder' ORDER BY start DESC LIMIT 20")]
+    """The Podcasts page: what you listened to lately (one row an episode, with how far), the clips
+    (highlights on episodes, and the older clip-only rows), and the subscriptions."""
+    from . import episodes
+    subs = [dict(r) | {"image": episodes.show_image(conn, r["url"])}
+            for r in conn.execute("SELECT url, title, added FROM gp_subs WHERE removed IS NULL ORDER BY COALESCE(title, url)")]
+    recent = []
+    for r in conn.execute("SELECT item, title, author, MAX(start + seconds) AS last, SUM(seconds) AS seconds FROM sessions "
+                          "WHERE origin = 'gpodder' AND item IS NOT NULL GROUP BY item ORDER BY last DESC LIMIT 20"):
+        p = episodes.position(conn, r["item"])
+        ep = episodes.meta(conn, r["item"]) or {}
+        dur = (p or {}).get("total") or ep.get("duration")
+        recent.append({"audio": r["item"], "title": r["title"], "author": r["author"], "start": r["last"], "seconds": r["seconds"],
+                       "at": (p or {}).get("t"), "duration": dur, "doc": episodes.doc_for(conn, r["item"], create=False),
+                       "transcript": bool(episodes.transcript(conn, r["item"]))})
     clips = [dict(r) for r in conn.execute(
-        "SELECT h.id, h.text, h.pos, h.created, b.title, b.author FROM highlights h JOIN books b ON b.id = h.book_id "
-        "WHERE h.source = 'clip' AND h.deleted = 0 ORDER BY h.created DESC LIMIT 30")]
-    last = conn.execute("SELECT MAX(received) FROM gp_actions").fetchone()[0]
+        "SELECT h.id, h.text, h.pos, h.created, d.title, d.source AS author, d.id AS doc FROM highlights h JOIN docs d ON d.id = h.book_id "
+        "WHERE d.kind = 'podcast' AND h.deleted = 0 "
+        "UNION ALL SELECT h.id, h.text, h.pos, h.created, b.title, b.author, NULL FROM highlights h JOIN books b ON b.id = h.book_id "
+        "WHERE h.source = 'clip' AND h.deleted = 0 AND h.book_id LIKE 'pod:%' ORDER BY created DESC LIMIT 30")]
+    last = conn.execute("SELECT MAX(received) FROM gp_actions WHERE device IS NOT 'daf'").fetchone()[0]
     return {"subs": subs, "recent": recent, "clips": clips, "last_sync": last}
 
 

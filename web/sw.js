@@ -76,7 +76,7 @@ self.addEventListener('fetch', e => {
     }).catch(() => caches.open(DATA).then(c => c.match(key).then(m => m || (any && c.match(any)))).then(m => m || Response.error())));
     return;
   }
-  if (url.pathname.startsWith('/subscriptions/') || url.pathname === '/share' || url.pathname === '/sw.js') return;
+  if (url.pathname.startsWith('/subscriptions/') || url.pathname === '/share' || url.pathname === '/sw.js' || url.pathname === '/anilist') return;
   // The page: this version's copy at once, and the server's behind it for next time.
   if (req.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
     const fresh = fetch('/', { cache: 'no-cache', credentials: 'same-origin' }).then(r => { if (r.ok) caches.open(SHELL).then(c => c.put('/', r.clone())); return r; });

@@ -308,6 +308,48 @@ def delete_instagram_cookies(c=Depends(conn)):
     return social.forget(c)
 
 
+# ---- AniList: the sign-in manga-track.py sets manga progress with (anilist.py) ----
+
+@app.get("/api/anilist", dependencies=[Depends(user)])
+def get_anilist():
+    from . import anilist
+    return anilist.status() | {"authorize": anilist.authorize_url()}
+
+
+@app.put("/api/anilist", dependencies=[Depends(user)])
+async def put_anilist(request: Request):
+    """{client_id}: the API client made on AniList for Daf."""
+    from . import anilist
+    b = await _body(request)
+    cid = str(b.get("client_id") or "").strip()
+    if cid and not cid.isdigit():
+        raise HTTPException(400, "AniList's client ids are numbers")
+    anilist.set_client_id(cid)
+    return anilist.status() | {"authorize": anilist.authorize_url()}
+
+
+@app.post("/api/anilist/token", dependencies=[Depends(user)])
+async def post_anilist_token(request: Request):
+    from . import anilist
+    b = await _body(request)
+    try:
+        return await asyncio.to_thread(anilist.save_token, b.get("access_token"), b.get("expires_in"))
+    except Exception as e:  # noqa: BLE001 - AniList said no, or didn't answer
+        raise HTTPException(400, f"AniList didn't take it: {e}")
+
+
+@app.delete("/api/anilist", dependencies=[Depends(user)])
+def delete_anilist():
+    from . import anilist
+    return anilist.forget()
+
+
+@app.get("/anilist")
+def anilist_callback():
+    from . import anilist
+    return HTMLResponse(anilist.CALLBACK_PAGE, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
 @app.get("/api/thumb/{name}", dependencies=[Depends(user_or_device)])
 def get_thumb(name: str):
     """A saved page's picture, kept on the server (pages.keep_thumb). The name is its content's hash."""
@@ -591,6 +633,8 @@ async def put_settings(request: Request):
     for k in ("hc_progress", "hc_autostart"):
         if isinstance(body.get(k), bool):
             s[k] = body[k]
+    if isinstance(body.get("podcasts"), dict) and isinstance(body["podcasts"].get("transcribe"), bool):
+        s["podcasts"] = {"transcribe": body["podcasts"]["transcribe"]}      # Preferences → Podcasts (episodes.py)
     if isinstance(body.get("cards_per_day"), int) and 0 <= body["cards_per_day"] <= 30:
         s["cards_per_day"] = body["cards_per_day"]
     if isinstance(body.get("appearance"), dict):
@@ -2245,6 +2289,11 @@ async def post_transcript(doc_id: str, request: Request, c=Depends(conn)):
 
 @app.get("/api/docs/{doc_id}/transcript", dependencies=[Depends(user)])
 def get_transcript_status(doc_id: str, c=Depends(conn)):
+    d = c.execute("SELECT kind, enclosure FROM docs WHERE id = ?", (doc_id,)).fetchone()
+    if d and d["kind"] == "podcast" and d["enclosure"]:      # an episode's transcript (episodes.py), apart from its show notes
+        from . import episodes
+        st = episodes.status(c, d["enclosure"])
+        return {"podtr": st, "ready": st["status"] == "done"}
     row = c.execute("SELECT blocks FROM doc_content WHERE id = ?", (doc_id,)).fetchone()
     return {"captions": media.job_status(c, "captions", doc_id), "whisper": media.job_status(c, "whisper", doc_id),
             "pdf": media.job_status(c, "pdf", doc_id), "page": media.job_status(c, "page", doc_id),
@@ -2268,6 +2317,98 @@ def get_podcasts(c=Depends(conn)):
     o = gpodder.overview(c)
     o["device"] = bool(c.execute("SELECT 1 FROM devices WHERE name = 'antennapod'").fetchone())
     return o
+
+
+# ---- an episode's page (episodes.py): open one, where you are, its transcript, a clip, a show ----
+
+def _episode_doc(c, doc_id):
+    d = c.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
+    if not d or d["kind"] != "podcast" or not d["enclosure"]:
+        raise HTTPException(404, "Not an episode")
+    return dict(d)
+
+
+@app.post("/api/podcasts/open", dependencies=[Depends(user)])
+def post_podcast_open(b=Depends(json_body), c=Depends(conn)):
+    """{audio}: the episode's page, made if it has none yet → {id}."""
+    from . import episodes
+    audio = str(b.get("audio") or "").strip()
+    if not re.match(r"^https?://", audio):
+        raise HTTPException(400, "An episode's audio address")
+    return {"id": episodes.doc_for(c, audio)}
+
+
+@app.post("/api/podcasts/position", dependencies=[Depends(user)])
+def post_podcast_position(b=Depends(json_body), c=Depends(conn)):
+    """{doc, started, position, total}: a stretch played in Daf (for AntennaPod, and listening time)."""
+    from . import episodes
+    d = _episode_doc(c, str(b.get("doc") or ""))
+    try:
+        started, pos = float(b["started"]), float(b["position"])
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(400, "started and position, in seconds")
+    if not 0 <= started <= pos < 24 * 3600:
+        raise HTTPException(400, "started and position, in seconds")
+    episodes.played(c, d, started, pos, b.get("total"))
+    return {"ok": True}
+
+
+@app.post("/api/podcasts/transcribe", dependencies=[Depends(user)])
+def post_podcast_transcribe(b=Depends(json_body), c=Depends(conn)):
+    from . import episodes
+    d = _episode_doc(c, str(b.get("doc") or ""))
+    return {"status": episodes.want(c, d["enclosure"], "ask")}
+
+
+@app.post("/api/podcasts/clip", dependencies=[Depends(user)])
+def post_podcast_clip(b=Depends(json_body), c=Depends(conn)):
+    """{doc, t, sec}: Clip on an episode with no transcript yet; the job makes the highlight."""
+    from . import episodes
+    d = _episode_doc(c, str(b.get("doc") or ""))
+    try:
+        t, sec = float(b["t"]), int(b.get("sec") or 30)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(400, "t, in seconds")
+    episodes.clip(c, d, t, max(10, min(sec, 120)))
+    return {"queued": True}
+
+
+@app.get("/api/podcasts/show", dependencies=[Depends(user)])
+def get_podcast_show(feed: str, c=Depends(conn)):
+    from . import episodes
+    if not re.match(r"^https?://", feed or ""):
+        raise HTTPException(400, "A feed's address")
+    return episodes.show(c, feed)
+
+
+@app.get("/api/podcasts/audio", dependencies=[Depends(user)])
+def get_podcast_audio(u: str, request: Request, c=Depends(conn)):
+    """An episode whose feed gives a plain-http address, through Daf (an https page can't play it).
+    Only episodes Daf knows, and Range passes through so it seeks."""
+    import urllib.request
+    from fastapi.responses import StreamingResponse
+    if not u.startswith("http://") or not (c.execute("SELECT 1 FROM gp_episodes WHERE url = ?", (u,)).fetchone()
+                                          or c.execute("SELECT 1 FROM docs WHERE enclosure = ?", (u,)).fetchone()):
+        raise HTTPException(404, "Not an episode Daf knows")
+    h = {"User-Agent": "Daf/1.0 (personal reading app)"}
+    if request.headers.get("range"):
+        h["Range"] = request.headers["range"]
+    try:
+        r = urllib.request.urlopen(urllib.request.Request(u, headers=h), timeout=30)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"The podcast's server didn't answer: {e}")
+    out = {k: r.headers[k] for k in ("Content-Length", "Content-Range", "Accept-Ranges") if r.headers.get(k)}
+
+    def body():
+        try:
+            while True:
+                chunk = r.read(256 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            r.close()
+    return StreamingResponse(body(), status_code=r.status, media_type=r.headers.get_content_type() or "audio/mpeg", headers=out)
 
 
 @app.post("/api/podcasts/token", dependencies=[Depends(user)])
@@ -2353,7 +2494,11 @@ def gp_episodes_get(username: str, request: Request, since: int = 0, c=Depends(c
 async def gp_episodes_post(username: str, request: Request, c=Depends(conn)):
     _gp_auth(request, c)
     body = await _body(request)
-    return gpodder.actions_upload(c, body if isinstance(body, list) else body.get("actions", []))
+    actions = body if isinstance(body, list) else body.get("actions", [])
+    out = gpodder.actions_upload(c, actions)
+    from . import episodes
+    episodes.on_actions(c, actions)               # what you're listening to gets its transcript
+    return out
 
 
 # ---- paper pages (Phase 7) -------------------------------------------------------

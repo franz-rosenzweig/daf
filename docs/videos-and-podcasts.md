@@ -2,7 +2,7 @@
 
 # Videos and podcasts
 
-This page covers the things you watch and listen to: YouTube videos and Instagram reels saved to the Library, podcasts from AntennaPod, and audiobook bookmarks. Daf doesn't try to be a video app or a podcast app. What it adds is the text, so a good minute of a talk can become a highlight like any line in a book.
+This page covers the things you watch and listen to: YouTube videos and Instagram reels saved to the Library, podcasts, and audiobook bookmarks. Daf doesn't try to be a video app or a podcast app. On the phone I still listen in AntennaPod. What Daf adds is the text, so a good minute of a talk can become a highlight like any line in a book.
 
 ## Videos
 
@@ -36,11 +36,35 @@ To connect it, go to **Preferences → Podcasts (AntennaPod)**, press **Make a p
 
 If AntennaPod used to sync to Nextcloud's GPodder Sync app, which is how I had it, `daf podcasts-import` on the server brings that history over first: the subscriptions, the ones you dropped, and where you stopped in each episode. It only reads from Nextcloud, never writes, and running it again adds only what's new. Then switch AntennaPod's sync from Nextcloud to Daf.
 
-From then on, the **Podcasts** page in the sidebar shows **Clips**, **Listened lately** and **Subscriptions**. Listening shows up among the day's sittings, but it never counts toward the hour. That was a decision, not a missing feature: the hour is for reading.
+From then on, the **Podcasts** page in the sidebar shows what I listened to lately and how far I got, my clips, and my shows. A show opens to its episodes. Listening shows up among the day's sittings, but it never counts toward the hour. That was a decision, not a missing feature: the hour is for reading.
 
-## Clips from a podcast
+## An episode's page
 
-When something in an episode is worth keeping, share it from AntennaPod "with position", or send a link with a time in it. Daf transcribes the minute before that point into a highlight, with the episode and the time, in about thirty seconds. It goes into the review like any other highlight and into a note in the vault.
+Any episode opens as a page in Daf, whether it's one from **Listened lately**, from a show, or a podcast episode in the Feed. The player sits on top, with the show's picture, and the transcript is under it, a line per stretch with the time and who's talking when the transcript knows. It works the way a YouTube video does here:
+
+- Click a line's time and it plays from there. **Follow along** keeps the transcript scrolling with the audio.
+- **−15** and **+30** skip the way AntennaPod does, and so do ← and →. The **1×** button steps through the speeds, and Daf remembers the last one.
+- **Chapters**, when the episode has them, are headings in the transcript and a menu in the player.
+- **Clip 30s** (or c) highlights the last thirty seconds. It works even before the transcript is there: the server transcribes just those thirty seconds and the highlight shows up in the Notebook a minute later.
+- Space plays and pauses, and the Mac's media keys work too.
+
+Where I stop goes back to AntennaPod as if I'd played it there, so the phone picks it up the next time AntennaPod syncs. And it works the other way round as well: an episode opens where I last stopped, in Daf or in AntennaPod, and says which.
+
+The show notes come after the transcript. An episode that only lives in AntennaPod gets **Save to Library**, the same as a Feed item, and anything I highlight or clip in a Feed episode saves it to the Library anyway.
+
+## Transcripts
+
+A few shows put their own transcript in the feed (the Podcasting 2.0 tags). When they do, Daf uses theirs, and it's there in seconds, speakers and all. Only a few of mine do.
+
+For everything else, Daf transcribes the episode on the server with faster-whisper. It's automatic for any episode I play, in AntennaPod or in Daf, and for any episode I open. It takes about a quarter of the episode's length, so an hour comes back in about fifteen minutes, and Hebrew works too. If I'd rather it only happened when I ask, I switch off **Transcribe episodes I play or open** in **Preferences → Podcasts**, and then each episode has a **Transcribe** button.
+
+Search (⌘K) finds what was said, not just the titles.
+
+When I highlight anything in an episode, its note goes to `Reference/podcasts` in the vault with the whole transcript, and every time in it is a link back into Daf at that moment.
+
+## Clips from AntennaPod
+
+When I'm out with the phone and something is worth keeping, I share it from AntennaPod "with position", or send a link with a time in it. Daf highlights the minute before that point on the episode's page, from the transcript if it has one and by transcribing that minute if not, in about thirty seconds. It goes into the review like any other highlight and into the episode's note in the vault.
 
 I send these to my Signal bot, which recognizes a link with `#t=750`, AntennaPod's "Starting position: 00:12:30", or "clip" plus a link and a time. On the server, the same thing is `daf clip "the link and the time"`, and `daf jobs` lists the transcripts and clips that are waiting or done.
 
