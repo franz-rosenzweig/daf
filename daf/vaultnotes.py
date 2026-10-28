@@ -469,12 +469,9 @@ def write_article(conn, settings, doc_id, backfill=False):
     full = own and bool(hls or note)
     blocks = []
     if m_["doc"] and (full or m_["kind"] == "torah"):
-        row = conn.execute("SELECT blocks FROM doc_content WHERE id = ?", (doc_id,)).fetchone()
-        try:
-            blocks = json.loads(row[0]) if row and row[0] else []
-        except ValueError:
-            blocks = []
-    doc = vaultmd.Doc(blocks, m_["kind"], m_["url"]) if full and blocks else None
+        from . import episodes                    # an episode's are its transcript and then its show notes
+        blocks = episodes.doc_blocks(conn, doc_id)
+    doc = vaultmd.Doc(blocks, m_["kind"], m_["url"], daf=m_["daf"]) if full and blocks else None
     book = None
     if m_["kind"] == "torah":
         d = conn.execute("SELECT summary FROM docs WHERE id = ?", (doc_id,)).fetchone()

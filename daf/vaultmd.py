@@ -233,9 +233,9 @@ def _norm(s):
 class Doc:
     """A document's blocks, ready to place highlights in and write out."""
 
-    def __init__(self, blocks, kind=None, url=None):
+    def __init__(self, blocks, kind=None, url=None, daf=None):
         self.blocks = [b for b in (blocks or []) if isinstance(b, dict)]
-        self.kind, self.url = kind, url
+        self.kind, self.url, self.daf = kind, url, daf     # daf: the doc in Daf, where a podcast's times open
         self.pieces = [None if b.get("t") in ("img", "pg") else _pieces(b) for b in self.blocks]
         self.plain = [_plain(p) if p is not None else "" for p in self.pieces]
         self.norm = [_norm(p) for p in self.plain]
@@ -393,7 +393,8 @@ class Doc:
         if t == "cue" and b.get("ts") is not None:
             vid = self._yt()
             when = _ts(b["ts"])
-            stamp = f"[{when}](https://www.youtube.com/watch?v={vid}&t={int(float(b['ts']))}s)" if vid else f"**{when}**"
+            stamp = (f"[{when}](https://www.youtube.com/watch?v={vid}&t={int(float(b['ts']))}s)" if vid
+                     else f"[{when}]({self.daf}/t:{int(float(b['ts']))})" if self.daf and self.kind == "podcast" else f"**{when}**")
             md[0] = f"{stamp} {md[0]}"
         if t in ("h2", "h3"):
             head = " ".join(md)

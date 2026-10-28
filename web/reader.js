@@ -689,7 +689,8 @@ async function docAct(act, id){
       if (R.doc && R.doc.id === id) drawReaderTop();
       if (L && !(L.arg === KIND_STAR && !on)) { drawRows(); return; }
     }
-    else if (act === 'save') { const r = await api('/api/docs/' + encodeURIComponent(id) + '/save', { method:'POST' }); toast('Saved to the Library'); if (R.doc && R.doc.id === id) { location.hash = 'read/' + encodeURIComponent(r.id); return; } }
+    else if (act === 'save') { const r = await api('/api/docs/' + encodeURIComponent(id) + '/save', { method:'POST' }); toast('Saved to the Library');
+      if (R.doc && R.doc.id === id) { const el = $('#lvp'); if (el && el.currentTime > 1) { R.podAt = el.currentTime; R.podPlay = !el.paused; podFlush(); } location.hash = 'read/' + encodeURIComponent(r.id); return; } }
     else {
       const status = act === 'seen' ? (d.status === 'seen' ? 'unseen' : 'seen') : act === 'later' ? (d.status === 'later' ? 'inbox' : 'later') : act === 'archive' ? (d.status === 'archive' ? 'inbox' : 'archive') : act === 'delete' ? 'deleted' : act;
       const before = d.status;
@@ -721,7 +722,7 @@ async function docAct(act, id){
 // extension's Open in Daf, a Signal message), to its list.
 function leaveDoc(d){
   if ((C.S.navs || 0) > 1) history.back();
-  else location.hash = d && d.where_ === 'feed' ? 'feed' : d && d.kind && KIND[d.kind] ? 'library/' + d.kind : 'library/article';
+  else location.hash = d && d.where_ === 'feed' ? 'feed' : d && d.where_ === 'podcast' ? 'podcasts' : d && d.kind && KIND[d.kind] ? 'library/' + d.kind : 'library/article';
 }
 const fmtT = t => { t = Math.max(0, Math.floor(t || 0)); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), x = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
 // X saves a tweet's title as '(2) Name on X: "first tweet" / X'. Show "Name" and the tweet apart.
@@ -846,7 +847,7 @@ function visibleItems(){ const L = R.list; if (!L) return []; return R.tag ? L.i
 function neighbor(id, dir){ const xs = visibleItems(), i = xs.findIndex(d => d.id === id); return i < 0 ? null : xs[i + dir] || null; }
 function drawReaderTop(){
   const d = R.doc, top = $('#rtop'); if (!d || !top) return;
-  const feed = d.where_ === 'feed';
+  const feed = d.where_ === 'feed', pod = d.where_ === 'podcast';     // pod: an episode met only in AntennaPod (episodes.py)
   const pv = neighbor(d.id, -1), nx = neighbor(d.id, 1);
   top.innerHTML = '<button class="ib" data-ract="back" aria-label="Back">' + I.back + '</button>' +
     (pv || nx ? '<button class="ib" data-ract="prevdoc" title="Previous in the list' + K.tip('article', 'prevdoc') + '" aria-label="Previous in the list"' + (pv ? '' : ' disabled') + '>' + ICON.up + '</button><button class="ib" data-ract="nextdoc" title="Next in the list' + K.tip('article', 'nextdoc') + '" aria-label="Next in the list"' + (nx ? '' : ' disabled') + '>' + ICON.down + '</button>' : '') +
@@ -854,10 +855,10 @@ function drawReaderTop(){
     (d.kind === 'torah' ? '<button class="btn sm tlcycle" data-tlcycle aria-label="Language: tap to switch">' + TLNAME[store.get('torahLang', 'both')] + '</button>' : '') +
     (d.kind === 'torah' ? '<div class="seg sm tlang" role="radiogroup" aria-label="Language">' + [['both', 'Both'], ['he', 'עברית'], ['en', 'English']].map(x => '<button type="button" role="radio" data-tlang="' + x[0] + '" class="' + ((store.get('torahLang', 'both') === x[0]) ? 'on' : '') + '" aria-checked="' + (store.get('torahLang', 'both') === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' : '') +
     '<span class="spacer"></span>' +     // whether it counts toward the hour shows on Today and in Stats, not over the text (decided 2026-10-11)
-    (d.blocks.length && d.kind !== 'video' ? '<button class="btn sm' + (R.tts.on && R.tts.doc === d.id && R.tts.playing ? ' on' : '') + '" data-ract="listen">' + ICON.listen + (R.tts.on && R.tts.doc === d.id && R.tts.playing ? 'Pause' : 'Listen') + '</button>' : '') +
+    (d.blocks.length && d.kind !== 'video' && !d.episode ? '<button class="btn sm' + (R.tts.on && R.tts.doc === d.id && R.tts.playing ? ' on' : '') + '" data-ract="listen">' + ICON.listen + (R.tts.on && R.tts.doc === d.id && R.tts.playing ? 'Pause' : 'Listen') + '</button>' : '') +
     (!feed ? '<button class="ib' + (d.starred ? ' on' : '') + '" data-dact="star" data-id="' + esc(d.id) + '" title="' + (d.starred ? 'Off the Shortlist' : 'Shortlist') + K.tip('article', 'star') + '" aria-label="Shortlist">' + ICON.star(!!d.starred) + '</button>' : '') +
-    (feed ? '<button class="btn sm" data-dact="save" data-id="' + esc(d.id) + '">' + ICON.save + 'Save to Library</button>' : '<button class="ib' + (d.status === 'later' ? ' on' : '') + '" data-dact="later" data-id="' + esc(d.id) + '" title="Later' + K.tip('article', 'later') + '" aria-label="Later">' + ICON.later + '</button>') +
-    '<button class="ib" data-dact="' + (feed ? 'seen' : 'archive') + '" data-id="' + esc(d.id) + '" title="Done' + K.tip('article', 'archive') + '" aria-label="Done">' + ICON.done + '</button>' +
+    (feed || pod ? '<button class="btn sm" data-dact="save" data-id="' + esc(d.id) + '">' + ICON.save + 'Save to Library</button>' : '<button class="ib' + (d.status === 'later' ? ' on' : '') + '" data-dact="later" data-id="' + esc(d.id) + '" title="Later' + K.tip('article', 'later') + '" aria-label="Later">' + ICON.later + '</button>') +
+    (pod ? '' : '<button class="ib" data-dact="' + (feed ? 'seen' : 'archive') + '" data-id="' + esc(d.id) + '" title="Done' + K.tip('article', 'archive') + '" aria-label="Done">' + ICON.done + '</button>') +
     (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
     (d.url ? '<a class="ib" href="' + esc(d.url) + '" target="_blank" rel="noopener" title="Open original" aria-label="Open original">' + ICON.ext + '</a>' : '') +
     '<button class="ib" data-ract="more" title="More actions (m)" aria-label="More actions"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg></button>' +
@@ -877,12 +878,13 @@ function openMore(anchor){
       it('panel', R.panelOpen ? 'Hide the notebook' : 'Notebook and info', '') +
       (d.has_pdf && d.blocks.length ? it('pages', 'The PDF as printed', '') : '') + '<hr>' : '') +
     it('note', 'Add a document note', K.label('article', 'docnote')) +
-    (d.blocks.length && d.kind !== 'video' ? it('listen', R.tts.on && R.tts.doc === d.id ? 'Stop reading aloud' : 'Read aloud from here', K.label('article', 'aloud')) : '') +
+    (d.blocks.length && d.kind !== 'video' && !d.episode ? it('listen', R.tts.on && R.tts.doc === d.id ? 'Stop reading aloud' : 'Read aloud from here', K.label('article', 'aloud')) : '') +
     it('ask', 'Ask about this', '') +
     (feed && d.url ? it('full', d.full ? 'Load the full article again' : 'Load the full article', '') : '') +
     (d.blocks.length && d.kind !== 'video' && d.kind !== 'podcast' ? it('kindle', d.kindle_sent ? 'Send to the Kindle again' : 'Send to the Kindle', '') : '') +
     (deviceKeeps() && d.blocks.length ? it('device', R.onDevice && R.onDevice.pinned.has(d.id) ? 'Remove from this device' : 'Keep on this device', '') : '') + '<hr>' +
-    (feed ? it('save', 'Save to Library', K.label('article', 'save')) + it('seen', d.status === 'seen' ? 'Back to Unseen' : 'Mark seen', K.label('article', 'archive')) :
+    (d.where_ === 'podcast' ? it('save', 'Save to Library', K.label('article', 'save')) :
+     feed ? it('save', 'Save to Library', K.label('article', 'save')) + it('seen', d.status === 'seen' ? 'Back to Unseen' : 'Mark seen', K.label('article', 'archive')) :
      lib ? it('later', d.status === 'later' ? 'Back to Inbox' : 'Read later', K.label('article', 'later')) + it('archive', d.status === 'archive' ? 'Back to Inbox' : 'Archive', K.label('article', 'archive')) : '') +
     it('reset', 'Reset reading progress', K.label('article', 'reset')) + it('meta', 'Edit title and author', K.label('article', 'meta')) + it('delete', 'Delete', K.label('article', 'delete'), 'danger') + '<hr>' +
     (d.url ? it('open', 'Open the original', K.label('article', 'open')) + it('copy', 'Copy the link', K.label('article', 'copy')) : '') +
@@ -940,6 +942,7 @@ function tagDoc(id, anchor){
 }
 async function readView(id){
   stopSel();
+  if (P.doc) { podFlush(); P.doc = null; }          // an episode that was playing: where it stopped, before its player goes
   $('#main').innerHTML = '<div class="rv"><div class="top" id="rtop"><button class="ib" data-ract="back" aria-label="Back">' + I.back + '</button></div><div class="docwrap"><div class="doc"><span class="mute">Loading…</span></div></div></div>';
   let d;
   try { d = await api('/api/docs/' + encodeURIComponent(id)); } catch(e){ $('.doc').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
@@ -952,22 +955,25 @@ async function readView(id){
     '<div class="eyebrow"' + dirAttr(d.source) + '>' + esc([d.source, d.category].filter(Boolean).join(' · ')) + '</div><h1' + dirAttr(d.title) + '>' + esc(tweetParts(d).title) + '</h1>' +
     '<div class="byline">' + [d.author ? esc(d.author) : '', d.mins ? d.mins + ' min' : '', d.published ? epochDate(d.published) : ''].filter(Boolean).join(' · ') + '</div>';
   if (d.kind === 'video') h += videoHead(d);
+  if (d.episode) h += podHead(d);
   if (tweetParts(d).lead) h += '<p class="tweetlead">' + esc(tweetParts(d).lead) + '</p>';
   if (d.kind === 'tweet') { const seen = {}; d.blocks.forEach(b => { if (b.t === 'img') seen[b.src] = (seen[b.src] || 0) + 1; }); R.avatars = new Set(Object.keys(seen).filter(k => seen[k] > 1)); } else R.avatars = null;
   if (!d.blocks.length && d.reel) { /* reelHead says where it is */ }
+  else if (!d.blocks.length && d.episode) { /* podHead says where its transcript is */ }
   else if (!d.blocks.length && d.kind === 'video') h += '<div class="placeholder" id="trstatus">No transcript yet. <button class="btn sm" data-tr="captions">Get YouTube’s captions</button> <button class="btn sm" data-tr="whisper">Transcribe on the server (slow)</button></div>';
   else if (!d.blocks.length && d.kind === 'pdf') h += '<div class="placeholder">' + (d.preparing ? '<span id="trstatus">Reading the PDF on the server. The text appears here in a moment.</span>' : 'Couldn’t read this PDF: ' + esc(d.content_error || '') + '.') + ' <a href="/api/docs/' + encodeURIComponent(d.id) + '/pdf" target="_blank" rel="noopener">Open the original layout</a></div>';
   else if (!d.blocks.length && d.preparing) h += '<div class="placeholder"><span id="trstatus">Reading the page on the server. The text appears here in a moment.</span> <a href="' + esc(d.url || '#') + '" target="_blank" rel="noopener">Open the original</a></div>';
   else if (!d.blocks.length) h += '<div class="placeholder">' + (d.content_error ? (/^Daf /.test(d.content_error) ? esc(d.content_error) : 'Karakeep didn’t answer: ' + esc(d.content_error)) : d.kind === 'pdf' ? 'PDFs open in the reader in a later round. For now, open the original.' : d.kind === 'podcast' ? 'A podcast episode. Listen in AntennaPod, and share it to Ezer with its position to clip the minute before.' : 'There’s no saved text for this one.') + (d.url ? ' <a href="' + esc(d.url) + '" target="_blank" rel="noopener">Open the original</a>' : '') + '</div>';
   else h += '<div class="body" id="docbody">' + d.blocks.map(blockHTML).join('') + '</div>';
   // A feed that sends only the start: the page has the rest (daf/fulltext.py)
-  if (d.where_ === 'feed' && d.url && !d.full && (d.words || 0) < 220) h += '<div class="fullnote" id="fullnote"><span>' + (d.blocks.length ? 'That’s what the feed sends.' : 'The feed sent no text.') +
+  if (d.where_ === 'feed' && d.url && !d.full && (d.words || 0) < 220 && !d.episode) h += '<div class="fullnote" id="fullnote"><span>' + (d.blocks.length ? 'That’s what the feed sends.' : 'The feed sent no text.') +
     '</span><button class="btn sm" data-ract="full">Load the full article</button></div>';
   h += '</article></div><aside class="rpanel" id="rpanel"></aside></div></div>';
   $('#main').innerHTML = h;
   drawReaderTop(); drawToc(); applyMarks(); drawPanel();
   if (d.kind === 'video') startPlayer(d);
-  if (d.preparing) pollTranscript(d.id);
+  if (d.episode) startPod(d);
+  if (d.preparing || (d.episode && ['queued', 'running'].includes(d.episode.transcript.status))) pollTranscript(d.id);
   const main = $('#main');
   if (d.progress > 3 && d.progress < 98) setTimeout(() => { main.scrollTop = (main.scrollHeight - main.clientHeight) * d.progress / 100; }, 50);
   main.onscroll = onScroll; R.lastActive = Date.now();
@@ -1084,7 +1090,8 @@ function startPlayer(d){
 function curTime(){ try { return V.player && V.player.getCurrentTime ? V.player.getCurrentTime() : 0; } catch(e){ return 0; } }
 function cueAt(t){ const d = R.doc; let best = -1; if (!d) return -1; d.blocks.forEach((b, i) => { if (b.t === 'cue' && b.ts <= t) best = i; }); return best; }
 function syncCue(){
-  if (C.S.route[0] !== 'read' || !R.doc || R.doc.kind !== 'video') { clearInterval(V.timer); return; }
+  if (C.S.route[0] !== 'read' || !R.doc || !['video', 'podcast'].includes(R.doc.kind) || (P.doc && R.doc.id !== P.doc.id) || (P.doc && !$('#lvp'))) {
+    clearInterval(V.timer); if (P.doc) { podFlush(P.last); P.doc = null; } return; }
   if (V.playing) R.lastActive = Date.now();
   const i = cueAt(curTime()); if (i === V.cur) return;
   V.cur = i; $$('#docbody .tl.now').forEach(x => x.classList.remove('now'));
@@ -1095,13 +1102,110 @@ function seek(t){ if (V.player && V.player.seekTo) { V.player.seekTo(t, true); i
 async function clipVideo(sec){
   const d = R.doc, now = curTime(); if (!d) return;
   const cues = d.blocks.map((b, i) => [b, i]).filter(x => x[0].t === 'cue' && x[0].ts >= now - sec && x[0].ts <= now);
-  if (!cues.length) { toast('Play the video first; Clip takes the last 30 seconds.'); return; }
+  if (!cues.length && d.episode && now > 3) { podClip(d, now, sec); return; }
+  if (!cues.length) { toast(d.episode ? 'Play it first; Clip takes the last 30 seconds.' : 'Play the video first; Clip takes the last 30 seconds.'); return; }
   for (const [b, i] of cues) {
     const el = $('#docbody [data-i="' + i + '"]'); const txt = el ? el.textContent.replace(/^\S+\s/, b.spk ? '' : '') : b.x;
     await highlight({ b:i, s:0, e:(el ? el.textContent.length : b.x.length), text:(el ? el.textContent : b.x).trim(), t:b.ts }, false, true);
   }
   toast('Clipped ' + fmtT(cues[0][0].ts) + '–' + fmtT(now) + ' · in the Notebook and the vault');
 }
+
+/* ---------- podcast episodes (episodes.py): Daf's own player over the transcript ---------- */
+// V.player speaks the YouTube player's few words over an <audio>, so the transcript, Follow along, Clip
+// and the keys work as they do for a video. Where you stop goes to AntennaPod in stretches (on pause, on
+// a jump, every two minutes, when the page goes), and Daf starts where the last play anywhere stopped.
+const P = { doc: null, seg: null, last: 0 };
+const RATES = [1, 1.2, 1.4, 1.6, 1.8, 2, 0.8];
+const rateLabel = r => (Math.round(r * 10) / 10) + '×';
+function podStatusHTML(st){
+  st = st || {};
+  if (st.status === 'done') return '';
+  if (st.status === 'queued' || st.status === 'running') return '<span class="mute tiny">Transcribing…</span>';
+  if (st.status === 'failed') return '<span class="mute tiny">No transcript: ' + esc(st.error || '') + '</span> <button class="btn sm" data-pod="tr">Try again</button>';
+  return '<button class="btn sm" data-pod="tr">Transcribe</button>';
+}
+function podHead(d){
+  const e = d.episode, chs = e.chapters || [], rate = +store.get('podRate', 1) || 1;
+  return '<div class="vhead phead"><div class="pplay">' + (e.image ? '<img class="pcover" alt="" src="' + esc(e.image) + '" loading="lazy">' : '') +
+      '<audio id="lvp" controls preload="metadata" src="' + esc(e.audio) + '"></audio></div><div class="vctl">' +
+    '<button class="btn sm" data-pod="back" title="Back 15 seconds (←)">−15</button>' +
+    '<button class="btn sm" data-pod="fwd" title="Ahead 30 seconds (→)">+30</button>' +
+    '<button class="btn sm" data-pod="rate" id="prate" title="Speed">' + rateLabel(rate) + '</button>' +
+    '<button class="btn sm" data-vclip="30" title="Highlight the last 30 seconds (c)">Clip 30s</button>' +
+    '<label class="tiny mute" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="vfollow" checked> Follow along</label>' +
+    (chs.length ? '<select class="field sm" id="pchap" aria-label="Chapters"><option value="">Chapters</option>' + chs.map(c => '<option value="' + c.t + '">' + fmtT(c.t) + '  ' + esc(c.title) + '</option>').join('') + '</select>' : '') +
+    '<span id="trstatus">' + podStatusHTML(e.transcript) + '</span><span class="spacer"></span>' +
+    (e.feed ? '<a class="tiny" href="#podcasts/' + encodeURIComponent(e.feed) + '">' + esc(e.podcast || 'The show') + '</a>' : '') + '</div></div>';
+}
+function startPod(d){
+  const el = $('#lvp'); if (!el) return;
+  clearInterval(V.timer); V.cur = -1; V.playing = false;
+  P.doc = d; P.seg = null; P.last = 0;
+  el.playbackRate = +store.get('podRate', 1) || 1;
+  V.player = { getCurrentTime: () => el.currentTime || 0, seekTo: t => { el.currentTime = t; },
+               playVideo: () => { const p = el.play(); if (p && p.catch) p.catch(() => {}); }, pauseVideo: () => el.pause() };
+  const e = d.episode, pos = e.position, asked = R.podAt != null, play = R.podPlay;
+  const at = asked ? R.podAt : pos && pos.t > 15 && (!e.duration || pos.t < e.duration - 30) ? pos.t : null;
+  R.podAt = null; R.podPlay = false;
+  if (at != null) el.addEventListener('loadedmetadata', () => { el.currentTime = at; if (play) V.player.playVideo(); }, { once: true });
+  if (at != null && !asked && !play) toast('From ' + fmtT(at) + ', where ' + (pos.from || 'AntennaPod') + ' left off');
+  el.addEventListener('play', () => { V.playing = true; P.seg = el.currentTime; R.lastActive = Date.now(); });
+  el.addEventListener('pause', () => { V.playing = false; podFlush(); });
+  el.addEventListener('ended', () => { V.playing = false; podFlush(); });
+  el.addEventListener('timeupdate', () => { if (!el.seeking) P.last = el.currentTime; });
+  el.addEventListener('seeking', () => { if (P.seg != null) podFlush(P.last); });
+  el.addEventListener('seeked', () => { if (!el.paused) P.seg = el.currentTime; });
+  el.addEventListener('ratechange', () => { store.set('podRate', el.playbackRate); const b = $('#prate'); if (b) b.textContent = rateLabel(el.playbackRate); });
+  if ('mediaSession' in navigator) {                  // the Mac's media keys and the lock screen
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: d.title, artist: e.podcast || d.source || '', artwork: e.image ? [{ src: e.image }] : [] });
+      navigator.mediaSession.setActionHandler('seekbackward', () => seek(Math.max(0, curTime() - 15)));
+      navigator.mediaSession.setActionHandler('seekforward', () => seek(curTime() + 30));
+    } catch(err){}
+  }
+  V.timer = setInterval(() => { syncCue(); if (V.playing && P.seg != null && el.currentTime - P.seg >= 120) podFlush(); }, 500);
+}
+// A stretch played, to the server: AntennaPod picks it up as a play on its next sync.
+function podFlush(end, beacon){
+  const d = P.doc, el = $('#lvp'); if (!d || P.seg == null) return;
+  const pos = end != null ? end : el ? el.currentTime : P.last;
+  const body = { doc: d.id, started: Math.floor(P.seg), position: Math.floor(pos), total: el && isFinite(el.duration) ? Math.round(el.duration) : null };
+  P.seg = el && !el.paused && !el.seeking ? el.currentTime : null;
+  if (!(body.position > body.started)) return;
+  if (beacon && navigator.sendBeacon) navigator.sendBeacon('/api/podcasts/position', new Blob([JSON.stringify(body)], { type: 'application/json' }));
+  else api('/api/podcasts/position', { method: 'POST', body: JSON.stringify(body) }).catch(() => {});
+}
+window.addEventListener('pagehide', () => podFlush(null, true));
+document.addEventListener('visibilitychange', () => { if (document.hidden) podFlush(null, true); });
+// Clip before there's a transcript: the server transcribes that stretch into a highlight.
+async function podClip(d, now, sec){
+  try {
+    await api('/api/podcasts/clip', { method: 'POST', body: JSON.stringify({ doc: d.id, t: now, sec }) });
+    toast('Clipping ' + fmtT(Math.max(0, now - sec)) + '–' + fmtT(now) + '. It’s in the Notebook in a minute.');
+    const had = d.highlights.length;
+    let n = 0;
+    const look = async () => {
+      if (!R.doc || R.doc.id !== d.id || ++n > 12) return;
+      try { const x = await api('/api/docs/' + encodeURIComponent(d.id) + '?prefetch=1');
+        if (x.highlights.length > had) { R.doc.highlights = x.highlights; drawPanel(); drawToc(); return; } } catch(e){}
+      setTimeout(look, 15000);
+    };
+    setTimeout(look, 15000);
+  } catch(err){ toast(err.message); }
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-pod]'); if (!b || !R.doc) return;
+  const a = b.dataset.pod, el = $('#lvp');
+  if (a === 'back') seek(Math.max(0, curTime() - 15));
+  else if (a === 'fwd') seek(curTime() + 30);
+  else if (a === 'rate' && el) { const i = RATES.findIndex(r => Math.abs(r - el.playbackRate) < 0.01); el.playbackRate = RATES[(i + 1) % RATES.length]; }
+  else if (a === 'tr') {
+    try { const r = await api('/api/podcasts/transcribe', { method: 'POST', body: JSON.stringify({ doc: R.doc.id }) });
+      const x = $('#trstatus'); if (x) x.innerHTML = podStatusHTML({ status: r.status === 'done' ? 'done' : 'queued' }); pollTranscript(R.doc.id); } catch(err){ toast(err.message); }
+  }
+});
+document.addEventListener('change', e => { if (e.target.id === 'pchap' && e.target.value !== '') { seek(+e.target.value); e.target.value = ''; } });
 
 /* ---------- selection and highlights ---------- */
 function blockEl(n){ while (n && n.nodeType !== 1) n = n.parentNode; return n ? n.closest('#docbody [data-i]') : null; }
@@ -1198,7 +1302,10 @@ function openNoteA(h){
   setTimeout(() => { const row = $('.hrow[data-h="' + CSS.escape(h.id) + '"]'); if (!row) return; row.scrollIntoView({ block:'center' }); const n = row.querySelector('[data-hra="note"]'); if (n) n.click(); }, 40);
 }
 function showHl(id){
-  const ms = $$('mark.hl[data-h="' + CSS.escape(id) + '"], figure.hlimg[data-h="' + CSS.escape(id) + '"]'); if (!ms.length) { toast('That highlight isn’t in this text any more'); return; }
+  const ms = $$('mark.hl[data-h="' + CSS.escape(id) + '"], figure.hlimg[data-h="' + CSS.escape(id) + '"]');
+  const hl = R.doc && R.doc.highlights.find(x => x.id === id);
+  if (!ms.length && hl && hl.pos && hl.pos.t != null && V.player) { seek(hl.pos.t); return; }   // a clip made before the transcript
+  if (!ms.length) { toast('That highlight isn’t in this text any more'); return; }
   ms[0].scrollIntoView({ block:'center', behavior:'smooth' });
   ms.forEach(m => m.classList.add('flash')); setTimeout(() => ms.forEach(m => m.classList.remove('flash')), 1800);
 }
@@ -1372,17 +1479,46 @@ function palGo(i){ const x = palItems[i]; closePalette(); if (!x) return; if (x.
 C.sendBeat = sendBeat; C.openAa = openAa;
 C.Reader = { getSel, highlight, removeHl, moved: movedToLibrary,   // for the pen (ink.js)
   remark: h => { unmark(h.id); markHl(h); drawPanel(); } };
-C.views.podcasts = async () => {
+// Podcasts: what you listened to lately and your clips, each opening its episode's page, and the
+// shows; #podcasts/<feed> is a show with its episodes (episodes.show).
+const podTime = r => r.duration && r.at != null ? (r.at >= r.duration - 60 ? 'Finished' : fmtT(r.at) + ' of ' + fmtT(r.duration))
+  : r.duration ? Math.round(r.duration / 60) + ' min' : r.seconds ? Math.round(r.seconds / 60) + ' min' : '';
+const epRow = (r, sub) => '<button class="nrow eprow" data-ep="' + esc(r.audio || '') + '"' + (r.doc ? ' data-epdoc="' + esc(r.doc) + '"' : '') + '><b' + dirAttr(r.title) + '>' + esc(r.title || 'Podcast episode') + '</b>' +
+  '<span class="mute tiny">' + [sub, podTime(r), r.published ? epochDate(r.published) : r.start ? epochDate(r.start) : ''].filter(Boolean).map(esc).join(' · ') +
+  (r.transcript ? ' · <span class="eptag">Transcript</span>' : '') + '</span></button>';
+C.views.podcasts = async args => {
   R.doc = null;
-  $('#main').innerHTML = '<div class="top"><h1>Podcasts</h1><span class="spacer"></span><span class="mute tiny">From AntennaPod · never counted toward the hour</span></div><div class="page" id="podpage"><span class="mute">Loading…</span></div>';
+  if (args && args[0]) return podShow(decodeURIComponent(args[0]));
+  $('#main').innerHTML = '<div class="top"><h1>Podcasts</h1></div><div class="page" id="podpage"><span class="mute">Loading…</span></div>';
   const p = await api('/api/podcasts');
   let h = '';
-  if (!p.subs.length) h += '<section class="card"><h2>AntennaPod isn’t syncing yet</h2><p class="mute" style="margin:0">Set it up in Preferences → Podcasts. Then share any episode from AntennaPod to Ezer with its position, and Daf transcribes the minute before it into a highlight.</p><a class="btn" href="#prefs" style="align-self:flex-start">Preferences</a></section>';
-  h += '<section class="card"><div class="cardh"><h2>Clips</h2><span class="mute tiny">' + p.clips.length + '</span></div>' + (p.clips.length ? p.clips.map(c => { const pos = (() => { try { return JSON.parse(c.pos).t; } catch(e){ return null; } })(); return '<div class="hlc"><q>' + esc(c.text) + '</q><div class="meta tiny mute">' + esc(c.title || '') + (c.author ? ' · ' + esc(c.author) : '') + (pos != null ? ' · ' + fmtT(pos) : '') + ' · ' + epochDate(c.created) + '</div></div>'; }).join('') : '<p class="mute" style="margin:0">None yet. In AntennaPod: Share → “with position” → Signal → Ezer.</p>') + '</section>';
-  if (p.recent.length) h += '<section class="card"><h2>Listened lately</h2>' + p.recent.map(r => '<div class="nrow"><b>' + esc(r.title || 'Podcast') + '</b><span class="mute tiny">' + esc(r.author || '') + ' · ' + Math.round(r.seconds / 60) + ' min · ' + epochDate(r.start) + '</span></div>').join('') + '</section>';
-  if (p.subs.length) h += '<section class="card"><h2>Subscriptions</h2>' + p.subs.map(x => '<div class="nrow"><b>' + esc(x.title || x.url) + '</b></div>').join('') + '<span class="mute tiny">Last sync ' + ago(p.last_sync) + '</span></section>';
+  if (!p.subs.length) h += '<section class="card"><h2>AntennaPod isn’t syncing yet</h2><a class="btn" href="#prefs/podcasts" style="align-self:flex-start">Preferences → Podcasts</a></section>';
+  if (p.recent.length) h += '<section class="card"><h2>Listened lately</h2>' + p.recent.slice(0, 8).map(r => epRow(r, r.author)).join('') +
+    (p.recent.length > 8 ? '<details class="epmore"><summary class="linkbtn tiny">More</summary>' + p.recent.slice(8).map(r => epRow(r, r.author)).join('') + '</details>' : '') + '</section>';
+  if (p.clips.length) h += '<section class="card"><div class="cardh"><h2>Clips</h2><span class="mute tiny">' + p.clips.length + '</span></div>' + p.clips.map(c => {
+    const pos = (() => { try { return JSON.parse(c.pos).t; } catch(e){ return null; } })();
+    const href = c.doc ? '#read/' + encodeURIComponent(c.doc) + (pos != null ? '/t:' + Math.max(0, Math.floor(pos) - 30) : '') : null;
+    return '<div class="hlc"><q' + dirAttr(c.text) + '>' + esc(c.text) + '</q><div class="meta tiny mute">' + (href ? '<a href="' + href + '">' : '') + esc(c.title || '') + (href ? '</a>' : '') +
+      (c.author ? ' · ' + esc(c.author) : '') + (pos != null ? ' · ' + fmtT(pos) : '') + ' · ' + epochDate(c.created) + '</div></div>'; }).join('') + '</section>';
+  if (p.subs.length) h += '<section class="card"><h2>Shows</h2><div class="shows">' + p.subs.map(x => '<a class="show" href="#podcasts/' + encodeURIComponent(x.url) + '">' +
+    (x.image ? '<img alt="" loading="lazy" src="' + esc(x.image) + '">' : '<span class="noimg"></span>') + '<span' + dirAttr(x.title || '') + '>' + esc(x.title || x.url) + '</span></a>').join('') + '</div>' +
+    '<span class="mute tiny">AntennaPod synced ' + ago(p.last_sync) + '</span></section>';
   $('#podpage').innerHTML = h;
 };
+async function podShow(feed){
+  $('#main').innerHTML = '<div class="top"><a class="ib" href="#podcasts" aria-label="Podcasts">' + I.back + '</a><h1 id="showt">…</h1></div><div class="page" id="podpage"><span class="mute">Loading…</span></div>';
+  let x;
+  try { x = await api('/api/podcasts/show?feed=' + encodeURIComponent(feed)); } catch(e){ $('#podpage').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
+  $('#showt').textContent = x.title || 'Podcast'; $('#showt').dir = 'auto';
+  $('#podpage').innerHTML = '<section class="card">' + (x.image ? '<img class="showimg" alt="" src="' + esc(x.image) + '">' : '') +
+    (x.episodes.length ? x.episodes.map(r => epRow(Object.assign({}, r, { at: r.played }), '')).join('') : '<span class="mute">No episodes in the feed.</span>') + '</section>';
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-ep]'); if (!b) return;
+  if (b.dataset.epdoc) { location.hash = 'read/' + encodeURIComponent(b.dataset.epdoc); return; }
+  try { const r = await api('/api/podcasts/open', { method: 'POST', body: JSON.stringify({ audio: b.dataset.ep }) }); location.hash = 'read/' + encodeURIComponent(r.id); }
+  catch(err){ toast(err.message); }
+});
 C.views.feed = args => { R.doc = null; R.view = null; R.tag = null; return listView('feed', args[0] ? decodeURIComponent(args[0]) : null); };   // a Library tag doesn't follow into the Feed
 C.views.library = args => { R.doc = null; R.view = null; R.tag = null; return args[0] ? listView('library', args[0]) : homeView(); };
 // A saved view: a list with its tab, tag and order, kept in settings so every device has it.
@@ -1457,6 +1593,11 @@ C.views.read = args => {
     const id = decodeURIComponent(args.slice(0, -1).join('/')), q = decodeURIComponent(last.slice(2));
     if (R.doc && R.doc.id === id && $('#docbody')) { findInDoc(q); return; }
     return readView(id).then(() => setTimeout(() => findInDoc(q), 200));
+  }
+  if (/^t:\d+$/.test(last) && args.length > 1) {      // a time in an episode (a vault note's transcript links here)
+    const id = decodeURIComponent(args.slice(0, -1).join('/')), t = +last.slice(2);
+    if (R.doc && R.doc.id === id && R.doc.episode && V.player) { seek(t); return; }
+    R.podAt = t; R.podPlay = true; return readView(id);
   }
   if (last.startsWith('hl:') && args.length > 1) {
     const id = decodeURIComponent(args.slice(0, -1).join('/')), hid = decodeURIComponent(last.slice(3));
@@ -1643,6 +1784,11 @@ function pollTranscript(id){
   setTimeout(async () => {
     if (!R.doc || R.doc.id !== id) return;
     try { const st = await api('/api/docs/' + encodeURIComponent(id) + '/transcript');
+      if (st.podtr) {
+        if (st.ready) { const el = $('#lvp'); if (el && el.currentTime > 1) { R.podAt = el.currentTime; R.podPlay = !el.paused; podFlush(); } readView(id); return; }
+        if (st.podtr.status === 'failed') { const x = $('#trstatus'); if (x) x.innerHTML = podStatusHTML(st.podtr); return; }
+        pollTranscript(id); return;
+      }
       if (st.ready || (st.page && ['done', 'failed'].includes(st.page.status) && !st.pdf) || (st.reel && ['done', 'failed'].includes(st.reel.status))) { readView(id); return; }
       const j = st.pdf || st.whisper || st.captions;
       if (j && j.status === 'failed') { $('#trstatus').innerHTML = 'That didn’t work: ' + esc(j.error || '') + ' <button class="btn sm" data-tr="whisper">Transcribe on the server instead</button>'; return; }
@@ -1694,11 +1840,12 @@ document.addEventListener('keydown', e => {
     else if (is('list', 'tag') && R.sel) { e.preventDefault(); tagDoc(R.sel, $('.row[data-doc="' + CSS.escape(R.sel) + '"]')); }
     return;
   }
-  if (v === 'read' && R.doc && R.doc.kind === 'video' && V.player) {
+  if (v === 'read' && R.doc && (R.doc.kind === 'video' || R.doc.episode) && V.player) {
+    const ep = !!R.doc.episode;                     // an episode skips as AntennaPod does: back 15, ahead 30
     if (k === ' ') { e.preventDefault(); V.playing ? V.player.pauseVideo() : V.player.playVideo(); return; }
     if (k === 'c') { e.preventDefault(); clipVideo(30); return; }
-    if (k === 'ArrowRight') { e.preventDefault(); seek(curTime() + 10); return; }
-    if (k === 'ArrowLeft') { e.preventDefault(); seek(Math.max(0, curTime() - 10)); return; }
+    if (k === 'ArrowRight') { e.preventDefault(); seek(curTime() + (ep ? 30 : 10)); return; }
+    if (k === 'ArrowLeft') { e.preventDefault(); seek(Math.max(0, curTime() - (ep ? 15 : 10))); return; }
   }
   if (is('list', 'search')) { e.preventDefault(); openPalette(); return; }     // Search everything, wherever you are
   if (v === 'read' && R.doc) {

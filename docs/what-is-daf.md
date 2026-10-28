@@ -43,7 +43,7 @@ Daf reads a lot of things it doesn't own, and it only changes something in them 
 - **Karakeep**, retired: the Library came from it in October 2026, and it's switched off now.
 - **Hardcover**, for reading status, ratings, progress and lists.
 - **Komga**, for manga.
-- **AntennaPod**, which syncs podcasts to Daf as if Daf were gpodder.net.
+- **AntennaPod**, which syncs podcasts to Daf as if Daf were gpodder.net. Daf has its own player for an episode's page, and goes back to AntennaPod with where I stopped.
 - **Proton Mail Bridge**, for the newsletters I pick, read-only, and to send me the morning email.
 - **My Obsidian vault**, where Daf writes highlights, notes and the paper reading log.
 - **Sefaria**, for the parasha, the haftarah and the Hebrew dictionaries.

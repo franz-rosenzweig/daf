@@ -38,7 +38,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 ### Counting the hour
 
 - **Today.** A ring with today's minutes, where they came from, each sitting with its book and page, the week, and Year 30 as a grid of 365 days, with Year 29 under it.
-- **Every place I read.** The Kindle (through a KOReader plugin), audiobooks from Audiobookshelf, paper books, and books, articles and manga read in Daf all count. Podcasts show up but never count, and videos are off unless I switch them on.
+- **Every place I read.** The Kindle (through a KOReader plugin), audiobooks from Audiobookshelf, paper books, and books, articles and manga read in Daf all count. Podcasts show up, each episode with its own page and transcript, but never count, and videos are off unless I switch them on.
 - **Paper books.** I press **Log paper**, or I text my Signal bot "read 40 paper" or "shabbat 60" after havdalah, and the minutes land on the right day and in my vault's reading log.
 - **Goals.** Reading time a day, week or month, plus pages, books, days with reading, a streak, highlights and the daily review, each one on or off, with presets called Gentle, Year 30 and Deep.
 - **Stats.** Streaks, totals, when in the day I read, where the minutes came from, books that are waiting for me, and "On this day".

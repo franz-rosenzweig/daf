@@ -797,11 +797,14 @@ async function drawPod(token){
   card.innerHTML = '<h2>Podcasts (AntennaPod)</h2>' +
     '<div class="prow"><div class="d"><b>Sync</b><span>' + (p.last_sync ? 'Last sync ' + ago(p.last_sync) + ', ' + p.subs.length + ' subscriptions.' : 'Not connected yet.') + ' Listening shows on Today but never counts toward the hour.</span></div><button class="btn sm" data-act="podtoken">' + (p.device ? 'New password' : 'Make a password') + '</button></div>' +
     (token ? '<div class="kindlenote"><span class="mute tiny">The AntennaPod password. Daf only shows it once.</span><code class="tok">' + esc(token) + '</code></div>' : '') +
+    '<div class="prow"><div class="d"><b>Transcribe episodes I play or open</b></div>' +
+      '<input type="checkbox" class="sw" id="podtr" aria-label="Transcribe episodes I play or open"' + (((S.settings || {}).podcasts || {}).transcribe !== false ? ' checked' : '') + '></div>' +
     '<details class="steps"' + (token ? ' open' : '') + '><summary>Set up AntennaPod</summary><ol>' +
     '<li>AntennaPod → Settings → <b>Synchronization</b> → <b>gpodder.net</b>.</li>' +
     '<li>Server: <code>' + esc(base) + '</code> (AntennaPod may insist on https; then use the secure address once it exists). Username: <code>' + esc(S.user || 'reader') + '</code>. Password: the one above.</li>' +
     '<li>Pick or create the device <b>AntennaPod</b>, and let it sync.</li>' +
     '<li>To clip: in an episode, <b>Share → with position</b>, send it to Ezer. The minute before that point comes back transcribed, and lands in Highlights and the vault.</li></ol></details>';
+  if (S.route[1] === 'podcasts') setTimeout(() => card.scrollIntoView({ block: 'start' }), 300);
 }
 async function drawPhone(token){
   const card = $('#phonecard'); if (!card) return;
@@ -1025,6 +1028,7 @@ document.addEventListener('change', async e => {
   try {
     if (t.dataset.count){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ count:{ [t.dataset.count]: t.checked } }) }); S.y29 = null; toast('Saved'); load(); }
     if (t.id === 'tz'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ home_tz:t.value }) }); S.y29 = null; toast('Days now follow ' + t.value); load(); }
+    if (t.id === 'podtr'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ podcasts:{ transcribe:t.checked } }) }); S.settings = Object.assign(S.settings || {}, { podcasts:{ transcribe:t.checked } }); toast(t.checked ? 'Episodes you play get transcripts' : 'Transcripts only when you ask'); }
     if (t.id === 'ttsvoice'){ await Voices.set(t.value); toast('Reading in ' + Voices.label(t.value)); }
     if (t.id === 'volkeys'){ lsSet('volumeKeys', t.checked); window.dispatchEvent(new Event('daf-reading')); toast(t.checked ? 'The volume buttons turn pages, unless something is playing' : 'The volume buttons only change the volume'); }
     if (t.id === 'ttsspeed'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ tts_speed:parseFloat(t.value) }) }); toast('Read-aloud at ' + t.value + '×'); }

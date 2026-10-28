@@ -15,7 +15,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 - [Paper books](paper-books.md) — logging minutes, Shabbat, and photos of marked pages
 - [The reader](reader.md) — books, articles and PDFs, themes and typefaces, writing with a pen, focus mode, Listen, lookup, Ask, and the keys
 - [The Feed and the Library](feed-and-library.md) — FreshRSS, the Library and its tags, imports, the morning email, newsletters, Home, search and Send to Kindle
-- [Videos and podcasts](videos-and-podcasts.md) — transcripts, clips, and AntennaPod
+- [Videos and podcasts](videos-and-podcasts.md) — transcripts, clips, episode pages, and AntennaPod
 - [Highlights and review](highlights-and-review.md) — colors, tags, the daily review, flashcards and export
 - [Books and shelves](books-and-shelves.md) — the nightstand, shelves, Hardcover and a book's page
 - [The Torah shelf](torah.md) — the parasha, the haftarah, divrei Torah and the dictionaries
