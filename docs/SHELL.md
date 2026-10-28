@@ -116,6 +116,7 @@ if the command doesn't apply where the page is now.
 | `keys` | Shows the keyboard shortcuts for where you are |
 | `delete`, `undo`, `tag` | In an article, or on the selected row of a list (or the rows picked with x): delete it, take back the last Done, Later, Shortlist or Delete, or open its tags |
 | `feedback` | Send feedback… (filed as an issue on the repo) |
+| `text:bigger`, `text:smaller`, `text:reset` | The reading text's size, Aa's, a pixel at a time (14 to 32; reset is 20), a book with its own type keeping its own. Windows' Ctrl+Plus, Ctrl+Minus, Ctrl+0 and Ctrl with the wheel |
 
 The commands that press a key (`highlight`, `note`, `next`, `prev`, `toc`, `star`, `delete`, `undo`, `tag`) press the one bound now in Preferences → Keyboard (`web/keys.js`), so a menu item keeps working after a shortcut changes. `dafState().can` also has `delete`, `undo` and `tag`.
 

@@ -190,6 +190,10 @@ const CMD = {
   tag: () => (art() || list()) && key(bound(art() ? 'article' : 'list', 'tag', 't')),
   feedback: () => { closeAll(); const F = C() && C().Feedback; if (F) F.open(); return !!F; },
   sidebar: () => mac && toggleSide(),
+  // the reading text's size, Aa's (Windows: Ctrl and + / - / 0, Ctrl and the wheel)
+  'text:bigger': () => textSize(1),
+  'text:smaller': () => textSize(-1),
+  'text:reset': () => textSize(0),
   // read-aloud's own buttons, for the lock screen, the headphones and the menus
   'listen:play': () => listenBtn('Play'),
   'listen:pause': () => listenBtn('Pause'),
@@ -203,6 +207,20 @@ const CMD = {
     return true;
   },
 };
+// The reading text a size bigger or smaller (0: the usual 20 px), as Aa's Font size does: a book
+// with its own type keeps it its own (reader.js, typeFor). Said in a toast, since away from a
+// reader the change shows only in the next article or book.
+function textSize(step){
+  const id = book() && C().curBook ? C().curBook() : null;
+  const key = id && localStorage.getItem('daf.bookType.' + id) ? 'daf.bookType.' + id : 'daf.type';
+  let t = {}; try { t = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) {}
+  t.size = step === 0 ? 20 : Math.max(14, Math.min(32, (t.size || 20) + step));
+  try { localStorage.setItem(key, JSON.stringify(t)); } catch (e) { return false; }
+  if (key === 'daf.type') root.style.setProperty('--read-size', t.size + 'px');
+  window.dispatchEvent(new Event('daf-type'));
+  if (C().toast) C().toast('Reading text ' + t.size + ' px');
+  return true;
+}
 // Play or Pause, only if that's what the player's button would do now.
 function listenBtn(want){
   const b = $('[data-tts="play"], [data-bt="play"]');

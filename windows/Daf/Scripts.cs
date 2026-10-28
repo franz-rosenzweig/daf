@@ -58,8 +58,9 @@ static class Scripts
           });
 
           // The shell's own keys, once the page has had them and left them alone (Ctrl+K and
-          // Daf's single letters stay the page's). AltGr is Ctrl+Alt on many keyboards and
-          // types letters, so it never counts.
+          // Daf's single letters stay the page's): the check waits a turn, so this handler
+          // never prevents the key itself. AltGr is Ctrl+Alt on many keyboards and types
+          // letters, so it never counts.
           const views = ['today', 'review', 'library', 'feed', 'highlights', 'books', 'stats'];
           const shellKey = (e) => {
             if (e.getModifierState && e.getModifierState('AltGraph')) return null;
@@ -81,10 +82,34 @@ static class Scripts
             if (!what) return;
             setTimeout(() => { if (!e.defaultPrevented) post({ channel: 'key', what }); }, 0);
           }, true);
-          // The menus' keys, as in any Windows app: Alt and a menu's letter opens it (File, View,
-          // Go, Reader, Help), and Alt alone, pressed and let go, puts the keyboard on the menus.
+          // The reading text's size, as in any Windows app: Ctrl and + or - (either row of
+          // keys), Ctrl+0 for the usual size, Ctrl and the mouse wheel or a pinch on the
+          // touchpad. They go to the page's own size (Aa's), never the browser's zoom of the
+          // whole window; the manga reader and PDFs, which zoom their pages, keep them.
+          const sized = () => !['mread', 'pdf'].includes((document.body && document.body.dataset.view) || '');
+          window.addEventListener('keydown', (e) => {
+            if (!e.ctrlKey || e.altKey || e.metaKey || !sized()) return;
+            const what = (e.code === 'Equal' || e.code === 'NumpadAdd' || e.key === '+') ? 'text:bigger'
+              : (e.code === 'Minus' || e.code === 'NumpadSubtract') ? 'text:smaller'
+              : ((e.code === 'Digit0' || e.code === 'Numpad0') && !e.shiftKey) ? 'text:reset' : null;
+            if (!what) return;
+            e.preventDefault();
+            post({ channel: 'key', what });
+          }, true);
+          let wheel = 0;
+          window.addEventListener('wheel', (e) => {
+            if (!e.ctrlKey || !sized()) return;
+            e.preventDefault();
+            wheel += e.deltaY;
+            if (Math.abs(wheel) < 50) return;
+            post({ channel: 'key', what: wheel < 0 ? 'text:bigger' : 'text:smaller' });
+            wheel = 0;
+          }, { capture: true, passive: false });
+
+          // The menus' keys, as in any Windows app: Alt and a menu's letter opens it (File, Edit,
+          // View, Reader, Help), and Alt alone, pressed and let go, puts the keyboard on the menus.
           // Again only if the page leaves them alone; Alt+← and Alt+→ stay Back and Forward.
-          const letters = ['F', 'V', 'G', 'R', 'H'];
+          const letters = ['F', 'E', 'V', 'R', 'H'];
           let altAlone = false;
           window.addEventListener('keydown', (e) => {
             if (e.key === 'Alt') { altAlone = !e.ctrlKey && !e.shiftKey && !e.metaKey; return; }

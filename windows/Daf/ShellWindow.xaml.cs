@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Daf.Core;
 using Microsoft.UI;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -32,12 +33,14 @@ public sealed partial class ShellWindow : Window
     public Uri? Start { get; }
     readonly string? route;
     WebView2? web;
+    CoreWebView2Environment? environment;
     readonly ShellServices services;
     readonly Menus menus;
     bool started;
     ulong opening;
     RectInt32 normal;
-    bool fullScreenForReader;
+    // full screen by F11 or the menu; by the page itself (the Fullscreen API); for the manga reader (dafShell.fullscreen)
+    bool shellFull, pageFull, readerFull;
     string? seedId;
 
     /// <summary>The title bar's colour now, for the self-test.</summary>
@@ -83,15 +86,22 @@ public sealed partial class ShellWindow : Window
         }
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(DragArea);
-        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Standard;
+        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
         Minimums();
         Paint(Settings.Current.BarColor, Settings.Current.BarDark);
         Place();
         AppWindow.Changed += OnChanged;
-        Root.Loaded += async (_, _) => await StartAsync();
+        Root.Loaded += async (_, _) =>
+        {
+            FitTitleBar();
+            await StartAsync();
+        };
         Activated += (_, e) =>
         {
-            if (e.WindowActivationState == WindowActivationState.Deactivated) return;
+            var active = e.WindowActivationState != WindowActivationState.Deactivated;
+            // as any Windows title bar: dimmer while another window is in front
+            TitleText.Opacity = AppIcon.Opacity = active ? 1 : 0.5;
+            if (!active) return;
             front = this;
             menus.Refresh();
         };
@@ -110,18 +120,29 @@ public sealed partial class ShellWindow : Window
     {
         if (started) return;
         started = true;
-        Caption();
-        Root.XamlRoot.Changed += (_, _) => Caption();
+        Root.XamlRoot.Changed += (_, _) => FitTitleBar();
         await MakeWebViewAsync();
         if (App.Options.SelfTest && All.FirstOrDefault() == this) await SelfTest.Run(this);
     }
 
-    /// <summary>Room for Windows' own minimize, maximize and close at the right of the title bar.</summary>
-    void Caption()
+    /// <summary>Room for Windows' own caption buttons (minimize, maximize, close), which it draws over the row.</summary>
+    void FitTitleBar()
     {
         var scale = Root.XamlRoot?.RasterizationScale ?? Win32.Scale(Handle);
-        CaptionColumn.Width = new GridLength(Math.Max(46 * 3, AppWindow.TitleBar.RightInset / scale));
+        if (scale <= 0) return;
+        LeftPad.Width = new GridLength(AppWindow.TitleBar.LeftInset / scale);
+        RightPad.Width = new GridLength(AppWindow.TitleBar.RightInset / scale);
     }
+
+    /// <summary>The window's name, in the title bar and the taskbar: the page's, then Daf, as Windows names a document's window.</summary>
+    void NameWindow(string? page)
+    {
+        var name = (page ?? "").Trim();
+        Title = TitleText.Text = name.Length == 0 || name == "Daf" || name.EndsWith(" Daf") ? (name.Length == 0 ? "Daf" : name) : $"{name} - Daf";
+    }
+
+    /// <summary>The title row is shown, for the self-test.</summary>
+    public bool TitleShown => Strip.Visibility == Visibility.Visible;
 
     void Minimums()
     {
@@ -136,7 +157,7 @@ public sealed partial class ShellWindow : Window
     async Task MakeWebViewAsync()
     {
         CoreWebView2Environment environment;
-        try { environment = await App.WebEnvironment; }
+        try { environment = this.environment = await App.WebEnvironment; }
         catch (Exception e)
         {
             Log.Write($"no WebView2: {e}");
@@ -153,6 +174,8 @@ public sealed partial class ShellWindow : Window
         var settings = core.Settings;
         settings.AreBrowserAcceleratorKeysEnabled = App.Options.DevTools;   // Daf's keys, not a browser's (F12 with --devtools)
         settings.IsStatusBarEnabled = false;
+        // Zoom control stays on: off, WebView2 keeps Ctrl+Plus and Ctrl+Minus from the page.
+        // Scripts.Shell turns them, and Ctrl and the wheel, into the reading text's size.
         settings.IsPinchZoomEnabled = false;           // the readers have their own
         settings.IsSwipeNavigationEnabled = false;     // a swipe in the manga reader turns its page
         settings.IsGeneralAutofillEnabled = false;
@@ -171,8 +194,14 @@ public sealed partial class ShellWindow : Window
         core.ContextMenuRequested += OnContextMenuRequested;
         core.DownloadStarting += services.OnDownloadStarting;
         core.LaunchingExternalUriScheme += OnExternalScheme;
-        core.ContainsFullScreenElementChanged += (_, _) => FullScreen(core.ContainsFullScreenElement);
+        core.PermissionRequested += OnPermissionRequested;
+        core.ContainsFullScreenElementChanged += (_, _) =>
+        {
+            pageFull = core.ContainsFullScreenElement;
+            ApplyFullScreen();
+        };
         core.HistoryChanged += (_, _) => RouteChanged();
+        core.DocumentTitleChanged += (_, _) => NameWindow(core.DocumentTitle);
         LocalCopy.Attach(core, environment);
         if (App.Options.Cookie is { } cookie)
         {
@@ -198,6 +227,12 @@ public sealed partial class ShellWindow : Window
 
     void Teardown()
     {
+        // a page that was full screen goes with its web view
+        if (pageFull)
+        {
+            pageFull = false;
+            ApplyFullScreen();
+        }
         if (web == null) return;
         Root.Children.Remove(web);
         // a closed window must stop counting: the page goes with it
@@ -257,7 +292,7 @@ public sealed partial class ShellWindow : Window
         {
             case "newWindow": Open(); break;
             case "close": Close(); break;
-            case "fullScreen": FullScreen(!IsFullScreen); break;
+            case "fullScreen": ToggleFullScreen(); break;
             case "reload": Reload(); break;
             case "back": Back(); break;
             case "forward": Forward(); break;
@@ -342,6 +377,18 @@ public sealed partial class ShellWindow : Window
     /// <summary>The keyboard back to the page, after a menu.</summary>
     public void FocusPage() => web?.Focus(FocusState.Programmatic);
 
+    /// <summary>A box in the page has the keyboard (a note, a search, a field), so Edit › Undo is its own.</summary>
+    public async Task<bool> Typing()
+    {
+        if (web?.CoreWebView2 is not { } core) return false;
+        try
+        {
+            return await core.ExecuteScriptAsync(
+                "(() => { const a = document.activeElement; return !!a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT|IFRAME)$/.test(a.tagName)); })()") == "true";
+        }
+        catch (Exception) { return false; }
+    }
+
     /// <summary>The menus as the page is now; whether a Reader item is enabled (for the self-test).</summary>
     public Task UpdateMenus() => menus.Update();
     public bool MenuEnabled(string command) => menus.Enabled(command);
@@ -374,6 +421,19 @@ public sealed partial class ShellWindow : Window
             }.ToJsonString());
     }
 
+    /// <summary>The mouse wheel turned over the page, with <paramref name="modifiers"/> held (2: Ctrl), for the self-test.</summary>
+    public async Task Wheel(int deltaY, int modifiers, int x = 300, int y = 300)
+    {
+        if (web?.CoreWebView2 is not { } core) return;
+        await core.CallDevToolsProtocolMethodAsync("Input.dispatchMouseEvent", new JsonObject
+        {
+            ["type"] = "mouseWheel", ["x"] = x, ["y"] = y, ["deltaX"] = 0, ["deltaY"] = deltaY, ["modifiers"] = modifiers,
+        }.ToJsonString());
+    }
+
+    /// <summary>The menus' titles, for the self-test.</summary>
+    public string[] MenuTitles => menus.Titles;
+
     /// <summary>A picture of the page, as a PNG (for the self-test's record).</summary>
     public async Task Capture(string path)
     {
@@ -382,12 +442,12 @@ public sealed partial class ShellWindow : Window
         await core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, file.AsRandomAccessStream());
     }
 
-    /// <summary>An expression in the page, a promise awaited, the value as JSON.</summary>
-    public async Task<JsonNode?> Evaluate(string expression)
+    /// <summary>An expression in the page, a promise awaited, the value as JSON; with <paramref name="gesture"/>, as if a person had just clicked (for the Fullscreen API).</summary>
+    public async Task<JsonNode?> Evaluate(string expression, bool gesture = false)
     {
         var core = web?.CoreWebView2 ?? throw new InvalidOperationException("no page yet");
         var json = await core.CallDevToolsProtocolMethodAsync("Runtime.evaluate",
-            new JsonObject { ["expression"] = expression, ["awaitPromise"] = true, ["returnByValue"] = true }.ToJsonString());
+            new JsonObject { ["expression"] = expression, ["awaitPromise"] = true, ["returnByValue"] = true, ["userGesture"] = gesture }.ToJsonString());
         var result = JsonNode.Parse(json);
         if (result?["exceptionDetails"] is { } problem)
             throw new Exception(problem["exception"]?["description"]?.ToString() ?? problem.ToJsonString());
@@ -467,12 +527,53 @@ public sealed partial class ShellWindow : Window
     static readonly HashSet<string> Unwanted =
         ["back", "forward", "reload", "saveAs", "print", "createQrCode", "share", "webCapture", "openLinkInNewWindow", "saveLinkAs", "copyLinkToHighlight"];
 
-    /// <summary>The page's right-click menu, without what belongs to a browser: spelling, cut, copy and paste stay.</summary>
-    void OnContextMenuRequested(CoreWebView2 sender, CoreWebView2ContextMenuRequestedEventArgs e)
+    /// <summary>
+    /// The page's right-click menu, without what belongs to a browser (spelling, cut, copy
+    /// and paste stay), and on words chosen in an article or a book with Daf's own Highlight
+    /// and Highlight with a Note first, as a Windows reading app has them there.
+    /// </summary>
+    async void OnContextMenuRequested(CoreWebView2 sender, CoreWebView2ContextMenuRequestedEventArgs e)
     {
         var items = e.MenuItems;
         for (var i = items.Count - 1; i >= 0; i--)
             if (Unwanted.Contains(items[i].Name)) items.RemoveAt(i);
+        if (!e.ContextMenuTarget.HasSelection || e.ContextMenuTarget.IsEditable || environment == null)
+        {
+            Tidy(items);
+            return;
+        }
+        var deferral = e.GetDeferral();
+        try
+        {
+            if (await State() is { } s && s["can"] is JsonObject can && J.Bool(can["highlight"]))
+            {
+                var at = items.Select((item, i) => (item, i)).FirstOrDefault(x => x.item.Name is "cut" or "copy" or "paste").i;
+                if (at == 0 && items.Count > 0 && items[0].Name is not ("cut" or "copy" or "paste")) at = items.Count;
+                var ours = new List<CoreWebView2ContextMenuItem> { Item("Highlight", "highlight"), Item("Highlight with a Note", "note") };
+                if (at > 0) ours.Insert(0, Line());
+                ours.Add(Line());
+                for (var i = ours.Count - 1; i >= 0; i--) items.Insert(at, ours[i]);
+            }
+        }
+        catch (Exception x) { Log.Write($"context menu: {x.Message}"); }
+        finally
+        {
+            Tidy(items);
+            deferral.Complete();
+        }
+
+        CoreWebView2ContextMenuItem Item(string label, string command)
+        {
+            var item = environment!.CreateContextMenuItem(label, null, CoreWebView2ContextMenuItemKind.Command);
+            item.CustomItemSelected += (_, _) => DispatcherQueue.TryEnqueue(() => _ = Run(command));
+            return item;
+        }
+        CoreWebView2ContextMenuItem Line() => environment!.CreateContextMenuItem("", null, CoreWebView2ContextMenuItemKind.Separator);
+    }
+
+    /// <summary>No separator left at an end of the menu, or beside another.</summary>
+    static void Tidy(IList<CoreWebView2ContextMenuItem> items)
+    {
         for (var i = items.Count - 1; i >= 0; i--)
             if (items[i].Kind == CoreWebView2ContextMenuItemKind.Separator
                 && (i == 0 || i == items.Count - 1 || items[i - 1].Kind == CoreWebView2ContextMenuItemKind.Separator))
@@ -483,7 +584,23 @@ public sealed partial class ShellWindow : Window
     void RouteChanged()
     {
         menus.Refresh();
-        if (fullScreenForReader && Address.Route(Source)?.StartsWith("#mread/") != true) FullScreen(false);
+        if (readerFull && Address.Route(Source)?.StartsWith("#mread/") != true)
+        {
+            readerFull = shellFull = false;
+            ApplyFullScreen();
+        }
+    }
+
+    /// <summary>
+    /// Daf's own page may download several files without a click in between (Share as
+    /// image's Download after the export, a book's file): they go to the save dialog like the
+    /// first. Anything else WebView2 asks as it would.
+    /// </summary>
+    void OnPermissionRequested(CoreWebView2 sender, CoreWebView2PermissionRequestedEventArgs e)
+    {
+        if (e.PermissionKind == CoreWebView2PermissionKind.MultipleAutomaticDownloads
+            && Uri.TryCreate(e.Uri, UriKind.Absolute, out var u) && Address.IsOurs(u, Settings.BaseUrl))
+            e.State = CoreWebView2PermissionState.Allow;
     }
 
     static string Unreachable(string why)
@@ -504,25 +621,88 @@ public sealed partial class ShellWindow : Window
 
     public bool IsFullScreen => AppWindow.Presenter.Kind == AppWindowPresenterKind.FullScreen;
 
-    public void FullScreen(bool on)
+    /// <summary>
+    /// F11 and View › Full Screen. Out of full screen is out, whichever way it came: the
+    /// page's own full screen (focus mode) too, so nothing is left half-way.
+    /// </summary>
+    public void ToggleFullScreen()
     {
-        if (on == IsFullScreen) return;
-        AppWindow.SetPresenter(on ? AppWindowPresenterKind.FullScreen : AppWindowPresenterKind.Overlapped);
-        Strip.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
-        if (!on)
-        {
-            fullScreenForReader = false;
-            Minimums();
-        }
+        if (shellFull || pageFull || IsFullScreen) LeaveFullScreen();
+        else shellFull = true;
+        ApplyFullScreen();
+    }
+
+    void LeaveFullScreen()
+    {
+        shellFull = readerFull = false;
+        if (pageFull) _ = web?.CoreWebView2?.ExecuteScriptAsync("document.fullscreenElement && document.exitFullscreen()");
+        pageFull = false;
     }
 
     /// <summary>dafShell.fullscreen: the manga reader's Full screen, left again with the reader. True when it went full screen.</summary>
     public bool ReaderFullScreen()
     {
-        var entering = !IsFullScreen;
-        FullScreen(entering);
-        fullScreenForReader = entering;
+        var entering = !(shellFull || pageFull || IsFullScreen);
+        if (entering) shellFull = readerFull = true; else LeaveFullScreen();
+        ApplyFullScreen();
         return entering;
+    }
+
+    /// <summary>One state from the ways in: full screen while any wants it, the title bar exactly when not.</summary>
+    void ApplyFullScreen()
+    {
+        var want = shellFull || pageFull;
+        try
+        {
+            if (want != IsFullScreen) AppWindow.SetPresenter(want ? AppWindowPresenterKind.FullScreen : AppWindowPresenterKind.Overlapped);
+        }
+        catch (Exception e) { Log.Write($"full screen: {e.Message}"); }
+        Presented();
+        if (want) Hint(pageFull && !shellFull ? "Press Esc to exit full screen" : "Press F11 to exit full screen");
+    }
+
+    /// <summary>
+    /// The presenter changed, by Daf or by Windows (Win+↓ takes a window out of full
+    /// screen): the title bar follows what the window really is.
+    /// </summary>
+    void Presented()
+    {
+        if (!IsFullScreen && (shellFull || pageFull)) LeaveFullScreen();
+        Strip.Visibility = IsFullScreen ? Visibility.Collapsed : Visibility.Visible;
+        if (!IsFullScreen) Minimums();
+    }
+
+    Border? hint;
+    DispatcherQueueTimer? hintTimer;
+
+    /// <summary>A word at the top for three seconds, as Windows' browsers say how to leave full screen.</summary>
+    void Hint(string text)
+    {
+        if (hint != null) Root.Children.Remove(hint);
+        hint = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x2B, 0x2B, 0x2B)),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(16, 10, 16, 10),
+            Margin = new Thickness(0, 24, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
+            IsHitTestVisible = false,
+            Child = new TextBlock { Text = text, Foreground = new SolidColorBrush(Colors.White) },
+        };
+        Grid.SetRowSpan(hint, 2);
+        Root.Children.Add(hint);
+        var shown = hint;
+        hintTimer?.Stop();
+        hintTimer = DispatcherQueue.CreateTimer();
+        hintTimer.Interval = TimeSpan.FromSeconds(3);
+        hintTimer.IsRepeating = false;
+        hintTimer.Tick += (_, _) =>
+        {
+            Root.Children.Remove(shown);
+            if (hint == shown) hint = null;
+        };
+        hintTimer.Start();
     }
 
     /// <summary>
@@ -534,6 +714,8 @@ public sealed partial class ShellWindow : Window
         var state = (sender.Presenter as OverlappedPresenter)?.State;
         if ((e.DidPositionChange || e.DidSizeChange) && state == OverlappedPresenterState.Restored)
             normal = new RectInt32(sender.Position.X, sender.Position.Y, sender.Size.Width, sender.Size.Height);
+        if (e.DidSizeChange) FitTitleBar();
+        if (e.DidPresenterChange) Presented();
         if (web != null)
         {
             var shown = state != OverlappedPresenterState.Minimized && sender.IsVisible;

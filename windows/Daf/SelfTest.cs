@@ -68,6 +68,9 @@ static class SelfTest
             await w.Evaluate($"dafShell.bars({{ bg: {Js(pageBg ?? "#ffffff")}, dark: document.documentElement.dataset.mode === 'dark' }})");
 
             // ---- the menus and the shell's keys run the page's commands (docs/SHELL.md §3)
+            var titles = string.Join(", ", w.MenuTitles);
+            Add("the title bar has Windows' five menus", titles == "File, Edit, View, Reader, Help", titles);
+            Add("the window is named in its title bar and the taskbar", w.Title.EndsWith("Daf"), w.Title);
             await w.Run("go:review");
             Add("View › Review goes there", J.Bool(await Until(w, "location.hash === '#review'", TimeSpan.FromSeconds(5))), J.Text(await w.Evaluate("location.hash")) ?? "");
             await w.Press("3", "Digit3", 0x33, 2);
@@ -77,8 +80,26 @@ static class SelfTest
             await w.Press("k", "KeyK", 0x4B, 2);
             var palette = J.Bool(await Until(w, "!!document.querySelector('#palette') && !document.querySelector('#palette').hidden", TimeSpan.FromSeconds(3)));
             Add("Ctrl+K is the page's own search", palette && !Menus.Ran.Contains("search"));
+            await w.Evaluate("document.querySelector('#palette').hidden || (dafBack(), true)");
 
-            // ---- Back: whatever is in front closes first (the search just opened), then the page before
+            // ---- the reading text's size: Ctrl and + / - / 0, and Ctrl with the wheel, are Aa's size, not the browser's zoom
+            const string size = "(JSON.parse(localStorage.getItem('daf.type') || '{}').size || 20)";
+            var ratio = J.Text(await w.Evaluate("String(devicePixelRatio)"));
+            await w.Evaluate("dafCommand('text:reset'), true");
+            await w.Press("=", "Equal", 0xBB, 2);
+            Add("Ctrl+Plus makes the reading text bigger", J.Int(await Until(w, $"{size} === 21 ? 21 : 0", TimeSpan.FromSeconds(3))) == 21, J.Int(await w.Evaluate(size)).ToString());
+            await w.Press("-", "Minus", 0xBD, 2);
+            Add("Ctrl+Minus makes it smaller", J.Int(await Until(w, $"{size} === 20 ? 20 : 0", TimeSpan.FromSeconds(3))) == 20, J.Int(await w.Evaluate(size)).ToString());
+            await w.Wheel(-120, 2);
+            Add("Ctrl and the mouse wheel make it bigger", J.Int(await Until(w, $"{size} === 21 ? 21 : 0", TimeSpan.FromSeconds(3))) == 21, J.Int(await w.Evaluate(size)).ToString());
+            await w.Press("0", "Digit0", 0x30, 2);
+            Add("Ctrl+0 is the usual size again", J.Int(await Until(w, $"{size} === 20 ? 20 : 0", TimeSpan.FromSeconds(3))) == 20, J.Int(await w.Evaluate(size)).ToString());
+            var after = J.Text(await w.Evaluate("String(devicePixelRatio)"));
+            Add("and the browser never zoomed the window", after == ratio, $"{ratio} then {after}");
+
+            // ---- Back: whatever is in front closes first (search, opened again), then the page before
+            await w.Press("k", "KeyK", 0x4B, 2);
+
             var paletteOpen = J.Bool(await Until(w, "!!document.querySelector('#palette') && !document.querySelector('#palette').hidden", TimeSpan.FromSeconds(3)));
             w.Back();
             var closed = J.Bool(await Until(w, "document.querySelector('#palette').hidden", TimeSpan.FromSeconds(3)));
@@ -135,9 +156,21 @@ static class SelfTest
             Add("navigator.share and canShare reach it (Share as image)",
                 J.Bool(await w.Evaluate("navigator.canShare({ files: [new File([new Uint8Array([1])], 'x.png', { type: 'image/png' })] }) && navigator.share({ text: 'Daf' }).then(() => true)")));
 
-            // ---- the manga reader's full screen
-            Add("fullscreen: the window goes full screen", J.Bool(await w.Evaluate("dafShell.fullscreen()")) && w.IsFullScreen);
-            Add("and the same again leaves it", !J.Bool(await w.Evaluate("dafShell.fullscreen()")) && !w.IsFullScreen);
+            // ---- full screen is one state, whichever way in and out
+            Add("dafShell.fullscreen: the window goes full screen, without the title bar",
+                J.Bool(await w.Evaluate("dafShell.fullscreen()")) && w.IsFullScreen && !w.TitleShown);
+            Add("and the same again leaves it, the title bar back", !J.Bool(await w.Evaluate("dafShell.fullscreen()")) && !w.IsFullScreen && w.TitleShown);
+            await w.Press("F11", "F11", 0x7A, 0);
+            Add("F11 makes the window full screen", await Until(() => w.IsFullScreen && !w.TitleShown, TimeSpan.FromSeconds(3)));
+            await w.Press("F11", "F11", 0x7A, 0);
+            Add("F11 again brings the window and its title bar back", await Until(() => !w.IsFullScreen && w.TitleShown, TimeSpan.FromSeconds(3)));
+            await w.Evaluate("document.documentElement.requestFullscreen().then(() => true)", gesture: true);
+            var pageFull = await Until(() => w.IsFullScreen && !w.TitleShown, TimeSpan.FromSeconds(3));
+            w.Key("fullScreen");       // View › Full Screen, while the page is the one full screen
+            var restored = await Until(() => !w.IsFullScreen && w.TitleShown, TimeSpan.FromSeconds(3));
+            var pageOut = J.Bool(await Until(w, "!document.fullscreenElement", TimeSpan.FromSeconds(3)));
+            Add("the page's own full screen (focus mode), then View › Full Screen: both out, nothing half-way", pageFull && restored && pageOut,
+                $"window {(w.IsFullScreen ? "full screen" : "normal")}, title bar {(w.TitleShown ? "shown" : "hidden")}, page {(pageOut ? "out" : "still full screen")}");
 
             // ---- the device token, today's minutes, the notification area
             var token = await Until(() => App.Token.Value != null, TimeSpan.FromSeconds(30));

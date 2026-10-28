@@ -7,19 +7,33 @@ new posts, `daf://` links, and a copy of Daf for when there's no connection. C# 
 (Windows App SDK 1.8), with the page in WebView2. The contract between page and shell is
 `docs/SHELL.md`; what a person sees is `docs/windows.md`.
 
-- **The window**: the page under a title bar in the page's own colour (`dafShell.bars`, which
-  `shell.js` sends at load and on each theme change), with the menus in it beside Windows'
-  caption buttons. The frame is remembered; at least 900 × 600; F11 is full screen, and so is
-  the manga reader's Full screen (`dafShell.fullscreen`), left again with the reader. Only Daf
+- **The window**: the page under one tall title bar in the page's own colour (`dafShell.bars`,
+  which `shell.js` sends at load and on each theme change) holding the icon, the menus and the
+  window's name ("<page> - Daf", dimmed while another window is in front), with Windows'
+  caption buttons and their Snap Layouts. The frame is remembered; at least 900 × 600. Only Daf
   loads in the window: any other address opens in the browser, `obsidian://` in Obsidian, and
   Daf's own files opened in a new tab (the PDF as printed) in a window of their own.
-- **The menus**: File, View, Go, Reader and Help, the Mac's items with Ctrl for ⌘. Each item
-  calls the page's own command (`window.dafCommand`); what's greyed comes from
-  `window.dafState()`. The page hears every key first: the keys with Ctrl reach the shell only
-  if the page leaves them alone, and the Reader's single letters are the page's. Alt and a
-  menu's letter opens it, Alt alone moves to the menus, and choosing an item gives the keyboard
-  back to the page. The browser's own keys are off (with `--devtools`, F12 comes back). Alt+←, Ctrl+[ and the mouse's back
-  button go through `window.dafBack()`, which closes what's in front first.
+- **Full screen is one state**: F11 and View › Full Screen, the page's own Fullscreen API (focus
+  mode) and the manga reader's Full screen (`dafShell.fullscreen`, left again with the reader)
+  all set the same full-screen presenter, the title bar shows exactly when the window isn't
+  full screen (also when Windows changes it, Win+↓), coming out of it leaves the page's too, and
+  a note says for three seconds which key leaves.
+- **The menus**: File, Edit, View, Reader and Help, the Windows set, with the Mac's items in them
+  and Ctrl for ⌘ (the Mac's Go is View › Go To, Back and Forward). Each item calls the page's
+  own command (`window.dafCommand`); what's greyed comes from `window.dafState()`. Edit's Cut,
+  Copy, Paste and Select All press their keys in the page; its Undo is the box's own while one
+  is being typed in, and Daf's `undo` otherwise. The page hears every key first: the keys with
+  Ctrl reach the shell only if the page leaves them alone, and the Reader's single letters are
+  the page's. Alt and a menu's letter opens it, Alt alone moves to the menus, Esc goes back, and
+  choosing an item gives the keyboard back to the page. The browser's own keys are off (with
+  `--devtools`, F12 comes back). Alt+←, Ctrl+[ and the mouse's back button go through
+  `window.dafBack()`, which closes what's in front first.
+- **Text size**: Ctrl+Plus, Ctrl+Minus, Ctrl+0 and Ctrl with the wheel are the reading text's
+  size, Aa's (`dafCommand('text:bigger' | 'text:smaller' | 'text:reset')`), never the browser's
+  zoom of the whole window; the manga reader and PDFs keep them for their pages. WebView2's zoom
+  control stays on, because with it off WebView2 keeps those keys from the page.
+- **Right-click** on words chosen in an article or a book has Daf's Highlight and Highlight with
+  a Note above Copy; the browser's own items (Back, Reload, Save as, Print, Share…) are gone.
 - **`window.dafShell`**, defined before the page's scripts run, over WebView2's web messages:
   `share` (Windows' share sheet, so Share as image works through `shell.js`'s stand-in for
   `navigator.share`), `download` and every `<a download>`, attachment and blob link (the save
@@ -91,12 +105,15 @@ the sign-in.
 The self-test starts `tools/sandbox.py` on an empty state of its own, with a made-up password
 (never the real Daf, whose outside writes the sandbox also stands in for), and runs the real
 app on it with `--selftest`, nobody at the keyboard. It checks: the user agent, `shell-windows`
-and `dafShell`'s calls; the title bar in the page's colour and following its theme; View ›
-Review and Ctrl+3, Ctrl+K staying the page's, the Reader items greyed away from a reader; Back
-closing search before going back, and the mouse's back button; a minimized window's page going
-hidden and coming back; links out, `obsidian://`, and Daf's own file in a window of its own;
-`dafShell.download`, an `<a download>`, a blob link and a URL saved; share; full screen; the
-token made by itself and today's minutes with it; the ring in the notification area and its
+and `dafShell`'s calls; the title bar in the page's colour and following its theme, its five
+menus and the window's name; View › Review and Ctrl+3, Ctrl+K staying the page's, the Reader
+items greyed away from a reader; Ctrl+Plus, Ctrl+Minus, Ctrl with the wheel and Ctrl+0 changing
+the reading text's size and never the browser's zoom; Back closing search before going back,
+and the mouse's back button; a minimized window's page going hidden and coming back; links out,
+`obsidian://`, and Daf's own file in a window of its own; `dafShell.download`, an
+`<a download>`, a blob link and a URL saved; share; full screen as one state (the reader's, F11
+in and out, and the page's own Fullscreen API then View › Full Screen, both out); the token
+made by itself and today's minutes with it; the ring in the notification area and its
 panel; alerts answering; `daf://save`, and a second start handing `daf://go/stats` to the
 first; Settings; the copy of every file of `web/` and the plan; and then, with the sandbox
 stopped, the window moving to the copy at the same page, signed in, its data from the PC, no
@@ -105,8 +122,11 @@ live site.
 
 What it can't check: the share sheet and the save dialog themselves (it saves to a folder
 instead), a notification appearing and its click, a window covered by another (only minimized),
-the real Daf's https and its service worker, and anything that needs a person at the PC. A
-notification-area check passes on a machine with no taskbar, and says so.
+the right-click menu, the menus opened from the keyboard, the real Daf's https and its service
+worker, and anything that needs a person at the PC. Its keys are sent through DevTools
+(`Input.dispatchKeyEvent`), inside the page, so they show the page and the shell agree on a key
+but can't prove a real key gets past WebView2 the same way. A notification-area check passes
+on a machine with no taskbar, and says so.
 
 ## The pieces
 

@@ -9,8 +9,10 @@ using Microsoft.UI.Xaml.Input;
 namespace Daf;
 
 /// <summary>
-/// The menus in the title bar: the Mac's (mac/Daf/Menus.swift) with Ctrl for ⌘. Each
-/// item calls the page's own command (window.dafCommand, docs/SHELL.md §3); what's greyed
+/// The menus in the title bar, the five a Windows reading app has: File, Edit, View,
+/// Reader and Help, with the Mac's items (mac/Daf/Menus.swift) gathered into them and Ctrl
+/// for ⌘ (the Mac's Go is View › Go To, Back and Forward). Each item calls the page's own
+/// command (window.dafCommand, docs/SHELL.md §3); what's greyed
 /// and what Listen and the Shortlist say come from window.dafState(), asked when a menu is
 /// pressed open and whenever the page moves. The page hears every key first, so an item
 /// only shows its key: the keys with Ctrl reach the shell once the page leaves them alone
@@ -37,7 +39,17 @@ sealed class Menus
         Build();
         foreach (var top in bar.Items)
             top.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, _) => Refresh()), handledEventsToo: true);
+        // Esc on the menus (after a lone Alt) gives the keyboard back to the page
+        bar.KeyDown += (_, e) =>
+        {
+            if (e.Key != Windows.System.VirtualKey.Escape) return;
+            e.Handled = true;
+            owner.FocusPage();
+        };
     }
+
+    /// <summary>The menus' titles, for the self-test.</summary>
+    public string[] Titles => bar.Items.Select(m => m.Title).ToArray();
 
     public void Refresh() => _ = Update();
 
@@ -96,32 +108,46 @@ sealed class Menus
         Page(file, "Log Paper Minutes…", "paper", "Ctrl+Shift+P");
         Page(file, "Export Highlights…", "export", "Ctrl+Shift+E");
         Line(file);
+        Page(file, "Preferences", "go:prefs");
+        Page(file, "Reading Goals…", "go:prefs/goals");
         Shell(file, "Settings…", SettingsWindow.Show, "Ctrl+,");
         Line(file);
         Shell(file, "Close Window", owner.Close, "Ctrl+W");
         Shell(file, "Exit Daf", App.Quit);
 
+        // what the keys do in a box being typed in; Undo away from one is Daf's own (a Done, Later or Delete taken back)
+        var edit = Top("Edit", "E");
+        Shell(edit, "Undo", async () => { if (await owner.Typing()) await owner.Press("z", "KeyZ", 0x5A, 2); else await owner.Run("undo"); }, "Ctrl+Z");
+        Native(edit, "Redo", "Ctrl+Y", "y", 0x59);
+        Line(edit);
+        Native(edit, "Cut", "Ctrl+X", "x", 0x58);
+        Native(edit, "Copy", "Ctrl+C", "c", 0x43);
+        Native(edit, "Paste", "Ctrl+V", "v", 0x56);
+        Native(edit, "Select All", "Ctrl+A", "a", 0x41);
+        Line(edit);
+        Page(edit, "Search Daf…", "search", "Ctrl+K");
+
         var view = Top("View", "V");
+        var places = Sub(view, "Go To");
         foreach (var (title, place, n) in new[] { ("Today", "today", 1), ("Review", "review", 2), ("Library", "library", 3), ("Feed", "feed", 4), ("Highlights", "highlights", 5), ("Books", "books", 6), ("Stats", "stats", 7) })
-            Page(view, title, "go:" + place, $"Ctrl+{n}");
-        Page(view, "Shortlist", "go:library/starred");
-        Page(view, "Torah", "go:torah");
-        Page(view, "Paper Pages", "go:paper");
-        Page(view, "Reading Goals…", "go:prefs/goals");
-        Page(view, "Preferences", "go:prefs");
+            Page(places, title, "go:" + place, $"Ctrl+{n}");
+        Line(places);
+        Page(places, "Shortlist", "go:library/starred");
+        Page(places, "Torah", "go:torah");
+        Page(places, "Paper Pages", "go:paper");
+        Shell(view, "Back", owner.Back, "Alt+←");
+        forward = Shell(view, "Forward", owner.Forward, "Alt+→");
         Line(view);
         ReaderItem(view, "Contents", "toc");
         ReaderItem(view, "Side Panel", "panel");
         ReaderItem(view, "Typography", "aa");
+        var size = Sub(view, "Text Size");
+        Page(size, "Bigger", "text:bigger", "Ctrl+Plus");
+        Page(size, "Smaller", "text:smaller", "Ctrl+Minus");
+        Page(size, "Usual Size", "text:reset", "Ctrl+0");
         Line(view);
         Shell(view, "Reload Page", owner.Reload, "Ctrl+R");
-        Shell(view, "Full Screen", () => owner.FullScreen(!owner.IsFullScreen), "F11");
-
-        var go = Top("Go", "G");
-        Shell(go, "Back", owner.Back, "Alt+←");
-        forward = Shell(go, "Forward", owner.Forward, "Alt+→");
-        Line(go);
-        Page(go, "Search", "search", "Ctrl+K");
+        Shell(view, "Full Screen", owner.ToggleFullScreen, "F11");
 
         var readerMenu = Top("Reader", "R");
         ReaderItem(readerMenu, "Highlight", "highlight", "h");
@@ -155,6 +181,21 @@ sealed class Menus
     }
 
     static void Line(IList<MenuFlyoutItemBase> into) => into.Add(new MenuFlyoutSeparator());
+
+    static IList<MenuFlyoutItemBase> Sub(IList<MenuFlyoutItemBase> into, string text)
+    {
+        var sub = new MenuFlyoutSubItem { Text = text };
+        into.Add(sub);
+        return sub.Items;
+    }
+
+    /// <summary>An item that presses its key in the page (Cut, Copy, Paste): what the key does, it does.</summary>
+    void Native(IList<MenuFlyoutItemBase> into, string text, string key, string letter, int virtualKey)
+    {
+        var item = new MenuFlyoutItem { Text = text, KeyboardAcceleratorTextOverride = key };
+        item.Click += async (_, _) => await owner.Press(letter, "Key" + letter.ToUpperInvariant(), virtualKey, 2);
+        into.Add(item);
+    }
 
     /// <summary>An item that runs one of the page's commands, anywhere in Daf.</summary>
     MenuFlyoutItem Page(IList<MenuFlyoutItemBase> into, string text, string command, string? key = null)
