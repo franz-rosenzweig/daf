@@ -652,6 +652,7 @@ public sealed partial class ShellWindow : Window
     void ApplyFullScreen()
     {
         var want = shellFull || pageFull;
+        if (App.Options.SelfTest) Log.Write($"full screen: want {want} (shell {shellFull}, page {pageFull}), now {AppWindow.Presenter.Kind}");
         try
         {
             if (want != IsFullScreen)
@@ -672,6 +673,7 @@ public sealed partial class ShellWindow : Window
     void Presented()
     {
         // nothing here may change the presenter, or Windows tells us again (AppWindow.Changed)
+        if (App.Options.SelfTest) Log.Write($"presented: {AppWindow.Presenter.Kind}");
         if (!IsFullScreen && (shellFull || pageFull)) LeaveFullScreen();
         Strip.Visibility = IsFullScreen ? Visibility.Collapsed : Visibility.Visible;
     }

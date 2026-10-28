@@ -33,6 +33,8 @@ static class SelfTest
     static void Add(string name, bool ok, string detail = "")
     {
         lock (Gate) Checks.Add(new Check(name, ok, detail));
+        // as it goes, so a crash still leaves what came before it
+        Write(false);
     }
 
     static string Js(string s) => J.Quote(s);
@@ -306,12 +308,17 @@ static class SelfTest
 
     static void Finish(string? problem = null)
     {
+        if (problem != null) lock (Gate) Checks.Add(new Check("the self-test ran to the end", false, problem));
+        var ok = Write(true);
+        Tray.Remove();
+        Environment.Exit(ok ? 0 : 1);
+    }
+
+    /// <summary>The results so far into --out; true when every check held. Until the end, a last check says it didn't get there.</summary>
+    static bool Write(bool end)
+    {
         Check[] checks;
-        lock (Gate)
-        {
-            if (problem != null) Checks.Add(new Check("the self-test ran to the end", false, problem));
-            checks = [.. Checks];
-        }
+        lock (Gate) checks = end ? [.. Checks] : [.. Checks, new Check("the self-test ran to the end", false, "it stopped after the check above")];
         var ok = checks.Length > 0 && checks.All(c => c.Ok);
         var report = new JsonObject
         {
@@ -322,10 +329,9 @@ static class SelfTest
         try
         {
             if (App.Options.Out is { } path)
-                File.WriteAllText(path, report.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }), Encoding.UTF8);
+                lock (Gate) File.WriteAllText(path, report.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }), Encoding.UTF8);
         }
         catch (Exception e) { Log.Write($"self-test results: {e.Message}"); }
-        Tray.Remove();
-        Environment.Exit(ok ? 0 : 1);
+        return ok;
     }
 }
