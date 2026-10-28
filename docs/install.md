@@ -28,6 +28,12 @@ cp -R build/Daf.app /Applications/ && open /Applications/Daf.app
 
 Sign in inside the window, then open **Daf → Settings…** and press **Connect This Mac**, which gives the menu bar and "Save to Daf" their own token. The details, including signing it so the Keychain stops asking, are in [the Mac app](mac.md) and [mac/README.md](../mac/README.md).
 
+## The Windows app
+
+The Windows app comes ready to install: GitHub builds it, and each [release](https://github.com/franz-rosenzweig/daf/releases) tagged `windows-v…` has `Daf-<version>-Setup.exe` and a portable zip. Run the Setup, which installs it for you alone and needs no administrator, or unzip the portable copy anywhere. The app isn't signed yet, so the first time Windows says the publisher is unknown: **More info → Run anyway**. It needs Windows 10 (1809 or newer) or Windows 11, and the WebView2 runtime, which Windows 11 already has.
+
+Sign in inside the window and it connects itself: the ring by the clock, Save a Link and the notifications get a token of their own without you doing anything. Daf's address is in **File › Settings…**. See [the Windows app](windows.md), and [windows/README.md](../windows/README.md) for building it yourself.
+
 ## The Android app
 
 The Android app is built from the repository too, on a computer with JDK 17 and the Android SDK, and it needs a keystore of your own to sign it.

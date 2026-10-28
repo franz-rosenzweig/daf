@@ -2,10 +2,10 @@
    Nothing here runs in a browser: it starts only when the user agent names a shell. */
 (() => {
 'use strict';
-const ua = / Daf\/([\w.]+) \((macOS|Android) shell\)/.exec(navigator.userAgent);
+const ua = / Daf\/([\w.]+) \((macOS|Android|Windows) shell\)/.exec(navigator.userAgent);
 if (!ua) return;
-const mac = ua[2] === 'macOS', root = document.documentElement;
-root.classList.add('shell', mac ? 'shell-mac' : 'shell-android');
+const mac = ua[2] === 'macOS', android = ua[2] === 'Android', windows = ua[2] === 'Windows', root = document.documentElement;
+root.classList.add('shell', mac ? 'shell-mac' : android ? 'shell-android' : 'shell-windows');
 
 const $ = s => document.querySelector(s);
 const C = () => window.DafCore;
@@ -175,9 +175,9 @@ const CMD = {
   note: () => (art() || book()) && key(bound(art() ? 'article' : 'book', 'note', 'n')),
   bookmark: () => book() && press('[data-bk="bookmark"]'),
   // In the manga reader, Android's next/prev are its volume keys: the reader's own event, so its
-  // "Volume keys: turn pages / inverted / off" setting holds; the Mac's menu items turn the page.
-  next: () => manga() ? (mac ? key(bound('manga', 'next', 'PageDown')) : volume(1)) : book() ? key(bound('book', 'next', 'ArrowRight')) : art() && key(bound('article', 'next', 'j')),
-  prev: () => manga() ? (mac ? key(bound('manga', 'prev', 'PageUp')) : volume(-1)) : book() ? key(bound('book', 'prev', 'ArrowLeft')) : art() && key(bound('article', 'prev', 'k')),
+  // "Volume keys: turn pages / inverted / off" setting holds; the Mac's and Windows' menu items turn the page.
+  next: () => manga() ? (android ? volume(1) : key(bound('manga', 'next', 'PageDown'))) : book() ? key(bound('book', 'next', 'ArrowRight')) : art() && key(bound('article', 'next', 'j')),
+  prev: () => manga() ? (android ? volume(-1) : key(bound('manga', 'prev', 'PageUp'))) : book() ? key(bound('book', 'prev', 'ArrowLeft')) : art() && key(bound('article', 'prev', 'k')),
   keys: () => (art() || book()) && key('?'),
   paper: () => { closeAll(); return act('paper'); },
   add: () => { closeAll(); return act('add'); },
@@ -255,10 +255,10 @@ window.dafState = () => {
 };
 
 /* ---------- Android: window.dafShell over the app's message port ---------- */
-// The Mac defines dafShell before the page runs. Android hands the page a message port
-// after each load (Shell.java); calls made before it arrives wait for it. Only a port
+// The Mac and Windows define dafShell before the page runs. Android hands the page a message
+// port after each load (Shell.java); calls made before it arrives wait for it. Only a port
 // from the app itself counts: its message has no source window, where a frame's would.
-if (!mac && !window.dafShell) {
+if (android && !window.dafShell) {
   let port = null, seq = 0;
   const waiting = new Map(), queue = [];
   const send = m => { if (port) port.postMessage(JSON.stringify(m)); else queue.push(m); };
@@ -318,7 +318,7 @@ if (can('share')) {
 
 /* ---------- Android: a tap felt in the hand, as native apps answer ---------- */
 // Keep in the review confirms, Less often and Never again reject; a tab or a highlight ticks.
-if (!mac) document.addEventListener('click', e => {
+if (android) document.addEventListener('click', e => {
   if (!can('haptic') || !e.target.closest) return;
   const t = e.target.closest('[data-act="rkeep"], [data-act="rless"], [data-act="rnever"], .mobbar .mb, #selbar [data-hb]');
   if (!t) return;
@@ -329,7 +329,7 @@ if (!mac) document.addEventListener('click', e => {
 /* ---------- Android: the manga reader takes the whole screen ---------- */
 // While a manga is open (#mread) the app hides the status and navigation bars (a swipe from the edge
 // shows them for a moment) and keeps the screen on; the reader turns pages by touch on its own.
-if (!mac) {
+if (android) {
   let was = null;
   const look = () => {
     const on = view() === 'mread';
@@ -341,10 +341,11 @@ if (!mac) {
   if (document.body) watch(); else document.addEventListener('DOMContentLoaded', watch);
 }
 
-/* ---------- Android: the status and navigation bars in the theme's colours ---------- */
+/* ---------- Android and Windows: the bars in the theme's colours ---------- */
+// Android's status and navigation bars, and the Windows window's title bar with its menus.
 // themes.js says when the theme changes ('daf-theme'); at load the page's own --bg says. Any CSS
 // colour goes, so it's drawn on a canvas and read back as #rrggbb.
-if (!mac) {
+if (android || windows) {
   const hex = c => {
     try {
       const x = document.createElement('canvas').getContext('2d');
@@ -370,7 +371,7 @@ if (!mac) {
 // them to the volume while anything plays. ownMenu: an article or a book is open and nothing
 // editable has focus, so Daf's own bar answers a selection and the app keeps Android's text menu
 // empty (note boxes keep Paste).
-if (!mac) {
+if (android) {
   let said = '';
   const tell = () => {
     if (!can('reading') || !document.body) return;
@@ -396,7 +397,7 @@ if (!mac) {
 /* ---------- Android: read-aloud with the screen off ---------- */
 // What the page's player is doing goes to the app (Listen.java), which keeps it playing behind
 // the lock screen and shows its controls there; they press the page's own buttons.
-if (!mac) {
+if (android) {
   let said = '', soon = 0;
   const tell = () => {
     clearTimeout(soon);
@@ -417,7 +418,8 @@ if (!mac) {
 }
 
 /* ---------- Android: blob downloads, which its WebView can't save ---------- */
-if (!mac) document.addEventListener('click', async e => {
+// WebView2 saves them itself, through the Windows app's save dialog.
+if (android) document.addEventListener('click', async e => {
   const a = e.target.closest && e.target.closest('a[download][href^="blob:"]');
   if (!a || !can('download')) return;
   e.preventDefault();

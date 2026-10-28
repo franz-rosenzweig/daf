@@ -1,0 +1,95 @@
+# Daf for Windows (windows/README.md), on GitHub's Windows machines: Daf.Core's tests, the
+# app, its self-test on a sandbox Daf made from this checkout (tools/sandbox.py, never the
+# real one), and the installer, kept with the run. A tag windows-vX.Y.Z also makes the
+# GitHub release.
+name: Windows
+on:
+  push:
+    branches: [master, 'windows*']
+    tags: ['windows-v*']
+    paths: ['windows/**', 'web/**', 'daf/**', 'tools/sandbox.py', 'requirements.txt', '.github/workflows/windows.yml']
+  pull_request:
+    paths: ['windows/**', 'web/**', 'daf/**', 'tools/sandbox.py', 'requirements.txt', '.github/workflows/windows.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: The version
+        id: version
+        shell: pwsh
+        run: |
+          $v = if ($env:GITHUB_REF -like 'refs/tags/windows-v*') { $env:GITHUB_REF_NAME -replace '^windows-v', '' }
+               else { ([xml](Get-Content windows/Daf/Daf.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1 }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Daf.Core's tests
+        run: dotnet run --project windows/Tests -c Release
+
+      - name: The icon
+        shell: powershell
+        run: windows/tools/make-icon.ps1
+
+      - name: The app builds
+        run: dotnet publish windows/Daf/Daf.csproj -c Release -r win-x64 -p:Platform=x64 -p:Version=${{ steps.version.outputs.version }} -o build/Daf
+
+      - name: A sandbox Daf can run
+        shell: pwsh
+        run: |
+          # the server's own requirements, without the transcripts' (faster-whisper, yt-dlp), which the self-test never reaches
+          $wanted = Get-Content requirements.txt | Where-Object { $_ -match '^(fastapi|uvicorn|python-multipart|pypdf|Pillow|trafilatura)==' } | ForEach-Object { ($_ -split '\s')[0] }
+          python -m pip install --disable-pip-version-check $wanted
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: The self-test
+        shell: pwsh
+        run: windows/selftest.ps1 -App build/Daf/Daf.exe
+
+      - name: The installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Q "/DVersion=${{ steps.version.outputs.version }}" "/DSource=$PWD\build\Daf" windows\installer.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Compress-Archive -Path build\Daf\* -DestinationPath "build\out\Daf-${{ steps.version.outputs.version }}-portable.zip"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Daf-${{ steps.version.outputs.version }}-windows
+          path: |
+            build/out/*
+            build/selftest/*
+          if-no-files-found: warn
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/windows-v')
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: The release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Daf for Windows ${GITHUB_REF_NAME#windows-v}" \
+            --notes "Daf for Windows. Run the Setup to install it for you alone (no administrator needed), or unzip the portable copy anywhere. Windows warns about an app from an unknown publisher the first time: More info → Run anyway. Daf's address is a setting (File › Settings); it opens on https://daf.tiresia.xyz." \
+            dist/*/out/Daf-*-Setup.exe dist/*/out/Daf-*-portable.zip

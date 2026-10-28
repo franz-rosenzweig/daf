@@ -16,3 +16,8 @@ android/keystore.properties
 android/*.keystore
 android/*.jks
 android/*.apk
+# Windows: dotnet's output, the icon windows/tools/make-icon.ps1 makes, and the build
+windows/*/bin/
+windows/*/obj/
+windows/Daf/Assets/
+build/
