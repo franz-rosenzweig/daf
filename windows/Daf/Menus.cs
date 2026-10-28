@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Daf.Core;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 
@@ -39,6 +41,21 @@ sealed class Menus
 
     public void Refresh() => _ = Update();
 
+    /// <summary>Alt and a menu's letter opens that menu; Alt alone puts the keyboard on the first.</summary>
+    public void Open(string? letter)
+    {
+        if (letter == null)
+        {
+            bar.Items.FirstOrDefault()?.Focus(FocusState.Keyboard);
+            return;
+        }
+        var top = bar.Items.FirstOrDefault(m => string.Equals(m.AccessKey, letter, StringComparison.OrdinalIgnoreCase));
+        if (top == null) return;
+        Refresh();
+        top.Focus(FocusState.Keyboard);
+        if (FrameworkElementAutomationPeer.CreatePeerForElement(top) is IExpandCollapseProvider menu) menu.Expand();
+    }
+
     /// <summary>The page's state, into the items that depend on it.</summary>
     public async Task Update()
     {
@@ -71,7 +88,7 @@ sealed class Menus
 
     void Build()
     {
-        var file = Top("File");
+        var file = Top("File", "F");
         Shell(file, "New Window", () => ShellWindow.Open(), "Ctrl+N");
         Line(file);
         Page(file, "Add to Daf…", "add", "Ctrl+O");
@@ -84,7 +101,7 @@ sealed class Menus
         Shell(file, "Close Window", owner.Close, "Ctrl+W");
         Shell(file, "Exit Daf", App.Quit);
 
-        var view = Top("View");
+        var view = Top("View", "V");
         foreach (var (title, place, n) in new[] { ("Today", "today", 1), ("Review", "review", 2), ("Library", "library", 3), ("Feed", "feed", 4), ("Highlights", "highlights", 5), ("Books", "books", 6), ("Stats", "stats", 7) })
             Page(view, title, "go:" + place, $"Ctrl+{n}");
         Page(view, "Shortlist", "go:library/starred");
@@ -100,13 +117,13 @@ sealed class Menus
         Shell(view, "Reload Page", owner.Reload, "Ctrl+R");
         Shell(view, "Full Screen", () => owner.FullScreen(!owner.IsFullScreen), "F11");
 
-        var go = Top("Go");
+        var go = Top("Go", "G");
         Shell(go, "Back", owner.Back, "Alt+←");
         forward = Shell(go, "Forward", owner.Forward, "Alt+→");
         Line(go);
         Page(go, "Search", "search", "Ctrl+K");
 
-        var readerMenu = Top("Reader");
+        var readerMenu = Top("Reader", "R");
         ReaderItem(readerMenu, "Highlight", "highlight", "h");
         ReaderItem(readerMenu, "Highlight with a Note", "note", "n");
         ReaderItem(readerMenu, "Bookmark This Page", "bookmark", "b");
@@ -120,7 +137,7 @@ sealed class Menus
         ReaderItem(readerMenu, "Next in the List", "nextdoc", "Shift+J");
         ReaderItem(readerMenu, "Previous in the List", "prevdoc", "Shift+K");
 
-        var help = Top("Help");
+        var help = Top("Help", "H");
         Page(help, "Keyboard Shortcuts", "keys");
         Page(help, "Send Feedback…", "feedback");
         Line(help);
@@ -130,9 +147,9 @@ sealed class Menus
 
     // ---- the kinds of item ---------------------------------------------------------------------
 
-    IList<MenuFlyoutItemBase> Top(string title)
+    IList<MenuFlyoutItemBase> Top(string title, string accessKey)
     {
-        var menu = new MenuBarItem { Title = title };
+        var menu = new MenuBarItem { Title = title, AccessKey = accessKey };
         bar.Items.Add(menu);
         return menu.Items;
     }
@@ -144,7 +161,7 @@ sealed class Menus
     {
         var item = new MenuFlyoutItem { Text = text };
         if (key != null) item.KeyboardAcceleratorTextOverride = key;
-        item.Click += (_, _) => { Ran.Add(command); _ = owner.Run(command); };
+        item.Click += (_, _) => { Ran.Add(command); owner.FocusPage(); _ = owner.Run(command); };
         into.Add(item);
         return item;
     }
@@ -159,11 +176,11 @@ sealed class Menus
     }
 
     /// <summary>An item the shell answers itself.</summary>
-    static MenuFlyoutItem Shell(IList<MenuFlyoutItemBase> into, string text, Action act, string? key = null)
+    MenuFlyoutItem Shell(IList<MenuFlyoutItemBase> into, string text, Action act, string? key = null)
     {
         var item = new MenuFlyoutItem { Text = text };
         if (key != null) item.KeyboardAcceleratorTextOverride = key;
-        item.Click += (_, _) => act();
+        item.Click += (_, _) => { owner.FocusPage(); act(); };
         into.Add(item);
         return item;
     }

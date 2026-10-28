@@ -240,6 +240,9 @@ public sealed partial class ShellWindow : Window
             case "shell":
                 services.Handle(J.Int(m["id"]), J.Text(m["op"]) ?? "", m["args"] as JsonObject ?? new JsonObject());
                 break;
+            case "key" when J.Text(m["what"]) == "menu":
+                menus.Open(J.Text(m["letter"]));
+                break;
             case "key":
                 Key(J.Text(m["what"]) ?? "");
                 break;
@@ -335,6 +338,9 @@ public sealed partial class ShellWindow : Window
         try { return JsonNode.Parse(await core.ExecuteScriptAsync("window.dafState ? window.dafState() : null")) as JsonObject; }
         catch (Exception) { return null; }
     }
+
+    /// <summary>The keyboard back to the page, after a menu.</summary>
+    public void FocusPage() => web?.Focus(FocusState.Programmatic);
 
     /// <summary>The menus as the page is now; whether a Reader item is enabled (for the self-test).</summary>
     public Task UpdateMenus() => menus.Update();

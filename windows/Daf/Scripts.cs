@@ -81,6 +81,23 @@ static class Scripts
             if (!what) return;
             setTimeout(() => { if (!e.defaultPrevented) post({ channel: 'key', what }); }, 0);
           }, true);
+          // The menus' keys, as in any Windows app: Alt and a menu's letter opens it (File, View,
+          // Go, Reader, Help), and Alt alone, pressed and let go, puts the keyboard on the menus.
+          // Again only if the page leaves them alone; Alt+← and Alt+→ stay Back and Forward.
+          const letters = ['F', 'V', 'G', 'R', 'H'];
+          let altAlone = false;
+          window.addEventListener('keydown', (e) => {
+            if (e.key === 'Alt') { altAlone = !e.ctrlKey && !e.shiftKey && !e.metaKey; return; }
+            altAlone = false;
+            if (!e.altKey || e.ctrlKey || e.shiftKey || e.metaKey || (e.getModifierState && e.getModifierState('AltGraph'))) return;
+            const m = /^Key([A-Z])$/.exec(e.code || '');
+            if (m && letters.includes(m[1])) setTimeout(() => { if (!e.defaultPrevented) post({ channel: 'key', what: 'menu', letter: m[1] }); }, 0);
+          }, true);
+          window.addEventListener('keyup', (e) => {
+            if (e.key === 'Alt' && altAlone) { altAlone = false; post({ channel: 'key', what: 'menu' }); }
+          }, true);
+          window.addEventListener('blur', () => { altAlone = false; });
+
           // The mouse's Back and Forward buttons: through the page's Back (dafBack), not the browser's
           for (const type of ['mousedown', 'mouseup', 'auxclick']) {
             window.addEventListener(type, (e) => {

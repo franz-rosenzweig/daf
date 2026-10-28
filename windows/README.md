@@ -16,8 +16,9 @@ new posts, `daf://` links, and a copy of Daf for when there's no connection. C# 
 - **The menus**: File, View, Go, Reader and Help, the Mac's items with Ctrl for ⌘. Each item
   calls the page's own command (`window.dafCommand`); what's greyed comes from
   `window.dafState()`. The page hears every key first: the keys with Ctrl reach the shell only
-  if the page leaves them alone, and the Reader's single letters are the page's. The browser's
-  own keys are off (with `--devtools`, F12 comes back). Alt+←, Ctrl+[ and the mouse's back
+  if the page leaves them alone, and the Reader's single letters are the page's. Alt and a
+  menu's letter opens it, Alt alone moves to the menus, and choosing an item gives the keyboard
+  back to the page. The browser's own keys are off (with `--devtools`, F12 comes back). Alt+←, Ctrl+[ and the mouse's back
   button go through `window.dafBack()`, which closes what's in front first.
 - **`window.dafShell`**, defined before the page's scripts run, over WebView2's web messages:
   `share` (Windows' share sheet, so Share as image works through `shell.js`'s stand-in for

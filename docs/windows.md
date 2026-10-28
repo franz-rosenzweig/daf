@@ -26,7 +26,7 @@ Every menu item calls the same command as the page's own buttons, and items that
 - **Reader:** **Highlight**, **Highlight with a Note**, **Bookmark This Page**, **Listen**, **Add to Shortlist**, **Tags…**, **Delete**, **Next** and **Previous**, and **Next in the List** and **Previous in the List**.
 - **Help:** **Keyboard Shortcuts**, **Send Feedback…**, this page, and **About Daf**.
 
-The page hears every key first, so Daf's single-letter keys (h, n, b, j and k, the arrows in a book) work exactly as in a browser, and typing an "h" in a note stays an "h". Back closes whatever is in front first, like search or a dialog, and only then goes to the page before.
+The page hears every key first, so Daf's single-letter keys (h, n, b, j and k, the arrows in a book) work exactly as in a browser, and typing an "h" in a note stays an "h". Alt and a menu's first letter opens it (Alt+F for File, Alt+R for Reader), and Alt alone moves to the menus. Back closes whatever is in front first, like search or a dialog, and only then goes to the page before.
 
 ## Today by the clock
 
