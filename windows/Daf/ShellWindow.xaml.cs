@@ -894,9 +894,15 @@ public sealed partial class ShellWindow : Window
         {
             if (J.Bool((await State())?["signedIn"]))
             {
-                var problem = await Connect();
-                if (problem != null) Log.Write($"connecting this PC: {problem}");
-                return;
+                // a Daf busy or starting up again (a 5xx) is asked twice more, a little later each time
+                for (var attempt = 1; ; attempt++)
+                {
+                    var problem = await Connect();
+                    if (problem == null) return;
+                    Log.Write($"connecting this PC: {problem}");
+                    if (attempt == 3 || !problem.StartsWith("Daf answered 5")) return;
+                    await Task.Delay(TimeSpan.FromSeconds(4 * attempt));
+                }
             }
             await Task.Delay(500);
         }

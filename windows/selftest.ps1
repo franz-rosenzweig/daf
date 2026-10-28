@@ -100,7 +100,14 @@ if ($code -notin 0, 1) {
 $log = Join-Path $data 'daf.log'
 if (Test-Path $log) { "--- daf.log"; Get-Content $log -Encoding utf8 }
 if ($code -ne 0) {
-    foreach ($f in $serverLog, "$serverLog.err") { if (Test-Path $f) { "--- $(Split-Path $f -Leaf)"; Get-Content $f -Tail 60 -Encoding utf8 } }
+    if (Test-Path $serverLog) { "--- server.log"; Get-Content $serverLog -Tail 40 -Encoding utf8 }
+    if (Test-Path "$serverLog.err") {
+        # each error the sandbox Daf met, once, with where in Daf's code it was
+        "--- the sandbox Daf's errors"
+        Get-Content "$serverLog.err" -Encoding utf8 |
+            Select-String -Pattern '\\daf\\daf\\\w+\.py", line \d+, in \w+|^\w[\w.]*(Error|Exception)\b' |
+            ForEach-Object { $_.Line.Trim() } | Select-Object -Unique -First 60
+    }
 }
 # the workflow keeps what was saved and the window's picture with the build
 New-Item -ItemType Directory -Force (Join-Path $repo 'build\selftest') | Out-Null
