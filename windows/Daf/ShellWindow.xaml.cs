@@ -186,7 +186,7 @@ public sealed partial class ShellWindow : Window
 
     /// <summary>Where a new page starts: one of Daf's files, the copy when Daf isn't answering, or the live site.</summary>
     Uri StartUrl() =>
-        Start ?? (LocalCopy.Active && App.Keeper.Store.Ready ? LocalCopy.Url(route) : Address.Url(Settings.BaseUrl, route ?? "/"));
+        Start ?? (LocalCopy.Active && App.Keeper.Store.Ready ? new Uri(LocalCopy.Url(route)) : Address.Url(Settings.BaseUrl, route ?? "/"));
 
     /// <summary>Daf's address changed: a file's window closes, the app's opens on the new one.</summary>
     void OnBaseChanged()
