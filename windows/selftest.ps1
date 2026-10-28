@@ -88,7 +88,11 @@ if (Test-Path $results) {
         if ($check.detail) { "$mark  $($check.name)  ($($check.detail))" } else { "$mark  $($check.name)" }
     }
 } else {
-    "no results were written"
+    "no results were written: the app ended with $('0x{0:X8}' -f $code)"
+    # what Windows saw of it, when it went down without a word
+    Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $started } -MaxEvents 20 -ErrorAction SilentlyContinue |
+        Where-Object { $_.ProviderName -in 'Application Error', '.NET Runtime', 'Windows Error Reporting' } |
+        ForEach-Object { "--- $($_.ProviderName)"; $_.Message }
 }
 $log = Join-Path $data 'daf.log'
 if (Test-Path $log) { "--- daf.log"; Get-Content $log -Encoding utf8 }

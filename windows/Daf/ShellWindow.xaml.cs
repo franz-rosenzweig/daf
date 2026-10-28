@@ -654,7 +654,11 @@ public sealed partial class ShellWindow : Window
         var want = shellFull || pageFull;
         try
         {
-            if (want != IsFullScreen) AppWindow.SetPresenter(want ? AppWindowPresenterKind.FullScreen : AppWindowPresenterKind.Overlapped);
+            if (want != IsFullScreen)
+            {
+                AppWindow.SetPresenter(want ? AppWindowPresenterKind.FullScreen : AppWindowPresenterKind.Overlapped);
+                if (!want) Minimums();
+            }
         }
         catch (Exception e) { Log.Write($"full screen: {e.Message}"); }
         Presented();
@@ -667,9 +671,9 @@ public sealed partial class ShellWindow : Window
     /// </summary>
     void Presented()
     {
+        // nothing here may change the presenter, or Windows tells us again (AppWindow.Changed)
         if (!IsFullScreen && (shellFull || pageFull)) LeaveFullScreen();
         Strip.Visibility = IsFullScreen ? Visibility.Collapsed : Visibility.Visible;
-        if (!IsFullScreen) Minimums();
     }
 
     Border? hint;
