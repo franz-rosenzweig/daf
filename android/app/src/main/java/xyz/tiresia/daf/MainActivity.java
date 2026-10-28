@@ -348,6 +348,17 @@ public class MainActivity extends Activity {
         Offline.soon(app);
     }
 
+    // ---- Sign in to Instagram (InstagramActivity), asked for by the page through Shell ----
+
+    private static final int INSTAGRAM = 8;
+    private java.util.function.Consumer<Boolean> instagramAnswer;
+
+    void signInInstagram(java.util.function.Consumer<Boolean> answer) {
+        if (instagramAnswer != null) instagramAnswer.accept(false);
+        instagramAnswer = answer;
+        startActivityForResult(new Intent(this, InstagramActivity.class), INSTAGRAM);
+    }
+
     // ---- permission to notify (new posts), asked for by the page through Shell ----
 
     private static final int NOTIFY = 7;
@@ -530,6 +541,9 @@ public class MainActivity extends Activity {
         } else if (request == FILES) {
             if (choosing != null) choosing.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
             choosing = null;
+        } else if (request == INSTAGRAM) {
+            if (instagramAnswer != null) instagramAnswer.accept(result == RESULT_OK);
+            instagramAnswer = null;
         }
     }
 

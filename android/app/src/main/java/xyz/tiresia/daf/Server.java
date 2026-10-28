@@ -165,6 +165,18 @@ final class Server {
         }
     }
 
+    /** POST /api/instagram/cookies {cookie_header}: Instagram's sign-in from InstagramActivity, which
+     *  Daf fetches reels with (social.py). With the device token, or the window's cookie before
+     *  there is one. */
+    static void instagram(Context c, String cookieHeader) throws IOException {
+        try {
+            byte[] body = new JSONObject().put("cookie_header", cookieHeader).toString().getBytes(StandardCharsets.UTF_8);
+            request(c, "POST", "/api/instagram/cookies", "application/json", body, token(c) != null);
+        } catch (org.json.JSONException e) {
+            throw new IOException(e);
+        }
+    }
+
     /** This device's name in Daf's device list: "android-" and the model, android-sm-s926u. Each
      *  device its own, since making a token replaces the one made under the same name. */
     static String deviceName() {

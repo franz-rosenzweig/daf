@@ -18,7 +18,8 @@ import java.util.UUID;
 
 /**
  * window.dafShell's Android half (docs/SHELL.md §2): share, download, openExternal, haptic,
- * ink (handwriting read as text by Google's reader: InkReader.java), media (what read-aloud is
+ * ink (handwriting read as text by Google's reader: InkReader.java), instagram (Instagram's
+ * sign-in, for the reels: InstagramActivity.java), media (what read-aloud is
  * doing, for listening with the screen off: Listen.java), offline
  * (books kept on the phone: Offline.java), screen (the manga reader's whole screen), and alerts
  * (notifications for new posts: FeedNews.java).
@@ -125,6 +126,11 @@ final class Shell {
                     break;
                 case "ink":
                     ink(p, id, a);
+                    break;
+                case "instagram":
+                    // Instagram's sign-in page in its own window (InstagramActivity): true once Daf has it
+                    final int signing = id;
+                    activity.signInInstagram(ok -> reply(p, signing, ok));
                     break;
                 default:
                     fail(p, id, "no such shell call: " + m.optString("op"));

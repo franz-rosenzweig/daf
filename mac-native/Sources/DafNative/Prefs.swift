@@ -166,15 +166,27 @@ struct ConnectionsPrefs: View {
     private var base: String { (settings?.s("public_url") ?? API.shared.base.absoluteString).replacingOccurrences(of: "/+$", with: "", options: .regularExpression) }
 
     var body: some View {
-        Form {
-            phoneSection
-            podSection
-            hcSection
-            NewslettersSection()
-            digestSection
+        ScrollViewReader { proxy in
+            Form {
+                phoneSection
+                podSection
+                hcSection
+                NewslettersSection()
+                digestSection
+                InstagramSection()
+                AniListSection()
+            }
+            .formStyle(.grouped)
+            .task {
+                await load()
+                // opened at a section (a reel that needs Instagram, the Podcasts page)
+                if let at = UserDefaults.standard.string(forKey: "prefsFocus") {
+                    UserDefaults.standard.removeObject(forKey: "prefsFocus")
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    withAnimation { proxy.scrollTo(at, anchor: .top) }
+                }
+            }
         }
-        .formStyle(.grouped)
-        .task { await load() }
     }
 
     private func load() async {
@@ -233,6 +245,17 @@ struct ConnectionsPrefs: View {
                          + " Listening shows on Today but never counts toward the hour.")
                 }
                 if let podToken { TokenBox(token: podToken, note: "The AntennaPod password. Daf only shows it once.") }
+                Toggle("Transcribe episodes I play or open", isOn: Binding(get: { settings?.o("podcasts")?.raw["transcribe"] as? Bool != false }, set: { on in
+                    guard var raw = settings?.raw else { return }
+                    raw["podcasts"] = ["transcribe": on]
+                    settings = J(raw)
+                    Task {
+                        do {
+                            try await API.shared.send("PUT", "/api/settings", ["podcasts": ["transcribe": on]])
+                            model.say(on ? "Episodes you play get transcripts" : "Transcripts only when you ask")
+                        } catch { model.error = error.localizedDescription }
+                    }
+                }))
                 DisclosureGroup("Set up AntennaPod") {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("1. AntennaPod → Settings → Synchronization → gpodder.net.")
@@ -244,6 +267,7 @@ struct ConnectionsPrefs: View {
                 }
             } else { ProgressView().controlSize(.small) }
         }
+        .id("podcasts")
     }
 
     @ViewBuilder private var hcSection: some View {

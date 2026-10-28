@@ -34,6 +34,8 @@ Tap the ring for Today and the highlight for Review. It refreshes every half hou
 
 Long-press the app icon for **Review**, **Continue reading** (the first book on your nightstand), **Log paper** and **Settings**.
 
+Reels need Daf to be signed in to Instagram (see [Videos and podcasts](videos-and-podcasts.md#instagram-reels)). In the app, **Preferences → Instagram → Sign in to Instagram** opens Instagram's own sign-in page in a window of the app's. Once you're in, the app hands the sign-in to Daf and the window closes, and the app clears Instagram's cookies, so the sign-in is only in Daf. It needs the app's 0.5.5 or later.
+
 ## Reading on the phone
 
 - **The volume keys can turn pages** in a book: turn on **Preferences → Reader → Volume buttons turn pages** on this device, and then down is the next page and up the one before. While music or read-aloud is playing they change the volume as usual, and they always do when the switch is off. In the manga reader, **Volume keys** in its settings decides.

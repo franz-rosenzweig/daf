@@ -27,6 +27,7 @@ Instagram shows almost nothing to someone who isn't signed in, so Daf uses my ow
 - **Keep Daf signed in from my browser.** With that on, the [browser extension](browser-extension.md) sends instagram.com's cookies to Daf whenever I'm on instagram.com and they've changed. That's how Daf's sign-in never runs out: as long as I'm signed in to Instagram in Zen, so is Daf. Only Instagram's cookies, only to my Daf, and only when the switch is on.
 - If Instagram does turn Daf's sign-in away, the reel waits instead of failing, the card says so, and so does the reel's page and the Sources page. Visiting instagram.com in Zen renews it, and every reel that waited comes in by itself.
 - **Forget it** removes the sign-in from the server.
+- In the apps, it's **Sign in to Instagram**: in Daf for Android (0.5.5 and later) on this same card, and in Daf for the Mac under **Settings → Connections → Instagram**. It opens Instagram's own sign-in page in a window of the app's, and once I'm in, the app hands the sign-in to Daf and closes the window. The app keeps nothing of Instagram itself.
 
 ## Podcasts
 
@@ -51,6 +52,8 @@ Any episode opens as a page in Daf, whether it's one from **Listened lately**, f
 Where I stop goes back to AntennaPod as if I'd played it there, so the phone picks it up the next time AntennaPod syncs. And it works the other way round as well: an episode opens where I last stopped, in Daf or in AntennaPod, and says which.
 
 The show notes come after the transcript. An episode that only lives in AntennaPod gets **Save to Library**, the same as a Feed item, and anything I highlight or clip in a Feed episode saves it to the Library anyway.
+
+Daf for the Mac has the same page and the same **Podcasts** page. There, P plays and pauses, and the episode shows in Now Playing, so the keyboard's media keys and Control Center work too.
 
 ## Transcripts
 

@@ -14,6 +14,12 @@ Only Daf loads in the window. Any other link opens in your browser, `obsidian://
 
 **Focus Mode** (⇧⌘F, the **[ ]** button in a reader's toolbar, F in a book and Shift F in an article) puts what you're reading on the whole screen, as the page's does: the window goes full screen, the sidebar and the list go, the side panels close, and the menu bar and the toolbar hide until the pointer goes to the top of the screen. The same again, or Esc, leaves it.
 
+## Videos, reels and podcasts
+
+A YouTube video, a reel and a podcast episode play in the Mac's own player above the transcript, the same as on the page (see [Videos and podcasts](videos-and-podcasts.md)). A reel stands up, or keeps its own shape when it's square or wide. An episode starts where I last stopped, in Daf or in AntennaPod, and has −15 and +30 (← and →), the speed, its chapters and **Clip 30s**. P plays and pauses, and the episode shows in Now Playing, so the keyboard's media keys and Control Center work too. **Podcasts** in the sidebar has what I listened to lately, my clips and my shows.
+
+**Settings → Connections** has **Instagram**, where **Sign In to Instagram…** opens Instagram's own sign-in in a window that keeps nothing on the Mac and hands the sign-in to Daf, and **AniList**, for the manga tracker.
+
 ## With no connection
 
 The app keeps its OWN copy of Daf on the Mac, which means it opens and works with no connection at all, on a plane or when the server is down. While it's online it saves Daf's screens and fonts, your lists, the articles you're reading with their pictures and the books you're reading, and it only fetches a file again when it changes. When Daf doesn't answer, the window moves to that copy on the same page, and what you do there (your place, highlights, notes) waits and goes to Daf when it's back. The app looks for Daf every 30 seconds and when the Mac wakes, and then goes back to the live site by itself, which is also where videos play.

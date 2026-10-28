@@ -506,13 +506,15 @@ struct Detail: View {
             }
             if let item = model.selected, item.isDoc {
                 ToolbarItemGroup {
-                    if item.whereIn == "feed" {
+                    if item.whereIn == "feed" || item.whereIn == "podcast" {     // podcast: an episode met only in AntennaPod
                         Button { Task { await model.saveToLibrary(item) } } label: { Label("Save to Library", systemImage: "tray.and.arrow.down") }
                     } else {
                         Button { Task { await model.later(item) } } label: { Label(item.status == "later" ? "Back to Inbox" : "Read Later", systemImage: "clock") }
                     }
-                    Button { Task { await model.done(item) } } label: {
-                        Label(item.whereIn == "feed" ? "Mark Seen" : "Archive", systemImage: item.whereIn == "feed" ? "checkmark.circle" : "archivebox")
+                    if item.whereIn != "podcast" {
+                        Button { Task { await model.done(item) } } label: {
+                            Label(item.whereIn == "feed" ? "Mark Seen" : "Archive", systemImage: item.whereIn == "feed" ? "checkmark.circle" : "archivebox")
+                        }
                     }
                     if item.whereIn != "feed" {
                         Button { Task { await model.star(item) } } label: {
@@ -550,7 +552,7 @@ struct Opened: View {
                 if let reader {
                     if let e = reader.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }
                     else if reader.doc == nil { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
-                    else if item.kind == "video" { VideoArticle(model: reader) }
+                    else if reader.playsMedia { VideoArticle(model: reader) }
                     else { ArticleReader(model: reader) }
                 } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
             }

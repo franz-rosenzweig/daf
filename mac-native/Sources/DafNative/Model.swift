@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -198,6 +199,8 @@ final class AppModel {
     var sheet: Sheet?
     /// A route to open in a window of its own ("#ebook/…", "#mread/…"), from code (menus, the self-test).
     var openRoute: String?
+    /// The show open on the Podcasts page (its feed), or nil for the page itself.
+    var podcastShow: String?
     /// For Add to Daf: a link dropped or pasted, books and PDFs dropped or pasted.
     @ObservationIgnored var addURL: String?
     @ObservationIgnored var addFiles: [URL] = []
@@ -663,10 +666,25 @@ final class AppModel {
     }
 
     func saveToLibrary(_ item: Item) async {
+        if item.whereIn == "podcast", let r = reader, r.id == item.id { await r.saveToLibrary(); reload(); return }   // the episode plays on
         do {
             try await API.shared.send("POST", "/api/docs/\(API.enc(item.id))/save", [:])
             counts = try? await API.shared.json("/api/docs/counts")
         } catch { self.error = error.localizedDescription }
+    }
+
+    /// A show's page on the Podcasts page (episodes.show).
+    func showPodcast(_ feed: String) {
+        podcastShow = feed
+        place = .podcasts
+        NSApp.activate()
+    }
+
+    /// Settings at a tab, scrolled to a section there ("instagram" in Connections).
+    func openSettings(tab: String, at section: String? = nil) {
+        UserDefaults.standard.set(tab, forKey: "prefsTab")
+        UserDefaults.standard.set(section, forKey: "prefsFocus")
+        showSettings = true
     }
 
     // MARK: counts for the sidebar
