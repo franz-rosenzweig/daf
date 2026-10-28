@@ -80,7 +80,14 @@ public static class Links
         }
         var name = sb.ToString().Trim('-');
         if (name.Length == 0) return "windows";
-        name = name.Length > 16 ? name[..16].TrimEnd('-') : name;
+        if (name.Length > 16)
+        {
+            // cut at a word where there is one, rather than in the middle of one
+            name = name[..16];
+            var dash = name.LastIndexOf('-');
+            if (dash >= 4) name = name[..dash];
+            name = name.TrimEnd('-');
+        }
         return "windows-" + name;
     }
 }

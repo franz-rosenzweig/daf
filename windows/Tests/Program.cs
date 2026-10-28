@@ -58,7 +58,7 @@ try
     Check(DafLink.Find("\"C:\\Program Files\\Daf\\Daf.exe\" daf://go/stats")?.Route == "stats", "a daf link found in a command line");
     Check(DafLink.Find("--background") == null, "a command line without one");
     Check(Links.DeviceName("DESKTOP-4F2K9") == "windows-desktop-4f2k9", "this PC's device name", Links.DeviceName("DESKTOP-4F2K9"));
-    Check(Links.DeviceName("Nate's Surface_Pro 9") == "windows-nates-surface-pro", "a PC's name made fit for Daf", Links.DeviceName("Nate's Surface_Pro 9"));
+    Check(Links.DeviceName("Nate's Surface_Pro 9") == "windows-nates-surface", "a PC's name made fit for Daf, cut at a word", Links.DeviceName("Nate's Surface_Pro 9"));
     Check(Links.DeviceName("") == "windows" && Links.DeviceName("éé") == "windows", "a PC with no usable name");
     Check(Links.DeviceName(new string('a', 40)).Length <= 24, "never longer than Daf takes");
 
