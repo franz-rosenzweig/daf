@@ -153,6 +153,22 @@ enum SelfTest {
         capture("03-reader")
         guard let r = m.reader, let tv = r.textView else { return finish("the reader didn't open") }
         check(!r.blocks.isEmpty, "its blocks are laid out", "\(r.blocks.count) blocks")
+        // as it opened, the article is as tall as its text, and the wheel scrolls it and it stays
+        // (on macOS 27 the view stopped growing to its text: one screen tall, springing back)
+        if let sv = tv.enclosingScrollView, let w = tv.window {
+            check(tv.frame.height > sv.contentView.bounds.height * 1.5, "the article is as tall as its text", "view \(Int(tv.frame.height)), window \(Int(sv.contentView.bounds.height))")
+            if let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -600, wheel2: 0, wheel3: 0) {
+                let y0 = sv.contentView.bounds.origin.y
+                let onScreen = w.convertPoint(toScreen: sv.convert(NSPoint(x: sv.bounds.midX, y: sv.bounds.midY), to: nil))
+                cg.location = CGPoint(x: onScreen.x, y: (w.screen?.frame.maxY ?? 0) - onScreen.y)
+                if let e = NSEvent(cgEvent: cg) { w.sendEvent(e) }
+                await pause(0.8)
+                let y1 = sv.contentView.bounds.origin.y
+                await pause(2.5)
+                let y2 = sv.contentView.bounds.origin.y
+                check(y1 > y0 + 100 && abs(y2 - y1) < 2, "as it opened, the wheel scrolls the article, and it stays", "\(Int(y0)) → \(Int(y1)) → \(Int(y2))")
+            }
+        }
 
         // focus mode (Focus.swift): the article on the whole screen, the toolbar away until the top
         if let w = main {
@@ -173,6 +189,25 @@ enum SelfTest {
             let back = await until(10) { !w.styleMask.contains(.fullScreen) }
             await pause(1.5)
             check(back && !Focus.shared.main && w.toolbar?.isVisible != false, "and leaving it gives the window back as it was")
+
+            // the window is still when nothing happens: no toolbar item drawn over and over (the
+            // focus button once was, and scrolling in the lists and articles broke)
+            let drawn0 = FocusButton.drawn
+            await pause(3)
+            check(FocusButton.drawn - drawn0 <= 3, "the window is still when nothing happens", "\(FocusButton.drawn - drawn0) toolbar draws in 3 s")
+            // a scroll of the wheel over the article moves it, and it stays there
+            if let sv = tv.enclosingScrollView, let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -400, wheel2: 0, wheel3: 0) {
+                let y0 = sv.contentView.bounds.origin.y
+                let mid = sv.convert(NSPoint(x: sv.bounds.midX, y: sv.bounds.midY), to: nil)
+                let onScreen = w.convertPoint(toScreen: mid)
+                cg.location = CGPoint(x: onScreen.x, y: (w.screen?.frame.maxY ?? 0) - onScreen.y)
+                if let e = NSEvent(cgEvent: cg) { w.sendEvent(e) }
+                await pause(0.6)
+                let y1 = sv.contentView.bounds.origin.y
+                await pause(2.5)
+                let y2 = sv.contentView.bounds.origin.y
+                check(y1 > y0 + 50 && abs(y2 - y1) < 2, "the wheel scrolls an article, and it stays where it was scrolled", "\(Int(y0)) → \(Int(y1)) → \(Int(y2))")
+            }
         }
 
         // a highlight from a selection
@@ -310,7 +345,7 @@ enum SelfTest {
         let h = tv.frame.height
         scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, h * 0.6 - scroll.contentView.bounds.height)))
         scroll.reflectScrolledClipView(scroll.contentView)
-        await pause(2.5)
+        await pause(5)                                       // a place goes at most every 4 s, the last one once they're up
         let placed = try? await API.shared.json("/api/docs/\(API.enc(r.id))")
         check((placed?.d("progress") ?? 0) >= 50, "reading on keeps the place in Daf",
               "\(placed?.d("progress") ?? -1)%; restored \(r.restored), last scroll \(String(format: "%.2f", r.lastFraction)), sent \(r.placeSent)")
@@ -636,8 +671,12 @@ enum SelfTest {
 
                     // the settings are the series' own, kept by Daf as the page keeps them
                     mm.set("scale", "width")
-                    await pause(1.5)
-                    let kept = (try? await API.shared.json("/api/manga/prefs"))?.o("series")?.o(mm.seriesID)
+                    var kept: J?
+                    for _ in 0..<12 {          // the save waits 0.7 s, then goes over the network
+                        await pause(0.5)
+                        kept = (try? await API.shared.json("/api/manga/prefs"))?.o("series")?.o(mm.seriesID)
+                        if kept?.s("scale") == "width" { break }
+                    }
                     check(kept?.s("layout") == "single" && kept?.s("scale") == "width", "a series keeps its own reading settings in Daf", "\(kept?.raw ?? [:])")
 
                     // the long strip

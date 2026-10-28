@@ -41,6 +41,7 @@ final class ReaderModel {
     @ObservationIgnored private var beatTimer: Timer?
     @ObservationIgnored private var sentPct = 0.0
     @ObservationIgnored private var sentAt = Date.distantPast
+    @ObservationIgnored private var placeLater: Task<Void, Never>?
     @ObservationIgnored var restored = false
     /// A highlight to bring into view once laid out (Open at Its Spot).
     @ObservationIgnored var pendingReveal: String?
@@ -160,6 +161,7 @@ final class ReaderModel {
     func stop() {
         beatTimer?.invalidate()
         beatTimer = nil
+        if placeLater != nil { placeLater?.cancel(); placeLater = nil; sentAt = .distantPast; scrolled(lastFraction) }   // the place still waiting goes now
         video?.stop()
         noteTask?.cancel()
         noteTask = nil
@@ -638,7 +640,18 @@ final class ReaderModel {
         lastActive = Date()
         lastFraction = fraction
         let pct = (fraction * 100).rounded()
-        guard restored, pct > sentPct, Date().timeIntervalSince(sentAt) > 4 else { return }
+        guard restored, pct > sentPct else { return }
+        // at most every four seconds; the last of a run of scrolls goes once they're up
+        let wait = 4 - Date().timeIntervalSince(sentAt)
+        if wait > 0 {
+            placeLater?.cancel()
+            placeLater = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64((wait + 0.05) * 1_000_000_000))
+                guard !Task.isCancelled, let self else { return }
+                self.scrolled(self.lastFraction)
+            }
+            return
+        }
         sentPct = pct
         sentAt = Date()
         placeSent.append(Int(pct))
@@ -737,9 +750,29 @@ final class ReaderTextView: NSTextView {
     }
 
     override func setFrameSize(_ newSize: NSSize) {
+        let wider = abs(newSize.width - frame.width) > 0.5
         super.setFrameSize(newSize)
         let side = max(28, (newSize.width - ReaderModel.column) / 2)
         if abs(textContainerInset.width - side) > 0.5 { textContainerInset = NSSize(width: side, height: 36) }
+        if wider { fitSoon() }
+    }
+
+    /// Its height from its text, laid out. The text is set straight into the storage (compose),
+    /// and on macOS 27 the view stopped growing to it by itself: an article stayed one screen tall
+    /// and sprang back when scrolled. So whenever the text, a picture or the width changes, it's
+    /// measured and the view made that tall.
+    private var fitting = false
+    func fitSoon() {
+        guard !fitting else { return }
+        fitting = true
+        DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.fitting = false; self?.fit() } }
+    }
+    func fit() {
+        guard let lm = layoutManager, let tc = textContainer else { return }
+        lm.ensureLayout(for: tc)
+        let used = ceil(lm.usedRect(for: tc).height + textContainerInset.height * 2)
+        let want = max(used, enclosingScrollView?.contentSize.height ?? 0)
+        if abs(frame.height - want) > 0.5 { setFrameSize(NSSize(width: frame.width, height: want)) }
     }
 
     override func keyDown(with event: NSEvent) {
@@ -917,9 +950,15 @@ struct ArticleReader: NSViewRepresentable {
     @MainActor
     final class Coordinator {
         private weak var model: ReaderModel?
+        private var edits: NSObjectProtocol?
 
         func watch(_ scroll: NSScrollView, _ model: ReaderModel) {
             self.model = model
+            if let e = edits { NotificationCenter.default.removeObserver(e) }
+            edits = NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: model.storage, queue: .main) { [weak scroll] _ in
+                MainActor.assumeIsolated { (scroll?.documentView as? ReaderTextView)?.fitSoon() }
+            }
+            (scroll.documentView as? ReaderTextView)?.fitSoon()
             (scroll as? ReaderScrollView)?.onScroll = { [weak scroll, weak model] in
                 MainActor.assumeIsolated {
                     guard let scroll, let model, let doc = scroll.documentView else { return }
@@ -959,6 +998,7 @@ struct ArticleReader: NSViewRepresentable {
         }
 
         func stop() {
+            if let e = edits { NotificationCenter.default.removeObserver(e); edits = nil }
             model?.stop()
         }
     }
