@@ -77,8 +77,7 @@ final class ReaderModel {
             asks = d.a("asks")
             questions = d.strings("questions")
             sentPct = d.d("progress") ?? 0
-            if d.s("kind") == "video", video == nil, let yt = VideoPlayer.id(d.s("url")) {
-                let v = VideoPlayer(ytID: yt)
+            if video == nil, let v = player(for: d) {
                 v.onTick = { [weak self] t, playing in self?.syncCue(t, playing) }
                 video = v
             }
@@ -89,8 +88,35 @@ final class ReaderModel {
 
     // MARK: a video's transcript
 
-    /// The player, for a video (YouTube's, above the transcript).
+    /// The player, for a video (YouTube's, or a reel's own copy) or an episode, above the transcript.
     var video: VideoPlayer?
+    /// A time to play an episode from (#read/<doc>/t:<sec>, a clip on the Podcasts page).
+    @ObservationIgnored var podAt: Double?
+    /// Whether it opens as a video or an episode, over its transcript.
+    var playsMedia: Bool { doc?.s("kind") == "video" || doc?.o("episode") != nil }
+
+    /// A reel's video once Daf has it, an episode's audio from where the last play anywhere
+    /// stopped, or YouTube's player.
+    private func player(for d: J) -> VideoPlayer? {
+        if let e = d.o("episode"), let audio = e.s("audio") {
+            let v = VideoPlayer(media: audio, kind: .episode)
+            v.docID = id
+            v.nowPlaying = (d.s("title") ?? "", e.s("podcast") ?? d.s("source") ?? "")
+            let pos = e.o("position"), dur = e.d("duration") ?? 0
+            if let t = podAt {
+                v.startAt = t
+                v.startPlaying = true
+            } else if let t = pos?.d("t"), t > 15, dur == 0 || t < dur - 30 {
+                v.startAt = t
+                AppModel.shared.say("From " + VideoPlayer.clock(t) + ", where " + (pos?.s("from") ?? "AntennaPod") + " left off")
+            }
+            podAt = nil
+            return v
+        }
+        if d.b("reel") { return d.s("media").map { VideoPlayer(media: $0, kind: .reel) } }
+        if d.s("kind") == "video", let yt = VideoPlayer.id(d.s("url")) { return VideoPlayer(ytID: yt) }
+        return nil
+    }
     /// The transcript's cues: each block's place in the video.
     @ObservationIgnored private(set) var cues: [(i: Int, ts: Double)] = []
     @ObservationIgnored private var nowCue = -1
@@ -118,7 +144,9 @@ final class ReaderModel {
         guard let v = video else { return }
         let now = v.time
         let these = cues.filter { $0.ts >= now - seconds && $0.ts <= now }
-        guard !these.isEmpty else { AppModel.shared.say("Play the video first; Clip takes the last 30 seconds."); return }
+        let episode = v.kind == .episode
+        if these.isEmpty, episode, now > 3 { await clipOnServer(now, seconds); return }
+        guard !these.isEmpty else { AppModel.shared.say(episode ? "Play it first; Clip takes the last 30 seconds." : "Play the video first; Clip takes the last 30 seconds."); return }
         let colour = HLTools.lastColour
         for c in these {
             guard let r = blocks.first(where: { $0.i == c.i })?.range else { continue }
@@ -130,6 +158,45 @@ final class ReaderModel {
         }
         applyHighlights()
         AppModel.shared.say("Clipped " + VideoPlayer.clock(these[0].ts) + "–" + VideoPlayer.clock(now))
+    }
+
+    /// Clip on an episode with no transcript yet: the server transcribes that stretch into a
+    /// highlight (/api/podcasts/clip), looked for every 15 seconds for three minutes.
+    private func clipOnServer(_ now: Double, _ seconds: Double) async {
+        do {
+            try await API.shared.send("POST", "/api/podcasts/clip", ["doc": id, "t": now, "sec": Int(seconds)])
+        } catch { AppModel.shared.error = error.localizedDescription; return }
+        AppModel.shared.say("Clipping " + VideoPlayer.clock(max(0, now - seconds)) + "–" + VideoPlayer.clock(now) + ". It's in the Notebook in a minute.")
+        let had = highlights.count, doc = id
+        Task { [weak self] in
+            for _ in 0..<12 {
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                guard let self, self.id == doc else { return }
+                if let d = try? await API.shared.json("/api/docs/\(API.enc(doc))?prefetch=1"), d.a("highlights").count > had {
+                    self.highlights = d.a("highlights")
+                    self.applyHighlights()
+                    return
+                }
+            }
+        }
+    }
+
+    /// An episode met only in AntennaPod, into the Library: it becomes a doc of its own there (a
+    /// new id), and the player plays on.
+    func saveToLibrary() async {
+        do {
+            let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/save", [:]))
+            if let moved = r?.s("id"), moved != id { self.moved(to: moved) }
+            AppModel.shared.say("Saved to the Library")
+            await loadMeta()
+        } catch { AppModel.shared.error = error.localizedDescription }
+    }
+
+    /// The doc has a new id (saved to the Library): what's sent from now on goes there.
+    private func moved(to newID: String) {
+        id = newID
+        movedToLibrary = true
+        if video?.docID != nil { video?.docID = newID }
     }
 
     /// Only the doc's own fields (the note, the tags), for a PDF or a video in the inspector.
@@ -259,7 +326,7 @@ final class ReaderModel {
         // the head: title, then where it's from
         out.append(NSAttributedString(string: d.s("title") ?? "Untitled", attributes: [.font: bold(serif, 30), .foregroundColor: ink, .paragraphStyle: para(8, line: 1.15)]))
         out.append(NSAttributedString(string: "\n"))
-        let by = [d.s("source"), d.s("author"), d.i("mins").map { "\($0) min" }].compactMap { $0 }.joined(separator: " · ")
+        let by = [d.s("source"), d.s("author"), d.s("kind") == "podcast" ? "episode" : d.i("mins").map { "\($0) min" }].compactMap { $0 }.joined(separator: " · ")
         out.append(NSAttributedString(string: by, attributes: [.font: NSFont.systemFont(ofSize: 13), .foregroundColor: quiet, .paragraphStyle: para(26, line: 1.2)]))
 
         var map: [(Int, NSRange)] = []
@@ -422,7 +489,7 @@ final class ReaderModel {
         let colour = HLTools.lastColour
         do {
             let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/highlights", ["b": p.i, "s": 0, "e": 0, "text": text, "img": p.src, "color": colour]))
-            if let moved = r?.s("saved_as") { id = moved; movedToLibrary = true }
+            if let moved = r?.s("saved_as") { self.moved(to: moved) }
             let made: [String: Any] = ["id": r?.s("id") ?? UUID().uuidString, "text": text, "pos": ["b": p.i, "s": 0, "e": 0, "img": p.src], "color": colour]
             highlights.append(J(made))
             applyHighlights()
@@ -483,7 +550,7 @@ final class ReaderModel {
             body["be"] = p.be != p.b ? p.be : NSNull()
             if !over.isEmpty { body["replaces"] = over.compactMap { $0.0.s("id") } }
             let r = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/highlights", body))
-            if let moved = r?.s("saved_as") { id = moved; movedToLibrary = true }   // a Feed item goes to the Library with its first highlight
+            if let moved = r?.s("saved_as") { self.moved(to: moved) }   // a Feed item goes to the Library with its first highlight
             var pos: [String: Any] = ["b": p.b, "s": p.s, "e": p.e]
             if p.be != p.b { pos["be"] = p.be }
             let gone = Set(over.compactMap { $0.0.s("id") })
@@ -779,6 +846,12 @@ final class ReaderTextView: NSTextView {
         let m = model
         MainActor.assumeIsolated { m?.lastActive = Date() }
         let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        // an episode: ← back 15 seconds, → ahead 30
+        if plain, [123, 124].contains(event.keyCode), MainActor.assumeIsolated({ () -> Bool in
+            guard let v = m?.video, v.kind == .episode else { return false }
+            v.skip(event.keyCode == 123 ? -15 : 30)
+            return true
+        }) { return }
         guard plain, let ch = event.characters, MainActor.assumeIsolated({ articleKey(ch) }) else { return super.keyDown(with: event) }
     }
 
@@ -794,7 +867,7 @@ final class ReaderTextView: NSTextView {
             else { Task { if sel.length > 0 { await m?.highlightSelection(thenNote: note) } else { await m?.highlightFocus(thenNote: note) } } }
         case "j": m?.moveFocus(1)
         case "k": m?.moveFocus(-1)
-        case "p": m?.listen()                                               // listen or pause
+        case "p": if let v = m?.video { v.toggle() } else { m?.listen() }  // play or pause; listen or pause
         case "L": m?.listen(from: sel.location)                             // read aloud from here
         case "e": if let item { Task { await app.done(item) } }
         case "l": if let item, item.whereIn != "feed" { Task { await app.later(item) } }

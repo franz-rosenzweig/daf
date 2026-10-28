@@ -59,7 +59,7 @@ class Net:
 
 
 NET = Net()
-ONLY = os.environ.get("DAF_CHECK", "")       # "offline", "book", "manga", "mangadl", "news", "boot", "docs", "theme", "prune", "listen" or "ink": only those checks
+ONLY = os.environ.get("DAF_CHECK", "")       # "offline", "book", "manga", "mangadl", "news", "boot", "docs", "theme", "prune", "listen", "ink" or "instagram": only those checks
 
 
 def forward(listen_port, target):
@@ -367,6 +367,26 @@ def main(base, cookie, token):
         js("location.reload(), 1")
         time.sleep(1)
         check(until(f"window.DafCore && window.DafCore.Ink && window.DafCore.Ink.state().strokes === {n1 + 1}", 20), "the strokes are there when it opens again", str(js("window.DafCore && window.DafCore.Ink && window.DafCore.Ink.state()")))
+        adb("reverse", "--remove", f"tcp:{PORT}", check_=False)
+        adb("forward", "--remove", "tcp:9224", check_=False)
+        print(("CHECK passed" if not failures else f"CHECK {failures} failed"), flush=True)
+        return 1 if failures else 0
+
+    if ONLY == "instagram":
+        # Sign in to Instagram (InstagramActivity): Preferences → Instagram offers it, it opens Instagram's
+        # own page in the app's window, and Back answers false. Nobody signs in here.
+        check(js("!!(window.dafShell && dafShell.can('instagram'))") is True, "the app can sign in to Instagram")
+        js("location.hash = 'prefs/instagram', 1")
+        check(until("document.querySelector('#igcard [data-ig=\\\"signin\\\"]')", 20), "Preferences → Instagram offers Sign in to Instagram")
+        js("window.__ig = 'waiting'; dafShell.instagram().then(v => { window.__ig = v; }, e => { window.__ig = 'error: ' + e.message; }), 1")
+        time.sleep(8)
+        front = adb("shell", "dumpsys", "activity", "activities", check_=False)
+        check("InstagramActivity" in "\n".join(l for l in front.splitlines() if "ResumedActivity" in l), "it opens Instagram's sign-in in the app's own window")
+        os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build"), exist_ok=True)
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "instagram.png"), "wb") as f:   # to look at
+            f.write(subprocess.run([ADB, "exec-out", "screencap", "-p"], capture_output=True).stdout)
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        check(until("window.__ig === false", 10), "Back closes it, and the page hears it wasn't signed in", str(js("window.__ig")))
         adb("reverse", "--remove", f"tcp:{PORT}", check_=False)
         adb("forward", "--remove", "tcp:9224", check_=False)
         print(("CHECK passed" if not failures else f"CHECK {failures} failed"), flush=True)

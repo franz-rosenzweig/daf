@@ -176,60 +176,6 @@ struct BookPage: View {
     }
 }
 
-/// Podcasts: what I've listened to lately, and what I follow (AntennaPod and Audiobookshelf send it).
-struct PodcastsView: View {
-    @State private var p: J?
-
-    var body: some View {
-        ScrollView {
-            if let p {
-                VStack(alignment: .leading, spacing: 14) {
-                    Heading("Listened to lately")
-                    VStack(spacing: 0) {
-                        ForEach(Array(episodes(p).enumerated()), id: \.offset) { k, e in
-                            if k > 0 { Divider() }
-                            HStack(alignment: .firstTextBaseline) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(e.title).lineLimit(1)
-                                    Text(e.author).font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text("\(e.seconds / 60)′").monospacedDigit().foregroundStyle(.secondary)
-                                Text(Date(timeIntervalSince1970: e.last), format: .dateTime.month().day()).foregroundStyle(.tertiary).frame(width: 60, alignment: .trailing)
-                            }
-                            .padding(.vertical, 7)
-                        }
-                    }
-                    Heading("Following (\(p.a("subs").count))").padding(.top, 10)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), alignment: .leading)], alignment: .leading, spacing: 8) {
-                        ForEach(p.a("subs"), id: \.self) { s in Text(s.s("title") ?? s.s("url") ?? "").lineLimit(1) }
-                    }
-                }
-                .padding(28)
-                .frame(maxWidth: 900, alignment: .leading)
-                .frame(maxWidth: .infinity)
-            } else {
-                ProgressView().frame(maxWidth: .infinity).padding(60)
-            }
-        }
-        .navigationTitle("Podcasts")
-        .task { p = try? await API.shared.json("/api/podcasts") }
-    }
-
-    /// One row an episode: its sessions added up, the latest day, and nothing under a minute.
-    private func episodes(_ p: J) -> [(title: String, author: String, seconds: Int, last: Double)] {
-        var out: [(title: String, author: String, seconds: Int, last: Double)] = []
-        var at: [String: Int] = [:]
-        for e in p.a("recent") {
-            let t = e.s("title") ?? "", a = e.s("author") ?? "", key = t + "\u{1}" + a
-            let secs = e.i("seconds") ?? 0, start = e.d("start") ?? 0
-            if let k = at[key] { out[k].seconds += secs; out[k].last = max(out[k].last, start) }
-            else { at[key] = out.count; out.append((t, a, secs, start)) }
-        }
-        return out.filter { $0.seconds >= 60 }
-    }
-}
-
 /// Sources: whether each place Daf reads from is answering, and Sync Now.
 struct SourcesView: View {
     @Environment(AppModel.self) private var model

@@ -68,7 +68,7 @@ struct RouteView: View {
             } else if parts.first == "page", parts.count > 1 {
                 WebPane(route: "#" + parts.dropFirst().map { API.enc($0) }.joined(separator: "/"))
             } else if parts.first == "read", parts.count > 1 {
-                if let reader, reader.doc != nil { if reader.doc?.s("kind") == "video" { VideoArticle(model: reader) } else { ArticleReader(model: reader) } }
+                if let reader, reader.doc != nil { if reader.playsMedia { VideoArticle(model: reader) } else { ArticleReader(model: reader) } }
                 else if let e = reader?.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }
                 else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
             } else {
@@ -78,13 +78,21 @@ struct RouteView: View {
         .frame(minWidth: 640, minHeight: 520)
         .themed()
         .tint(Theme.shared.accent)
-        .toolbar { if ["read", "pdf"].contains(parts.first ?? "") { ToolbarItem { FocusButton() } } }
+        .toolbar {
+            if let reader, reader.doc?.s("where_") == "podcast" {       // an episode met only in AntennaPod
+                ToolbarItem {
+                    Button { Task { await reader.saveToLibrary() } } label: { Label("Save to Library", systemImage: "tray.and.arrow.down") }
+                }
+            }
+            if ["read", "pdf"].contains(parts.first ?? "") { ToolbarItem { FocusButton() } }
+        }
         .navigationTitle(reader?.title ?? "Daf")
         .task(id: route) {
             guard parts.first == "read", parts.count > 1 else { return }
             let r = ReaderModel(id: parts[1])
             r.pendingReveal = parts.last.flatMap { $0.hasPrefix("hl:") ? String($0.dropFirst(3)) : nil }
             r.pendingFind = parts.count > 2 ? parts.last.flatMap { $0.hasPrefix("q:") ? String($0.dropFirst(2)) : nil } : nil
+            r.podAt = parts.count > 2 ? parts.last.flatMap { $0.hasPrefix("t:") ? Double($0.dropFirst(2)) : nil } : nil   // a time in an episode
             reader = r
             await r.load()
         }

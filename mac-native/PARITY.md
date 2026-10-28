@@ -42,7 +42,9 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: a highlight's tags, favorite, flashcards (fill in the blank, question, suggest), share as an image; Remove with Undo; overlapping highlights merged; highlight when selecting (⌥ to just select)
 - here: paragraph focus (j, k) and h or n on it; the page's article keys (h n j k p L e l s f t N d z o J K C R M)
 - here: picture highlights (right-click a picture, or select it and press H), framed in their colour, shown as the picture everywhere
-- here: videos natively (YouTube's private player above the transcript, follow along, a timestamp plays from there, Clip 30s, C), captions or a transcription when there's none; podcast episodes in the reader
+- here: videos natively (YouTube's private player above the transcript, follow along, a timestamp plays from there, Clip 30s, C), captions or a transcription when there's none
+- here: reels (social.py): Daf's own copy in AVPlayer, standing up, or square and wide in their own shape; the transcript follows along, Clip 30s; on its way from Instagram, or why not, with the way to Instagram in Settings; Open on Instagram
+- here: a podcast episode's page (episodes.py): its audio from where the last play anywhere stopped (and says where), −15 and +30 (← →), the speed (1× to 2×, 0.8×, kept), chapters, Clip 30s (the server transcribes it when there's no transcript yet), Follow Along, Transcribe and Try Again, P plays and pauses, the media keys and Now Playing; where it stops goes back in stretches (/api/podcasts/position); #read/<doc>/t:<sec>; Save to Library for an episode met only in AntennaPod
 - here: highlights in the PDF view (as you select, H or N, right-click), the text view's found on the page, its zoom keys (− +), its reading time and the page read
 - here: Torah's verses in Hebrew and English, or one of them (the toolbar, or Article › Torah)
 - not yet: what's written on an article with a pen (ink.js, /api/docs/{id}/ink), shown over the text and in the margin, in the pens' kinds (pens.js)
@@ -60,6 +62,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 ## Pages
 
 - here: Today (the ring, the week, the sittings, keep reading), Review (highlights and flashcards), Highlights, Stats, Books, a book's page, shelves, Torah, Podcasts, Sources, Paper pages, Log paper minutes
+- here: Podcasts as the page has it: Listened lately (how far, a transcript), the clips (each opens its episode 30 seconds before), the shows, a show's episodes; each opens its episode's page
 - here: Today's notices (Shabbat, the Kindle finished a book, a book read off the nightstand), the other goals' chips, minutes by source, the day's review, On this day, the nightstand (or the suggested three), Year 30's year, how fresh the sources are, a goal met or a milestone said once
 - here: Today as a page across the window, with Year 29 under Year 30
 - here: Review by a book or by whatever the Highlights filters show (a tag, favorites, a colour, a search), Review more, another round; a flashcard, tags and share as an image from the review
@@ -77,7 +80,8 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: AI (summaries and tags of what I save, the model, the ready questions, what Daf asks for each)
 - here: Library tags (rename, merge, remove, the tidy-up)
 - here: Import (Instapaper, Readwise, Raindrop, Pocket, OPML…), dropped or chosen, followed as it goes
-- here: Morning email, Newsletters, Hardcover, Phone, Podcasts (AntennaPod)
+- here: Morning email, Newsletters, Hardcover, Phone, Podcasts (AntennaPod, and Transcribe episodes I play or open)
+- here: Instagram (the sign-in, Sign In to Instagram in a window that keeps nothing, Keep Daf signed in from my browser, the reels waiting, Forget It) and AniList (the client, Connect, the last update)
 - here: Send Feedback (Help menu)
 - here: appearance: Daf's themes (a theme for light and one for dark, with the Mac or always one), kept in Daf for every device; books keep their own
 

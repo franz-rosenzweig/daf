@@ -13,6 +13,8 @@ function ago(t){
   if (h < 36) return h + ' hours ago';
   return Math.round(h / 24) + ' days ago';
 }
+// The Android app signs in itself (InstagramActivity): Instagram's own page in a window of its own.
+const app = () => !!(window.dafShell && window.dafShell.can && window.dafShell.can('instagram'));
 const BY = { web: 'this page', browser: 'the browser extension', safari: 'Safari' };
 const by = n => BY[n] || (/^android/.test(n || '') ? 'the Android app' : /^mac/.test(n || '') ? 'the Mac app' : n || '');
 
@@ -24,8 +26,9 @@ async function prefs(card){
   card.innerHTML = '<h2>Instagram</h2>' +
     '<p class="mute" style="margin-top:0">Share a reel to Daf (or save its link) and Daf keeps the video, its caption and a transcript you can highlight. ' +
     'To fetch it, Daf uses your own Instagram sign-in, kept on your server and nowhere else.</p>' +
-    '<div class="prow"><div class="d"><b>Sign-in</b><span>' + state + '</span></div>' +
-      (s.signed_in ? '<button class="btn sm" data-ig="forget">Forget it</button>' : '') + '</div>' +
+    '<div class="prow"><div class="d"><b>Sign-in</b><span>' + state + '</span></div><div style="display:flex;gap:8px">' +
+      (s.signed_in ? '<button class="btn sm" data-ig="forget">Forget it</button>' : '') +
+      (app() ? '<button class="btn sm primary" data-ig="signin">' + (s.signed_in ? 'Sign in again' : 'Sign in to Instagram') + '</button>' : '') + '</div></div>' +
     '<div class="prow"><div class="d"><b>Keep Daf signed in from my browser</b><span>When you’re on instagram.com in a browser with the Daf extension, it sends Instagram’s sign-in to Daf whenever it has changed, so Daf’s never runs out. Only instagram.com’s cookies, only to your Daf.</span></div>' +
       '<input type="checkbox" class="sw" data-ig="browser" aria-label="Keep Daf signed in from my browser"' + (s.from_browser ? ' checked' : '') + '></div>' +
     (s.waiting ? '<div class="prow"><div class="d"><b>Waiting</b><span>' + s.waiting + (s.waiting === 1 ? ' reel is' : ' reels are') + ' waiting for a sign-in. ' + (s.signed_in && !s.expired ? (s.waiting === 1 ? 'It’s on its way.' : 'They’re on their way.') : (s.waiting === 1 ? 'It comes in by itself' : 'They come in by themselves') + ' once Daf has one.') + '</span></div></div>' : '') +
@@ -42,9 +45,12 @@ document.addEventListener('change', async e => {
   catch(err){ toast(err.message); t.checked = !t.checked; }
 });
 document.addEventListener('click', async e => {
-  const b = e.target.closest && e.target.closest('[data-ig="forget"]'); if (!b) return;
-  try { await api('/api/instagram/cookies', { method: 'DELETE' }); toast('Daf forgot the Instagram sign-in'); prefs($('#igcard')); }
-  catch(err){ toast(err.message); }
+  const b = e.target.closest && e.target.closest('[data-ig="forget"], [data-ig="signin"]'); if (!b) return;
+  try {
+    if (b.dataset.ig === 'signin') { if (await window.dafShell.instagram()) toast('Signed in to Instagram'); }
+    else { await api('/api/instagram/cookies', { method: 'DELETE' }); toast('Daf forgot the Instagram sign-in'); }
+    prefs($('#igcard'));
+  } catch(err){ toast(err.message); }
 });
 
 C.Social = { prefs };

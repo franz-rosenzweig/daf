@@ -14,8 +14,8 @@ android {
         // 31: the widget's wallpaper colours and its two sizes from one provider
         minSdk 31
         targetSdk 36
-        versionCode 22
-        versionName '0.5.4'
+        versionCode 23
+        versionName '0.5.5'
         resValue 'string', 'app_name', 'Daf'
         manifestPlaceholders = [shareAuthority: 'xyz.tiresia.daf.share']
         // 64-bit ARM only (every phone and tablet on Android 12 and up): the handwriting reader's

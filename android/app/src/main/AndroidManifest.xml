@@ -64,6 +64,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Sign in to Instagram (Preferences → Instagram): Instagram's own page, for the reels -->
+        <activity
+            android:name=".InstagramActivity"
+            android:exported="false"
+            android:label="Sign in to Instagram"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden" />
+
         <activity
             android:name=".SettingsActivity"
             android:exported="true"
