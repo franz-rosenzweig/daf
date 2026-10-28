@@ -493,7 +493,7 @@ public sealed partial class ShellWindow : Window
         return $$"""
             <!doctype html><meta charset="utf-8"><style>
             body{font:14px "Segoe UI Variable Text","Segoe UI",sans-serif;color:#555;display:flex;height:100vh;margin:0;align-items:center;justify-content:center;text-align:center}
-            @media (prefers-color-scheme:dark){body{color:#bbb;background:#16171a}}
+            @media (prefers-color-scheme:dark){body{color:#bbb;background:#16171a} }
             h1{font-size:18px;font-weight:600;color:inherit}a{color:inherit}
             </style><div><h1>Daf didn't answer</h1><p>{{Esc(base_)}}: {{Esc(why)}}</p>
             <p><a href="{{Esc(base_)}}">Try again</a> · or change the address in File › Settings.</p></div>
