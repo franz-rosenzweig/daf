@@ -7,7 +7,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 ### Getting started
 - [What is Daf?](what-is-daf.md) — what it does, what works where, and what it connects to
 - [A day with Daf](how-i-use-it.md) — how the pieces fit together, from the morning highlight to Shabbat
-- [Install](install.md) — the web app, the Mac and Android apps, the Kindle plugin and the extension
+- [Install](install.md) — the web app, the Mac, Windows and Android apps, the Kindle plugin and the extension
 
 ### Using Daf
 - [Today and goals](today-and-goals.md) — the ring, the sittings, the year grid, and the goals behind them
@@ -26,6 +26,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 ### Devices
 - [The Kindle](kindle.md) — the KOReader plugin: Home, Shelves, the Daf tab and the sleep screen
 - [The Mac app](mac.md) — the window, the menus, the menu bar and Safari
+- [The Windows app](windows.md) — the window, the menus, today by the clock and no connection
 - [The Android app](android.md) — phone and tablet, the widget, Listen and books on the phone
 - [The browser extension](browser-extension.md) — highlighting on any web page
 - [Sharing, messages and the widget](phone-shortcuts.md) — "Save to Daf", Signal messages, the morning highlight
@@ -46,4 +47,5 @@ The first time you reach something you haven't used yet, like the search, a book
 - [The shell contract](SHELL.md) — how the page and the native apps talk to each other
 - [Daf for macOS](../mac/README.md) — building and testing the Mac app
 - [Daf for Android](../android/README.md) — building and testing the Android app
+- [Daf for Windows](../windows/README.md) — building and testing the Windows app
 - [The extension's notes](../extension/README.md) — building, signing and connecting the extension

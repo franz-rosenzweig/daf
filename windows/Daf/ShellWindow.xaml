@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One Daf window: a title bar in the page's own colour holding the icon, Daf's menus
+     (Menus.cs) and the window's name, over the page, which ShellWindow.xaml.cs adds once
+     WebView2 is ready. -->
+<Window
+    x:Class="Daf.ShellWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid x:Name="Strip" Grid.Row="0" Height="48">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="LeftPad" Width="0" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="RightPad" Width="138" />
+            </Grid.ColumnDefinitions>
+            <Image x:Name="AppIcon" Grid.Column="1" Width="16" Height="16" Margin="16,0,6,0" VerticalAlignment="Center" />
+            <MenuBar x:Name="Menu" Grid.Column="2" VerticalAlignment="Center" />
+            <!-- the part that moves the window, and double-clicks to maximize it -->
+            <Grid x:Name="DragArea" Grid.Column="3" Background="Transparent">
+                <TextBlock x:Name="TitleText" Text="Daf" Margin="12,0,16,0" VerticalAlignment="Center" HorizontalAlignment="Right"
+                           TextTrimming="CharacterEllipsis" Style="{StaticResource CaptionTextBlockStyle}" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

@@ -9,7 +9,7 @@ function stuck(){ try { return JSON.parse(localStorage.getItem('daf.outbox.stuck
 function context(){
   const route = location.hash || '#today';
   const title = (document.querySelector('.doc h1, #btitle, .top h1') || {}).textContent || '';
-  const shell = window.dafShell ? 'Daf for ' + (dafShell.platform === 'mac' ? 'Mac' : 'Android') + ' ' + (dafShell.version || '') : '';
+  const shell = window.dafShell ? 'Daf for ' + ({ mac: 'Mac', windows: 'Windows' }[dafShell.platform] || 'Android') + ' ' + (dafShell.version || '') : '';
   return { route, title: title.trim().slice(0, 200), device: shell || navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 160),
            app: (document.documentElement.dataset.sw || '') + (navigator.serviceWorker && navigator.serviceWorker.controller ? ' (service worker)' : ''),
            size: innerWidth + '×' + innerHeight + (matchMedia('(pointer:coarse)').matches ? ' touch' : ''),

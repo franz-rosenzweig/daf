@@ -70,6 +70,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 
 - **The Kindle.** The plugin sends reading time, shows today's minutes on the sleep screen, and gives KOReader a Home page, Shelves for moving books between folders, and a Daf tab with the review and the nightstand. Places and highlights go both ways.
 - **Mac.** A native window, Daf's menus, today's minutes in the menu bar, "Save to Daf" in the share menu, the Safari extension, and its own copy of Daf for a plane or a server that's down.
+- **Windows.** A window with Daf's menus in its title bar, today's minutes as a ring by the clock, notifications for new posts, `daf://` links, and its own copy of Daf for no connection.
 - **Android.** A home-screen widget with the ring, "Save to Daf" in the share sheet, the volume keys turning pages if I want them to, listening with the screen off, and its own copy of Daf, with the books and articles I keep, for no signal.
 - **The browser extension.** Highlight on any web page in Firefox, Zen, Chrome, Arc or Safari, and the page goes into the Library with the highlight on it. The right-click menu saves a page or a link without highlighting (Alt+Shift+S saves the page), and a paywalled article I'm signed in to comes in whole.
 - **Send to Kindle.** Articles go to the Kindle as one EPUB, or a digest of several, and what I highlight there comes back to the article.
@@ -153,6 +154,10 @@ Daf is a web app with one sign-in, a username and password, so the copy you open
 
 There's no download yet, so the Mac app is built from this repository: on a Mac with the Command Line Tools and `brew install xcodegen`, run `cd mac && ./build.sh` and copy `build/Daf.app` to Applications. See [the Mac app](docs/mac.md) and [mac/README.md](mac/README.md).
 
+### Windows
+
+The Windows app installs from the [releases](https://github.com/franz-rosenzweig/daf/releases) (the `windows-v…` ones): run `Daf-<version>-Setup.exe`, which needs no administrator, or unzip the portable copy. GitHub builds and tests it (`.github/workflows/windows.yml`). See [the Windows app](docs/windows.md) and [windows/README.md](windows/README.md).
+
 ### Android
 
 The Android app is built from the repository too: `cd android && ./release.sh` makes a signed APK (it needs JDK 17, the Android SDK and your own keystore), and `adb install -r` puts it on the phone. See [the Android app](docs/android.md) and [android/README.md](android/README.md).
@@ -175,7 +180,7 @@ The docs are a set of short pages, written the way I'd explain Daf to a friend.
 
 - **Getting started:** [What is Daf?](docs/what-is-daf.md), [A day with Daf](docs/how-i-use-it.md), [Install](docs/install.md)
 - **Using Daf:** [Today and goals](docs/today-and-goals.md), [Where the minutes come from](docs/reading-time.md), [Paper books](docs/paper-books.md), [The reader](docs/reader.md), [The Feed and the Library](docs/feed-and-library.md), [Videos and podcasts](docs/videos-and-podcasts.md), [Highlights and review](docs/highlights-and-review.md), [Books and shelves](docs/books-and-shelves.md), [The Torah shelf](docs/torah.md), [Stats](docs/stats.md), [Manga](docs/manga.md)
-- **Devices:** [The Kindle](docs/kindle.md), [The Mac app](docs/mac.md), [The Android app](docs/android.md), [The browser extension](docs/browser-extension.md), [Sharing, messages and the widget](docs/phone-shortcuts.md)
+- **Devices:** [The Kindle](docs/kindle.md), [The Mac app](docs/mac.md), [The Windows app](docs/windows.md), [The Android app](docs/android.md), [The browser extension](docs/browser-extension.md), [Sharing, messages and the widget](docs/phone-shortcuts.md)
 - **Running your own server:** [Your own server](docs/server.md)
 - **Under the hood:** [How Daf runs](docs/OPERATIONS.md), [The plan](PLAN.md), [The native apps brief](docs/NATIVE.md), [The shell contract](docs/SHELL.md)
 
@@ -187,7 +192,7 @@ Start with [Getting started](docs/what-is-daf.md).
 - **Web app:** plain JavaScript and CSS with no build step, foliate-js for books and pdf.js for PDFs, and a service worker that keeps Daf on the device, so it opens at once and reads offline.
 - **Where the data lives:** my Obsidian vault holds every highlight, note and hand-logged minute. Daf's SQLite database is mostly an index of the sources and the vault, plus Daf's own things like the review schedule, places in books and the Library, whose pages and pictures stay on my server. Daf only changes something in those apps when I press the button for it, like marking a post read or unfollowing a feed.
 - **What it talks to:** KOReader (through the plugin), Audiobookshelf and Calibre (their databases, read-only), FreshRSS (its API), Karakeep (off since October 2026, when its saves moved into Daf's Library), a headless Chrome for pages that only show themselves to a real browser, Hardcover, Komga, Kokoro for read-aloud, faster-whisper for transcripts, Proton Mail Bridge for newsletters and the morning email, and Claude on my own subscription for Ask, summaries, tags and reading photos of paper pages.
-- **The apps:** the Mac app (SwiftUI and AppKit around WKWebView) and the Android app (a WebView) load the live site, keep a copy of it for when there's no connection, and add what a page can't do. The contract between them is [docs/SHELL.md](docs/SHELL.md).
+- **The apps:** the Mac app (SwiftUI and AppKit around WKWebView), the Windows app (WinUI 3 around WebView2) and the Android app (a WebView) load the live site, keep a copy of it for when there's no connection, and add what a page can't do. The contract between them is [docs/SHELL.md](docs/SHELL.md).
 
 ## Credits
 

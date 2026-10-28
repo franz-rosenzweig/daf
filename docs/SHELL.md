@@ -1,6 +1,6 @@
 # The shell contract
 
-How Daf's page and a native shell (`mac/`, `android/`) talk to each other. The page is the
+How Daf's page and a native shell (`mac/`, `windows/`, `android/`) talk to each other. The page is the
 live site; a shell is a window around it plus the few things a page can't do. Dvarim and
 Moshe have `BRIDGE.md` for a folder; Daf has no folder, so this is all there is.
 
@@ -12,17 +12,21 @@ there, so a browser never sees any of it.
 The shell appends one of these to WebView's user agent:
 
 - `Daf/<version> (macOS shell)`
+- `Daf/<version> (Windows shell)`
 - `Daf/<version> (Android shell)`
 
-`shell.js` then puts `shell` and `shell-mac` or `shell-android` on `<html>`. The page makes no
-room for anything: the Mac window has a plain title bar above the page, in the page's colour
-(Readwise Reader's way), and `shell.js` tells it when the theme changes. The empty part of a
-top bar moves the window too (§5).
+`shell.js` then puts `shell` and `shell-mac`, `shell-windows` or `shell-android` on `<html>`. The
+page makes no room for anything: the Mac window has a plain title bar above the page, in the
+page's colour (Readwise Reader's way), and `shell.js` tells it when the theme changes. The empty
+part of a top bar moves the window too (§5). The Windows window has a title bar of its own above
+the page with Daf's menus in it, in the page's colour, which `shell.js` sends with `bars`.
 
 ## 2. `window.dafShell`: the shell's, the page calls it
 
 On the Mac the shell defines it at document start, before the page's own scripts run, over
-WebKit's `dafShell` message handler. On Android `shell.js` defines it, and the calls go over a
+WebKit's `dafShell` message handler. Windows does the same over WebView2's web messages
+(`chrome.webview.postMessage`), in the top frame of Daf's own origin and its copy only
+(`windows/Daf/Scripts.cs`). On Android `shell.js` defines it, and the calls go over a
 message port the app posts to the main frame as soon as the page shows, addressed to Daf's
 origin (`Shell.java`); if nothing has come back on it when the page has finished loading
 (`shell.js` wasn't listening yet), the app posts another. A document's ports stay open until
@@ -36,26 +40,26 @@ video) can't call the app. Calls made before the port arrives wait for it.
 | `download(url)` or `download({name, mime, base64})` | Saves a file through the save panel (Mac) or the create-document screen (Android). A URL is fetched with the window's own cookie. | Promise → `true`, or `false` if cancelled |
 | `openExternal(url)` | Opens `http`, `https`, `mailto` or `obsidian` links in the browser or the app they belong to. | Promise → `true` |
 | `notify({title, text, route})` | A system notification; tapping it opens `#route`. Not built: nothing in the page needs it yet. | Promise → `true` |
-| `fullscreen()` | Mac: the window's own full screen (macOS full screen), for the manga reader's Full screen; leaving the reader leaves it again. Android doesn't list it: the reader is already immersive there. | Promise → `true` when it went full screen |
-| `alerts()` | Notifications for new posts in the feeds set to notify (the sources sheet's feed editor). The shell asks the system for permission once; from then on the app asks `/api/phone/feed-news` with its token (Android every 15 minutes, the Mac with the menu bar's five-minute look) and posts one notification a post, which opens it in Daf. It stops by itself once no feed is set to notify. | Promise → `true` if the system lets Daf notify |
+| `fullscreen()` | Mac and Windows: the window's own full screen (macOS full screen, Windows' F11), for the manga reader's Full screen; leaving the reader leaves it again. Android doesn't list it: the reader is already immersive there. | Promise → `true` when it went full screen |
+| `alerts()` | Notifications for new posts in the feeds set to notify (the sources sheet's feed editor). The shell asks the system for permission once; from then on the app asks `/api/phone/feed-news` with its token (Android every 15 minutes, the Mac with the menu bar's five-minute look, Windows with the notification area's) and posts one notification a post, which opens it in Daf. It stops by itself once no feed is set to notify. | Promise → `true` if the system lets Daf notify |
 | `media({state, title, sub})` | Android: what read-aloud is doing (`playing`, `paused`, `stopped`). `shell.js` sends it by itself; the app keeps playing behind the lock screen and shows the controls there, which press the page's own buttons (`listen:play`, `listen:pause`, `listen:next`, `listen:prev`, `listen:stop`). | Promise → `true` |
 | `haptic(kind)` | A tap felt in the hand: `confirm`, `reject` or `tick`. Android only; `shell.js` sends it for the review's Keep and Less often, the bottom tabs and the highlight bar. | Promise → `true` if the phone felt it |
-| `bars({bg, dark})` | Android: the status and navigation bars behind the theme's background (`#rrggbb`), with dark or light icons. `shell.js` sends it by itself, at load and on `themes.js`'s `daf-theme` event; the app keeps it for the phone's current mode, so the next start paints it from the first frame. | Promise → `true`, or `false` for a colour it can't read |
+| `bars({bg, dark})` | Android: the status and navigation bars behind the theme's background (`#rrggbb`), with dark or light icons. Windows: the title bar and its menus in that colour, with light or dark letters and caption buttons. `shell.js` sends it by itself, at load and on `themes.js`'s `daf-theme` event; the app keeps it, so the next start paints it from the first frame. | Promise → `true`, or `false` for a colour it can't read |
 | `reading({volumeKeys, ownMenu})` | Android: how reading goes on this device. `volumeKeys`: the volume buttons turn pages in a book or the manga reader (Preferences → Reader, off unless turned on; the app keeps the last value for its next start), and never while music or read-aloud plays. `ownMenu`: the page's own text menu stands in for Android's, which then comes up empty (true only with an article or a book open and nothing editable in focus). `shell.js` sends it when the port arrives and whenever either changes. | Promise → `true` |
-| `offline({op, id?, on?, size?})` | What's kept on the device for no network, on both shells. `list` (what's there), `has` (a book), `keep` (a book; `on: false` lets it go), `doc` (an article, from the reader's ⋯ menu, with its pictures and, for a PDF, its file), `manga` (a volume, `size` its page width, 600–2400), `sync` (everything now). Android also keeps every book opened in it and the books being read, and gives the WebView and the service worker a book's file from the phone; the Mac keeps the books being read, and its copy (`daf-app://app/`) answers from what's kept. | Promise → `{books: [{id, title, size, kept}], manga: [{id, title, series, state, done, total, bytes}], docs: [{id, pinned}], app: {ready, version, at}, data, bytes, synced}`, or `{has}` |
+| `offline({op, id?, on?, size?})` | What's kept on the device for no network, on every shell. `list` (what's there), `has` (a book), `keep` (a book; `on: false` lets it go), `doc` (an article, from the reader's ⋯ menu, with its pictures and, for a PDF, its file), `manga` (a volume, `size` its page width, 600–2400), `sync` (everything now). Android also keeps every book opened in it and the books being read, and gives the WebView and the service worker a book's file from the phone; the Mac keeps the books being read, and its copy (`daf-app://app/`) answers from what's kept. | Promise → `{books: [{id, title, size, kept}], manga: [{id, title, series, state, done, total, bytes}], docs: [{id, pinned}], app: {ready, version, at}, data, bytes, synced}`, or `{has}` |
 
-`dafShell.version` is the shell's version and `dafShell.platform` is `"mac"` or `"android"`.
+`dafShell.version` is the shell's version and `dafShell.platform` is `"mac"`, `"windows"` or `"android"`.
 
-Both shells answer `share`, `download`, `openExternal`, `alerts` and `offline`; the Mac `fullscreen`; Android `haptic`, `media`, `screen`, `bars` and `reading`. The Mac needs no `bars`: its title bar is see-through, so the page's own colours are the window's.
+Every shell answers `share`, `download`, `openExternal`, `alerts` and `offline`; the Mac and Windows `fullscreen`; Windows and Android `bars`; Android `haptic`, `media`, `screen` and `reading`. The Mac needs no `bars`: its title bar is see-through, so the page's own colours are the window's.
 
-In the manga reader, Android's volume keys reach the page as `window`'s `daf-volume` event (`detail.dir` 1 for down, -1 for up), so the reader's own "Volume keys" setting decides; the Mac's Next and Previous menu items send PageDown and PageUp. While the reader is open, the Mac turns off the two-finger Back swipe, and Android keeps the middle of each side edge (200dp) for the page's own swipes.
+In the manga reader, Android's volume keys reach the page as `window`'s `daf-volume` event (`detail.dir` 1 for down, -1 for up), so the reader's own "Volume keys" setting decides; the Mac's and Windows' Next and Previous menu items send PageDown and PageUp. While the reader is open, the Mac turns off the two-finger Back swipe, and Android keeps the middle of each side edge (200dp) for the page's own swipes.
 
 **Offline.** Writes the book reader makes with no network (its place, highlights and their notes,
 colours and tags, bookmarks) wait in `app.js`'s outbox, in order, and go when the network is back
 with the time they were made (`at`). The server keeps the newer place, so one sent late doesn't
 replace the Kindle's. This is the page's own, so it works in a browser too; the shell adds the books.
 
-Both shells also start with no network at all, from a copy of Daf kept on the device: every file in
+Every shell also starts with no network at all, from a copy of Daf kept on the device: every file in
 `web/` (from `/api/app-files`, fetched again only when its hash changes), Daf's own fonts among them,
 plus what `/api/offline/plan` names (the lists, the articles being read with their pictures, the
 books' details). A list asked for in a way that wasn't kept falls back to the kept one with the same
@@ -63,7 +67,11 @@ books' details). A list asked for in a way that wasn't kept falls back to the ke
 (`AppFiles`, `DataStore`). The Mac can't step in front of `https`, so when Daf doesn't answer, the
 window moves to the copy at `daf-app://app/` (`LocalCopy.swift`), at the same route; it checks Daf
 every 30 seconds and on wake, sends the outbox, then moves back to the live site. Writes made on
-the copy fail as they would with no network, so the outbox keeps them. Each sync also brings the
+the copy fail as they would with no network, so the outbox keeps them. Windows does the same,
+its copy at `https://daf-app.example/` (`windows/Daf/LocalCopy.cs`), which WebView2 answers
+from the app (`WebResourceRequested`); a write Daf can't take is left to the network, where
+`daf-app.example` doesn't exist, so it fails as a lost connection does. The copy's page has no
+service worker there. Each sync also brings the
 articles kept by hand up to date (one deleted in Daf goes), keeps a PDF's own file with its article, and
 lets go of what nothing names any more (not the plan, not what's kept by hand, not their pictures, PDFs
 or manga pages) once it hasn't been kept or read on the device for three weeks; reading it offline
@@ -108,6 +116,7 @@ if the command doesn't apply where the page is now.
 | `keys` | Shows the keyboard shortcuts for where you are |
 | `delete`, `undo`, `tag` | In an article, or on the selected row of a list (or the rows picked with x): delete it, take back the last Done, Later, Shortlist or Delete, or open its tags |
 | `feedback` | Send feedback… (filed as an issue on the repo) |
+| `text:bigger`, `text:smaller`, `text:reset` | The reading text's size, Aa's, a pixel at a time (14 to 32; reset is 20), a book with its own type keeping its own. Windows' Ctrl+Plus, Ctrl+Minus, Ctrl+0 and Ctrl with the wheel |
 
 The commands that press a key (`highlight`, `note`, `next`, `prev`, `toc`, `star`, `delete`, `undo`, `tag`) press the one bound now in Preferences → Keyboard (`web/keys.js`), so a menu item keeps working after a shortcut changes. `dafState().can` also has `delete`, `undo` and `tag`.
 
@@ -149,10 +158,12 @@ eraser end's (`pointerType` "pen", `buttons` 32), and the page erases with it.
   the sidebar posts `drag` (`zoom` on a double press) to the `dafWindow` handler.
 - **Hidden means hidden:** a minimized, covered or hidden window must leave
   `document.visibilityState` at `hidden`, or Daf counts minutes nobody read. WKWebView and
-  Android's WebView both do this by default; the shells' self-tests check it.
+  Android's WebView both do this by default; Windows takes the web view away while the window is
+  minimized. The shells' self-tests check it.
 - **One sign-in:** the page's own form and its `daf` cookie, in the default (persistent) data
   store.
-- **Native surfaces use a device token, never the cookie:** the menu bar, the share extension
-  and the Android widget send `Authorization: Bearer <token>` to `/api/phone/widget` and
-  `/api/save` (`docs/NATIVE.md` has the endpoints). The token is in the Keychain on the Mac and
-  in EncryptedSharedPreferences on Android.
+- **Native surfaces use a device token, never the cookie:** the menu bar, the share extension,
+  the Windows notification area and the Android widget send `Authorization: Bearer <token>` to
+  `/api/phone/widget` and `/api/save` (`docs/NATIVE.md` has the endpoints). The token is in the
+  Keychain on the Mac, encrypted with DPAPI for the Windows user, and in EncryptedSharedPreferences
+  on Android.

@@ -57,4 +57,4 @@ If a feed is set to **Notify me of new posts** (in the Feed's sources, see [The 
 
 Basically, the Mac app is the web app with a real window and the minutes in sight all day. If you only install one of the apps, I'd make it this one if you work at a Mac, and the [Android app](android.md) if your phone is where the distractions are.
 
-<sub>Next: [The Android app](android.md) →</sub>
+<sub>Next: [The Windows app](windows.md) →</sub>

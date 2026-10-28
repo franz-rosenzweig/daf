@@ -761,10 +761,10 @@ function organizePrefs(){
 async function drawDevices(token){
   const box = $('#devlist'); if (!box) return;
   const p = await api('/api/phone');
-  const label = { kindle:'The Kindle (Daf plugin)', phone:'The phone (Tasker and the widget)', mac:'Daf for Mac', android:'Daf for Android', safari:'Safari extension (connected by Daf for Mac)' };
+  const label = { kindle:'The Kindle (Daf plugin)', phone:'The phone (Tasker and the widget)', mac:'Daf for Mac', android:'Daf for Android', windows:'Daf for Windows', safari:'Safari extension (connected by Daf for Mac)' };
   const seen = d => 'Connected ' + epochDate(d.created) + (d.last_seen ? ', last used ' + ago(d.last_seen) : ', not used yet'), br = p.devices.find(d => d.name === 'browser');
   box.innerHTML = '<div class="prow"><div class="d"><b>Connected devices</b><span>Each has its own token. Disconnecting one stops it until it connects again.</span></div></div>' +
-    p.devices.filter(d => d.name !== 'browser').map(d => '<div class="prow sub"><div class="d"><b>' + esc(label[d.name] || (/^android-./.test(d.name) ? 'Daf for Android · ' + d.name.slice(8).toUpperCase() : d.name)) + '</b><span>' + seen(d) + '</span></div>' +
+    p.devices.filter(d => d.name !== 'browser').map(d => '<div class="prow sub"><div class="d"><b>' + esc(label[d.name] || (/^android-./.test(d.name) ? 'Daf for Android · ' + d.name.slice(8).toUpperCase() : /^windows-./.test(d.name) ? 'Daf for Windows · ' + d.name.slice(8).toUpperCase() : d.name)) + '</b><span>' + seen(d) + '</span></div>' +
       '<button class="btn sm" data-act="devoff" data-name="' + esc(d.name) + '">Disconnect</button></div>').join('') +
     // The browser extension (extension/): a token for the device "browser", shown once, pasted into its options.
     '<div class="prow sub"><div class="d"><b>Browser extension</b><span>' + (br ? seen(br) + '. A new token replaces it.' : 'Highlight on any web page and keep it in Daf. Make a token and paste it into the extension’s options.') +

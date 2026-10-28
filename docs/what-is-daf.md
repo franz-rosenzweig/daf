@@ -19,18 +19,18 @@ Basically, instead of five apps that each know a little, I have ONE place that k
 
 ## What works where
 
-Daf is a web app first. The Mac and Android apps wrap the same page and add what a web page can't do, and the Kindle has its own plugin.
+Daf is a web app first. The Mac, Windows and Android apps wrap the same page and add what a web page can't do, and the Kindle has its own plugin.
 
-| | Web | Mac app | Android app | Kindle | Extension |
-|---|---|---|---|---|---|
-| Today, review, highlights, stats | Yes | Yes | Yes | Today's minutes, the review and the nightstand on the Daf tab | No |
-| Reading books and articles | Yes | Yes | Yes | Books in KOReader | No |
-| Reading time counted | While a reader is open | While a reader is open | While a reader is open | Every page turn | No |
-| Today's minutes always in sight | No | The menu bar | The home-screen widget | The sleep screen | No |
-| Saving links into Daf | The share menu, once installed | The share menu | The share sheet | No | The toolbar button, the right-click menu, Alt+Shift+S |
-| Highlighting web pages | No | Safari, with the extension | No | No | Firefox, Zen, Chrome, Arc |
-| Reading with no signal | Pages opened before, on https | Its own copy of Daf, what I'm reading and what I keep | Its own copy of Daf, what I'm reading and what I keep | Always | No |
-| Notifications for new posts | No | Yes | Yes | No | No |
+| | Web | Mac app | Windows app | Android app | Kindle | Extension |
+|---|---|---|---|---|---|---|
+| Today, review, highlights, stats | Yes | Yes | Yes | Yes | Today's minutes, the review and the nightstand on the Daf tab | No |
+| Reading books and articles | Yes | Yes | Yes | Yes | Books in KOReader | No |
+| Reading time counted | While a reader is open | While a reader is open | While a reader is open | While a reader is open | Every page turn | No |
+| Today's minutes always in sight | No | The menu bar | By the clock | The home-screen widget | The sleep screen | No |
+| Saving links into Daf | The share menu, once installed | The share menu | Save a Link…, `daf://save` | The share sheet | No | The toolbar button, the right-click menu, Alt+Shift+S |
+| Highlighting web pages | No | Safari, with the extension | No | No | No | Firefox, Zen, Chrome, Arc |
+| Reading with no signal | Pages opened before, on https | Its own copy of Daf, what I'm reading and what I keep | Its own copy of Daf, what I'm reading and what I keep | Its own copy of Daf, what I'm reading and what I keep | Always | No |
+| Notifications for new posts | No | Yes | Yes | Yes | No | No |
 
 ## What it connects to
 
