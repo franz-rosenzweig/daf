@@ -128,10 +128,16 @@ public sealed partial class ShellWindow : Window
     /// <summary>Room for Windows' own caption buttons (minimize, maximize, close), which it draws over the row.</summary>
     void FitTitleBar()
     {
-        var scale = Root.XamlRoot?.RasterizationScale ?? Win32.Scale(Handle);
-        if (scale <= 0) return;
-        LeftPad.Width = new GridLength(AppWindow.TitleBar.LeftInset / scale);
-        RightPad.Width = new GridLength(AppWindow.TitleBar.RightInset / scale);
+        // a minimized window has no caption buttons to measure: Windows fails asking (0xE0464645, 0xC000027B)
+        if (!AppWindow.IsVisible || IsFullScreen || AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized }) return;
+        try
+        {
+            var scale = Root.XamlRoot?.RasterizationScale ?? Win32.Scale(Handle);
+            if (scale <= 0) return;
+            LeftPad.Width = new GridLength(AppWindow.TitleBar.LeftInset / scale);
+            RightPad.Width = new GridLength(AppWindow.TitleBar.RightInset / scale);
+        }
+        catch (Exception e) { Log.Write($"title bar: {e.Message}"); }
     }
 
     /// <summary>The window's name, in the title bar and the taskbar: the page's, then Daf, as Windows names a document's window.</summary>
@@ -720,15 +726,19 @@ public sealed partial class ShellWindow : Window
         var state = (sender.Presenter as OverlappedPresenter)?.State;
         if ((e.DidPositionChange || e.DidSizeChange) && state == OverlappedPresenterState.Restored)
             normal = new RectInt32(sender.Position.X, sender.Position.Y, sender.Size.Width, sender.Size.Height);
-        // A turn later, not inside Windows' own change: laying the title bar out while a
-        // minimized window is coming back made Microsoft.UI.Windowing fail fast (0xE0464645).
+        // A turn later, not inside Windows' own change (and FitTitleBar leaves a minimized
+        // window alone): measuring the caption buttons then made Microsoft.UI.Windowing fail fast.
         if (e.DidSizeChange || e.DidPresenterChange)
         {
             var presenter = e.DidPresenterChange;
             DispatcherQueue.TryEnqueue(() =>
             {
-                FitTitleBar();
-                if (presenter) Presented();
+                try
+                {
+                    FitTitleBar();
+                    if (presenter) Presented();
+                }
+                catch (Exception x) { Log.Write($"the window changed: {x.Message}"); }
             });
         }
         if (web != null)
