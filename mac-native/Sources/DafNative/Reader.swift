@@ -41,6 +41,7 @@ final class ReaderModel {
     @ObservationIgnored private var beatTimer: Timer?
     @ObservationIgnored private var sentPct = 0.0
     @ObservationIgnored private var sentAt = Date.distantPast
+    @ObservationIgnored private var placeLater: Task<Void, Never>?
     @ObservationIgnored var restored = false
     /// A highlight to bring into view once laid out (Open at Its Spot).
     @ObservationIgnored var pendingReveal: String?
@@ -160,6 +161,7 @@ final class ReaderModel {
     func stop() {
         beatTimer?.invalidate()
         beatTimer = nil
+        if placeLater != nil { placeLater?.cancel(); placeLater = nil; sentAt = .distantPast; scrolled(lastFraction) }   // the place still waiting goes now
         video?.stop()
         noteTask?.cancel()
         noteTask = nil
@@ -638,7 +640,18 @@ final class ReaderModel {
         lastActive = Date()
         lastFraction = fraction
         let pct = (fraction * 100).rounded()
-        guard restored, pct > sentPct, Date().timeIntervalSince(sentAt) > 4 else { return }
+        guard restored, pct > sentPct else { return }
+        // at most every four seconds; the last of a run of scrolls goes once they're up
+        let wait = 4 - Date().timeIntervalSince(sentAt)
+        if wait > 0 {
+            placeLater?.cancel()
+            placeLater = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64((wait + 0.05) * 1_000_000_000))
+                guard !Task.isCancelled, let self else { return }
+                self.scrolled(self.lastFraction)
+            }
+            return
+        }
         sentPct = pct
         sentAt = Date()
         placeSent.append(Int(pct))

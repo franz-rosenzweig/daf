@@ -345,7 +345,7 @@ enum SelfTest {
         let h = tv.frame.height
         scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, h * 0.6 - scroll.contentView.bounds.height)))
         scroll.reflectScrolledClipView(scroll.contentView)
-        await pause(2.5)
+        await pause(5)                                       // a place goes at most every 4 s, the last one once they're up
         let placed = try? await API.shared.json("/api/docs/\(API.enc(r.id))")
         check((placed?.d("progress") ?? 0) >= 50, "reading on keeps the place in Daf",
               "\(placed?.d("progress") ?? -1)%; restored \(r.restored), last scroll \(String(format: "%.2f", r.lastFraction)), sent \(r.placeSent)")
@@ -671,8 +671,12 @@ enum SelfTest {
 
                     // the settings are the series' own, kept by Daf as the page keeps them
                     mm.set("scale", "width")
-                    await pause(1.5)
-                    let kept = (try? await API.shared.json("/api/manga/prefs"))?.o("series")?.o(mm.seriesID)
+                    var kept: J?
+                    for _ in 0..<12 {          // the save waits 0.7 s, then goes over the network
+                        await pause(0.5)
+                        kept = (try? await API.shared.json("/api/manga/prefs"))?.o("series")?.o(mm.seriesID)
+                        if kept?.s("scale") == "width" { break }
+                    }
                     check(kept?.s("layout") == "single" && kept?.s("scale") == "width", "a series keeps its own reading settings in Daf", "\(kept?.raw ?? [:])")
 
                     // the long strip
