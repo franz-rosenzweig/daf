@@ -720,8 +720,17 @@ public sealed partial class ShellWindow : Window
         var state = (sender.Presenter as OverlappedPresenter)?.State;
         if ((e.DidPositionChange || e.DidSizeChange) && state == OverlappedPresenterState.Restored)
             normal = new RectInt32(sender.Position.X, sender.Position.Y, sender.Size.Width, sender.Size.Height);
-        if (e.DidSizeChange) FitTitleBar();
-        if (e.DidPresenterChange) Presented();
+        // A turn later, not inside Windows' own change: laying the title bar out while a
+        // minimized window is coming back made Microsoft.UI.Windowing fail fast (0xE0464645).
+        if (e.DidSizeChange || e.DidPresenterChange)
+        {
+            var presenter = e.DidPresenterChange;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                FitTitleBar();
+                if (presenter) Presented();
+            });
+        }
         if (web != null)
         {
             var shown = state != OverlappedPresenterState.Minimized && sender.IsVisible;
