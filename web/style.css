@@ -1494,3 +1494,19 @@ html.focus.fpanel .ptabs .pclose{display:none}
 .rv.titled .rtitle{opacity:1}
 .rleft{position:sticky;bottom:0;text-align:center;font-size:12.5px;color:var(--fg-3);padding:22px 0 12px;margin-top:-40px;background:linear-gradient(to bottom,transparent,var(--bg) 55%);pointer-events:none;font-variant-numeric:tabular-nums}
 @media (max-width:600px){ .rtitle{display:none} }
+/* ---------- a book, the Apple Books way (book.js): one column for the pages (two pages side by side
+   on a wide screen, by foliate), the contents and the side panel as sheets over them at every size,
+   a quiet bar with the title in its middle, and no line over the footer. ---------- */
+.rv.ebook .rvgrid{grid-template-columns:minmax(0,1fr)!important}
+.rv.ebook .rvgrid > .docwrap{grid-column:1}
+.rv.ebook .btoc,.rv.ebook .rpanel{display:none}
+body.btocsheet .rv.ebook .btoc{display:flex;position:fixed;inset:56px auto 0 0;width:min(360px,88vw);z-index:36;background:var(--bg);box-shadow:var(--shadow);max-height:none;animation:sheetl .18s ease-out}
+body.bpanelsheet .rv.ebook .rpanel{display:block;position:fixed;inset:56px 0 0 auto;width:min(400px,92vw);z-index:36;box-shadow:var(--shadow);max-height:none;animation:sheetr .18s ease-out}
+.bscrim{display:none}
+body.btocsheet .bscrim,body.bpanelsheet .bscrim{display:block;position:fixed;inset:56px 0 0 0;z-index:35;background:rgba(10,12,16,.14)}
+@keyframes sheetl{from{transform:translateX(-100%)}}
+@keyframes sheetr{from{transform:translateX(100%)}}
+.rv.ebook #btop{gap:2px}
+.rv.ebook .btitle-top{flex:1;min-width:0;text-align:center;max-width:none;padding:0 12px}
+.rv.ebook .bookfoot{border-top:0;justify-content:center}
+.rv.ebook .bookfoot .spacer{flex:0 0 12px}

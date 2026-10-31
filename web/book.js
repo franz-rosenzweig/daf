@@ -52,17 +52,17 @@ function bookCSS(){
     .daf-speaking { background: ${v('--speak')} !important; border-radius: 4px; box-shadow: 0 0 0 4px ${v('--speak')}; }
     ::highlight(daf-speaking) { background-color: ${v('--speak-line')}; }
     aside[epub|type~="footnote"], aside[epub|type~="endnote"], aside[epub|type~="rearnote"] { display: none; }
-    ${(t.flow || 'scrolled') === 'scrolled' ? 'body { padding-bottom: 72px !important; }   /* room under the last line for Next */' : ''}
+    ${(t.flow || 'paginated') === 'scrolled' ? 'body { padding-bottom: 72px !important; }   /* room under the last line for Next */' : ''}
     @namespace epub "http://www.idpf.org/2007/ops";
   `];
 }
 function applyBookType(){
   const v = B.view; if (!v || !v.renderer) return;
   const t = C.typeFor ? C.typeFor(B.id) : store.get('type', {});
-  const flow = t.flow || 'scrolled';   // like the feeds; Aa → Layout → Pages for page turns
+  const flow = t.flow || 'paginated';  // pages, as Apple Books has them; Aa → Scroll for one long column
   v.renderer.setAttribute('flow', flow);
   v.renderer.setAttribute('max-inline-size', Math.round((t.measure || 38) * 16 * ((t.size || 20) / 20)) + 'px');
-  v.renderer.setAttribute('max-column-count', flow === 'paginated' && window.innerWidth >= 1280 && !B.panelOpen ? '2' : '1');
+  v.renderer.setAttribute('max-column-count', flow === 'paginated' && window.innerWidth >= 1180 && window.innerWidth > window.innerHeight ? '2' : '1');   // two pages, as a book opens
   v.renderer.setAttribute('gap', '6%');
   v.renderer.setAttribute('margin', window.innerWidth < 760 ? '24px' : '40px');
   v.renderer.setStyles?.(bookCSS());
@@ -78,9 +78,9 @@ async function openBook(id, at){
   wake(true);
   document.body.dataset.view = 'ebook';
   $('#main').innerHTML = '<div class="progress"><i id="rprog"></i></div><div class="rv ebook"><div class="top" id="btop"><a class="ib" href="#books" aria-label="Back">' + I.back + '</a></div>' +
-    '<div class="rvgrid' + (B.tocOpen && window.innerWidth > 1000 ? '' : ' notoc') + (B.panelOpen && window.innerWidth > 1000 ? ' withpanel' : '') + '" id="bgrid"><nav class="toc btoc" id="btoc" aria-label="Contents"></nav>' +
+    '<div class="rvgrid notoc" id="bgrid"><nav class="toc btoc" id="btoc" aria-label="Contents"></nav>' +
     '<div class="docwrap bookwrap"><div id="bnotice"></div><div class="bookstage" id="bstage"><div class="bookload mute">Opening the book…</div></div><div class="bookfoot" id="bfoot"></div></div>' +
-    '<aside class="rpanel" id="bpanel"></aside></div></div>';
+    '<aside class="rpanel" id="bpanel"></aside></div><div class="bscrim" data-bk="closesheets"></div></div>';
   // The file starts coming at once, beside the book's details: from the device when it's been
   // opened before (sw.js), else from Daf.
   const fileUrl = '/api/ebooks/' + encodeURIComponent(id) + '/file';
@@ -475,7 +475,7 @@ function drawNextChapter(l){
   b.hidden = false;
 }
 // (in focus mode, the bar comes and goes instead: focus.js)
-function toggleChrome(){ if (C.Focus && C.Focus.on()) { C.Focus.bar(); return; } B.chrome = !B.chrome; document.body.classList.toggle('bookbare', !B.chrome); }
+function toggleChrome(){ if (C.Focus && C.Focus.on()) { C.Focus.bar(); return; } if (B.chrome) { B.chrome = false; document.body.classList.add('bookbare'); } else showChrome(); }
 
 // Pages for page goals: a page counts once it has been on screen for five seconds, the way
 // KOReader counts the Kindle's. The printed page when the book has one, else foliate's location.
@@ -487,6 +487,7 @@ function notePage(l){
 }
 function onRelocate(e){
   const l = e.detail; B.loc = l; notePage(l); drawNextChapter(l);
+  if (Date.now() - B.opened > 2500) hideChrome();
   followBar();
   if (B.forget && Date.now() - (B.forgetAt || 0) > 2000) B.forget = false;   // reading on after Forget: the place counts again
   const pct = Math.round((l.fraction || 0) * 100);
@@ -515,7 +516,7 @@ function onRelocate(e){
   const on = $('#btoc .on'); if (on && !B.searching) { const r = on.getBoundingClientRect(), t = $('#btoc').getBoundingClientRect(); if (r.top < t.top + 40 || r.bottom > t.bottom - 20) on.scrollIntoView({ block: 'center' }); }
   const mk = $('[data-bk="bookmark"]'); if (mk) { const m = markHere(); mk.classList.toggle('on', !!m); mk.innerHTML = ICON.mark(!!m); mk.title = m ? 'Remove the bookmark (b)' : 'Bookmark this page (b)'; }
   clearTimeout(B.saveT); B.saveT = setTimeout(() => savePosition(), 1500);
-  if (B.panel === 'info' && B.panelOpen) drawPanelInfoProgress();
+  if (B.panel === 'info' && panelShown()) drawPanelInfoProgress();
 }
 function savePosition(now){
   const l = B.loc, id = B.id; if (!l || !l.cfi || !id || B.forget) return;
@@ -559,19 +560,31 @@ function drawMarks(){
 }
 
 /* ---------- top bar, contents, panel ---------- */
+// The bar, as Apple Books has it: back, the title, and Contents, Aa, Search and the bookmark; Listen, the
+// notebook, Ask and focus mode are in the … menu. It fades once you turn a page (chrome below).
 function drawTop(){
-  const d = B.d;
+  const d = B.d, tip = a => C.Keys.tip('book', a);
   $('#btop').innerHTML = '<a class="ib" href="#book/' + encodeURIComponent(d.id) + '" aria-label="Back to the book">' + I.back + '</a>' +
-    '<button class="ib' + (B.tocOpen && window.innerWidth > 1000 ? ' on' : '') + '" data-bk="toc" title="Contents and search' + C.Keys.tip('book', 'toc') + '" aria-label="Contents">' + ICON.toc + '</button>' +
-    '<button class="ib aa" data-bk="aa" aria-label="Typography and theme">Aa</button>' +
-
-    '<span class="btitle-top mute">' + esc(String(d.title || '').split(/:\s/)[0]) + '</span><span class="spacer"></span>' +
-    '<button class="ib" data-bk="bookmark" title="Bookmark this page' + C.Keys.tip('book', 'bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' +
-    '<button class="btn sm" data-bk="listen" title="Read aloud from here">Listen</button>' +
-    '<button class="ib" data-bk="more" title="More" aria-label="More">' + ICON.more + '</button>' +
-    (C.Focus ? C.Focus.button('book') : '') +
-    '<button class="ib' + (B.panelOpen && window.innerWidth > 1000 ? ' on' : '') + '" data-bk="panel" aria-label="Show or hide the side panel">' + ICON.panel + '</button>';
+    '<span class="btitle-top mute"' + (isRtlText(d.title) ? ' dir="rtl"' : '') + '>' + esc(String(d.title || '').split(/:\s/)[0]) + '</span>' +
+    '<button class="ib" data-bk="toc" title="Contents' + tip('toc') + '" aria-label="Contents">' + ICON.toc + '</button>' +
+    '<button class="ib aa" data-bk="aa" title="Themes and settings" aria-label="Themes and settings">Aa</button>' +
+    '<button class="ib" data-bk="search" title="Search the book' + tip('search') + '" aria-label="Search the book">' + ICON.search + '</button>' +
+    '<button class="ib" data-bk="bookmark" title="Bookmark this page' + tip('bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' +
+    '<button class="ib" data-bk="more" title="More" aria-label="More">' + ICON.more + '</button>';
 }
+// The bar and the footer: there when the book opens, while a menu, a sheet or Listen is up, and when the
+// pointer comes to the top or the bottom; gone once you turn a page. A tap in the middle of the page on
+// a touch screen brings them or puts them away.
+function showChrome(){ B.chrome = true; document.body.classList.remove('bookbare'); }
+function hideChrome(){
+  if ((C.Focus && C.Focus.on()) || !B.view) return;
+  if (!$('#pop').hidden || document.body.classList.contains('btocsheet') || panelShown() || H.visible() || (B.tts && B.tts.on) || $('#bjump')) return;
+  B.chrome = false; document.body.classList.add('bookbare');
+}
+document.addEventListener('mousemove', e => {
+  if (C.S.route[0] !== 'ebook' || B.chrome) return;
+  if (e.clientY < 64 || e.clientY > window.innerHeight - 52) showChrome();
+}, { passive: true });
 function tocHTML(items, depth){
   return (items || []).map(it => '<a class="tocit d' + Math.min(depth, 3) + '" href="#" data-href="' + esc(it.href || '') + '"' + (isRtlText(it.label) ? ' dir="rtl"' : '') + '>' + esc((it.label || '').trim() || '—') + '</a>' + (it.subitems ? tocHTML(it.subitems, depth + 1) : '')).join('');
 }
@@ -716,7 +729,7 @@ async function highlightSel(withNote, quiet){
     else {
       const rr = (() => { try { return rectFor(s.doc, range); } catch(e){ return s.rect; } })();
       if (!quiet) H.show(H.hlBar(h), rr, { h, cfi });
-      if (B.panelOpen && B.panel === 'notebook') drawPanel();
+      if (panelShown() && B.panel === 'notebook') drawPanel();
     }
     const tab = $('[data-bpt="notebook"] .c'); if (tab) tab.textContent = allHighlights().length;
     return h;
@@ -1051,12 +1064,13 @@ C.BookInk = {
     return null;
   },
 };
-function openPanel(){
-  B.panelOpen = true; store.set('bookPanel', true);
-  const g = $('#bgrid'); if (g) g.classList.add('withpanel');
-  if (window.innerWidth <= 1000) document.body.classList.add('bpanelsheet');
-  drawPanel(); drawTop(); applyBookType();
+function openPanel(tab){
+  if (tab) B.panel = tab;
+  document.body.classList.remove('btocsheet'); document.body.classList.add('bpanelsheet');
+  showChrome(); drawPanel();
 }
+const panelShown = () => document.body.classList.contains('bpanelsheet');
+function openToc(){ document.body.classList.remove('bpanelsheet'); document.body.classList.add('btocsheet'); showChrome(); }
 function contextText(){
   try { return (B.loc && B.loc.range ? B.loc.range.toString() : '').slice(0, 6000); } catch(e){ return ''; }
 }
@@ -1080,7 +1094,7 @@ const ACT = {
   ask: ctx => { H.hide(); ask('What does this passage mean here?', ctx.h ? ctx.h.text : ctx.text); },
   rm: ctx => { H.hide(); return removeHighlight(ctx.h.id); },
   notebook: ctx => { H.hide(); B.panel = 'notebook'; openPanel(); setTimeout(() => H.flash($('.hrow[data-h="' + CSS.escape(ctx.h.id) + '"]')), 60); },
-  changed: h => { const cfi = h.pos && h.pos.cfi || h.cfi; if (cfi && B.view) B.view.addAnnotation({ value: cfi }).catch(() => {}); if (B.panel === 'notebook' && B.panelOpen) drawPanel(); },
+  changed: h => { const cfi = h.pos && h.pos.cfi || h.cfi; if (cfi && B.view) B.view.addAnnotation({ value: cfi }).catch(() => {}); if (B.panel === 'notebook' && panelShown()) drawPanel(); },
   deselect: () => { B.sel && B.sel.doc.getSelection()?.removeAllRanges(); },
   meta: () => ({ title: B.d && B.d.title, author: B.d && B.d.author }),
 };
@@ -1090,6 +1104,11 @@ window.addEventListener('daf-hl-changed', e => { if (C.S.route[0] === 'ebook' &&
 function openMore(anchor){
   const p = $('#pop'), r = anchor.getBoundingClientRect();
   p.innerHTML = '<div class="menu">' +
+    '<button data-bm="listen">' + (B.tts.on ? 'Stop listening' : 'Listen from here') + '<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'listen') : 'l') + '</span></button>' +
+    '<button data-bm="notebook">Notebook<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'panel') : ']') + '</span></button>' +
+    '<button data-bm="info">About this book</button>' +
+    '<button data-bm="ask">Ask about this book</button>' +
+    (C.Focus ? '<button data-bm="focus">' + (C.Focus.on() ? 'Leave focus mode' : 'Focus mode') + '<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'focus') : 'f') + '</span></button>' : '') + '<hr>' +
     '<button data-bm="start">Go to the beginning</button>' +
     '<button data-bm="kindle"' + (B.d.kindle ? '' : ' disabled') + '>Go to the Kindle’s page</button>' +
     '<button data-bm="mark">' + (markHere() ? 'Remove the bookmark' : 'Bookmark this page') + '<span class="kbd">b</span></button>' +
@@ -1125,7 +1144,7 @@ function onKey(e){
   else if (is('toc')) click('toc');
   else if (is('listen')) click('listen');
   else if (k === '?') showKeys();
-  else if (is('search')) { e.preventDefault(); if (!B.tocOpen) click('toc'); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
+  else if (is('search')) { e.preventDefault(); openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
   else if (is('panel')) click('panel');
   else if (is('focus') && C.Focus) C.Focus.toggle();
   else if (k === 'Escape' && C.Focus && C.Focus.escape()) {}
@@ -1144,13 +1163,11 @@ document.addEventListener('click', async e => {
   if (bk) {
     const a = bk.dataset.bk;
     if (a === 'nextch') { bk.hidden = true; B.view.next(); return; }
-    if (a === 'toc') {
-      if (window.innerWidth <= 1000) { document.body.classList.toggle('btocsheet'); return; }
-      B.tocOpen = !B.tocOpen; store.set('bookToc', B.tocOpen); $('#bgrid').classList.toggle('notoc', !B.tocOpen); drawTop(); applyBookType();
-    } else if (a === 'panel') {
-      if (window.innerWidth <= 1000) { document.body.classList.toggle('bpanelsheet'); if (document.body.classList.contains('bpanelsheet')) drawPanel(); return; }
-      B.panelOpen = !B.panelOpen; store.set('bookPanel', B.panelOpen); $('#bgrid').classList.toggle('withpanel', B.panelOpen); drawTop(); applyBookType(); if (B.panelOpen) drawPanel();
-    } else if (a === 'aa') { C.openAa && C.openAa(bk, { book: true }); }
+    if (a === 'toc') { if (document.body.classList.contains('btocsheet')) document.body.classList.remove('btocsheet'); else openToc(); }
+    else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
+    else if (a === 'panel') { if (panelShown()) document.body.classList.remove('bpanelsheet'); else openPanel(); }
+    else if (a === 'closesheets') document.body.classList.remove('btocsheet', 'bpanelsheet');
+    else if (a === 'aa') { showChrome(); C.openAa && C.openAa(bk, { book: true }); }
     else if (a === 'more') openMore(bk);
     else if (a === 'bookmark') toggleMark();
     else if (a === 'kindle' && B.d.kindle) { $('#bnotice').innerHTML = ''; await B.view.goToFraction(B.d.kindle.fraction); toast('At the Kindle’s page, about ' + Math.round(B.d.kindle.fraction * 100) + '% in'); }
@@ -1187,7 +1204,10 @@ document.addEventListener('click', async e => {
   if (bm) {
     $('#pop').hidden = true;
     const a = bm.dataset.bm;
-    if (a === 'start') await B.view.goToTextStart().catch(() => {});
+    if (a === 'listen') { if (B.tts.on) stopListen(); else startListen(); }
+    else if (a === 'notebook' || a === 'info' || a === 'ask') openPanel(a);
+    else if (a === 'focus' && C.Focus) C.Focus.toggle();
+    else if (a === 'start') await B.view.goToTextStart().catch(() => {});
     else if (a === 'kindle' && B.d.kindle) await B.view.goToFraction(B.d.kindle.fraction);
     else if (a === 'mark') toggleMark();
     else if (a === 'book') location.hash = '#book/' + encodeURIComponent(B.d.id);
