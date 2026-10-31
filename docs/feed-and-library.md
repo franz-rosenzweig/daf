@@ -43,7 +43,7 @@ Library documents with text get a two- or three-sentence summary, which shows in
 
 ## Adding things
 
-The **+** next to "Library" in the sidebar opens **Add to Daf**. Paste a link and press **Save**, and it goes into the Library, where Daf reads the page. The same dialog can follow the site in the Feed, in the folder you pick, with **Follow**.
+The **+** at the top of the sidebar opens **Add to Daf**. Paste a link and press **Save**, and it goes into the Library, where Daf reads the page. The same dialog can follow the site in the Feed, in the folder you pick, with **Follow**.
 
 ![The Add to Daf dialog](images/add.png)
 *Add to Daf: a link, or a book or a PDF dropped on it.*

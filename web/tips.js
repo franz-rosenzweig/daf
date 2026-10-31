@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-10-30-focused', date: 'Oct 30', title: 'Daf, focused', text: 'Reading takes the whole screen, the bars get out of the way, books open as two pages, and the sidebar can be full, mini or hidden (⌘\\).', go: '#prefs/sidebar' },
   { id: '2026-10-28-episodes', date: 'Oct 28', title: 'Podcast episodes in Daf', text: 'Play an episode with its transcript under it, clip 30 seconds, and pick up where AntennaPod left off.', go: '#podcasts' },
   { id: '2026-10-26-anilist', date: 'Oct 26', title: 'AniList from Daf', text: 'Connect AniList in Preferences and your manga progress goes there every hour, volumes turned into chapters.', go: '#prefs/anilist' },
   { id: '2026-10-25-vault-text', date: 'Oct 25', title: 'The whole text in the vault', text: 'Highlight an article, video or podcast and its note in Obsidian gets the full text or transcript, your highlights marked in it.', go: '#highlights' },

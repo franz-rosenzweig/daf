@@ -1444,6 +1444,11 @@ const TYPEFACES = [['serif', 'Source Serif', "'Source Serif 4'"], ['literata', '
 // justification. The theme stays the app's.
 const ownKey = () => { const id = R.aaBook && C.curBook && C.curBook(); return id ? 'bookType.' + id : null; };
 C.typeFor = id => { const g = store.get('type', {}), o = id ? store.get('bookType.' + id, null) : null; return o ? Object.assign({}, g, o, { theme: g.theme }) : g; };
+// Themes & Settings (the Aa button, for articles and books): the text's size, Pages or Scroll for a book,
+// six looks to tap (three for the day, three for the night, from Daf's themes), when light and dark
+// apply, and below them the typeface and the finer settings. A popover under the button; a sheet from
+// the bottom on a phone.
+const LOOKS = [['daf', 'light', 'Daf'], ['paper', 'light', 'Paper'], ['eink', 'light', 'E-ink'], ['paper', 'dark', 'Dusk'], ['eink', 'dark', 'Night'], ['oled', 'dark', 'Black']];
 function openAa(anchor, opts){
   const rv = $('#main .rv'); if (rv) rv.classList.remove('chromehide');
   opts = opts || (C.S.route[0] === 'ebook' ? { book: true } : {});
@@ -1453,21 +1458,37 @@ function openAa(anchor, opts){
   const seg = (k, list, cur) => '<div class="seg">' + list.map(o => '<button class="' + ((cur || list[0][0]) === o[0] ? 'on' : '') + '" data-type="' + k + '" data-v="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
   const step = (k, label, val, d, fmt) => '<div class="stepper"><span>' + label + '</span><div><button class="btn sm" data-type="' + k + '" data-v="-' + d + '" aria-label="Less">−</button><span class="num">' + fmt(val) + '</span><button class="btn sm" data-type="' + k + '" data-v="' + d + '" aria-label="More">+</button></div></div>';
   const faces = (C.Themes ? C.Themes.faces() : TYPEFACES).concat(opts.book ? [['book', 'The book’s own', 'inherit', 'This book']] : []);
-  const cur = t.font || 'serif';
+  const cur = t.font || 'serif', curFace = faces.find(f => f[0] === cur) || faces[0];
   let lastGroup = null;
   const faceBtn = f => (f[3] && f[3] !== lastGroup ? '<span class="facegrp">' + esc(lastGroup = f[3]) + '</span>' : '') +
     '<button class="face' + (cur === f[0] ? ' on' : '') + '" data-type="font" data-v="' + esc(f[0]) + '" style="font-family:' + f[2].replace(/"/g, '') + ',serif">' + esc(f[1]) + '<i></i></button>';
-  const TH = C.Themes, th = TH ? TH.get() : { mode: 'system' }, fam = TH ? (TH.FAMILIES.find(f => f.id === (TH.isDark() ? th.dark : th.light)) || {}).name : '';
-  p.innerHTML = '<span class="lbl">Theme · ' + esc(fam || '') + ' <a class="aamore" href="#prefs/appearance">More themes</a></span>' + seg('thmode', [['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], th.mode) +
-    '<span class="lbl">Typeface</span><div class="faces">' + faces.map(faceBtn).join('') + '</div>' +
-    step('size', 'Font size', t.size || 20, 1, v => v + 'px') +
-    step('spacing', 'Line spacing', t.spacing || 1.6, 1, v => v.toFixed(1)) +
-    step('measure', 'Line width', t.measure || 38, 3, v => v <= 32 ? 'Narrow' : v >= 44 ? 'Wide' : 'Medium') +
-    (opts.book ? '<span class="lbl">Layout</span>' + seg('flow', [['scrolled', 'Scroll'], ['paginated', 'Pages']], t.flow || 'scrolled') +
-      '<label class="aaline"><input type="checkbox" data-type="justify"' + (t.justify ? ' checked' : '') + '> Justify the text</label>' +
-      '<label class="aaline"><input type="checkbox" data-type="own"' + (own ? ' checked' : '') + '> Just for this book</label>' : '');
-  p.hidden = false; p.style.left = Math.max(8, Math.min(window.innerWidth - 300, r.left)) + 'px'; p.style.top = (r.bottom + 8) + 'px';
+  const TH = C.Themes, th = TH ? TH.get() : { mode: 'system' }, dark = TH ? TH.isDark() : false;
+  const look = l => { const fam = TH && TH.FAMILIES.find(f => f.id === l[0]); const c = fam ? fam[l[1]] : { bg: '#fff', fg: '#222' };
+    const on = l[1] === 'dark' ? dark && th.dark === l[0] : !dark && th.light === l[0];
+    return '<button class="look' + (on ? ' on' : '') + '" data-type="look" data-v="' + l[0] + ':' + l[1] + '" style="background:' + c.bg + ';color:' + (c.read || c.fg) + '" aria-pressed="' + on + '"><b>Aa</b><span>' + l[2] + '</span></button>'; };
+  p.innerHTML = '<div class="aahead"><b>Themes &amp; Settings</b><button class="ib" data-aaclose aria-label="Close">' + ICON.close + '</button></div>' +
+    '<div class="aarow"><div class="seg aasize"><button data-type="size" data-v="-2" aria-label="Smaller text">A</button><button data-type="size" data-v="2" aria-label="Larger text">A</button></div>' +
+      (opts.book ? seg('flow', [['paginated', 'Pages'], ['scrolled', 'Scroll']], t.flow || 'paginated') : '') + '</div>' +
+    '<div class="looks">' + LOOKS.map(look).join('') + '</div>' +
+    seg('thmode', [['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], th.mode) +
+    '<details class="aamore2"' + (R.aaOpen === 'font' ? ' open' : '') + ' data-aasec="font"><summary><span>Font</span><span class="aaval" style="font-family:' + curFace[2].replace(/"/g, '') + ',serif">' + esc(curFace[1]) + '</span></summary><div class="faces">' + faces.map(faceBtn).join('') + '</div></details>' +
+    '<details class="aamore2"' + (R.aaOpen === 'fine' ? ' open' : '') + ' data-aasec="fine"><summary><span>Spacing, margins, justify</span></summary>' +
+      step('size', 'Font size', t.size || 20, 1, v => v + 'px') +
+      step('spacing', 'Line spacing', t.spacing || 1.6, 1, v => v.toFixed(1)) +
+      step('measure', 'Line width', t.measure || 38, 3, v => v <= 32 ? 'Narrow' : v >= 44 ? 'Wide' : 'Medium') +
+      (opts.book ? '<label class="aaline"><input type="checkbox" data-type="justify"' + (t.justify ? ' checked' : '') + '> Justify the text</label>' +
+        '<label class="aaline"><input type="checkbox" data-type="own"' + (own ? ' checked' : '') + '> Just for this book</label>' : '') + '</details>' +
+    '<a class="aamore" href="#prefs/appearance">All themes</a>';
+  p.classList.add('aapop');
+  p.hidden = false;
+  if (matchMedia('(max-width:700px)').matches) { p.style.left = ''; p.style.top = ''; p.classList.add('aasheet'); }
+  else { p.classList.remove('aasheet'); p.style.left = Math.max(8, Math.min(window.innerWidth - 330, r.left)) + 'px'; p.style.top = (r.bottom + 8) + 'px'; }
 }
+// (which of its two sections was open, so a tap inside one keeps it open as the panel redraws)
+document.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.aasec) R.aaOpen = d.open ? d.dataset.aasec : (R.aaOpen === d.dataset.aasec ? null : R.aaOpen); }, true);
+document.addEventListener('click', e => { if (e.target.closest('[data-aaclose]')) { $('#pop').hidden = true; } });
+// The pop is everyone's: an Aa look stays only while it's the Aa panel.
+new MutationObserver(() => { const p = $('#pop'); if (p.hidden) p.classList.remove('aapop', 'aasheet'); }).observe(document.getElementById('pop'), { attributes: true, attributeFilter: ['hidden'] });
 
 /* ---------- ⌘K ---------- */
 let palItems = [], palIdx = 0, palT = null;
@@ -1706,6 +1727,12 @@ document.addEventListener('click', e => {
   if (ty) {
     const k = ty.dataset.type, v = ty.dataset.v, ok = ownKey();
     if (k === 'thmode' && C.Themes) { C.Themes.set({ mode: v }); openAa($('[data-ract="aa"]') || $('[data-bk="aa"]') || ty, { book: R.aaBook }); return; }
+    if (k === 'look' && C.Themes) {
+      const [id, when] = v.split(':'), TH = C.Themes;
+      if (when === 'dark') TH.set(TH.isDark() ? { dark: id } : { dark: id, mode: 'dark' });
+      else TH.set(TH.isDark() ? { light: id, mode: 'light' } : { light: id });
+      openAa($('[data-ract="aa"]') || $('[data-bk="aa"]') || ty, { book: R.aaBook }); return;
+    }
     if (k === 'own' && ok) {
       if (ty.checked) store.set(ok, Object.assign({}, store.get('type', {}), { theme: undefined }));
       else { try { localStorage.removeItem('daf.' + ok); } catch(e){} }

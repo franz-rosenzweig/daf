@@ -2,7 +2,7 @@
 
 # Recovery
 
-**Recovery**, under Library in the sidebar, is a page for the Big Book of Alcoholics Anonymous: the readings people come back to, the book itself by its chapters, and prayers. It's built from your own copy in Calibre, so everything on it opens in Daf's reader, and the time counts like any other book.
+**Recovery**, pinned in the sidebar, is a page for the Big Book of Alcoholics Anonymous: the readings people come back to, the book itself by its chapters, and prayers. It's built from your own copy in Calibre, so everything on it opens in Daf's reader, and the time counts like any other book.
 
 It's private, the same as the books on it: none of it shows up in the daily review, the Signal messages, the nightstand or on the Kindle.
 

@@ -6,7 +6,7 @@ Paper books are the one kind of reading Daf can't see by itself, so this page co
 
 ## Logging minutes
 
-Press **Log paper** at the top of Today, or in the sidebar. The dialog asks for:
+Press **Log paper** at the top of Today, or find it with ⌘K. The dialog asks for:
 
 - **Minutes**, with quick buttons for 15, 30, 45, 60 and 90;
 - **Which day**: **Today**, **Yesterday**, or **Shabbat** with its date;

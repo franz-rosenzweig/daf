@@ -11,6 +11,18 @@
 
 Under the title is the date, then "Year 30, day N", then the streak: "5 days in a row reading", or "N days in a row at the hour" once the hour starts happening. The sidebar shows the same numbers next to **Today**, like "45/60", so you see them from every page.
 
+## The sidebar
+
+The sidebar has six places: **Today**, **Review**, **Library**, **Books**, **Feed** and **Highlights**. The little arrow next to Library opens its kinds (Articles, Videos, Tweets, PDFs and my saved views), and the one next to Feed opens its folders. Under them is **Pinned**, which I choose in **Preferences → Sidebar**: Podcasts, Manga, Torah, Recovery and Shortlist to start with, and Paper pages and Sources if I want them. At the bottom are **Search** (⌘K), **Stats** and **Preferences**. Anything that isn't pinned is still one ⌘K away.
+
+It comes in three sizes, and each device remembers its own:
+
+- **Full**, with the names. The button at its top makes it mini.
+- **Mini**, a strip of icons. The buttons at its bottom make it full again or hide it.
+- **Hidden.** The button at the top left of the page, or a swipe in from the left edge on a touch screen, brings the mini one over the page for a moment.
+
+⌘\\ goes round the three. When something is open to read, the sidebar is always hidden, the way Readwise does it, and the same swipe or ⌘\\ brings it.
+
 At the top right, the round arrow syncs every source now instead of waiting for the next five-minute pass, and **Log paper** opens the dialog for minutes read in a paper book (see [Paper books](paper-books.md)).
 
 A few notices show up above the cards only when they matter:

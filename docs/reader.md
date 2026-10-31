@@ -2,7 +2,7 @@
 
 # The reader
 
-Daf's reading view is where books, articles and PDFs open, and it works the same way for all three: the text in the middle, contents on the left, and a side panel on the right with **Info**, **Notebook** and **Ask**. This page covers books first, then what's different for articles and PDFs, then Listen, looking words up and the keys.
+Daf's reading view is where books, articles and PDFs open. Whatever I'm reading takes the whole window: the sidebar goes away (a swipe from the left edge or ⌘\\ brings it back for a moment), and the bar on top is short and gets out of the way once I start reading. The contents and a side panel with **Info**, **Notebook** and **Ask** are there when I want them. This page covers books first, then what's different for articles and PDFs, then Listen, looking words up and the keys.
 
 ![A book in Daf with highlights and the Notebook](images/reader.png)
 *A book in Daf, with the Notebook open on the right.*
@@ -13,18 +13,23 @@ Every book in my Calibre library with an EPUB, KEPUB, AZW3, MOBI, FB2 or CBZ fil
 
 Your place is kept per book on the server, so the phone and the desk agree, and the newest place wins when you open it ("Picked up at 45%"). If the Kindle is further along, Daf says "On the Kindle you're at page 212 of 480", with **Go there** and **Stay here**.
 
-The top bar has, from the left: back, **Contents and search** (t), **Aa**, the bookmark ribbon (b), **Listen**, the **…** menu and the side panel. The footer has the chapter, the minutes left in it and in the book, the printed page when the EPUB knows it, and the percent. Tap the percent to jump anywhere.
+A book reads the way it does in Apple Books. On a wide screen it opens as two pages side by side, like a real book, and on a phone as one. The bar has back and the title, then **Contents** (t), **Aa**, **Search** (/), the bookmark ribbon (b) and the **…** menu, and it fades as soon as I turn a page. Moving the pointer to the top or the bottom brings it back. The contents and the side panel slide in over the pages and go again with a tap outside them. The footer has the minutes left in the chapter and in the book, the printed page when the EPUB knows it, and the percent. Tap the percent to jump anywhere.
+
+On a phone the page is all there is: no bar, just the minutes left in the chapter at the bottom. One tap in the middle brings ✕ with the title and the author at the top, and at the bottom a slider to go anywhere in the book and a round button. That button opens one menu with **Contents**, **Notebook**, **Search Book**, **Themes & Settings**, **Listen** and **Ask about this book**, and under them the bookmark, focus mode and the full **…** menu. Tap the middle again and it's just the page.
 
 Footnotes open in a small popover next to the link, so you never lose your place. The screen stays awake while a book is open. Near the end of a book in a series, Daf offers the next one (**Start it**), and at the very end it asks "The end. Mark it read on Hardcover?" with **Finished** and **Not now**.
 
-The **…** menu has **Go to the beginning**, **Go to the Kindle's page**, **Bookmark this page**, **Book page, notes and nightstand**, **Export highlights (Markdown)**, **Download the file**, **Auto highlight**, **Keyboard shortcuts** and **Forget my place in Daf**. In the Mac and Android apps it also has **Keep on this device**.
+The **…** menu has **Listen from here** (l), the **Notebook** (]), **About this book**, **Ask about this book** and **Focus mode** (f), then **Go to the beginning**, **Go to the Kindle's page**, **Bookmark this page**, **Book page, notes and nightstand**, **Export highlights (Markdown)**, **Download the file**, **Auto highlight**, **Keyboard shortcuts** and **Forget my place in Daf**. In the Mac and Android apps it also has **Keep on this device**.
 
 ## How the page looks
 
-**Aa** sets the look, and it's the same menu for books and articles:
+**Aa** opens **Themes & Settings**, the same for books and articles. On a phone it comes up from the bottom of the screen.
 
-- **Theme:** Auto, Light or Dark, and **More themes**, which opens Preferences → Appearance.
-- **Typeface:** 24 faces in groups, each shown in itself:
+- **The two A's** make the text smaller or bigger, and a book has **Pages** or **Scroll** beside them. Pages is how a book opens unless I've picked Scroll on that device.
+- **Six looks to tap:** Daf, Paper and E-ink for the day, Dusk, Night and Black for the night. A day look sets the theme Daf uses in light mode and a night look the one for dark mode, so with **Auto** the page still follows the system. **All themes** opens Preferences → Appearance for the other twelve.
+- **Auto, Light or Dark:** when light and dark apply.
+- **Font** opens the typefaces:
+  24 faces in groups, each shown in itself:
   - **Serif:** Source Serif, Literata (the free cousin of Bookerly, made for Google's e-reader), Charis (Charter), Merriweather, Lora, EB Garamond, Crimson Pro, Newsreader, Spectral, Libre Baskerville, Alegreya, Vollkorn, IBM Plex Serif and Bitter.
   - **Sans:** Figtree, Inter and Source Sans.
   - **Easier to read:** Atkinson Hyperlegible, Lexend and OpenDyslexic.
@@ -33,8 +38,7 @@ The **…** menu has **Go to the beginning**, **Go to the Kindle's page**, **Boo
   - **For books:** the book's own.
 
   They all come from Daf itself, so they work offline too.
-- **Font size**, **Line spacing** and **Line width** (Narrow, Medium, Wide).
-- For books: **Layout**, Scroll or Pages (two columns on a wide screen with the panel closed), and **Justify the text**.
+- **Spacing, margins, justify:** **Font size**, **Line spacing**, **Line width** (Narrow, Medium, Wide), and for books **Justify the text**.
 
 **Just for this book** keeps a book's own typeface, size and layout, while the theme stays the same everywhere.
 
@@ -64,9 +68,11 @@ The choice is kept on the server, so every device follows it.
 
 ## Articles
 
-Articles from the Feed and the Library open in the same view. Click a picture to highlight it: it gets a frame in the color, and it shows as the picture in the Notebook, Highlights, the review and the vault. The top bar adds the previous and next item of the list you came from (Shift K and Shift J), **Shortlist** (f), **Later** (l) or **Save to Library** for a Feed item, **Done** (e), and **Open original**. Hebrew titles and paragraphs read right to left on their own.
+Articles from the Feed and the Library open in the same view. Click a picture to highlight it: it gets a frame in the color, and it shows as the picture in the Notebook, Highlights, the review and the vault. Hebrew titles and paragraphs read right to left on their own.
 
-The article **…** menu has **Add a document note**, **Read aloud from here**, **Ask about this**, **Load the full article** (for feeds that only send a summary), **Send to the Kindle**, **Keep on this device** (in the apps), **Save to Library** and **Mark seen** for a Feed item or **Read later** and **Archive** for a Library one, **Reset reading progress**, **Edit title and author**, **Delete**, **Open the original**, **Copy the link**, **Open the note in Obsidian** and **Keyboard shortcuts**.
+The bar has six things on it: back, **Aa**, **Listen** (p), **Done** (e), the **…** menu and the notebook (]). A Feed item has **Save to Library** (s) too. It slides away while I read on, and comes back when I scroll up a little or move the pointer to the top, with the title in the middle once the heading has gone by. Under the text, quietly, is how many minutes are left.
+
+The article **…** menu has the next and previous item of the list I came from (Shift J and Shift K), **Shortlist** (f), **Focus mode** (Shift F), **Add a document note**, **Read aloud from here**, **Ask about this**, **Load the full article** (for feeds that only send a summary), **Send to the Kindle**, **Keep on this device** (in the apps), **Save to Library** and **Mark seen** for a Feed item or **Read later** and **Archive** for a Library one, **Reset reading progress**, **Edit title and author**, **Delete**, **Open the original**, **Copy the link**, **Open the note in Obsidian** and **Keyboard shortcuts**.
 
 ![An article with a new green highlight](images/article.png)
 *Selecting a sentence highlights it, and the bar above it changes the color, adds a note or tags it.*
@@ -99,13 +105,13 @@ While the pen is over the screen, a small ring shows where it'll write and how w
 
 ## Focus mode
 
-The **[ ]** button in the bar of an article, a book or a PDF puts it on the whole screen: the sidebar, the bar and the book's footer go, and in the Android app the status and navigation bars go too and the screen stays on. In a browser the window goes full screen. The edges bring back what you need:
+**Focus mode** in the **…** menu of an article or a book (the **[ ]** button in a PDF's bar) puts it on the whole screen: the sidebar, the bar and the book's footer go, and in the Android app the status and navigation bars go too and the screen stays on. In a browser the window goes full screen. The edges bring back what you need:
 
 - **The top or bottom edge:** the bar (and a book's footer), with Aa, the contents, the side panel and the rest. It goes again after a few seconds, or when you touch the page. In a book, a tap in the middle of the page does the same.
 - **The left edge:** the contents.
 - **The right edge:** the side panel, with Info, the Notebook and Ask.
 
-Focus mode stays on for the next thing you open until you leave it with the **[ ]** button, Esc, or F (Shift F in an article). The pen's tools are hidden while you're in it; the S Pen's button still opens the round menu.
+Focus mode stays on for the next thing you open until you leave it from the **…** menu, Esc, or F (Shift F in an article). The pen's tools are hidden while you're in it; the S Pen's button still opens the round menu.
 
 ## PDFs
 

@@ -18,6 +18,12 @@ const ICON = {
   search: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12.5 12.5l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   more: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>',
   mark: on => '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.5h8v13l-4-3-4 3z" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  menu: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M4 10h12M4 14h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  x: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  pen: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5l3 3L8 15H5v-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  listen: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 13.5v-3a6 6 0 0 1 12 0v3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3" y="12" width="3.5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="12" width="3.5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  ask: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12v8H9l-3.5 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  focus: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
 const fmtMins = m => { m = Math.max(0, Math.round(m || 0)); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; };
 const xpIndex = xp => { const m = /DocFragment\[(\d+)\]/.exec(xp || ''); return m ? +m[1] - 1 : null; };
@@ -79,7 +85,9 @@ async function openBook(id, at){
   document.body.dataset.view = 'ebook';
   $('#main').innerHTML = '<div class="progress"><i id="rprog"></i></div><div class="rv ebook"><div class="top" id="btop"><a class="ib" href="#books" aria-label="Back">' + I.back + '</a></div>' +
     '<div class="rvgrid notoc" id="bgrid"><nav class="toc btoc" id="btoc" aria-label="Contents"></nav>' +
-    '<div class="docwrap bookwrap"><div id="bnotice"></div><div class="bookstage" id="bstage"><div class="bookload mute">Opening the book…</div></div><div class="bookfoot" id="bfoot"></div></div>' +
+    '<div class="docwrap bookwrap"><div id="bnotice"></div><div class="bookstage" id="bstage"><div class="bookload mute">Opening the book…</div></div><div class="bookfoot" id="bfoot"></div>' +
+    '<div class="bctl" id="bctl"><input type="range" id="bslide" min="0" max="1000" value="0" aria-label="Where you are in the book"><div class="bctlrow"><span id="bslidet" class="mute"></span>' +
+    '<button class="round bmenu" data-bk="pmenu" aria-label="Reading menu">' + ICON.menu + '</button></div></div></div>' +
     '<aside class="rpanel" id="bpanel"></aside></div><div class="bscrim" data-bk="closesheets"></div></div>';
   // The file starts coming at once, beside the book's details: from the device when it's been
   // opened before (sw.js), else from Daf.
@@ -160,6 +168,7 @@ async function openBook(id, at){
   else if (words) await goToWords(words);
   if (!at && mine && (mine.fraction || 0) > 0.01) toast('Picked up at ' + Math.round(mine.fraction * 100) + '%' + (mine.chapter ? ' · ' + mine.chapter : ''));
   if (!at) offerKindle(mine);
+  if (PHONE()) setTimeout(hideChrome, 600);
 }
 function findHl(id){ return B.d && (B.d.highlights.find(h => h.id === id) || B.d.other_highlights.find(h => h.id === id)); }
 
@@ -492,6 +501,8 @@ function onRelocate(e){
   if (B.forget && Date.now() - (B.forgetAt || 0) > 2000) B.forget = false;   // reading on after Forget: the place counts again
   const pct = Math.round((l.fraction || 0) * 100);
   const p = $('#rprog'); if (p) p.style.width = pct + '%';
+  const sl = $('#bslide'); if (sl && !B.sliding) sl.value = Math.round((l.fraction || 0) * 1000);
+  const st = $('#bslidet'); if (st && !B.sliding) st.textContent = (l.time && l.time.section > 0.5 ? fmtMins(l.time.section) + ' left in the chapter · ' : '') + pct + '%';
   const ch = l.tocItem?.label || '';
   const f = $('#bfoot');
   if (f && !B.tts.on && !f.querySelector('#bjump')) f.innerHTML = '<span class="bch"' + (isRtlText(ch) ? ' dir="rtl"' : '') + '>' + esc(ch) + '</span><span class="spacer"></span>' +
@@ -564,6 +575,11 @@ function drawMarks(){
 // notebook, Ask and focus mode are in the … menu. It fades once you turn a page (chrome below).
 function drawTop(){
   const d = B.d, tip = a => C.Keys.tip('book', a);
+  if (PHONE()) {
+    $('#btop').innerHTML = '<a class="ib bclose" href="#book/' + encodeURIComponent(d.id) + '" aria-label="Close the book">' + ICON.x + '</a>' +
+      '<div class="btitle2"' + (isRtlText(d.title) ? ' dir="rtl"' : '') + '><b>' + esc(String(d.title || '').split(/:\s/)[0]) + '</b><span>' + esc(d.author || '') + '</span></div><span class="bgap"></span>';
+    return;
+  }
   $('#btop').innerHTML = '<a class="ib" href="#book/' + encodeURIComponent(d.id) + '" aria-label="Back to the book">' + I.back + '</a>' +
     '<span class="btitle-top mute"' + (isRtlText(d.title) ? ' dir="rtl"' : '') + '>' + esc(String(d.title || '').split(/:\s/)[0]) + '</span>' +
     '<button class="ib" data-bk="toc" title="Contents' + tip('toc') + '" aria-label="Contents">' + ICON.toc + '</button>' +
@@ -571,6 +587,18 @@ function drawTop(){
     '<button class="ib" data-bk="search" title="Search the book' + tip('search') + '" aria-label="Search the book">' + ICON.search + '</button>' +
     '<button class="ib" data-bk="bookmark" title="Bookmark this page' + tip('bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' +
     '<button class="ib" data-bk="more" title="More" aria-label="More">' + ICON.more + '</button>';
+}
+const PHONE = () => matchMedia('(max-width:700px)').matches;
+// One tap on a phone: everything the bar holds elsewhere, in one menu above the round button.
+function openPhoneMenu(anchor){
+  const p = $('#pop'), r = anchor.getBoundingClientRect(), n = allHighlights().length;
+  const row = (a, label, icon, extra) => '<button data-pm="' + a + '"><span>' + label + '</span>' + (extra || '') + icon + '</button>';
+  p.innerHTML = '<div class="menu pmenu">' +
+    row('toc', 'Contents', ICON.toc) + row('notebook', 'Notebook', ICON.pen, n ? '<span class="pmc">' + n + '</span>' : '') + row('search', 'Search Book', ICON.search) +
+    row('aa', 'Themes &amp; Settings', '<b class="pmaa">Aa</b>') + row('listen', B.tts.on ? 'Stop listening' : 'Listen', ICON.listen) + row('ask', 'Ask about this book', ICON.ask) +
+    '<div class="pmrow"><button data-pm="mark" aria-label="' + (markHere() ? 'Remove the bookmark' : 'Bookmark this page') + '">' + ICON.mark(!!markHere()) + '</button>' +
+    (C.Focus ? '<button data-pm="focus" aria-label="Focus mode">' + ICON.focus + '</button>' : '') + '<button data-pm="more" aria-label="More">' + ICON.more + '</button></div></div>';
+  p.hidden = false; p.style.left = Math.max(8, window.innerWidth - 272) + 'px'; p.style.top = Math.max(8, r.top - p.offsetHeight - 12) + 'px';
 }
 // The bar and the footer: there when the book opens, while a menu, a sheet or Listen is up, and when the
 // pointer comes to the top or the bottom; gone once you turn a page. A tap in the middle of the page on
@@ -1119,7 +1147,8 @@ function openMore(anchor){
     '<button data-bm="keys">Keyboard shortcuts<span class="kbd">?</span></button>' +
     '<button data-bm="reset">Forget my place in Daf</button>' +
     (phoneKeeps() ? '<button data-bm="offline" disabled>Keep on this device</button>' : '') + '</div>';
-  p.hidden = false; p.style.left = Math.max(8, Math.min(window.innerWidth - 280, r.right - 260)) + 'px'; p.style.top = (r.bottom + 8) + 'px';
+  p.hidden = false; p.style.left = Math.max(8, Math.min(window.innerWidth - 280, r.right - 260)) + 'px';
+  p.style.top = (r.bottom + 8 + p.offsetHeight > window.innerHeight ? Math.max(8, r.top - p.offsetHeight - 10) : r.bottom + 8) + 'px';
   // the apps keep books for reading with no network; this one, for good, or not
   if (phoneKeeps()) dafShell.offline({ op: 'list' }).then(l => {
     const b = $('#pop [data-bm="offline"]'), x = (l.books || []).find(k => k.id === B.d.id); if (!b) return;
@@ -1167,6 +1196,7 @@ document.addEventListener('click', async e => {
     else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
     else if (a === 'panel') { if (panelShown()) document.body.classList.remove('bpanelsheet'); else openPanel(); }
     else if (a === 'closesheets') document.body.classList.remove('btocsheet', 'bpanelsheet');
+    else if (a === 'pmenu') { if (!$('#pop').hidden && $('#pop .pmenu')) $('#pop').hidden = true; else openPhoneMenu(bk); }
     else if (a === 'aa') { showChrome(); C.openAa && C.openAa(bk, { book: true }); }
     else if (a === 'more') openMore(bk);
     else if (a === 'bookmark') toggleMark();
@@ -1200,6 +1230,19 @@ document.addEventListener('click', async e => {
   const ti = t.closest('#btoc [data-href]'); if (ti) { e.preventDefault(); await B.view.goTo(ti.dataset.href).catch(() => {}); document.body.classList.remove('btocsheet'); return; }
   const sr = t.closest('#bres [data-cfi]'); if (sr) { e.preventDefault(); await B.view.goTo(sr.dataset.cfi).catch(() => {}); document.body.classList.remove('btocsheet'); return; }
   const gm = t.closest('[data-gomark]'); if (gm) { e.preventDefault(); await B.view.goTo(gm.dataset.gomark).catch(() => {}); document.body.classList.remove('btocsheet'); return; }
+  const pm = t.closest('[data-pm]');
+  if (pm) {
+    const a = pm.dataset.pm, anchor = $('[data-bk="pmenu"]'); $('#pop').hidden = true;
+    if (a === 'toc') openToc();
+    else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
+    else if (a === 'notebook' || a === 'ask') openPanel(a);
+    else if (a === 'aa') C.openAa && C.openAa(anchor || pm, { book: true });
+    else if (a === 'listen') { if (B.tts.on) stopListen(); else startListen(); }
+    else if (a === 'mark') toggleMark();
+    else if (a === 'focus' && C.Focus) C.Focus.toggle();
+    else if (a === 'more') openMore(anchor || pm);
+    return;
+  }
   const bm = t.closest('[data-bm]');
   if (bm) {
     $('#pop').hidden = true;
@@ -1242,7 +1285,10 @@ setInterval(() => {
 }, 15000);
 document.addEventListener('visibilitychange', () => { if (document.hidden && B.view) savePosition(true); });
 window.addEventListener('pagehide', () => { if (B.view) savePosition(true); });
-window.addEventListener('resize', () => { clearTimeout(B.rsT); B.rsT = setTimeout(applyBookType, 200); });
+window.addEventListener('resize', () => { clearTimeout(B.rsT); B.rsT = setTimeout(() => { applyBookType(); if (B.d && $('#btop')) drawTop(); }, 200); });
+// The phone's slider: drag to anywhere in the book.
+document.addEventListener('input', e => { if (e.target.id !== 'bslide') return; B.sliding = true; const st = $('#bslidet'); if (st) st.textContent = Math.round(e.target.value / 10) + '%'; });
+document.addEventListener('change', e => { if (e.target.id !== 'bslide' || !B.view) return; B.view.goToFraction(e.target.value / 1000).catch(() => {}).finally(() => { B.sliding = false; }); });
 window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#ebook/')) { cleanup(); document.body.classList.remove('btocsheet', 'bpanelsheet', 'bookbare'); } });
 
 C.views.ebook = args => {
