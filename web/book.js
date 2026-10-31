@@ -1094,11 +1094,12 @@ C.BookInk = {
 };
 function openPanel(tab){
   if (tab) B.panel = tab;
+  if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(true); return; }   // focus mode has its own drawers (focus.js)
   document.body.classList.remove('btocsheet'); document.body.classList.add('bpanelsheet');
   showChrome(); drawPanel();
 }
 const panelShown = () => document.body.classList.contains('bpanelsheet');
-function openToc(){ document.body.classList.remove('bpanelsheet'); document.body.classList.add('btocsheet'); showChrome(); }
+function openToc(){ if (C.Focus && C.Focus.on()) { C.Focus.toc(true); return; } document.body.classList.remove('bpanelsheet'); document.body.classList.add('btocsheet'); showChrome(); }
 function contextText(){
   try { return (B.loc && B.loc.range ? B.loc.range.toString() : '').slice(0, 6000); } catch(e){ return ''; }
 }
@@ -1192,9 +1193,9 @@ document.addEventListener('click', async e => {
   if (bk) {
     const a = bk.dataset.bk;
     if (a === 'nextch') { bk.hidden = true; B.view.next(); return; }
-    if (a === 'toc') { if (document.body.classList.contains('btocsheet')) document.body.classList.remove('btocsheet'); else openToc(); }
+    if (a === 'toc') { if (C.Focus && C.Focus.on()) C.Focus.toc(); else if (document.body.classList.contains('btocsheet')) document.body.classList.remove('btocsheet'); else openToc(); }
     else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
-    else if (a === 'panel') { if (panelShown()) document.body.classList.remove('bpanelsheet'); else openPanel(); }
+    else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); } else if (panelShown()) document.body.classList.remove('bpanelsheet'); else openPanel(); }
     else if (a === 'closesheets') document.body.classList.remove('btocsheet', 'bpanelsheet');
     else if (a === 'pmenu') { if (!$('#pop').hidden && $('#pop .pmenu')) $('#pop').hidden = true; else openPhoneMenu(bk); }
     else if (a === 'aa') { showChrome(); C.openAa && C.openAa(bk, { book: true }); }

@@ -1196,11 +1196,24 @@ html.rail:not(.shell-mac) .side.open::after{content:"";position:fixed;inset:0 0 
 .brand .spacer{flex:1}
 .sidebtn{width:30px;height:30px;color:var(--fg-3)}
 .navbot{margin-top:auto;padding-top:10px;padding-bottom:14px}
-.railends{display:none}
 html.rail:not(.shell-mac) .side:not(.open) .nvx,
 html.rail:not(.shell-mac) .side:not(.open) .sidebtn{display:none}
-html.rail:not(.shell-mac) .side:not(.open) .railends{display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
-html.rail:not(.shell-mac) .side.open .railbtn{display:none}
+/* the one sidebar button, in the same corner whether the sidebar is full, mini or hidden (#sideshow) */
+.brand .sidetog{width:34px;height:34px;color:var(--fg-2);margin-left:-5px}
+.side:not(.open) .brand:has(.sidetog){padding:12px 12px 8px 13px;gap:8px}
+html.rail:not(.shell-mac) .side:not(.open) .brand{padding:12px 0 6px}
+html.rail:not(.shell-mac) .side:not(.open) .brand .sidetog{margin:0}
+/* its edge, dragged for mini, full or hidden (app.js); a small handle shows on a touch screen */
+.side{position:relative}
+/* its edge handle lies over the page's edge, so the sidebar doesn't clip it: its list scrolls instead */
+@media (min-width:781px){ .side{z-index:6;overflow:visible} .side .navfull{min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin} }
+.sidegrip{position:absolute;top:0;bottom:0;right:-7px;width:14px;z-index:4;cursor:col-resize;touch-action:none}
+.sidegrip::after{content:"";position:absolute;top:50%;left:5px;width:4px;height:40px;margin-top:-20px;border-radius:2px;background:var(--line-2);opacity:0;transition:opacity .15s}
+.sidegrip:hover::after,html.sidedrag .sidegrip::after{opacity:1}
+@media (pointer:coarse){ .sidegrip{right:-11px;width:22px} .sidegrip::after{left:9px;opacity:.9} }
+html.sidedrag,html.sidedrag *{cursor:col-resize!important;user-select:none!important}
+html.rail:not(.shell-mac) .side.open .sidegrip{position:fixed;left:273px;right:auto;z-index:47}
+@media (max-width:780px){ .sidegrip{display:none} }
 html.sidehid:not(.shell-mac) .app:not(.loggedout){grid-template-columns:minmax(0,1fr)}
 html.sidehid:not(.shell-mac) .side{display:none}
 html.sidehid:not(.shell-mac) .side.peek,html.sidehid:not(.shell-mac) .side.open{display:flex;position:fixed;left:0;top:0;bottom:0;width:60px;z-index:46;box-shadow:var(--shadow)}
@@ -1209,10 +1222,10 @@ html.sidehid:not(.shell-mac) .side.peek::after{content:"";position:fixed;inset:0
 html.sidehid:not(.shell-mac) .side.open{background:transparent;box-shadow:none;width:0}
 @keyframes sidein{from{transform:translateX(-100%)}to{transform:none}}
 .sideshow{display:none}
-html.sidehid:not(.reading):not(.shell-mac) .sideshow{display:inline-grid;place-items:center;position:fixed;left:12px;top:calc(11px + env(safe-area-inset-top,0px));z-index:7;width:36px;height:36px;border:0;border-radius:9px;background:transparent;color:var(--fg-2);cursor:pointer}
+html.sidehid:not(.reading):not(.shell-mac) .sideshow{display:inline-grid;place-items:center;position:fixed;left:13px;top:calc(12px + env(safe-area-inset-top,0px));z-index:7;width:34px;height:34px;border:0;border-radius:8px;background:transparent;color:var(--fg-2);cursor:pointer}
 html.sidehid:not(.reading):not(.shell-mac) .sideshow:hover{background:var(--hover);color:var(--fg)}
 html.sidehid:not(.reading):not(.shell-mac) .main > .top,html.sidehid:not(.reading):not(.shell-mac) .lvmain > .top{padding-left:60px}
-@media (max-width:780px){ .sideshow{display:none!important} .navbot{margin-top:0} .railends{display:none!important} .sidebtn{display:none} .nvx{width:34px;height:34px} }
+@media (max-width:780px){ .sideshow{display:none!important} .navbot{margin-top:0} .sidebtn,.brand .sidetog{display:none} .nvx{width:34px;height:34px} }
 /* A list's header when the list is narrow (a tablet, or the info panel open beside it): the
    Inbox / Later / Archive tabs get their own row instead of crowding the title. */
 .lvmain{container-type:inline-size}
@@ -1564,3 +1577,9 @@ body.btocsheet .bscrim,body.bpanelsheet .bscrim{display:block;position:fixed;ins
   .bctl .bmenu{width:46px;height:46px;flex:none}
 }
 @media (max-width:1000px) and (min-width:701px){ .rv.ebook .btitle-top{display:block} }
+
+/* ---------- the reader's panels over the page fill its height. align-self:start is for the sticky
+   column beside the text; browsers now align positioned boxes too, so as a sheet over the page it
+   made the panel only as tall as what's in it (the tablet's empty-looking strip, 2026-10-31). ---------- */
+@media (max-width:1180px){ .rvgrid.withpanel .rpanel{align-self:stretch} }
+body.btocsheet .rv.ebook .btoc,body.bpanelsheet .rv.ebook .rpanel,html.focus.fpanel .rvgrid > .rpanel,html.focus.ftoc .rvgrid > .toc{align-self:stretch}

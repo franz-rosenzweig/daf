@@ -74,8 +74,8 @@ function bar(on){
   root.classList.toggle('fbar', !!on);
   if (on) F.barT = setTimeout(function again(){ if ($('#pop') && !$('#pop').hidden) F.barT = setTimeout(again, 2000); else root.classList.remove('fbar'); }, 4500);
 }
-function drawer(which){
-  const open = !root.classList.contains(which);
+function drawer(which, force){
+  const open = force != null ? !!force : !root.classList.contains(which);
   root.classList.remove('ftoc', 'fpanel', 'fbar');
   if (open) root.classList.add(which);
   const s = $('#fedges .fscrim'); if (s) s.hidden = !open;
@@ -114,5 +114,7 @@ document.addEventListener('fullscreenchange', () => { if (!document.fullscreenEl
 const watch = () => { new MutationObserver(sync).observe(document.body, { attributes: true, attributeFilter: ['data-view'] }); sync(); };
 if (document.body) watch(); else document.addEventListener('DOMContentLoaded', watch);
 
-C.Focus = { button, toggle, on: () => F.on, bar: () => bar(!root.classList.contains('fbar')), close, escape };
+// panel(), toc(): the bar's own buttons in focus mode open the same drawers the edges do (true: open).
+C.Focus = { button, toggle, on: () => F.on, bar: () => bar(!root.classList.contains('fbar')), close, escape,
+  panel: open => drawer('fpanel', open), toc: open => drawer('ftoc', open) };
 })();

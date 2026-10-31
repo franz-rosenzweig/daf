@@ -29,8 +29,6 @@ const I = {
   moon:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M15 12.5A6.5 6.5 0 0 1 7.5 4a6.5 6.5 0 1 0 8.6 7.6c-.35.33-.72.63-1.1.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   sync:'<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 0 1-10.4 4.1M4 10a6 6 0 0 1 10.4-4.1M14.5 2.5v3.5H11M5.5 17.5V14H9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   sidebar:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 4v12" stroke="currentColor" stroke-width="1.6"/></svg>',
-  expand:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l5 5-5 5M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  collapse:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M15 5l-5 5 5 5M9 5l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   back:'<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 
@@ -255,23 +253,22 @@ function cover(b, cls){
 function bar(p){ return '<span class="pbar"><i style="width:' + Math.max(0, Math.min(100, p || 0)) + '%"></i></span>'; }
 
 /* ---------- sidebar ---------- */
-// Full, mini (a strip of icons) or hidden, chosen on each device (daf.side): the button at its top
-// takes the full one down to the mini one, the mini one's buttons take it up again or away, ⌘\ goes
-// round the three, and when it's hidden a swipe from the left edge (or the button at the top left)
-// brings the mini one over the page. Reading something (an article, a book, a PDF, manga) has no
-// sidebar at all, as in Readwise: the same swipe or ⌘\ brings it for a moment. Below 780 px wide the
-// phone's tab bar and its More sheet take its place.
-// html.rail is the mini look (style.css); html.sidehid hides it (the mini one slides in as .peek, and
-// the full one as .open over the page, from either).
+// One button, always in the top left corner, shows and hides the sidebar (so does ⌘\). Shown, it's mini
+// (a strip of icons) or full, and its edge is dragged to change that: wider for full, narrower for
+// mini, and further for hidden. It never changes by itself: a touch screen starts mini, a mouse full,
+// and turning a tablet round keeps what was chosen. A swipe in from the left edge brings it over the
+// page for a moment, mini, and further, full. Reading something (an article, a book, a PDF, manga) hides
+// it, as in Readwise; the same swipe brings it. Below 780 px wide the phone's tab bar and its More
+// sheet take its place. Each device keeps its own (daf.sideShown, daf.sideSize).
+// html.rail is the mini look (style.css); html.sidehid hides it (the mini one slides in as .peek, the
+// full one as .open over the page).
 const READING = new Set(['read', 'ebook', 'pdf', 'mread']);
-const SIDE_MODES = ['full', 'mini', 'hidden'];
-const sideWant = () => { const m = lsGet('side', null); return SIDE_MODES.includes(m) ? m : null; };
+const sideSize = () => { const v = lsGet('sideSize', null) || lsGet('side', null); return v === 'mini' || v === 'full' ? v : (matchMedia('(pointer: coarse)').matches ? 'mini' : 'full'); };
+const sideShown = () => { const v = lsGet('sideShown', null); return v == null ? lsGet('side', null) !== 'hidden' : !!v; };
 function sideMode(){
-  const w = window.innerWidth, v = (S.route || [])[0];
-  if (w <= 780) return 'phone';
-  if (READING.has(v)) return 'hidden';
-  const m = sideWant() || (w < 1100 ? 'mini' : 'full');
-  return m === 'full' && w < 1000 ? 'mini' : m;      // a narrow window keeps the page's room
+  if (window.innerWidth <= 780) return 'phone';
+  if (READING.has((S.route || [])[0]) || !sideShown()) return 'hidden';
+  return sideSize();
 }
 function railMode(){
   const m = sideMode(), r = document.documentElement, sd = $('#side');
@@ -281,24 +278,54 @@ function railMode(){
   if (sd && m !== 'phone' && !sd.matches(':hover')) sd.classList.remove('open', 'peek');
   let b = $('#sideshow');
   if (m === 'hidden' && !READING.has((S.route || [])[0])) {
-    if (!b) { document.body.insertAdjacentHTML('beforeend', '<button class="sideshow" id="sideshow" data-act="sidepeek" aria-label="Show the sidebar" title="Show the sidebar (⌘\\)">' + I.sidebar + '</button>'); }
+    if (!b) { document.body.insertAdjacentHTML('beforeend', '<button class="sideshow" id="sideshow" data-act="sidetoggle" aria-label="Show the sidebar" title="Show the sidebar (⌘\\)">' + I.sidebar + '</button>'); }
   } else if (b) b.remove();
 }
 window.addEventListener('resize', () => { clearTimeout(railMode.t); railMode.t = setTimeout(railMode, 120); });
-function setSide(m){ lsSet('side', m); $('#side').classList.remove('open', 'peek'); railMode(); window.dispatchEvent(new Event('resize')); }
-// ⌘\: round the three; on a reading screen, the mini one over the page and away again.
-function cycleSide(){
+function setSide(shown, size){
+  if (shown != null) lsSet('sideShown', !!shown);
+  if (size) lsSet('sideSize', size);
+  $('#side').classList.remove('open', 'peek'); railMode(); window.dispatchEvent(new Event('resize'));
+}
+// The button and ⌘\: shown or hidden. On a reading screen, over the page for a moment.
+function toggleSide(){
   const sd = $('#side'), m = sideMode();
   if (m === 'phone') return;
-  if (READING.has(S.route[0]) || (m === 'hidden' && sd.classList.contains('peek'))) { sd.classList.toggle('peek'); sd.classList.remove('open'); return; }
-  setSide(m === 'full' ? 'mini' : m === 'mini' ? 'hidden' : 'full');
+  if (READING.has(S.route[0])) { const on = sd.classList.contains('peek') || sd.classList.contains('open'); sd.classList.remove('peek', 'open'); if (!on) sd.classList.add('peek'); return; }
+  setSide(!sideShown());
 }
-// A swipe in from the left edge, on a touch screen, when the sidebar is hidden.
+// Dragging the sidebar's edge: it takes the size nearest the finger or the pointer, full past the
+// middle of the full one (146 px), mini down to near the screen's edge, hidden at the edge. Over the
+// page (a swipe, or a reading screen) the same sizes open it there or put it away.
+(() => {
+  let d = null;
+  const sizeAt = x => x >= 146 ? 'full' : x >= 28 ? 'mini' : 'none';
+  document.addEventListener('pointerdown', e => {
+    const g = e.target.closest && e.target.closest('.sidegrip'); if (!g) return;
+    e.preventDefault(); g.setPointerCapture(e.pointerId);
+    d = { id: e.pointerId, at: null };
+    document.documentElement.classList.add('sidedrag');
+  });
+  document.addEventListener('pointermove', e => {
+    if (!d || e.pointerId !== d.id) return;
+    const want = sizeAt(e.clientX); if (want === d.at) return;
+    d.at = want;
+    const sd = $('#side');
+    if (sd.classList.contains('peek') || sd.classList.contains('open')) {
+      sd.classList.toggle('open', want === 'full'); sd.classList.toggle('peek', want === 'mini');
+    } else if (want === 'none') setSide(false);
+    else if (want !== sideMode()) setSide(true, want);
+  });
+  const end = () => { d = null; document.documentElement.classList.remove('sidedrag'); };
+  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+})();
+// A swipe in from the left edge, on a touch screen, when the sidebar is hidden: the mini one over the
+// page, and further, the full one.
 (() => {
   let x0 = null, y0 = 0;
   document.addEventListener('touchstart', e => {
     const t = e.touches[0];
-    x0 = t && t.clientX < 22 && document.documentElement.classList.contains('sidehid') ? t.clientX : null; y0 = t ? t.clientY : 0;
+    x0 = t && t.clientX < 24 && document.documentElement.classList.contains('sidehid') ? t.clientX : null; y0 = t ? t.clientY : 0;
   }, { passive: true });
   document.addEventListener('touchmove', e => {
     if (x0 == null) return;
@@ -323,14 +350,14 @@ const pinsOn = () => { const p = (S.settings || (S.data && S.data.settings) || {
 // Preferences → Sidebar: how it is on this device, and what's pinned (settings nav_pins, every device).
 function drawSideCard(){
   const card = $('#sidecard'); if (!card) return;
-  const cur = sideWant() || (window.innerWidth < 1100 ? 'mini' : 'full'), on = pinsOn();
+  const cur = sideShown() ? sideSize() : 'hidden', on = pinsOn();
   card.innerHTML = '<h2>Sidebar</h2>' +
     '<div class="prow"><div class="d"><b>On this device</b></div><div class="seg">' + [['full', 'Full'], ['mini', 'Mini'], ['hidden', 'Hidden']].map(x => '<button class="' + (cur === x[0] ? 'on' : '') + '" data-sidemode="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>' +
     '<div class="prow"><div class="d"><b>Pinned</b></div></div><div class="pinlist">' +
     PINS().map(x => '<label class="aaline"><input type="checkbox" data-pin="' + x[0] + '"' + (on.includes(x[0]) ? ' checked' : '') + '> ' + x[1] + '</label>').join('') + '</div>';
   if (S.route[1] === 'sidebar') setTimeout(() => card.scrollIntoView({ block: 'start' }), 200);
 }
-document.addEventListener('click', e => { const b = e.target.closest('[data-sidemode]'); if (!b) return; setSide(b.dataset.sidemode); drawSideCard(); });
+document.addEventListener('click', e => { const b = e.target.closest('[data-sidemode]'); if (!b) return; const m = b.dataset.sidemode; if (m === 'hidden') setSide(false); else setSide(true, m); drawSideCard(); });
 document.addEventListener('change', async e => {
   const t = e.target; if (!t.dataset || !t.dataset.pin) return;
   const keys = PINS().map(x => x[0]), want = new Set(pinsOn());
@@ -350,9 +377,8 @@ function renderSide(){
     mob('library', 'Library', I.books, 'library') + '<button class="mb' + (window.DafCore && window.DafCore.Tips && window.DafCore.Tips.unseen() ? ' hasnew' : '') + '" data-act="more"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>More</span></button></div>';
   const D = window.DafCore || {}, on = pinsOn(), route = (S.route || []).join('/');
   const pins = PINS().filter(p => on.includes(p[0])).map(p => '<button class="nv' + (route === p[2] || v === p[2] || (p[0] === 'manga' && v === 'mread') ? ' on' : '') + '" data-go="' + p[2] + '">' + p[3] + '<span>' + p[1] + '</span></button>').join('');
-  $('#side').innerHTML = mobbar + '<div class="navfull"><div class="brand"><button class="railbtn" data-act="rail" aria-label="Expand the sidebar" title="Expand the sidebar">' + I.sidebar + '</button><b>Daf</b><span class="spacer"></span>' +
-      '<button class="ib sidebtn" data-act="add" aria-label="Add to Daf" title="Add a link, a book or a PDF"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
-      '<button class="ib sidebtn" data-act="sidemini" aria-label="Collapse the sidebar" title="Collapse the sidebar (⌘\\)">' + I.sidebar + '</button></div>' +
+  $('#side').innerHTML = mobbar + '<div class="sidegrip" aria-hidden="true"></div><div class="navfull"><div class="brand"><button class="ib sidetog" data-act="sidetoggle" aria-label="Hide the sidebar" title="Hide the sidebar (⌘\\). Drag its edge for mini or full.">' + I.sidebar + '</button><b>Daf</b><span class="spacer"></span>' +
+      '<button class="ib sidebtn" data-act="add" aria-label="Add to Daf" title="Add a link, a book or a PDF"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>' +
     '<div class="nav">' +
     n('today', 'Today', I.today, '<span class="ct">' + mins + '</span>') +
     n('review', 'Review', I.review, '<span class="ct">' + (rv || (rv === 0 ? '✓' : '')) + '</span>') +
@@ -360,9 +386,7 @@ function renderSide(){
     (pins ? '<div class="navh"><span>Pinned</span></div><div class="nav pins">' + pins + '</div>' : '') +
     '<div class="nav navbot">' + (D.navSearch ? D.navSearch() : '') +
     n('stats', 'Stats', '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16V9M8.7 16V4M13.3 16v-5M18 16H2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>', d && d.streak && d.streak.goal ? '<span class="ct" title="Days in a row ' + atWord(d.goal) + '">' + d.streak.goal + '</span>' : '') +
-    n('prefs', 'Preferences', I.prefs) + (D.Tips ? D.Tips.navItem() : '') +
-    '<div class="railends"><button class="nv" data-act="rail" aria-label="Expand the sidebar" title="Expand the sidebar">' + I.expand + '</button>' +
-    '<button class="nv" data-act="sidehide" aria-label="Hide the sidebar" title="Hide the sidebar (⌘\\)">' + I.collapse + '</button></div></div></div>';
+    n('prefs', 'Preferences', I.prefs) + (D.Tips ? D.Tips.navItem() : '') + '</div></div>';
   // As a strip of icons, each one says what it is.
   $$('#side .navfull .nv').forEach(b => { const t = b.querySelector('span'); if (t && !b.title) { b.title = t.textContent.trim(); b.setAttribute('aria-label', b.title); } });
 }
@@ -1031,13 +1055,10 @@ document.addEventListener('click', e => {
 document.addEventListener('click', async e => {
   const go = e.target.closest('[data-go]');
   if (go){ $('#side').classList.remove('open', 'peek'); location.hash = go.dataset.go; return; }
-  const sa = e.target.closest('[data-act="sidemini"],[data-act="sidehide"],[data-act="sidepeek"]');
-  if (sa){ const a = sa.dataset.act; if (a === 'sidemini') setSide('mini'); else if (a === 'sidehide') setSide('hidden'); else { $('#side').classList.add('peek'); } return; }
-  const rail = e.target.closest('[data-act="rail"]');
-  if (rail){
-    // The mini one's expand: the full sidebar from now on, or (hidden, or on a reading screen) over the page for a moment.
-    if (sideMode() === 'mini' && !$('#side').classList.contains('peek')) setSide('full');
-    else { $('#side').classList.add('open'); $('#side').classList.remove('peek'); }
+  if (e.target.closest('[data-act="sidetoggle"]')){
+    const sd = $('#side');
+    if (sd.classList.contains('peek') || sd.classList.contains('open')) sd.classList.remove('peek', 'open');   // over the page: put it away
+    else toggleSide();
     return;
   }
   const more = e.target.closest('[data-act="more"]'); if (more){ $('#side').classList.toggle('open'); return; }
@@ -1148,7 +1169,7 @@ document.addEventListener('submit', async e => {
   catch(err){ $('#loginerr').textContent = err.message; }
 });
 document.addEventListener('keydown', e => {
-  if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === '\\' || e.code === 'Backslash')) { e.preventDefault(); cycleSide(); return; }
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === '\\' || e.code === 'Backslash')) { e.preventDefault(); toggleSide(); return; }
   const tag = (e.target.tagName || '').toLowerCase(), typing = tag === 'input' || tag === 'textarea' || tag === 'select';
   // A sheet in front takes the keys: Esc closes it and nothing else (not the article behind it too),
   // and no shortcut reaches the list or article under it. keys.js's own capture comes first.

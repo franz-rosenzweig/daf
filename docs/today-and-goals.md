@@ -15,13 +15,9 @@ Under the title is the date, then "Year 30, day N", then the streak: "5 days in 
 
 The sidebar has six places: **Today**, **Review**, **Library**, **Books**, **Feed** and **Highlights**. The little arrow next to Library opens its kinds (Articles, Videos, Tweets, PDFs and my saved views), and the one next to Feed opens its folders. Under them is **Pinned**, which I choose in **Preferences → Sidebar**: Podcasts, Manga, Torah, Recovery and Shortlist to start with, and Paper pages and Sources if I want them. At the bottom are **Search** (⌘K), **Stats** and **Preferences**. Anything that isn't pinned is still one ⌘K away.
 
-It comes in three sizes, and each device remembers its own:
+One button in the top left corner shows and hides it, and it stays in that corner either way. ⌘\\ does the same. When it's showing, it's either **full**, with the names, or **mini**, a strip of icons: I drag its edge wider for full or narrower for mini, and all the way to the edge to hide it. It never changes size by itself, so turning the tablet round keeps it the way I left it. A touch screen starts with the mini one and a computer with the full one, and each device remembers its own.
 
-- **Full**, with the names. The button at its top makes it mini.
-- **Mini**, a strip of icons. The buttons at its bottom make it full again or hide it.
-- **Hidden.** The button at the top left of the page, or a swipe in from the left edge on a touch screen, brings the mini one over the page for a moment.
-
-⌘\\ goes round the three. When something is open to read, the sidebar is always hidden, the way Readwise does it, and the same swipe or ⌘\\ brings it.
+When something is open to read, the sidebar is hidden, the way Readwise does it. A swipe in from the left edge brings the mini one over the page for a moment (on Android the system's back swipe can get there first), and pulling it further brings the full one.
 
 At the top right, the round arrow syncs every source now instead of waiting for the next five-minute pass, and **Log paper** opens the dialog for minutes read in a paper book (see [Paper books](paper-books.md)).
 

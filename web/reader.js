@@ -910,7 +910,7 @@ function moreAct(a){
   const d = R.doc; if (!d) return;
   $('#pop').hidden = true;
   if (a === 'nextdoc' || a === 'prevdoc') { const nb = neighbor(d.id, a === 'nextdoc' ? 1 : -1); if (nb) location.hash = 'read/' + encodeURIComponent(nb.id); }
-  else if (a === 'panel') { R.panelOpen = !R.panelOpen; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); if (R.panelOpen) drawPanel(); }
+  else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; } R.panelOpen = !R.panelOpen; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); if (R.panelOpen) drawPanel(); }
   else if (a === 'full') loadFull(d.id);
   else if (a === 'device') deviceList().then(on => keepOnDevice(d.id, !(on && on.pinned.has(d.id))));
   else if (a === 'pages') location.hash = 'pdf/' + encodeURIComponent(d.id);
@@ -1026,7 +1026,7 @@ async function ask(q, quote){
   catch(e){ toast(e.message); }
   R.asking = null; if (R.doc === d) drawPanel();
 }
-function openPanel(){ if (!R.panelOpen){ R.panelOpen = true; const g = $('.rvgrid'); if (g) g.classList.add('withpanel'); drawReaderTop(); } }
+function openPanel(){ if (C.Focus && C.Focus.on()) { C.Focus.panel(true); return; } if (!R.panelOpen){ R.panelOpen = true; const g = $('.rvgrid'); if (g) g.classList.add('withpanel'); drawReaderTop(); } }
 function onScroll(){
   // (on a touch screen a selection's bar stays and follows the words: the scroll listener below)
   const main = $('#main'), d = R.doc; if (!(H.touch() && H.ctx && H.ctx.kind === 'sel')) stopSel(); R.lastActive = Date.now();
@@ -1708,7 +1708,10 @@ document.addEventListener('click', e => {
     if (a === 'back') { stopSel(); leaveDoc(R.doc); }
     else if (a === 'prevdoc' || a === 'nextdoc') { const nb = R.doc && neighbor(R.doc.id, a === 'nextdoc' ? 1 : -1); if (nb) location.hash = 'read/' + encodeURIComponent(nb.id); }
     else if (a === 'aa') openAa(ra);
-    else if (a === 'panel') { R.panelOpen = !R.panelOpen; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); }
+    else if (a === 'panel') {
+      if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; }     // focus mode hides the column: its drawer instead
+      R.panelOpen = !R.panelOpen; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); if (R.panelOpen) drawPanel();
+    }
     else if (a === 'listen') { const T = R.tts; if (T.on && T.doc === R.doc.id) { T.playing ? pauseTTS() : resumeTTS(); } else startTTS(); }
     else if (a === 'more') openMore(ra);
     else if (a === 'lmore') openListMore(ra);
