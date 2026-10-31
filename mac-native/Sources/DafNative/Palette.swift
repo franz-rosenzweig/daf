@@ -27,7 +27,7 @@ struct PaletteSheet: View {
         ("Shortlist", .shortlist), ("Archive", .library("archive")), ("All Feeds", .feed(nil)), ("Books", .books), ("Manga", .manga),
         ("Highlights", .highlights), ("Stats", .stats), ("Torah", .torah), ("Recovery", .recovery), ("Podcasts", .podcasts),
         ("Paper Pages", .paper), ("Sources", .sources),
-    ]
+    ] + Place.kinds.map { ($0.1, .kind($0.0)) }
     private static let settings: [(String, String)] = [
         ("Settings", "general"), ("Reading Settings", "reading"), ("Goals", "goals"), ("Account", "account"),
         ("Phone, Podcasts and Hardcover", "connections"), ("Newsletters and the Morning Email", "connections"),

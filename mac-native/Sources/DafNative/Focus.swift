@@ -71,7 +71,7 @@ final class Focus {
     }
 
     /// The split view that holds the main window's sidebar, list and what's open.
-    private static func split(_ w: NSWindow) -> NSSplitViewController? {
+    static func split(_ w: NSWindow) -> NSSplitViewController? {
         func find(_ v: NSView) -> NSSplitView? { (v as? NSSplitView) ?? v.subviews.lazy.compactMap(find).first }
         return w.contentView.flatMap(find)?.delegate as? NSSplitViewController
     }
@@ -86,6 +86,7 @@ final class Focus {
     private func uncollapse(_ w: NSWindow) {
         guard let was = panes.removeValue(forKey: w.windowNumber), let s = Self.split(w) else { return }
         for (item, c) in zip(s.splitViewItems, was) where item.isCollapsed != c { item.animator().isCollapsed = c }
+        if Self.isMain(w) { Side.shared.applySoon() }          // the sidebar as it is now (full, mini, hidden, reading)
     }
 
     /// The toolbar hidden till the pointer goes to the top: the Mac's own way (with the menu bar)

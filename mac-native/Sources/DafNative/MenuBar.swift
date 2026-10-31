@@ -84,6 +84,21 @@ struct PrefsView: View {
                     LabeledContent("Signed in", value: API.shared.cookie == nil ? "No" : "Yes")
                     Button("Sign Out") { API.shared.signOut(); model.needsSignIn = true }
                 }
+                Section("Sidebar") {
+                    Picker("On this Mac", selection: Binding(get: { Side.shared.mode }, set: { Side.shared.mode = $0 })) {
+                        ForEach(Side.modes, id: \.0) { Text($0.1).tag($0.0) }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .id("sidebar")
+                Section("Pinned in the sidebar") {
+                    let pins = Side.shared.pins(model.today?.o("settings"))
+                    ForEach(Side.pinnable, id: \.0) { p in
+                        Toggle(p.1, isOn: Binding(get: { pins.contains(p.0) }, set: { on in
+                            Task { await Side.shared.setPins(on ? pins + [p.0] : pins.filter { $0 != p.0 }) }
+                        }))
+                    }
+                }
                 Section {
                     Toggle("Show today's minutes in the menu bar", isOn: $menuBar)
                     Toggle("Tell me about new posts in the feeds I choose", isOn: Binding(get: { alerts }, set: { on in

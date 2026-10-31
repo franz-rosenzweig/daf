@@ -176,22 +176,6 @@ struct BulkActions: View {
 
 // MARK: the sidebar's views and shelves
 
-struct ViewsSection: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        if !model.views.isEmpty {
-            Section("Views") {
-                ForEach(model.views, id: \.self) { v in
-                    Label(v.s("name") ?? "View", systemImage: "line.3.horizontal.decrease.circle")
-                        .tag(Place.view(v.s("id") ?? ""))
-                        .contextMenu { Button("Remove the View", role: .destructive) { Task { await model.removeView(v.s("id") ?? "") } } }
-                }
-            }
-        }
-    }
-}
-
 /// Books, opening onto its shelves.
 struct BooksRow: View {
     @Environment(AppModel.self) private var model

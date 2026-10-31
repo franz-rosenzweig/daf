@@ -130,6 +130,49 @@ enum SelfTest {
         check(m.count(.library("inbox")) != nil, "with the counts beside the sidebar")
         capture("02-library")
 
+        // the sidebar, as the page's: full → mini → hidden (⌘\), a hidden one back for a moment
+        if let w = main, let s = Focus.split(w), let side = s.splitViewItems.first {
+            let mode0 = Side.shared.mode
+            let wide = { side.viewController.view.frame.width }
+            Side.shared.mode = "full"
+            _ = await until(3) { !side.isCollapsed && wide() > 150 }
+            Side.shared.cycle()
+            let mini = await until(3) { !side.isCollapsed && wide() < 90 }
+            await pause(0.8)
+            capture("02b-sidebar-mini")
+            Side.shared.cycle()
+            let hidden = await until(3) { side.isCollapsed }
+            Side.shared.button()
+            let peek = await until(3) { !side.isCollapsed && Side.shared.mini }
+            Side.shared.chose()
+            let gone = await until(3) { side.isCollapsed }
+            Side.shared.cycle()
+            let full = await until(3) { !side.isCollapsed && wide() > 150 }
+            check(mini && hidden && peek && gone && full, "the sidebar goes full → mini → hidden, and a hidden one comes back for a moment",
+                  "mini \(mini), hidden \(hidden), back \(peek), gone again \(gone), full \(full) (\(Int(wide())) wide)")
+            Side.shared.mode = mode0
+        }
+        // Library › Articles, with Inbox, Later and Archive
+        await go(m, .kind("article"))
+        let arts = m.items
+        let tab0 = m.libraryTab
+        m.libraryTab = "later"
+        await m.load()
+        let later = m.items
+        m.libraryTab = tab0
+        await m.load()
+        check(!arts.isEmpty && arts.allSatisfy { $0.kind == "article" } && later.allSatisfy { $0.status == "later" && $0.kind == "article" },
+              "Library › Articles lists the articles, and Later the ones saved for later", "\(arts.count), later \(later.count)")
+        // what's pinned, kept in Daf for every device
+        let pins0 = Side.shared.pins(m.today?.o("settings"))
+        await Side.shared.setPins(pins0.filter { $0 != "torah" } + ["sources"])
+        let kept = (try? await API.shared.json("/api/settings"))?.raw["nav_pins"] as? [String] ?? []
+        await pause(0.6)
+        capture("02c-sidebar-pins")
+        check(kept.contains("sources") && !kept.contains("torah") && Side.shared.pins(m.today?.o("settings")) == kept, "the sidebar's pins are kept in Daf", kept.joined(separator: ", "))
+        await Side.shared.setPins(pins0)
+        await go(m, .library("inbox"))
+
         // its order and filters
         let sort0 = m.sortLibrary
         m.sortLibrary = "short"
@@ -153,6 +196,46 @@ enum SelfTest {
         capture("03-reader")
         guard let r = m.reader, let tv = r.textView else { return finish("the reader didn't open") }
         check(!r.blocks.isEmpty, "its blocks are laid out", "\(r.blocks.count) blocks")
+        // no sidebar while it's read; ⌘\ brings it for a moment
+        if let w = main, let s = Focus.split(w), let side = s.splitViewItems.first {
+            let away = await until(3) { side.isCollapsed }
+            Side.shared.cycle()
+            let back = await until(3) { !side.isCollapsed && Side.shared.mini }
+            await pause(0.6)
+            capture("03b-reading-sidebar")
+            Side.shared.cycle()
+            let again = await until(3) { side.isCollapsed }
+            check(away && back && again, "while an article is read there's no sidebar; ⌘\\ brings it for a moment", "away \(away), back \(back), away again \(again)")
+        }
+        check(r.minutesLeft?.hasSuffix("left") == true || r.minutesLeft == "The end", "the time left shows under the text", r.minutesLeft ?? "-")
+        // Themes & Settings: the text larger, a look picked, both kept
+        let type0 = ArticleType.current
+        var bigger = type0
+        bigger.size += 2
+        bigger.save()
+        await pause(0.8)
+        let at = r.blocks.first { $0.range.length > 60 }?.range.location ?? 0
+        let size1 = (r.storage.attribute(.font, at: at, effectiveRange: nil) as? NSFont)?.pointSize ?? 0
+        type0.save()
+        await pause(0.5)
+        let size2 = (r.storage.attribute(.font, at: r.blocks.first { $0.range.length > 60 }?.range.location ?? 0, effectiveRange: nil) as? NSFont)?.pointSize ?? 0
+        check(abs(size1 - (type0.size + 2)) < 0.5 && abs(size2 - type0.size) < 0.5, "Themes & Settings makes the text larger, and back", "\(Int(type0.size)) → \(Int(size1)) → \(Int(size2))")
+        let th0 = (Theme.shared.mode, Theme.shared.light, Theme.shared.dark)
+        Theme.shared.choose(mode: "light", light: "paper")
+        await pause(0.8)
+        let paperBG = Theme.rgb(Theme.family("paper").light.bg).usingColorSpace(.sRGB)
+        let pageBG = r.textView?.backgroundColor.usingColorSpace(.sRGB)
+        let sheet = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 342, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
+        sheet.contentView = NSHostingView(rootView: ThemesPanel().environment(m))
+        sheet.orderFront(nil)
+        await pause(1)
+        capture("03c-themes", sheet)
+        sheet.close()
+        capture("03d-paper-look")
+        Theme.shared.choose(mode: th0.0, light: th0.1, dark: th0.2)
+        await pause(0.5)
+        check(paperBG != nil && pageBG.map { abs($0.redComponent - paperBG!.redComponent) < 0.02 && abs($0.blueComponent - paperBG!.blueComponent) < 0.02 } == true,
+              "a look (Paper) sets the day's theme, and the article takes it")
         // as it opened, the article is as tall as its text, and the wheel scrolls it and it stays
         // (on macOS 27 the view stopped growing to its text: one screen tall, springing back)
         if let sv = tv.enclosingScrollView, let w = tv.window {

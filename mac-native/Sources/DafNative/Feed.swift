@@ -110,50 +110,13 @@ extension AppModel {
     func refresh() {
         switch place {
         case .feed, .feedSource: Task { await refreshFeed() }
-        case .library, .shortlist, .home: Task { await syncNow() }
+        case .library, .kind, .shortlist, .home: Task { await syncNow() }
         default: reload()
         }
     }
 }
 
 // MARK: the sidebar's Feed section
-
-struct FeedSection: View {
-    @Environment(AppModel.self) private var model
-    @AppStorage("openFolders") private var open = ""
-
-    var body: some View {
-        Section("Feed") {
-            Label("All Feeds", systemImage: "dot.radiowaves.up.forward")
-                .badge(model.count(.feed(nil)) ?? 0)
-                .tag(Place.feed(nil))
-                .contextMenu { ScopeMenu(place: .feed(nil)) }
-            ForEach(model.folderNames, id: \.self) { name in
-                if name.isEmpty {
-                    ForEach(model.feeds(in: ""), id: \.self) { FeedRow(feed: $0) }
-                } else {
-                    DisclosureGroup(isExpanded: expanded(name)) {
-                        ForEach(model.feeds(in: name), id: \.self) { FeedRow(feed: $0) }
-                    } label: {
-                        Label(name, systemImage: "folder")
-                            .badge(model.count(.feed(name)) ?? 0)
-                            .tag(Place.feed(name))
-                            .contextMenu { ScopeMenu(place: .feed(name)) }
-                    }
-                }
-            }
-        }
-    }
-
-    private func expanded(_ name: String) -> Binding<Bool> {
-        Binding(get: { open.split(separator: "\n").contains { $0 == name } },
-                set: { on in
-                    var names = open.split(separator: "\n").map(String.init).filter { $0 != name }
-                    if on { names.append(name) }
-                    open = names.joined(separator: "\n")
-                })
-    }
-}
 
 struct FeedRow: View {
     @Environment(AppModel.self) private var model

@@ -51,6 +51,15 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: focus mode (Focus.swift, as focus.js): full screen, only what's open, the toolbar and menu bar hidden till the top; ⇧⌘F, [ ], F in a book, ⇧F in an article, Esc
 - not needed: the pens (pens.js), the lasso and handwriting into text are the tablet's; a note on the passage made from handwriting shows here as any highlight's note
 
+## The focused round (2026-10-30)
+
+- here: the sidebar full, mini or hidden on this Mac (⌘\, the button at the top left, View › Sidebar, Settings › General); a hidden one back for a moment; none while an article is read
+- here: Today, Review, Library (its kinds with Inbox, Later and Archive, and the saved views), Books, Feed (its folders), Highlights; Pinned (settings nav_pins, Settings › General); Search ⌘K, Stats, Preferences at the bottom
+- here: the article bar: Aa, Listen, Save (Feed, AntennaPod-only episodes), Done, …, Notebook; Shortlist, Later, the original, Focus Mode and next/previous in the … menu; the time left under the text
+- here: books the Apple Books way: two pages when wide (already), Pages by default (already), the title in the middle, Contents, Aa, Search, Bookmark, …; Listen, Notebook, About, Ask and Focus in …; contents and the panel slide over the pages; the footer fades after a page turn
+- here: Themes & Settings (Aa) for articles and books: A A, Pages/Scroll, six looks, Auto/Light/Dark, the typeface, spacing, width, justify; All Themes; articles now have a typeface, a size, spacing and a width (they had none)
+- not needed: the toolbar hiding as you scroll, and fading in a book (a Mac window keeps its toolbar; Focus Mode hides it)
+
 ## Lists
 
 - here: the Library and the Feed, kinds, tabs, order, filters (length, added, highlighted, not started, source, author, tag), saved views, several at once, Undo, the Feed's sources (rename, move, switches, unfollow, follow a site), Check for New Posts

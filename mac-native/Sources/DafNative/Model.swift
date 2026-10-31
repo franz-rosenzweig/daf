@@ -8,6 +8,7 @@ enum Place: Hashable {
     case home                         // the Library's home: its shelves
     case review
     case library(String)              // inbox, later, archive
+    case kind(String)                 // a kind of the Library (article, email, video, tweet, pdf), in AppModel.libraryTab
     case shortlist
     case feed(String?)                // nil: everything unseen; else a category
     case feedSource(String)           // one feed ("feed/12")
@@ -27,6 +28,18 @@ enum Place: Hashable {
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
     var isPage: Bool { self == .today || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
 
+    /// A list of the Library's (Inbox, Later, Archive, or a kind).
+    var isLibrary: Bool {
+        switch self {
+        case .library, .kind: return true
+        default: return false
+        }
+    }
+
+    /// The Library's kinds, as the sidebar has them: the kind, its name, its icon.
+    static let kinds = [("article", "Articles", "doc.text"), ("email", "Emails", "envelope"), ("video", "Videos", "play.rectangle"),
+                        ("tweet", "Tweets", "bubble.left"), ("pdf", "PDFs", "doc.richtext")]
+
     var title: String {
         switch self {
         case .today: return "Today"
@@ -40,6 +53,7 @@ enum Place: Hashable {
         case .podcasts: return "Podcasts"
         case .sources: return "Sources"
         case .library(let tab): return ["inbox": "Inbox", "later": "Later", "archive": "Archive"][tab] ?? tab.capitalized
+        case .kind(let k): return Self.kinds.first { $0.0 == k }?.1 ?? k.capitalized
         case .feed(let cat): return cat ?? "All Feeds"
         case .feedSource: return "Feed"
         case .view: return "View"
@@ -137,6 +151,13 @@ final class AppModel {
     var query = ""
     /// The Library's kind: "" for everything, else article, video, tweet, pdf, email.
     var kind = ""
+    /// A kind of the Library's tab: Inbox, Later or Archive, as the page's list has them.
+    var libraryTab = UserDefaults.standard.string(forKey: "libraryTab") ?? "inbox" {
+        didSet {
+            UserDefaults.standard.set(libraryTab, forKey: "libraryTab")
+            if case .kind? = place { reload() }
+        }
+    }
     /// A short word at the bottom of the window ("Saved to the Library"), with Undo when it can be undone.
     var toast: String?
     var toastUndo = false
@@ -300,6 +321,9 @@ final class AppModel {
             case .library(let tab):
                 items = try await docs("library", tab: tab, arg: kind, sort: sortLibrary, filter: listFilter.dict)
                 if tab != "archive" { keepForLater(items) }
+            case .kind(let k):
+                items = try await docs("library", tab: libraryTab, arg: k, sort: sortLibrary, filter: listFilter.dict)
+                if libraryTab != "archive" { keepForLater(items) }
             case .shortlist:
                 items = try await docs("library", tab: "inbox", arg: "starred", sort: sortLibrary, filter: listFilter.dict)
             case .view(let id):
@@ -456,6 +480,7 @@ final class AppModel {
         var v: [String: Any] = ["name": name, "tag": tag ?? "", "filter": listFilter.dict]
         switch place {
         case .library(let tab)?: v["where"] = "library"; v["arg"] = kind; v["tab"] = tab; v["sort"] = sortLibrary
+        case .kind(let k)?: v["where"] = "library"; v["arg"] = k; v["tab"] = libraryTab; v["sort"] = sortLibrary
         case .shortlist?: v["where"] = "library"; v["arg"] = "starred"; v["tab"] = "inbox"; v["sort"] = sortLibrary
         case .feed(let cat)?: v["where"] = "feed"; v["arg"] = cat ?? ""; v["tab"] = feedTab; v["sort"] = sortFeed
         case .feedSource(let f)?: v["where"] = "feed"; v["arg"] = f; v["tab"] = feedTab; v["sort"] = sortFeed
@@ -673,6 +698,15 @@ final class AppModel {
         } catch { self.error = error.localizedDescription }
     }
 
+    /// The places pinned in the sidebar, changed here (Settings › Reading › Sidebar): kept with today's settings.
+    func pinned(_ keys: [String]) {
+        guard var t = today?.raw else { return }
+        var s = t["settings"] as? [String: Any] ?? [:]
+        s["nav_pins"] = keys
+        t["settings"] = s
+        today = J(t)
+    }
+
     /// A show's page on the Podcasts page (episodes.show).
     func showPodcast(_ feed: String) {
         podcastShow = feed
@@ -700,6 +734,10 @@ final class AppModel {
         case .library(let tab):
             if tab == "inbox" { return counts.o("library")?.raw.values.compactMap { ($0 as? NSNumber)?.intValue }.reduce(0, +) }
             return nil
+        case .home:
+            return counts.o("library")?.raw.values.compactMap { ($0 as? NSNumber)?.intValue }.reduce(0, +)
+        case .kind(let k):
+            return counts.o("library")?.i(k).flatMap { $0 > 0 ? $0 : nil }
         case .feed(let cat):
             if let cat { return counts.o("feed")?.i(cat) }
             return counts.i("feed_total")

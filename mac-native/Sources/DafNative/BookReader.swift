@@ -36,7 +36,8 @@ final class BookModel {
     var highlights: [J] = []
     var bookmarks: [J] = []
     var marked = false
-    var showContents = UserDefaults.standard.bool(forKey: "book.contents")
+    /// The panel over the pages (contents, search and bookmarks from the left; the book's details, the notebook and Ask from the right).
+    var showContents = false
     var sidebar = "contents"            // contents, highlights, bookmarks
     var editing: ReaderModel.Editing?
     var sheet: HLSheet?
@@ -75,6 +76,13 @@ final class BookModel {
         self.target = target
         look = BookLook.load(book: id)
         ownLook = UserDefaults.standard.dictionary(forKey: "book.look." + id) != nil
+        // the app's look (Themes & Settings, or Settings › Appearance): a book that follows it is set again in it
+        NotificationCenter.default.addObserver(forName: .dafTheme, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.look.theme == "auto", self.epub != nil else { return }
+                self.restyle(self.look)
+            }
+        }
     }
 
     func say(_ s: String) {
@@ -1031,6 +1039,9 @@ struct BookReaderView: View {
     @State private var showLook = false
     @State private var showPercent = false
     @State private var percent = ""
+    /// The footer, faded once a page has turned, and back with the pointer near it.
+    @State private var quiet = false
+    @State private var openedAt = Date()
 
     init(id: String, at: String? = nil) { _m = State(initialValue: BookModel(id: id, at: at)) }
 
@@ -1041,15 +1052,17 @@ struct BookReaderView: View {
             } else if let e = m.error, m.epub == nil {
                 ContentUnavailableView("The book didn't open", systemImage: "exclamationmark.triangle", description: Text(e))
             } else {
-                HStack(spacing: 0) {
-                    if m.showContents {
-                        BookSidebar(m: m).frame(width: 270)
-                        Divider()
-                    }
+                ZStack(alignment: panelOnRight ? .trailing : .leading) {
                     BookPages(model: m)
                         .overlay(alignment: .bottom) {
                             Text(m.footer).font(.caption).foregroundStyle(Color(nsColor: m.look.quiet)).monospacedDigit().padding(.bottom, 12)
+                                .opacity(quiet ? 0 : 1)
+                                .animation(.easeInOut(duration: 0.35), value: quiet)
                         }
+                        .onContinuousHover { phase in
+                            if case .active(let p) = phase, quiet, p.y > pagesHeight - 70 { quiet = false }
+                        }
+                        .background(GeometryReader { g in Color.clear.onAppear { pagesHeight = g.size.height }.onChange(of: g.size.height) { _, h in pagesHeight = h } })
                         .overlay(alignment: .top) {
                             VStack(spacing: 8) {
                                 kindleBanner
@@ -1063,6 +1076,23 @@ struct BookReaderView: View {
                             if Speaker.shared.key == m.listenKey { SpeakerBar().padding(.bottom, 72) }
                         }
                         .overlay { if m.epub == nil { ProgressView("Opening the book…").padding(40) } }
+                    // the panel slides over the pages; a click beside it puts it away
+                    if m.showContents {
+                        Color.black.opacity(0.14)
+                            .contentShape(Rectangle())
+                            .onTapGesture { m.showContents = false }
+                            .transition(.opacity)
+                        BookSidebar(m: m)
+                            .frame(width: 310)
+                            .frame(maxHeight: .infinity)
+                            .background(.regularMaterial)
+                            .shadow(color: .black.opacity(0.18), radius: 14)
+                            .transition(.move(edge: panelOnRight ? .trailing : .leading))
+                    }
+                }
+                .animation(.snappy(duration: 0.25), value: m.showContents)
+                .onChange(of: m.footer) { _, _ in
+                    if Date().timeIntervalSince(openedAt) > 2.5, !m.showContents, !showLook { quiet = true }
                 }
             }
         }
@@ -1070,30 +1100,33 @@ struct BookReaderView: View {
         .background(WindowFinder { if let w = $0, w !== window { window = w } })
         .onChange(of: Focus.shared.started) { _, _ in if Focus.shared.isOn(window) { m.showContents = false } }
         .navigationTitle(m.title)
-        .navigationSubtitle(m.chapter)
+        .toolbar(removing: .title)
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button { m.showContents.toggle(); UserDefaults.standard.set(m.showContents, forKey: "book.contents") } label: {
-                    Label("Contents", systemImage: "list.bullet")
-                }
-                .help("Contents, highlights and bookmarks")
-                .keyboardShortcut("t", modifiers: [.command, .option])
+            // as Apple Books has it: the title in the middle, and Contents, Aa, Search, Bookmark and … beside it
+            ToolbarItem(placement: .principal) {
+                Text(m.title).font(.headline).lineLimit(1).help(m.chapter)
             }
             ToolbarItemGroup {
+                Button { panel("contents") } label: { Label("Contents", systemImage: "list.bullet") }
+                    .help("Contents (⌥⌘T)")
+                    .keyboardShortcut("t", modifiers: [.command, .option])
+                Button { showLook.toggle() } label: { Label("Themes & Settings", systemImage: "textformat.size") }
+                    .help("Themes & Settings")
+                    .popover(isPresented: $showLook, arrowEdge: .bottom) { ThemesPanel(book: m) }
                 Button { m.sidebar = "search"; m.showContents = true; m.focusSearch += 1 } label: { Label("Search the Book", systemImage: "magnifyingglass") }
                     .help("Search the book (⌘F)")
                     .keyboardShortcut("f", modifiers: .command)
-                Button { if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) } } label: {
-                    Label("Listen", systemImage: Speaker.shared.key == m.listenKey && Speaker.shared.playing ? "pause.circle" : "play.circle")
-                }
-                .help("Read aloud from this page (P)")
-                Button { showLook.toggle() } label: { Label("Appearance", systemImage: "textformat.size") }
-                    .help("Typeface, size and theme")
-                    .popover(isPresented: $showLook, arrowEdge: .bottom) { LookPanel(m: m) }
                 Button { Task { await m.toggleBookmark() } } label: { Label(m.marked ? "Remove the Bookmark" : "Bookmark", systemImage: m.marked ? "bookmark.fill" : "bookmark") }
                     .help(m.marked ? "Remove the bookmark (B)" : "Bookmark this page (B)")
-                FocusButton()
                 Menu {
+                    Button(Speaker.shared.key == m.listenKey && Speaker.shared.playing ? "Pause Listening" : "Listen from Here") {
+                        if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) }
+                    }
+                    Button("Notebook") { panel("highlights") }
+                    Button("About This Book") { panel("info") }
+                    Button("Ask About This Book") { panel("ask") }
+                    Button("Focus Mode") { Focus.shared.toggle() }
+                    Divider()
                     Button("Go to the Beginning") { m.goToBeginning() }
                     Button("Go to the Kindle's Page") { m.goToKindle() }.disabled(m.details?.o("kindle") == nil)
                     Button("Go to a Percent…") { percent = "\(Int((m.fraction * 100).rounded()))"; showPercent = true }
@@ -1129,6 +1162,18 @@ struct BookReaderView: View {
             Button("OK") { m.error = nil }
         } message: { Text(m.error ?? "") }
         .frame(minWidth: 640, minHeight: 520)
+    }
+
+    @State private var pagesHeight: CGFloat = 0
+
+    /// The book's details, the notebook and Ask come from the right; contents, search and bookmarks from the left.
+    private var panelOnRight: Bool { ["info", "highlights", "ask"].contains(m.sidebar) }
+
+    /// The panel at a tab, or away if it's already there.
+    private func panel(_ tab: String) {
+        if m.showContents && m.sidebar == tab { m.showContents = false; return }
+        m.sidebar = tab
+        m.showContents = true
     }
 
     /// Near the end: the next in the series; Finished on Hardcover.
@@ -1339,63 +1384,4 @@ struct BookSidebar: View {
 
 extension EPUB.TOCItem {
     var kids: [EPUB.TOCItem]? { children.isEmpty ? nil : children }
-}
-
-/// The Aa panel: typeface, size, spacing, justified, theme.
-struct LookPanel: View {
-    let m: BookModel
-    @State private var look = BookLook()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                ForEach(BookLook.themes, id: \.0) { t in
-                    let l = { var x = look; x.theme = t.0; return x }()
-                    Button { look.theme = t.0; m.restyle(look) } label: {
-                        ZStack {
-                            Circle().fill(Color(nsColor: l.background))
-                            Text("Aa").font(.system(size: 13, weight: .semibold, design: .serif)).foregroundStyle(Color(nsColor: l.ink))
-                        }
-                        .frame(width: 38, height: 38)
-                        .overlay(Circle().stroke(look.theme == t.0 ? Color.daf : Color.secondary.opacity(0.35), lineWidth: look.theme == t.0 ? 2.5 : 1))
-                    }
-                    .buttonStyle(.plain)
-                    .help(t.1)
-                }
-            }
-            Picker("Typeface", selection: Binding(get: { look.font }, set: { look.font = $0; m.restyle(look) })) {
-                ForEach(BookLook.fonts, id: \.self) { f in Text(f).tag(f) }
-            }
-            HStack {
-                Button { look.size = max(13, look.size - 1); m.restyle(look) } label: { Image(systemName: "textformat.size.smaller") }
-                Text("\(Int(look.size)) pt").monospacedDigit().frame(width: 52)
-                Button { look.size = min(34, look.size + 1); m.restyle(look) } label: { Image(systemName: "textformat.size.larger") }
-            }
-            LabeledContent("Line spacing") {
-                Slider(value: Binding(get: { Double(look.spacing) }, set: { look.spacing = CGFloat(($0 * 20).rounded() / 20) }), in: 1.1...2.0) { editing in
-                    if !editing { m.restyle(look) }
-                }
-                .frame(width: 150)
-            }
-            Toggle("Justify the text", isOn: Binding(get: { look.justify }, set: { look.justify = $0; m.restyle(look) }))
-            Picker("Line width", selection: Binding(get: { look.width }, set: { look.width = $0; m.restyle(look) })) {
-                ForEach(BookLook.widths, id: \.0) { Text($0.1).tag($0.0) }
-            }
-            .pickerStyle(.segmented)
-            Picker("Layout", selection: Binding(get: { look.flow }, set: { look.flow = $0; m.restyle(look) })) {
-                Text("Pages").tag("paginated")
-                Text("Scroll").tag("scrolled")
-            }
-            .pickerStyle(.segmented)
-            Toggle("Just for this book", isOn: Binding(get: { m.ownLook }, set: { on in
-                m.ownLook = on
-                if !on { UserDefaults.standard.removeObject(forKey: "book.look." + m.id); look = BookLook.load(); m.restyle(look) }
-                else { m.restyle(look) }
-            }))
-            .help("This book keeps its own typeface, size, spacing and width")
-        }
-        .padding(18)
-        .frame(width: 300)
-        .onAppear { look = m.look }
-    }
 }

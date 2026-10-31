@@ -33,20 +33,34 @@ struct MainView: View {
         }
     }
 
+    /// The sidebar, as wide as full or mini asks.
+    private var sidebar: some View {
+        let mini = Side.shared.mini
+        return Sidebar().navigationSplitViewColumnWidth(min: mini ? 54 : 190, ideal: mini ? 58 : 220, max: mini ? 64 : 320)
+    }
+
+    /// An article (or a PDF, a video, an episode) open from the list: no sidebar while it's read.
+    private var reading: Bool {
+        guard model.place?.isPage != true, model.place != .highlights, let item = model.selected else { return false }
+        return item.isDoc
+    }
+
     var body: some View {
         @Bindable var model = model
         Group {
             if model.place?.isPage == true {
                 NavigationSplitView {
-                    Sidebar().navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
+                    sidebar
                 } detail: {
                     page
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .themed()
+                        .toolbar { ToolbarItem(placement: .navigation) { SidebarButton() } }
                 }
+                .toolbar(removing: .sidebarToggle)
             } else {
                 NavigationSplitView {
-                    Sidebar().navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
+                    sidebar
                 } content: {
                     Group {
                         switch model.place {
@@ -57,11 +71,13 @@ struct MainView: View {
                     }
                     .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 520)
                     .themed()
+                    .toolbar { ToolbarItem(placement: .navigation) { SidebarButton() } }
                 } detail: {
                     opened
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .themed()
                 }
+                .toolbar(removing: .sidebarToggle)
             }
         }
         .overlay(alignment: .bottom) {
@@ -120,12 +136,13 @@ struct MainView: View {
             }
         }
         .importsItemProviders([.image]) { PaperPages.take($0) }        // Continuity Camera: File › Import from iPhone
-        .searchable(text: $model.query, placement: .sidebar, prompt: "Search Daf")
-        .onSubmit(of: .search) {
-            model.place = .search
-            model.reload()
+        .onChange(of: model.place) { _, _ in
+            model.placeChanged()
+            Side.shared.reading = reading
+            Side.shared.applySoon()
         }
-        .onChange(of: model.place) { _, _ in model.placeChanged() }
+        .onChange(of: model.selection) { _, _ in Side.shared.reading = reading }
+        .onAppear { Side.shared.applySoon() }
         .task {
             model.reload()
             await model.loadViews()
@@ -135,62 +152,6 @@ struct MainView: View {
         .alert("Daf", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
         } message: { Text(model.error ?? "") }
-    }
-}
-
-// MARK: the sidebar
-
-struct Sidebar: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        @Bindable var model = model
-        List(selection: $model.place) {
-            Label("Today", systemImage: "sun.max").tag(Place.today)
-            row(.review, "Review", "rectangle.stack")
-            Section("Library") {
-                row(.home, "Home", "house")
-                row(.library("inbox"), "Inbox", "tray")
-                row(.library("later"), "Later", "clock")
-                row(.shortlist, "Shortlist", "star")
-                row(.library("archive"), "Archive", "archivebox")
-            }
-            FeedSection()
-            ViewsSection()
-            Section("Reading") {
-                BooksRow()
-                row(.manga, "Manga", "book.pages")
-                row(.torah, "Torah", "scroll")
-                row(.recovery, "Recovery", "sunrise")
-                row(.podcasts, "Podcasts", "headphones")
-                row(.highlights, "Highlights", "highlighter")
-                row(.paper, "Paper Pages", "camera.viewfinder")
-                row(.stats, "Stats", "chart.bar")
-            }
-            Section {
-                row(.sources, "Sources", "arrow.triangle.2.circlepath")
-            }
-            if model.place == .search {
-                Section("Search") { Label("“\(model.query)”", systemImage: "magnifyingglass").tag(Place.search) }
-            }
-        }
-        .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) {
-            if Connection.shared.offline {
-                Label(Outbox.shared.ops.isEmpty ? "Offline: what this Mac kept" : "Offline · " + plural(Outbox.shared.ops.count, "change") + " waiting",
-                      systemImage: "wifi.slash")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    private func row(_ p: Place, _ title: String, _ icon: String) -> some View {
-        Label(title, systemImage: icon)
-            .badge(model.count(p) ?? 0)
-            .tag(p)
     }
 }
 
@@ -227,6 +188,17 @@ struct ItemList: View {
             }
         }
         .toolbar {
+            if case .kind = model.place {
+                ToolbarItem {
+                    Picker("Show", selection: $model.libraryTab) {
+                        Text("Inbox").tag("inbox")
+                        Text("Later").tag("later")
+                        Text("Archive").tag("archive")
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
+            }
             if case .library = model.place {
                 ToolbarItem {
                     Picker("Kind", selection: $model.kind) {
@@ -345,7 +317,7 @@ private func isFeed(_ p: Place) -> Bool {
 /// A list of articles and the like, which has an order and filters (not books, manga or search).
 private func hasDocs(_ p: Place) -> Bool {
     switch p {
-    case .library, .shortlist, .feed, .feedSource, .view: return true
+    case .library, .kind, .shortlist, .feed, .feedSource, .view: return true
     default: return false
     }
 }
@@ -387,6 +359,39 @@ struct Thumb: View {
             .frame(width: book ? 40 : 54, height: book ? 60 : 54)
             .clipShape(RoundedRectangle(cornerRadius: book ? 3 : 6))
         }
+    }
+}
+
+/// An article's … menu: what the bar doesn't show, as the page's.
+struct ReaderMore: View {
+    @Environment(AppModel.self) private var model
+    let item: Item
+
+    var body: some View {
+        if item.whereIn != "feed" {
+            Button(item.j.b("starred") ? "Remove from the Shortlist" : "Add to the Shortlist") { Task { await model.star(item) } }
+        }
+        if item.whereIn == "library" {
+            Button(item.status == "later" ? "Back to Inbox" : "Read Later") { Task { await model.later(item) } }
+        }
+        if let u = item.j.s("url"), let url = URL(string: u) {
+            Button("Open the Original") { NSWorkspace.shared.open(url) }
+            Button("Copy the Link") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string) }
+        }
+        Button("Focus Mode") { Focus.shared.toggle() }
+        Divider()
+        Button("Next in the List") { model.step(1) }
+        Button("Previous in the List") { model.step(-1) }
+        Divider()
+        if let r = model.reader, r.doc != nil, !r.playsMedia {
+            Button("Read Aloud from Here") { r.listen(from: r.textView?.selectedRange().location ?? 0) }
+            Button("Reset Reading Progress") { Task { await r.resetProgress() } }
+        }
+        Button("Edit the Title and Author…") { model.editMeta = true }
+        Button("Send to Kindle") { Task { await model.sendToKindle([item.id]) } }
+        if let r = model.route(for: item) { Button("Open in a New Window") { model.openRoute = r } }
+        Divider()
+        Button("Delete", role: .destructive) { Task { await model.delete(item) } }
     }
 }
 
@@ -479,6 +484,7 @@ struct Week: View {
 struct Detail: View {
     @Environment(AppModel.self) private var model
     @AppStorage("torahLang") private var torahLang = "both"
+    @State private var showAa = false
 
     var body: some View {
         @Bindable var model = model
@@ -504,28 +510,31 @@ struct Detail: View {
                     .help("The reading in Hebrew, English or both")
                 }
             }
+            // as the page's bar: Aa, Listen, Save (the Feed's, and an episode met only in AntennaPod), Done, …, the notebook
             if let item = model.selected, item.isDoc {
                 ToolbarItemGroup {
+                    Button { showAa.toggle() } label: { Label("Themes & Settings", systemImage: "textformat.size") }
+                        .help("Themes & Settings")
+                        .popover(isPresented: $showAa, arrowEdge: .bottom) { ThemesPanel() }
+                    if let r = model.reader, r.doc != nil, !r.playsMedia {
+                        let on = Speaker.shared.docID == r.id && Speaker.shared.playing
+                        Button { r.listen() } label: { Label(on ? "Pause" : "Listen", systemImage: on ? "pause.circle" : "speaker.wave.2") }
+                            .help(on ? "Pause (P)" : "Listen (P)")
+                    }
                     if item.whereIn == "feed" || item.whereIn == "podcast" {     // podcast: an episode met only in AntennaPod
                         Button { Task { await model.saveToLibrary(item) } } label: { Label("Save to Library", systemImage: "tray.and.arrow.down") }
-                    } else {
-                        Button { Task { await model.later(item) } } label: { Label(item.status == "later" ? "Back to Inbox" : "Read Later", systemImage: "clock") }
+                            .help("Save to Library (S)")
                     }
                     if item.whereIn != "podcast" {
                         Button { Task { await model.done(item) } } label: {
-                            Label(item.whereIn == "feed" ? "Mark Seen" : "Archive", systemImage: item.whereIn == "feed" ? "checkmark.circle" : "archivebox")
+                            Label(item.whereIn == "feed" ? "Mark Seen" : "Done", systemImage: "checkmark.circle")
                         }
+                        .help(item.whereIn == "feed" ? "Mark seen (E)" : "Done: to the Archive (E)")
                     }
-                    if item.whereIn != "feed" {
-                        Button { Task { await model.star(item) } } label: {
-                            Label(item.j.b("starred") ? "Off the Shortlist" : "On the Shortlist", systemImage: item.j.b("starred") ? "star.fill" : "star")
-                        }
-                        .help("The Shortlist (F)")
-                    }
-                }
-                ToolbarItem { FocusButton() }
-                ToolbarItem {
-                    Button { model.showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.right") }
+                    Menu { ReaderMore(item: item) } label: { Label("More", systemImage: "ellipsis.circle") }
+                        .help("More actions")
+                    Button { model.showInspector.toggle() } label: { Label("Notebook", systemImage: "sidebar.right") }
+                        .help("The notebook: highlights, the note and the tags (⌥⌘I)")
                         .keyboardShortcut("i", modifiers: [.command, .option])
                 }
             }
@@ -553,7 +562,7 @@ struct Opened: View {
                     if let e = reader.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }
                     else if reader.doc == nil { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
                     else if reader.playsMedia { VideoArticle(model: reader) }
-                    else { ArticleReader(model: reader) }
+                    else { ArticleReader(model: reader).overlay(alignment: .bottom) { MinutesLeft(model: reader) } }
                 } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
             }
         }
