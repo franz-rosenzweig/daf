@@ -1484,3 +1484,13 @@ html.focus.fpanel .ptabs .pclose{display:none}
 .epmore summary::-webkit-details-marker{display:none}
 .epmore[open] summary{display:none}
 .pinlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 16px;padding:4px 0 6px}
+/* ---------- the reader's bar, focused (reader.js drawReaderTop, chrome): it slides away as you read
+   on and the title takes its middle once the heading has gone; the time left sits under the text. ---------- */
+.rv > #rtop{transition:transform .25s ease, box-shadow .25s ease}
+.rv.chromehide > #rtop{transform:translateY(calc(-100% - 2px))}
+.rv.chromehide .vhead{top:0}
+.vhead{transition:top .25s ease}
+.rtitle{flex:1;min-width:0;text-align:center;font-size:13px;color:var(--fg-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .2s}
+.rv.titled .rtitle{opacity:1}
+.rleft{position:sticky;bottom:0;text-align:center;font-size:12.5px;color:var(--fg-3);padding:22px 0 12px;margin-top:-40px;background:linear-gradient(to bottom,transparent,var(--bg) 55%);pointer-events:none;font-variant-numeric:tabular-nums}
+@media (max-width:600px){ .rtitle{display:none} }

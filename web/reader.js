@@ -854,38 +854,39 @@ function markRange(el, s, e, h){
 // The item before or after this one in the list it was opened from (the tag filter counts).
 function visibleItems(){ const L = R.list; if (!L) return []; return R.tag ? L.items.filter(d => tagsOf(d).includes(R.tag)) : L.items; }
 function neighbor(id, dir){ const xs = visibleItems(), i = xs.findIndex(d => d.id === id); return i < 0 ? null : xs[i + dir] || null; }
+// The reader's bar: Back, Aa, the title once you're past it, Listen, Save (a Feed item or an episode of
+// its own), Done, … and the notebook. Everything else (Shortlist, Later, Open original, Focus, the next
+// and previous in the list) is in the … menu with its key. While you read it slides away, and comes
+// back when you scroll up or the pointer nears the top (onScroll, chrome).
 function drawReaderTop(){
   const d = R.doc, top = $('#rtop'); if (!d || !top) return;
-  const feed = d.where_ === 'feed', pod = d.where_ === 'podcast';     // pod: an episode met only in AntennaPod (episodes.py)
-  const pv = neighbor(d.id, -1), nx = neighbor(d.id, 1);
+  const feed = d.where_ === 'feed', pod = d.where_ === 'podcast', playing = R.tts.on && R.tts.doc === d.id && R.tts.playing;
   top.innerHTML = '<button class="ib" data-ract="back" aria-label="Back">' + I.back + '</button>' +
-    (pv || nx ? '<button class="ib" data-ract="prevdoc" title="Previous in the list' + K.tip('article', 'prevdoc') + '" aria-label="Previous in the list"' + (pv ? '' : ' disabled') + '>' + ICON.up + '</button><button class="ib" data-ract="nextdoc" title="Next in the list' + K.tip('article', 'nextdoc') + '" aria-label="Next in the list"' + (nx ? '' : ' disabled') + '>' + ICON.down + '</button>' : '') +
     '<button class="ib aa" data-ract="aa" aria-label="Typography and theme">Aa</button>' +
     (d.kind === 'torah' ? '<button class="btn sm tlcycle" data-tlcycle aria-label="Language: tap to switch">' + TLNAME[store.get('torahLang', 'both')] + '</button>' : '') +
     (d.kind === 'torah' ? '<div class="seg sm tlang" role="radiogroup" aria-label="Language">' + [['both', 'Both'], ['he', 'עברית'], ['en', 'English']].map(x => '<button type="button" role="radio" data-tlang="' + x[0] + '" class="' + ((store.get('torahLang', 'both') === x[0]) ? 'on' : '') + '" aria-checked="' + (store.get('torahLang', 'both') === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' : '') +
-    '<span class="spacer"></span>' +     // whether it counts toward the hour shows on Today and in Stats, not over the text (decided 2026-10-11)
-    (d.blocks.length && d.kind !== 'video' && !d.episode ? '<button class="btn sm' + (R.tts.on && R.tts.doc === d.id && R.tts.playing ? ' on' : '') + '" data-ract="listen">' + ICON.listen + (R.tts.on && R.tts.doc === d.id && R.tts.playing ? 'Pause' : 'Listen') + '</button>' : '') +
-    (!feed ? '<button class="ib' + (d.starred ? ' on' : '') + '" data-dact="star" data-id="' + esc(d.id) + '" title="' + (d.starred ? 'Off the Shortlist' : 'Shortlist') + K.tip('article', 'star') + '" aria-label="Shortlist">' + ICON.star(!!d.starred) + '</button>' : '') +
-    (feed || pod ? '<button class="btn sm" data-dact="save" data-id="' + esc(d.id) + '">' + ICON.save + 'Save to Library</button>' : '<button class="ib' + (d.status === 'later' ? ' on' : '') + '" data-dact="later" data-id="' + esc(d.id) + '" title="Later' + K.tip('article', 'later') + '" aria-label="Later">' + ICON.later + '</button>') +
+    '<span class="rtitle"' + dirAttr(d.title) + '>' + esc(shortTitle(tweetParts(d).title || '')) + '</span>' +     // whether it counts toward the hour shows on Today and in Stats, not over the text (decided 2026-10-11)
+    (d.blocks.length && d.kind !== 'video' && !d.episode ? '<button class="ib' + (playing ? ' on' : '') + '" data-ract="listen" title="' + (playing ? 'Pause' : 'Listen') + K.tip('article', 'listen') + '" aria-label="' + (playing ? 'Pause' : 'Listen') + '">' + (playing ? ICON.pause : ICON.listen) + '</button>' : '') +
+    (feed || pod ? '<button class="ib" data-dact="save" data-id="' + esc(d.id) + '" title="Save to Library' + K.tip('article', 'save') + '" aria-label="Save to Library">' + ICON.save + '</button>' : '') +
     (pod ? '' : '<button class="ib" data-dact="' + (feed ? 'seen' : 'archive') + '" data-id="' + esc(d.id) + '" title="Done' + K.tip('article', 'archive') + '" aria-label="Done">' + ICON.done + '</button>') +
     (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
-    (d.url ? '<a class="ib" href="' + esc(d.url) + '" target="_blank" rel="noopener" title="Open original" aria-label="Open original">' + ICON.ext + '</a>' : '') +
     '<button class="ib" data-ract="more" title="More actions (m)" aria-label="More actions"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg></button>' +
-    (C.Focus ? C.Focus.button('article') : '') +
-    '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" aria-label="Show or hide the side panel">' + ICON.panel + '</button>';
+    '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" title="Notebook and info' + K.tip('article', 'panel') + '" aria-label="Notebook and info">' + ICON.panel + '</button>';
 }
 // The … menu (Readwise's "More actions"): everything the bar doesn't show, with its key.
 function openMore(anchor){
   const d = R.doc; if (!d) return;
+  const rv = $('#main .rv'); if (rv) rv.classList.remove('chromehide');     // its button is in the bar
   const feed = d.where_ === 'feed', lib = d.where_ === 'library';
   const it = (act, label, key, cls) => '<button data-more="' + act + '"' + (cls ? ' class="' + cls + '"' : '') + '><span>' + label + '</span>' + (key ? '<kbd>' + key + '</kbd>' : '') + '</button>';
   const p = $('#pop'), r = anchor.getBoundingClientRect();
   // on a phone the bar has no room for these, so they're here (see style.css, max-width 600px)
   const phone = matchMedia('(max-width:600px)').matches, pv = neighbor(d.id, -1), nx = neighbor(d.id, 1);
   p.innerHTML = '<div class="menu">' +
-    (phone ? (nx ? it('nextdoc', 'Next in the list', K.label('article', 'nextdoc')) : '') + (pv ? it('prevdoc', 'Previous in the list', K.label('article', 'prevdoc')) : '') +
-      it('panel', R.panelOpen ? 'Hide the notebook' : 'Notebook and info', '') +
-      (d.has_pdf && d.blocks.length ? it('pages', 'The PDF as printed', '') : '') + '<hr>' : '') +
+    (nx ? it('nextdoc', 'Next in the list', K.label('article', 'nextdoc')) : '') + (pv ? it('prevdoc', 'Previous in the list', K.label('article', 'prevdoc')) : '') +
+    (phone ? it('panel', R.panelOpen ? 'Hide the notebook' : 'Notebook and info', '') + (d.has_pdf && d.blocks.length ? it('pages', 'The PDF as printed', '') : '') : '') +
+    (!feed ? it('star', d.starred ? 'Off the Shortlist' : 'Shortlist', K.label('article', 'star')) : '') +
+    (C.Focus ? it('focus', C.Focus.on() ? 'Leave focus mode' : 'Focus mode', K.label('article', 'focus')) : '') + '<hr>' +
     it('note', 'Add a document note', K.label('article', 'docnote')) +
     (d.blocks.length && d.kind !== 'video' && !d.episode ? it('listen', R.tts.on && R.tts.doc === d.id ? 'Stop reading aloud' : 'Read aloud from here', K.label('article', 'aloud')) : '') +
     it('ask', 'Ask about this', '') +
@@ -917,7 +918,8 @@ function moreAct(a){
   else if (a === 'listen') { if (R.tts.on && R.tts.doc === d.id) stopTTS(); else startTTS(); }
   else if (a === 'kindle') sendToKindle([d.id]).then(r => { if (r) d.kindle_sent = { file: r.file, at: Date.now() / 1000 }; });
   else if (a === 'ask') { R.panel = 'ask'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#rpanel textarea'); if (x) x.focus(); }, 40); }
-  else if (['save', 'seen', 'later', 'archive', 'delete'].includes(a)) docAct(a, d.id);
+  else if (['save', 'seen', 'later', 'archive', 'delete', 'star'].includes(a)) docAct(a, d.id);
+  else if (a === 'focus' && C.Focus) C.Focus.toggle();
   else if (a === 'reset') api('/api/docs/' + encodeURIComponent(d.id) + '/progress', { method:'DELETE' }).then(() => { d.progress = 0; $('#main').scrollTo({ top:0, behavior:'smooth' }); toast('Back to the start; progress cleared'); }).catch(e => toast(e.message));
   else if (a === 'open' && d.url) window.open(d.url, '_blank', 'noopener');
   else if (a === 'copy' && d.url) navigator.clipboard && navigator.clipboard.writeText(d.url).then(() => toast('Link copied'), () => {});
@@ -977,14 +979,14 @@ async function readView(id){
   // A feed that sends only the start: the page has the rest (daf/fulltext.py)
   if (d.where_ === 'feed' && d.url && !d.full && (d.words || 0) < 220 && !d.episode) h += '<div class="fullnote" id="fullnote"><span>' + (d.blocks.length ? 'That’s what the feed sends.' : 'The feed sent no text.') +
     '</span><button class="btn sm" data-ract="full">Load the full article</button></div>';
-  h += '</article></div><aside class="rpanel" id="rpanel"></aside></div></div>';
+  h += '</article>' + (d.mins && d.kind !== 'video' && !d.episode && d.blocks.length ? '<div class="rleft" id="rleft" aria-live="off">' + d.mins + ' min left</div>' : '') + '</div><aside class="rpanel" id="rpanel"></aside></div></div>';
   $('#main').innerHTML = h;
   drawReaderTop(); drawToc(); applyMarks(); drawPanel();
   if (d.kind === 'video') startPlayer(d);
   if (d.episode) startPod(d);
   if (d.preparing || (d.episode && ['queued', 'running'].includes(d.episode.transcript.status))) pollTranscript(d.id);
   const main = $('#main');
-  if (d.progress > 3 && d.progress < 98) setTimeout(() => { main.scrollTop = (main.scrollHeight - main.clientHeight) * d.progress / 100; }, 50);
+  if (d.progress > 3 && d.progress < 98) setTimeout(() => { R.lastY = (main.scrollHeight - main.clientHeight) * d.progress / 100; main.scrollTop = R.lastY; }, 50);   // (picking up isn't reading on: the bar stays)
   main.onscroll = onScroll; R.lastActive = Date.now();
   markSpeaking();
   if (C.Ink) C.Ink.open(d);                           // what's written on it with a pen (ink.js)
@@ -1032,7 +1034,23 @@ function onScroll(){
   const max = main.scrollHeight - main.clientHeight, pct = max > 0 ? Math.round(main.scrollTop / max * 100) : 100;
   const bar = $('#rprog'); if (bar) bar.style.width = pct + '%';
   if (pct > (d.progress || 0) && Date.now() - R.progT > 4000) { R.progT = Date.now(); d.progress = pct; api('/api/docs/' + encodeURIComponent(d.id) + '/progress', { method:'PUT', body:JSON.stringify({ pct }) }).catch(() => {}); }
+  chrome(main.scrollTop);
+  const left = $('#rleft');
+  if (left && d.mins) { const m = Math.round(d.mins * (1 - pct / 100)); left.textContent = pct >= 99 ? 'The end' : m < 1 ? 'Less than a minute left' : m + ' min left'; }
 }
+// The bar goes while you read on and comes back when you scroll up, reach the top, or bring the
+// pointer to it; the title shows in it once the heading has scrolled away. Not while the
+// selection's bar or a menu is up.
+function chrome(y){
+  const rv = $('#main .rv'); if (!rv) return;
+  const h1 = $('.doc h1'), past = h1 ? h1.getBoundingClientRect().bottom < 60 : y > 200;
+  rv.classList.toggle('titled', past);
+  const dy = y - (R.lastY || 0); R.lastY = y;
+  const busy = !$('#pop').hidden || H.visible();
+  if (y < 80 || dy < -6 || busy) rv.classList.remove('chromehide');
+  else if (dy > 6 && y > 160) rv.classList.add('chromehide');
+}
+document.addEventListener('mousemove', e => { if (e.clientY < 64 && C.S.route[0] === 'read') { const rv = $('#main .rv.chromehide'); if (rv) rv.classList.remove('chromehide'); } }, { passive: true });
 function setFocus(i, scroll){
   const d = R.doc; if (!d || !d.blocks.length) return;
   const idx = []; d.blocks.forEach((b, j) => { if (b.t !== 'img') idx.push(j); });
@@ -1427,6 +1445,7 @@ const TYPEFACES = [['serif', 'Source Serif', "'Source Serif 4'"], ['literata', '
 const ownKey = () => { const id = R.aaBook && C.curBook && C.curBook(); return id ? 'bookType.' + id : null; };
 C.typeFor = id => { const g = store.get('type', {}), o = id ? store.get('bookType.' + id, null) : null; return o ? Object.assign({}, g, o, { theme: g.theme }) : g; };
 function openAa(anchor, opts){
+  const rv = $('#main .rv'); if (rv) rv.classList.remove('chromehide');
   opts = opts || (C.S.route[0] === 'ebook' ? { book: true } : {});
   R.aaBook = !!opts.book;
   const own = ownKey() && store.get(ownKey(), null);
