@@ -50,6 +50,51 @@ enum SelfTest {
         for w in NSApp.windows where w.isVisible && w != main && w.level == .normal { w.close() }
     }
 
+    /// The article reaches the top of the window, and what's there over its column is the article's own.
+    static func atTop(_ w: NSWindow, _ tv: NSTextView?) -> Bool {
+        guard let tv, let sv = tv.enclosingScrollView, let frame = w.contentView?.superview else { return false }
+        let r = sv.convert(sv.bounds, to: nil), top = frame.bounds.height
+        guard r.maxY >= top - 1 else { return false }
+        let hit = frame.hitTest(NSPoint(x: r.midX, y: top - 12))
+        return hit == nil || hit!.isDescendant(of: sv)
+    }
+
+    /// What's at the top of a full-screen window, for the log: where the article starts, what a click
+    /// there would land on, the views across the top 60 points, and the windows.
+    static func topReport(_ w: NSWindow, _ tv: NSTextView?) -> String {
+        guard let frame = w.contentView?.superview else { return "-" }
+        let top = frame.bounds.height, band = NSRect(x: 0, y: top - 60, width: frame.bounds.width, height: 60)
+        var bits: [String] = []
+        if let sv = tv?.enclosingScrollView {
+            let r = sv.convert(sv.bounds, to: nil)
+            bits.append("article \(Int(r.minY))-\(Int(r.maxY)) of \(Int(top)), inset \(Int(sv.contentInsets.top)), layout \(Int(w.contentLayoutRect.maxY))")
+            var hit = frame.hitTest(NSPoint(x: r.midX, y: top - 12)), chain: [String] = []
+            while let h = hit, chain.count < 5 { chain.append(String(describing: type(of: h))); hit = h.superview }
+            bits.append("hit " + chain.joined(separator: "<"))
+        }
+        var views: [String] = []
+        func walk(_ v: NSView, _ depth: Int) {
+            let r = v.convert(v.bounds, to: nil)
+            guard depth < 10, r.intersects(band), !v.isHidden, v.alphaValue > 0.01, (v.layer?.opacity ?? 1) > 0.01 else { return }
+            if r.height <= 120 { views.append("\(type(of: v)) \(Int(r.minX))-\(Int(r.maxX))x\(Int(r.minY))-\(Int(r.maxY))") }
+            for s in v.subviews { walk(s, depth + 1) }
+        }
+        walk(frame, 0)
+        bits.append("top views: " + views.prefix(24).joined(separator: ", "))
+        bits.append("windows: " + NSApp.windows.filter(\.isVisible).map { "\(type(of: $0)) \(Int($0.frame.minY))-\(Int($0.frame.maxY)) a\(String(format: "%.1f", $0.alphaValue))" }.joined(separator: ", "))
+        return bits.joined(separator: " | ")
+    }
+
+    /// A colour as the view draws it now (Daf's colours change with light and dark).
+    static func drawn(_ c: NSColor?, in v: NSView?) -> NSColor? {
+        guard let c else { return nil }
+        var out: NSColor?
+        (v?.effectiveAppearance ?? NSApp.effectiveAppearance).performAsCurrentDrawingAppearance { out = c.usingColorSpace(.sRGB) }
+        return out
+    }
+
+    static func rgb(_ c: NSColor) -> String { String(format: "%.0f,%.0f,%.0f", c.redComponent * 255, c.greenComponent * 255, c.blueComponent * 255) }
+
     static func capture(_ name: String, _ which: NSWindow? = nil) {
         guard let w = which ?? window, let v = w.contentView?.superview ?? w.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
         v.cacheDisplay(in: v.bounds, to: rep)
@@ -166,10 +211,10 @@ enum SelfTest {
         // what's pinned, kept in Daf for every device
         let pins0 = Side.shared.pins(m.today?.o("settings"))
         await Side.shared.setPins(pins0.filter { $0 != "torah" } + ["sources"])
-        let kept = (try? await API.shared.json("/api/settings"))?.raw["nav_pins"] as? [String] ?? []
+        let keptPins = (try? await API.shared.json("/api/settings"))?.raw["nav_pins"] as? [String] ?? []
         await pause(0.6)
         capture("02c-sidebar-pins")
-        check(kept.contains("sources") && !kept.contains("torah") && Side.shared.pins(m.today?.o("settings")) == kept, "the sidebar's pins are kept in Daf", kept.joined(separator: ", "))
+        check(keptPins.contains("sources") && !keptPins.contains("torah") && Side.shared.pins(m.today?.o("settings")) == keptPins, "the sidebar's pins are kept in Daf", keptPins.joined(separator: ", "))
         await Side.shared.setPins(pins0)
         await go(m, .library("inbox"))
 
@@ -223,8 +268,8 @@ enum SelfTest {
         let th0 = (Theme.shared.mode, Theme.shared.light, Theme.shared.dark)
         Theme.shared.choose(mode: "light", light: "paper")
         await pause(0.8)
-        let paperBG = Theme.rgb(Theme.family("paper").light.bg).usingColorSpace(.sRGB)
-        let pageBG = r.textView?.backgroundColor.usingColorSpace(.sRGB)
+        let paperLook = Theme.rgb(Theme.family("paper").light.bg).usingColorSpace(.sRGB)
+        let pageBG = drawn(r.textView?.backgroundColor, in: r.textView)
         let sheet = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 342, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
         sheet.contentView = NSHostingView(rootView: ThemesPanel().environment(m))
         sheet.orderFront(nil)
@@ -234,8 +279,8 @@ enum SelfTest {
         capture("03d-paper-look")
         Theme.shared.choose(mode: th0.0, light: th0.1, dark: th0.2)
         await pause(0.5)
-        check(paperBG != nil && pageBG.map { abs($0.redComponent - paperBG!.redComponent) < 0.02 && abs($0.blueComponent - paperBG!.blueComponent) < 0.02 } == true,
-              "a look (Paper) sets the day's theme, and the article takes it")
+        check(paperLook != nil && pageBG.map { abs($0.redComponent - paperLook!.redComponent) < 0.02 && abs($0.blueComponent - paperLook!.blueComponent) < 0.02 } == true,
+              "a look (Paper) sets the day's theme, and the article takes it", "\(pageBG.map(rgb) ?? "-") for \(paperLook.map(rgb) ?? "-")")
         // as it opened, the article is as tall as its text, and the wheel scrolls it and it stays
         // (on macOS 27 the view stopped growing to its text: one screen tall, springing back)
         if let sv = tv.enclosingScrollView, let w = tv.window {
@@ -268,10 +313,23 @@ enum SelfTest {
                   "full screen \(full), options \(NSApp.presentationOptions.rawValue), toolbar shown \(w.toolbar?.isVisible ?? false)")
             check(panes() == 1 && m.reader?.textView === textView, "with only the article, the sidebar and the list gone, and the same reader still open", "panes \(panesBefore) → \(panes())")
             capture("70-focus")
+            // nothing over the page at the top of the screen (an empty title bar once stayed, a dark strip)
+            check(atTop(w, textView), "in focus mode the article goes to the top of the screen, no bar over it", topReport(w, textView))
             Focus.shared.leave(w)
             let back = await until(10) { !w.styleMask.contains(.fullScreen) }
             await pause(1.5)
             check(back && !Focus.shared.main && w.toolbar?.isVisible != false, "and leaving it gives the window back as it was")
+            // full screen without focus mode: the same, the bar there when the pointer goes to the top
+            w.toggleFullScreen(nil)
+            let plain = await until(10) { w.styleMask.contains(.fullScreen) }
+            await pause(1.5)
+            check(plain && NSApp.presentationOptions.contains(.autoHideToolbar) && atTop(w, textView),
+                  "full screen hides the toolbar till the top, the article up to the top of the screen",
+                  "options \(NSApp.presentationOptions.rawValue); " + topReport(w, textView))
+            capture("70b-full-screen")
+            w.toggleFullScreen(nil)
+            _ = await until(10) { !w.styleMask.contains(.fullScreen) }
+            await pause(1.5)
 
             // the window is still when nothing happens: no toolbar item drawn over and over (the
             // focus button once was, and scrolling in the lists and articles broke)
@@ -407,11 +465,12 @@ enum SelfTest {
         check(edited && seen == "Edited by the self-test", "Edit the Title and Author changes them", seen ?? "-")
         await r.resetProgress()
         check(((try? await API.shared.json("/api/docs/\(API.enc(r.id))"))?.d("progress") ?? -1) == 0, "Reset Reading Progress starts it again")
-        if let item = m.selected, item.whereIn != "feed" {
+        if let sel = m.selected, sel.whereIn != "feed" {
+            let item = m.items.first { $0.id == sel.id } ?? sel, was = item.j.b("starred")      // an earlier run may have left it on
             await m.star(item)
             let on = (try? await API.shared.json("/api/docs?where=library&tab=inbox&kind=starred&limit=200"))?.a("items").contains { $0.s("id") == item.id } ?? false
             if let again = m.items.first(where: { $0.id == item.id }) { await m.star(again) }
-            check(on, "F puts it on the Shortlist (and off again)")
+            check(on != was, "F puts it on the Shortlist (and off again)", was ? "it was on" : "")
         }
 
         // Ask (the sandbox's stand-in answers; the model is never asked)
@@ -1393,6 +1452,7 @@ enum SelfTest {
         let m1 = (try? await API.shared.json("/api/today"))?.d("counted") ?? 0
         check(m1 > m0, "15 seconds with the book count toward today's minutes", "\(m0) → \(m1)")
 
+        bm.sidebar = "contents"
         bm.showContents = true
         await pause(1)
         capture("31-book-contents", win)
@@ -1435,9 +1495,11 @@ enum SelfTest {
         scroll.flow = "paginated"
         bm.restyle(scroll)
         await pause(0.6)
+        let saves0 = bm.saves
         await bm.forgetPlace()
-        let forgot = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position") == nil
-        check(forgot, "Forget My Place in Daf forgets it")
+        let left = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position")
+        check(left == nil, "Forget My Place in Daf forgets it",
+              left.map { "kept \(Int(Date().timeIntervalSince1970 - ($0.d("updated") ?? 0))) s ago, saves \(saves0) → \(bm.saves), offline \(Connection.shared.offline), outbox \(Outbox.shared.ops.count), \(bm.error ?? "")" } ?? "")
         Speaker.shared.sleep(after: 15)
         let sleeping = Speaker.shared.sleepAt != nil
         Speaker.shared.sleep(after: nil)

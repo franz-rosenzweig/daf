@@ -58,7 +58,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: the article bar: Aa, Listen, Save (Feed, AntennaPod-only episodes), Done, …, Notebook; Shortlist, Later, the original, Focus Mode and next/previous in the … menu; the time left under the text
 - here: books the Apple Books way: two pages when wide (already), Pages by default (already), the title in the middle, Contents, Aa, Search, Bookmark, …; Listen, Notebook, About, Ask and Focus in …; contents and the panel slide over the pages; the footer fades after a page turn
 - here: Themes & Settings (Aa) for articles and books: A A, Pages/Scroll, six looks, Auto/Light/Dark, the typeface, spacing, width, justify; All Themes; articles now have a typeface, a size, spacing and a width (they had none)
-- not needed: the toolbar hiding as you scroll, and fading in a book (a Mac window keeps its toolbar; Focus Mode hides it)
+- not needed: the toolbar hiding as you scroll, and fading in a book (a Mac window keeps its toolbar; in full screen and Focus Mode it hides till the pointer goes to the top)
 
 ## Lists
 

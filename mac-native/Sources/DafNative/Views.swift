@@ -51,16 +51,17 @@ struct MainView: View {
             if model.place?.isPage == true {
                 NavigationSplitView {
                     sidebar
+                        .toolbar(removing: .sidebarToggle)          // SidebarButton instead (full, mini, hidden)
                 } detail: {
                     page
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .themed()
                         .toolbar { ToolbarItem(placement: .navigation) { SidebarButton() } }
                 }
-                .toolbar(removing: .sidebarToggle)
             } else {
                 NavigationSplitView {
                     sidebar
+                        .toolbar(removing: .sidebarToggle)
                 } content: {
                     Group {
                         switch model.place {
@@ -77,7 +78,6 @@ struct MainView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .themed()
                 }
-                .toolbar(removing: .sidebarToggle)
             }
         }
         .overlay(alignment: .bottom) {

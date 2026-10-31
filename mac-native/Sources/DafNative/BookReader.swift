@@ -330,12 +330,13 @@ final class BookModel {
 
     /// Forget my place in Daf: the book opens at its start (or where the Kindle is) next time.
     func forgetPlace() async {
+        saveTask?.cancel()                  // a place waiting to be kept would come back after the forgetting
+        forget = true
+        forgotAt = Date()
         do {
             try await API.shared.send("DELETE", "/api/ebooks/\(API.enc(id))/position", nil)
-            forget = true
-            forgotAt = Date()
             say("Daf forgot your place in this book")
-        } catch { self.error = error.localizedDescription }
+        } catch { forget = false; self.error = error.localizedDescription }
     }
 
     func exportHighlights() async {
@@ -1104,7 +1105,9 @@ struct BookReaderView: View {
         .toolbar {
             // as Apple Books has it: the title in the middle, and Contents, Aa, Search, Bookmark and … beside it
             ToolbarItem(placement: .principal) {
-                Text(m.title).font(.headline).lineLimit(1).help(m.chapter)
+                Text(m.title).font(.headline).lineLimit(1).truncationMode(.tail)
+                    .frame(maxWidth: 320)            // a long title would push the buttons into »
+                    .help(m.title + (m.chapter.isEmpty ? "" : " · " + m.chapter))
             }
             ToolbarItemGroup {
                 Button { panel("contents") } label: { Label("Contents", systemImage: "list.bullet") }

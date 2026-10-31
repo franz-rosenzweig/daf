@@ -24,7 +24,7 @@ A book opens the way Apple Books does it: two pages side by side when the window
 
 **Themes & Settings** is the same for both: two A buttons for smaller and bigger, Pages or Scroll for a book, six looks (Daf, Paper and E-ink for the day; Dusk, Night and Black for the night), Auto, Light or Dark, and under them the typeface and the spacing, the line width and justifying. A day look while it's dark switches to light, and a night look while it's light to dark. **All Themes…** opens Settings → Appearance.
 
-The toolbars stay where they are: a Mac window keeps its toolbar. For nothing but the page, there's Focus Mode.
+In a window the toolbars stay where they are, the way a Mac window keeps its toolbar. In full screen the toolbar hides until the pointer goes to the top of the screen, so the page goes right to the top. For nothing but the page, there's Focus Mode.
 
 ## Focus mode
 

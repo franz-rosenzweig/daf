@@ -14,6 +14,7 @@ struct DafNativeApp: App {
             MainView()
                 .environment(model)
                 .frame(minWidth: 900, minHeight: 560)
+                .windowToolbarFullScreenVisibility(.onHover)        // full screen is for reading: the bar comes at the top
         }
         .defaultSize(width: 1280, height: 820)
         .commands {
@@ -120,7 +121,7 @@ struct DafNativeApp: App {
         }
 
         WindowGroup("Daf", id: "route", for: String.self) { $route in
-            if let route { RouteView(route: route).environment(model) }
+            if let route { RouteView(route: route).environment(model).windowToolbarFullScreenVisibility(.onHover) }
         }
         .defaultSize(width: 860, height: 760)
 

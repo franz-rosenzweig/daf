@@ -45,17 +45,30 @@ final class Side {
 
     /// The main window's sidebar as it should be (Focus mode puts it away itself).
     func apply() {
+        let want = shown == "hidden" ? "" : mini ? "mini" : "full", changed = want != widthFor
+        widthFor = want
         for w in NSApp.windows where Focus.isMain(w) && !Focus.shared.isOn(w) {
             guard let s = Focus.split(w), s.splitViewItems.count > 1 else { continue }
-            let item = s.splitViewItems[0], hide = shown == "hidden"
+            let item = s.splitViewItems[0], hide = want.isEmpty
             item.minimumThickness = mini ? 54 : 190
             item.maximumThickness = mini ? 64 : 320
-            if item.isCollapsed != hide { item.animator().isCollapsed = hide }
-            let want = hide ? "" : mini ? "mini" : "full"
-            if !hide, widthFor != want || item.viewController.view.frame.width < item.minimumThickness - 1 || item.viewController.view.frame.width > item.maximumThickness + 1 {
+            if item.isCollapsed != hide {
+                // sized once it's out: sized while it opens, it settled too narrow
+                NSAnimationContext.runAnimationGroup { _ in item.animator().isCollapsed = hide } completionHandler: {
+                    MainActor.assumeIsolated { Side.shared.fit(changed) }
+                }
+            } else { fit(changed) }
+        }
+    }
+
+    /// An open sidebar at its width: as it was dragged, unless it changed size or is out of bounds.
+    private func fit(_ changed: Bool) {
+        for w in NSApp.windows where Focus.isMain(w) && !Focus.shared.isOn(w) {
+            guard let s = Focus.split(w), s.splitViewItems.count > 1, !s.splitViewItems[0].isCollapsed else { continue }
+            let item = s.splitViewItems[0], wide = item.viewController.view.frame.width
+            if changed || wide < item.minimumThickness - 1 || wide > item.maximumThickness + 1 {
                 s.splitView.setPosition(mini ? 58 : 220, ofDividerAt: 0)
             }
-            widthFor = want
         }
     }
 
