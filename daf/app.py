@@ -633,6 +633,8 @@ async def put_settings(request: Request):
     for k in ("hc_progress", "hc_autostart"):
         if isinstance(body.get(k), bool):
             s[k] = body[k]
+    if isinstance(body.get("nav_pins"), list) and all(isinstance(x, str) and len(x) < 40 for x in body["nav_pins"]):
+        s["nav_pins"] = body["nav_pins"][:20]                             # Preferences → Sidebar
     if isinstance(body.get("podcasts"), dict) and isinstance(body["podcasts"].get("transcribe"), bool):
         s["podcasts"] = {"transcribe": body["podcasts"]["transcribe"]}      # Preferences → Podcasts (episodes.py)
     if isinstance(body.get("cards_per_day"), int) and 0 <= body["cards_per_day"] <= 30:

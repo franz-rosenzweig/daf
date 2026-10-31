@@ -113,6 +113,8 @@ DEFAULT_SETTINGS = {
     # Reels (social.py): the extension sends Instagram's cookies only when this says so.
     "instagram": {"from_browser": False},
     "podcasts": {"transcribe": True},                 # transcribe an episode you play or open (episodes.py)
+    # the sidebar's Pinned places (web/app.js renderSide), below Today, Review, Library, Books, Feed and Highlights
+    "nav_pins": ["podcasts", "manga", "torah", "recovery", "shortlist"],
     # Books whose titles contain any of these never appear by name outside Daf's own pages:
     # not in review, the morning message, the nightstand or the Kindle. More live in settings.json.
     "private_titles": ["alcoholics anonymous", "big book", "twelve steps", "twelve and twelve"],
@@ -171,6 +173,8 @@ def load_settings():
             s[k] = saved[k]
     if isinstance(saved.get("vault_search_exclude"), list):   # vault folders ⌘K never searches (vaultsearch.py)
         s["vault_search_exclude"] = [x for x in saved["vault_search_exclude"] if isinstance(x, str)][:50]
+    if isinstance(saved.get("nav_pins"), list):       # Preferences → Sidebar
+        s["nav_pins"] = [x for x in saved["nav_pins"] if isinstance(x, str)][:20]
     if isinstance(saved.get("views"), list):          # saved Library and Feed views (Readwise's filtered views)
         s["views"] = [v for v in saved["views"] if isinstance(v, dict) and isinstance(v.get("id"), str)][:30]
     if isinstance(saved.get("goals"), list):

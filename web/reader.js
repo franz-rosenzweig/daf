@@ -58,19 +58,28 @@ async function refreshCounts(){
   try { R.counts = await api('/api/docs/counts'); C.renderSide(); } catch(e){}
 }
 C.navSearch = () => '<button class="nv" data-act="palette">' + ICON.search + '<span>Search</span><span class="ct"><span class="kbd">⌘K</span></span></button>';
-C.navExtra = (v, n) => {
-  const rt = C.S.route || [];
-  const on = (a, b) => rt[0] === a && (b == null || decodeURIComponent(rt[1] || '') === b) ? ' on' : '';
-  const k = R.counts || { feed: {}, library: {}, feed_total: '' };
-  const lib = '<button class="nv' + (rt[0] === 'library' && !rt[1] ? ' on' : '') + '" data-go="library"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 9 10 3.8 16.5 9v7.2h-4.3v-4.4H7.8v4.4H3.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span>Home</span></button>' + ['article', ...(k.emails_on || (k.library || {}).email ? ['email'] : []), 'video', 'tweet', 'pdf'].map(x => '<button class="nv' + on('library', x) + '" data-go="library/' + x + '">' + ICON[x] + '<span>' + KIND[x] + '</span><span class="ct">' + (k.library[x] || '') + '</span></button>').join('');
+// The sidebar's Library and Feed rows (app.js renderSide): each opens to its kinds or its folders, as
+// plain rows under it; the arrow beside it keeps that open or shut on this device.
+const CHEV = open => '<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="' + (open ? 'M5 8l5 5 5-5' : 'M8 5l5 5-5 5') + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const LIB_ICON = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.5 4v12M8.5 4v12M12 4.8l3.6 11"/></svg>';
+const navOn = (a, b) => { const rt = C.S.route || []; return rt[0] === a && (b == null || decodeURIComponent(rt[1] || '') === b) ? ' on' : ''; };
+C.navLibrary = () => {
+  const rt = C.S.route || [], k = R.counts || { feed: {}, library: {}, feed_total: '' };
+  const kinds = ['article', ...(k.emails_on || (k.library || {}).email ? ['email'] : []), 'video', 'tweet', 'pdf'];
+  const open = store.get('libOpen', false);
+  const total = kinds.reduce((a, x) => a + (+(k.library || {})[x] || 0), 0);
+  return '<div class="nvrow"><button class="nv' + (rt[0] === 'library' && !rt[1] ? ' on' : '') + '" data-go="library">' + LIB_ICON + '<span>Library</span><span class="ct">' + (total || '') + '</span></button>' +
+      '<button class="nvx" data-act="libopen" aria-expanded="' + open + '" aria-label="' + (open ? 'Hide' : 'Show') + ' the kinds" title="Articles, videos and the rest">' + CHEV(open) + '</button></div>' +
+    (open ? kinds.map(x => '<button class="nv sub' + navOn('library', x) + '" data-go="library/' + x + '"><span>' + KIND[x] + '</span><span class="ct">' + ((k.library || {})[x] || '') + '</span></button>').join('') +
+      (R.views || []).map(v => '<button class="nv sub' + navOn('view', v.id) + '" data-go="view/' + encodeURIComponent(v.id) + '" title="A saved view"><span>' + esc(v.name) + '</span></button>').join('') : '');
+};
+C.navFeed = () => {
+  const rt = C.S.route || [], k = R.counts || { feed: {}, library: {}, feed_total: '' };
   const cats = Object.keys(k.feed || {}).filter(Boolean).sort();
   const open = store.get('catsOpen', true);
-  const short = '<button class="nv' + on('library', KIND_STAR) + '" data-go="library/' + KIND_STAR + '">' + ICON.star(false) + '<span>Shortlist</span><span class="ct">' + (k.starred || '') + '</span></button>' +
-    (R.views || []).map(v => '<button class="nv sub' + on('view', v.id) + '" data-go="view/' + encodeURIComponent(v.id) + '" title="A saved view"><span>' + esc(v.name) + '</span></button>').join('');
-  return '<div class="navh"><span>Library</span><button class="ib tiny" data-act="add" aria-label="Add to Daf" title="Add a link, a book or a PDF">+</button></div><div class="nav">' + lib + short + n('books', 'Books', I.books) + '<button class="nv' + (rt[0] === 'manga' || rt[0] === 'mread' ? ' on' : '') + '" data-go="manga"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 3.5h8.5v13H4zM12.5 5.5H16v11h-3.5"/><path d="M6.5 6.5h3.5M6.5 9h3.5"/></svg><span>Manga</span></button>' + n('torah', 'Torah', I.torah) + n('recovery', 'Recovery', '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 14.5h14M5.5 14.5a4.5 4.5 0 0 1 9 0M10 4.5v2M4.6 7.1l1.4 1.4M15.4 7.1 14 8.5"/></svg>') + '<button class="nv' + (rt[0] === 'podcasts' ? ' on' : '') + '" data-go="podcasts"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="7.5" y="3" width="5" height="9" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Podcasts</span></button>' + n('highlights', 'Highlights', I.hl) + '</div>' +
-    '<div class="navh"><span>Feed</span><button class="ib tiny" data-act="cats" aria-label="Show or hide feed folders">' + (open ? '–' : '+') + '</button></div><div class="nav">' +
-    '<button class="nv' + (rt[0] === 'feed' && !rt[1] ? ' on' : '') + '" data-go="feed">' + ICON.feed + '<span>All feeds</span><span class="ct">' + (k.feed_total || '') + '</span></button>' +
-    (open ? cats.map(c => '<button class="nv sub' + on('feed', c) + '" data-go="feed/' + encodeURIComponent(c) + '"><span' + dirAttr(c) + '>' + esc(c) + '</span><span class="ct">' + k.feed[c] + '</span></button>').join('') : '') + '</div>';
+  return '<div class="nvrow"><button class="nv' + (rt[0] === 'feed' && !rt[1] ? ' on' : '') + '" data-go="feed">' + ICON.feed + '<span>Feed</span><span class="ct">' + (k.feed_total || '') + '</span></button>' +
+      (cats.length ? '<button class="nvx" data-act="cats" aria-expanded="' + open + '" aria-label="' + (open ? 'Hide' : 'Show') + ' the folders" title="Folders">' + CHEV(open) + '</button>' : '') + '</div>' +
+    (open ? cats.map(c => '<button class="nv sub' + navOn('feed', c) + '" data-go="feed/' + encodeURIComponent(c) + '"><span' + dirAttr(c) + '>' + esc(c) + '</span><span class="ct">' + k.feed[c] + '</span></button>').join('') : '');
 };
 
 /* ---------- Add: a link, a book or a PDF, as in Readwise's Add menu ---------- */
@@ -1450,6 +1459,7 @@ function openPalette(){
 }
 async function palResults(q){
   const cmds = [['Today', '#today'], ['Daily review', '#review'], ['All feeds', '#feed'], ['Articles', '#library/article'], ['Videos', '#library/video'], ['Books', '#books'], ['Highlights', '#highlights'], ['Preferences', '#prefs'],
+    ['Stats', '#stats'], ['Podcasts', '#podcasts'], ['Manga', '#manga'], ['Torah', '#torah'], ['Recovery', '#recovery'], ['Shortlist', '#library/' + KIND_STAR], ['Paper pages', '#paper'], ['Sources', '#sources'], ['The sidebar', '#prefs/sidebar'],
     ['Import from another app', '#prefs/import'], ['Keyboard shortcuts', '#prefs/keys'], ['AI settings', '#prefs/ai'], ['Morning email', '#prefs/digest'], ['Library tags', '#prefs/tags'], ['Tips', '#prefs/tips']]
     .filter(c => !q || c[0].toLowerCase().includes(q.toLowerCase()));
   palItems = cmds.map(c => ({ label:c[0], sub:'Go to', go:c[1] }));
@@ -1720,6 +1730,7 @@ document.addEventListener('click', e => {
   if (act && act.dataset.act === 'palette') { openPalette(); return; }
   if (act && act.dataset.act === 'add') { $('#side').classList.remove('open'); openAdd(); return; }
   if (act && act.dataset.act === 'cats') { store.set('catsOpen', !store.get('catsOpen', true)); C.renderSide(); return; }
+  if (act && act.dataset.act === 'libopen') { store.set('libOpen', !store.get('libOpen', false)); C.renderSide(); return; }
   if (act && act.dataset.act === 'expirefr') { act.disabled = true; api('/api/feed/expire', { method:'POST' }).then(() => { toast('Marked read in FreshRSS'); refreshCounts(); listView(R.list.where, R.list.arg); }).catch(err => { toast(err.message); act.disabled = false; }); return; }
   const mk = t.closest('mark.hl');
   if (mk && !getSel() && R.doc) { const h = R.doc.highlights.find(x => x.id === mk.dataset.h); if (h) { showHlBar(h); return; } }

@@ -28,6 +28,9 @@ const I = {
   paper:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3.5h7l3 3v10H5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 9v5M7.5 11.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
   moon:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M15 12.5A6.5 6.5 0 0 1 7.5 4a6.5 6.5 0 1 0 8.6 7.6c-.35.33-.72.63-1.1.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   sync:'<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 0 1-10.4 4.1M4 10a6 6 0 0 1 10.4-4.1M14.5 2.5v3.5H11M5.5 17.5V14H9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  sidebar:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 4v12" stroke="currentColor" stroke-width="1.6"/></svg>',
+  expand:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l5 5-5 5M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  collapse:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M15 5l-5 5 5 5M9 5l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   back:'<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 
@@ -252,16 +255,90 @@ function cover(b, cls){
 function bar(p){ return '<span class="pbar"><i style="width:' + Math.max(0, Math.min(100, p || 0)) + '%"></i></span>'; }
 
 /* ---------- sidebar ---------- */
-// The sidebar as a strip of icons (style.css, html.rail): from phone width up to 1100 (a tablet in
-// portrait), and on the reading screens up to 1400 (a tablet in landscape), where the page needs the room.
-const READING = new Set(['read', 'ebook', 'pdf']);
-function railMode(){
+// Full, mini (a strip of icons) or hidden, chosen on each device (daf.side): the button at its top
+// takes the full one down to the mini one, the mini one's buttons take it up again or away, ⌘\ goes
+// round the three, and when it's hidden a swipe from the left edge (or the button at the top left)
+// brings the mini one over the page. Reading something (an article, a book, a PDF, manga) has no
+// sidebar at all, as in Readwise: the same swipe or ⌘\ brings it for a moment. Below 780 px wide the
+// phone's tab bar and its More sheet take its place.
+// html.rail is the mini look (style.css); html.sidehid hides it (the mini one slides in as .peek, and
+// the full one as .open over the page, from either).
+const READING = new Set(['read', 'ebook', 'pdf', 'mread']);
+const SIDE_MODES = ['full', 'mini', 'hidden'];
+const sideWant = () => { const m = lsGet('side', null); return SIDE_MODES.includes(m) ? m : null; };
+function sideMode(){
   const w = window.innerWidth, v = (S.route || [])[0];
-  const on = w > 780 && (w < 1100 || (w < 1400 && READING.has(v)));
-  document.documentElement.classList.toggle('rail', on);
-  if (!on) { const sd = $('#side'); if (sd && sd.classList.contains('open') && w > 780) sd.classList.remove('open'); }
+  if (w <= 780) return 'phone';
+  if (READING.has(v)) return 'hidden';
+  const m = sideWant() || (w < 1100 ? 'mini' : 'full');
+  return m === 'full' && w < 1000 ? 'mini' : m;      // a narrow window keeps the page's room
+}
+function railMode(){
+  const m = sideMode(), r = document.documentElement, sd = $('#side');
+  r.classList.toggle('rail', m === 'mini' || m === 'hidden');
+  r.classList.toggle('sidehid', m === 'hidden');
+  r.classList.toggle('reading', READING.has((S.route || [])[0]));
+  if (sd && m !== 'phone' && !sd.matches(':hover')) sd.classList.remove('open', 'peek');
+  let b = $('#sideshow');
+  if (m === 'hidden' && !READING.has((S.route || [])[0])) {
+    if (!b) { document.body.insertAdjacentHTML('beforeend', '<button class="sideshow" id="sideshow" data-act="sidepeek" aria-label="Show the sidebar" title="Show the sidebar (⌘\\)">' + I.sidebar + '</button>'); }
+  } else if (b) b.remove();
 }
 window.addEventListener('resize', () => { clearTimeout(railMode.t); railMode.t = setTimeout(railMode, 120); });
+function setSide(m){ lsSet('side', m); $('#side').classList.remove('open', 'peek'); railMode(); window.dispatchEvent(new Event('resize')); }
+// ⌘\: round the three; on a reading screen, the mini one over the page and away again.
+function cycleSide(){
+  const sd = $('#side'), m = sideMode();
+  if (m === 'phone') return;
+  if (READING.has(S.route[0]) || (m === 'hidden' && sd.classList.contains('peek'))) { sd.classList.toggle('peek'); sd.classList.remove('open'); return; }
+  setSide(m === 'full' ? 'mini' : m === 'mini' ? 'hidden' : 'full');
+}
+// A swipe in from the left edge, on a touch screen, when the sidebar is hidden.
+(() => {
+  let x0 = null, y0 = 0;
+  document.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    x0 = t && t.clientX < 22 && document.documentElement.classList.contains('sidehid') ? t.clientX : null; y0 = t ? t.clientY : 0;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (x0 == null) return;
+    const t = e.touches[0], dx = t.clientX - x0;
+    if (Math.abs(t.clientY - y0) > 60) { x0 = null; return; }
+    const sd = $('#side');
+    if (dx > 200) { sd.classList.add('open'); sd.classList.remove('peek'); x0 = null; }
+    else if (dx > 40) sd.classList.add('peek');
+  }, { passive: true });
+  document.addEventListener('touchend', () => { x0 = null; }, { passive: true });
+})();
+const PIN_ICONS = {
+  manga: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 3.5h8.5v13H4zM12.5 5.5H16v11h-3.5"/><path d="M6.5 6.5h3.5M6.5 9h3.5"/></svg>',
+  recovery: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 14.5h14M5.5 14.5a4.5 4.5 0 0 1 9 0M10 4.5v2M4.6 7.1l1.4 1.4M15.4 7.1 14 8.5"/></svg>',
+  podcasts: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="7.5" y="3" width="5" height="9" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  shortlist: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="m10 3.3 2 4.3 4.6.6-3.4 3.2.9 4.6L10 13.7 5.9 16l.9-4.6-3.4-3.2 4.6-.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+};
+// The places that can be pinned, in the order they show: [key, label, hash, icon].
+const PINS = () => [['podcasts', 'Podcasts', 'podcasts', PIN_ICONS.podcasts], ['manga', 'Manga', 'manga', PIN_ICONS.manga], ['torah', 'Torah', 'torah', I.torah],
+  ['recovery', 'Recovery', 'recovery', PIN_ICONS.recovery], ['shortlist', 'Shortlist', 'library/starred', PIN_ICONS.shortlist], ['paper', 'Paper pages', 'paper', I.camera], ['sources', 'Sources', 'sources', I.sources]];
+const pinsOn = () => { const p = (S.settings || (S.data && S.data.settings) || {}).nav_pins; return Array.isArray(p) ? p : ['podcasts', 'manga', 'torah', 'recovery', 'shortlist']; };
+// Preferences → Sidebar: how it is on this device, and what's pinned (settings nav_pins, every device).
+function drawSideCard(){
+  const card = $('#sidecard'); if (!card) return;
+  const cur = sideWant() || (window.innerWidth < 1100 ? 'mini' : 'full'), on = pinsOn();
+  card.innerHTML = '<h2>Sidebar</h2>' +
+    '<div class="prow"><div class="d"><b>On this device</b></div><div class="seg">' + [['full', 'Full'], ['mini', 'Mini'], ['hidden', 'Hidden']].map(x => '<button class="' + (cur === x[0] ? 'on' : '') + '" data-sidemode="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>' +
+    '<div class="prow"><div class="d"><b>Pinned</b></div></div><div class="pinlist">' +
+    PINS().map(x => '<label class="aaline"><input type="checkbox" data-pin="' + x[0] + '"' + (on.includes(x[0]) ? ' checked' : '') + '> ' + x[1] + '</label>').join('') + '</div>';
+  if (S.route[1] === 'sidebar') setTimeout(() => card.scrollIntoView({ block: 'start' }), 200);
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-sidemode]'); if (!b) return; setSide(b.dataset.sidemode); drawSideCard(); });
+document.addEventListener('change', async e => {
+  const t = e.target; if (!t.dataset || !t.dataset.pin) return;
+  const keys = PINS().map(x => x[0]), want = new Set(pinsOn());
+  if (t.checked) want.add(t.dataset.pin); else want.delete(t.dataset.pin);
+  const pins = keys.filter(k => want.has(k));
+  try { await api('/api/settings', { method: 'PUT', body: JSON.stringify({ nav_pins: pins }) }); S.settings = Object.assign(S.settings || {}, { nav_pins: pins }); if (S.data && S.data.settings) S.data.settings.nav_pins = pins; renderSide(); }
+  catch(err){ toast(err.message); }
+});
 function renderSide(){
   const v = S.route[0];
   const n = (key, label, icon, extra) => '<button class="nv' + (v === key || (key === 'books' && v === 'book') ? ' on' : '') + '" data-go="' + key + '">' + icon + '<span>' + label + '</span>' + (extra || '') + '</button>';
@@ -271,18 +348,22 @@ function renderSide(){
   const mob = (key, label, icon, hash) => '<button class="mb' + (v === key || (key === 'library' && v === 'books') ? ' on' : '') + '" data-go="' + (hash || key) + '">' + icon + '<span>' + label + '</span></button>';
   const mobbar = '<div class="mobbar">' + mob('today', 'Today', I.today) + mob('review', 'Review', I.review) + mob('feed', 'Feed', '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 15.5h.01M4.5 10a5.5 5.5 0 0 1 5.5 5.5M4.5 4.5a11 11 0 0 1 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>') +
     mob('library', 'Library', I.books, 'library') + '<button class="mb' + (window.DafCore && window.DafCore.Tips && window.DafCore.Tips.unseen() ? ' hasnew' : '') + '" data-act="more"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>More</span></button></div>';
-  $('#side').innerHTML = mobbar + '<div class="navfull"><div class="brand"><button class="railbtn" data-act="rail" aria-label="Show the sidebar" title="Show the sidebar"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button><b>Daf</b></div><div class="nav">' +
+  const D = window.DafCore || {}, on = pinsOn(), route = (S.route || []).join('/');
+  const pins = PINS().filter(p => on.includes(p[0])).map(p => '<button class="nv' + (route === p[2] || v === p[2] || (p[0] === 'manga' && v === 'mread') ? ' on' : '') + '" data-go="' + p[2] + '">' + p[3] + '<span>' + p[1] + '</span></button>').join('');
+  $('#side').innerHTML = mobbar + '<div class="navfull"><div class="brand"><button class="railbtn" data-act="rail" aria-label="Expand the sidebar" title="Expand the sidebar">' + I.sidebar + '</button><b>Daf</b><span class="spacer"></span>' +
+      '<button class="ib sidebtn" data-act="add" aria-label="Add to Daf" title="Add a link, a book or a PDF"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
+      '<button class="ib sidebtn" data-act="sidemini" aria-label="Collapse the sidebar" title="Collapse the sidebar (⌘\\)">' + I.sidebar + '</button></div>' +
+    '<div class="nav">' +
     n('today', 'Today', I.today, '<span class="ct">' + mins + '</span>') +
     n('review', 'Review', I.review, '<span class="ct">' + (rv || (rv === 0 ? '✓' : '')) + '</span>') +
+    (D.navLibrary ? D.navLibrary() : n('library', 'Library', I.books)) + n('books', 'Books', I.books) + (D.navFeed ? D.navFeed() : n('feed', 'Feed', I.sources)) + n('highlights', 'Highlights', I.hl) + '</div>' +
+    (pins ? '<div class="navh"><span>Pinned</span></div><div class="nav pins">' + pins + '</div>' : '') +
+    '<div class="nav navbot">' + (D.navSearch ? D.navSearch() : '') +
     n('stats', 'Stats', '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16V9M8.7 16V4M13.3 16v-5M18 16H2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>', d && d.streak && d.streak.goal ? '<span class="ct" title="Days in a row ' + atWord(d.goal) + '">' + d.streak.goal + '</span>' : '') +
-    (window.DafCore && window.DafCore.navSearch ? window.DafCore.navSearch() : '') + '</div>' +
-    (window.DafCore && window.DafCore.navExtra ? window.DafCore.navExtra(v, n) : '<div class="nav">' + n('highlights', 'Highlights', I.hl) + n('books', 'Books', I.books) + '</div>') +
-    '<div class="nav" style="margin-top:8px">' +
-    '<button class="nv" data-act="paper">' + I.paper + '<span>Log paper</span></button>' +
-    n('paper', 'Paper pages', I.camera) +
-    n('sources', 'Sources', I.sources) + n('prefs', 'Preferences', I.prefs) + (window.DafCore && window.DafCore.Tips ? window.DafCore.Tips.navItem() : '') + '</div>' +
-    '<div class="sidefoot">Year 30 began October 9, 2026. One hour a day.</div></div>';
-  // On a tablet the sidebar is a strip of icons: each one says what it is.
+    n('prefs', 'Preferences', I.prefs) + (D.Tips ? D.Tips.navItem() : '') +
+    '<div class="railends"><button class="nv" data-act="rail" aria-label="Expand the sidebar" title="Expand the sidebar">' + I.expand + '</button>' +
+    '<button class="nv" data-act="sidehide" aria-label="Hide the sidebar" title="Hide the sidebar (⌘\\)">' + I.collapse + '</button></div></div></div>';
+  // As a strip of icons, each one says what it is.
   $$('#side .navfull .nv').forEach(b => { const t = b.querySelector('span'); if (t && !b.title) { b.title = t.textContent.trim(); b.setAttribute('aria-label', b.title); } });
 }
 
@@ -682,7 +763,7 @@ async function renderPrefs(){
   S.settings = s;
   const sw = (k, label, desc, locked) => '<div class="prow"><div class="d"><b>' + label + '</b><span>' + desc + '</span></div><input type="checkbox" class="sw" id="c-' + k + '" data-count="' + k + '"' + (s.count[k] ? ' checked' : '') + (locked ? ' disabled' : '') + ' aria-label="' + esc(label) + '"></div>';
   let zones = []; try { zones = Intl.supportedValuesOf('timeZone'); } catch(e) {} if (zones.indexOf('UTC') < 0) zones.unshift('UTC'); if (s.home_tz && zones.indexOf(s.home_tz) < 0) zones.push(s.home_tz);
-  $('#main').innerHTML = '<div class="top"><h1>Preferences</h1></div><div class="page"><section class="card" id="goalscard"><h2>Goals</h2><span class="mute">Loading…</span></section><section class="card" id="appearcard"></section><section class="card" id="countcard"><h2>What counts toward the goal</h2><div>' +
+  $('#main').innerHTML = '<div class="top"><h1>Preferences</h1></div><div class="page"><section class="card" id="goalscard"><h2>Goals</h2><span class="mute">Loading…</span></section><section class="card" id="appearcard"></section><section class="card" id="sidecard"></section><section class="card" id="countcard"><h2>What counts toward the goal</h2><div>' +
     sw('kindle','Books on the Kindle','KOReader reading time') + sw('manga','Manga in Daf','Time in Daf’s manga reader') + sw('audio','Audiobooks','Listening time from Audiobookshelf') + sw('article','Articles in Daf','Time with an article open in Daf') +
     sw('paper','Paper books','Minutes you log here or with Ezer') + sw('video','Videos','Time with a video open in Daf') + sw('podcast','Podcasts','Never counted', true) + '</div></section>' +
     '<section class="card" id="reviewcard"><h2>Daily review</h2><div class="prow"><div class="d"><b>Highlights per day</b><span>Ezer sends the first one in the morning. Takes effect tomorrow.</span></div><select class="field" id="revsize" style="width:auto">' + [3,5,8,12].map(n => '<option' + (n === s.review_size ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div></section>' +
@@ -719,7 +800,7 @@ async function renderPrefs(){
 // cards on a wide screen, a row across the top on a narrow one. The one being read is marked.
 const PREF_GROUPS = [
   ['Reading', [['goalscard', 'Goals'], ['countcard', 'What counts'], ['reviewcard', 'Daily review'], ['readercard', 'Reader'], ['dayscard', 'Days']]],
-  ['Look', [['appearcard', 'Appearance'], ['keyscard', 'Keyboard']]],
+  ['Look', [['appearcard', 'Appearance'], ['sidecard', 'Sidebar'], ['keyscard', 'Keyboard']]],
   ['Connections', [['phonecard', 'Phone'], ['podcard', 'Podcasts'], ['hccard', 'Hardcover'], ['nlcard', 'Newsletters'], ['digestcard', 'Morning email'], ['igcard', 'Instagram'], ['alcard', 'AniList']]],
   ['AI', [['aicard', 'AI']]],
   ['Library', [['tagscard', 'Library tags'], ['importcard', 'Import']]],
@@ -907,7 +988,7 @@ function show(quiet){
   else if (v === 'book') { const last = S.route[S.route.length - 1] || '', hl = last.startsWith('hl:') && S.route.length > 2 ? decodeURIComponent(last.slice(3)) : null; run(renderBook(decodeURIComponent(S.route.slice(1, hl ? -1 : undefined).join('/')), hl)); }
   else if (v === 'sources') run(renderSources());
   else if (v === 'prefs') run(renderPrefs().then(() => { if (window.DafCore.Themes) { window.DafCore.Themes.section($('#appearcard')); if (S.route[1] === 'appearance') $('#appearcard').scrollIntoView({ block: 'start' }); }
-    if (window.DafCore.Goals) window.DafCore.Goals.prefs().then(() => { if (S.route[1] === 'goals') { const g = $('#goalscard'); if (g) g.scrollIntoView({ block: 'start' }); } }); drawPhone(); drawPod(); drawDevices(); if (window.DafCore.HC) window.DafCore.HC.prefs($('#hccard')); drawNewsletters(); prefsMore(); Voices.cur = (S.settings && S.settings.tts_voice) || 'af_heart'; return Voices.load(); }).then(all => { const sel = $('#ttsvoice'); if (sel && all.length) { const cur = sel.value; sel.innerHTML = all.map(x => '<option value="' + esc(x) + '"' + (x === cur ? ' selected' : '') + '>' + esc(Voices.label(x)) + '</option>').join(''); } }));
+    if (window.DafCore.Goals) window.DafCore.Goals.prefs().then(() => { if (S.route[1] === 'goals') { const g = $('#goalscard'); if (g) g.scrollIntoView({ block: 'start' }); } }); drawSideCard(); drawPhone(); drawPod(); drawDevices(); if (window.DafCore.HC) window.DafCore.HC.prefs($('#hccard')); drawNewsletters(); prefsMore(); Voices.cur = (S.settings && S.settings.tts_voice) || 'af_heart'; return Voices.load(); }).then(all => { const sel = $('#ttsvoice'); if (sel && all.length) { const cur = sel.value; sel.innerHTML = all.map(x => '<option value="' + esc(x) + '"' + (x === cur ? ' selected' : '') + '>' + esc(Voices.label(x)) + '</option>').join(''); } }));
   else if (window.DafCore.views[v]) run(Promise.resolve(window.DafCore.views[v](S.route.slice(1))));
   else if (v === 'ebook') { window.addEventListener('daf-ebook-ready', show, { once:true }); return; }   // the reader module is still loading
   else if (v === 'pdf') { window.addEventListener('daf-pdf-ready', show, { once:true }); return; }       // so is the PDF view
@@ -949,10 +1030,19 @@ document.addEventListener('click', e => {
 }, true);
 document.addEventListener('click', async e => {
   const go = e.target.closest('[data-go]');
-  if (go){ $('#side').classList.remove('open'); location.hash = go.dataset.go; return; }
-  const more = e.target.closest('[data-act="more"],[data-act="rail"]'); if (more){ $('#side').classList.toggle('open'); return; }
+  if (go){ $('#side').classList.remove('open', 'peek'); location.hash = go.dataset.go; return; }
+  const sa = e.target.closest('[data-act="sidemini"],[data-act="sidehide"],[data-act="sidepeek"]');
+  if (sa){ const a = sa.dataset.act; if (a === 'sidemini') setSide('mini'); else if (a === 'sidehide') setSide('hidden'); else { $('#side').classList.add('peek'); } return; }
+  const rail = e.target.closest('[data-act="rail"]');
+  if (rail){
+    // The mini one's expand: the full sidebar from now on, or (hidden, or on a reading screen) over the page for a moment.
+    if (sideMode() === 'mini' && !$('#side').classList.contains('peek')) setSide('full');
+    else { $('#side').classList.add('open'); $('#side').classList.remove('peek'); }
+    return;
+  }
+  const more = e.target.closest('[data-act="more"]'); if (more){ $('#side').classList.toggle('open'); return; }
   // Outside the sheet or the tablet's drawer, or on the drawer's shade (the sidebar element itself), closes it.
-  if ($('#side').classList.contains('open') && (!e.target.closest('#side') || e.target.id === 'side')) $('#side').classList.remove('open');
+  if (($('#side').classList.contains('open') || $('#side').classList.contains('peek')) && (!e.target.closest('#side') || e.target.id === 'side')) $('#side').classList.remove('open', 'peek');
   const q = e.target.closest('[data-min]'); if (q){ $('#pmin').value = q.dataset.min; return; }
   const hs = e.target.closest('[data-hlsrc]'); if (hs){ S.hlSource = hs.dataset.hlsrc; drawHighlights(); return; }
   const hc = e.target.closest('[data-hlcolor]'); if (hc){ S.hlColor = S.hlColor === hc.dataset.hlcolor ? '' : hc.dataset.hlcolor; drawHighlights(); return; }
@@ -1058,6 +1148,7 @@ document.addEventListener('submit', async e => {
   catch(err){ $('#loginerr').textContent = err.message; }
 });
 document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === '\\' || e.code === 'Backslash')) { e.preventDefault(); cycleSide(); return; }
   const tag = (e.target.tagName || '').toLowerCase(), typing = tag === 'input' || tag === 'textarea' || tag === 'select';
   // A sheet in front takes the keys: Esc closes it and nothing else (not the article behind it too),
   // and no shortcut reaches the list or article under it. keys.js's own capture comes first.

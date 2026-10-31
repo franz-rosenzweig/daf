@@ -1186,6 +1186,33 @@ html.rail:not(.shell-mac) .side.open .navfull{position:fixed;left:0;top:0;bottom
   box-shadow:var(--shadow);z-index:46;padding-top:env(safe-area-inset-top,0px)}
 html.rail:not(.shell-mac) .side.open .brand{padding:12px 14px 6px;gap:6px}
 html.rail:not(.shell-mac) .side.open::after{content:"";position:fixed;inset:0 0 0 280px;background:rgba(10,12,16,.28);z-index:45}
+/* ---------- the sidebar's three states (app.js railMode): full, mini (html.rail, above) and hidden
+   (html.sidehid: no column at all; the mini one slides in over the page as .peek, the full one as
+   .open). Reading screens are always hidden (html.reading). ---------- */
+.nvrow{display:flex;align-items:center;gap:2px}
+.nvrow .nv{flex:1;min-width:0}
+.nvx{flex:none;width:26px;height:26px;border:0;border-radius:6px;background:transparent;color:var(--fg-3);display:inline-grid;place-items:center;cursor:pointer}
+.nvx:hover{background:var(--hover);color:var(--fg)}
+.brand .spacer{flex:1}
+.sidebtn{width:30px;height:30px;color:var(--fg-3)}
+.navbot{margin-top:auto;padding-top:10px;padding-bottom:14px}
+.railends{display:none}
+html.rail:not(.shell-mac) .side:not(.open) .nvx,
+html.rail:not(.shell-mac) .side:not(.open) .sidebtn{display:none}
+html.rail:not(.shell-mac) .side:not(.open) .railends{display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
+html.rail:not(.shell-mac) .side.open .railbtn{display:none}
+html.sidehid:not(.shell-mac) .app:not(.loggedout){grid-template-columns:minmax(0,1fr)}
+html.sidehid:not(.shell-mac) .side{display:none}
+html.sidehid:not(.shell-mac) .side.peek,html.sidehid:not(.shell-mac) .side.open{display:flex;position:fixed;left:0;top:0;bottom:0;width:60px;z-index:46;box-shadow:var(--shadow)}
+html.sidehid:not(.shell-mac) .side.peek{animation:sidein .18s ease-out}
+html.sidehid:not(.shell-mac) .side.peek::after{content:"";position:fixed;inset:0 0 0 60px;background:rgba(10,12,16,.16);z-index:-1}
+html.sidehid:not(.shell-mac) .side.open{background:transparent;box-shadow:none;width:0}
+@keyframes sidein{from{transform:translateX(-100%)}to{transform:none}}
+.sideshow{display:none}
+html.sidehid:not(.reading):not(.shell-mac) .sideshow{display:inline-grid;place-items:center;position:fixed;left:12px;top:calc(11px + env(safe-area-inset-top,0px));z-index:7;width:36px;height:36px;border:0;border-radius:9px;background:transparent;color:var(--fg-2);cursor:pointer}
+html.sidehid:not(.reading):not(.shell-mac) .sideshow:hover{background:var(--hover);color:var(--fg)}
+html.sidehid:not(.reading):not(.shell-mac) .main > .top,html.sidehid:not(.reading):not(.shell-mac) .lvmain > .top{padding-left:60px}
+@media (max-width:780px){ .sideshow{display:none!important} .navbot{margin-top:0} .railends{display:none!important} .sidebtn{display:none} .nvx{width:34px;height:34px} }
 /* A list's header when the list is narrow (a tablet, or the info panel open beside it): the
    Inbox / Later / Archive tabs get their own row instead of crowding the title. */
 .lvmain{container-type:inline-size}
@@ -1456,3 +1483,4 @@ html.focus.fpanel .ptabs .pclose{display:none}
 .epmore summary{list-style:none;cursor:pointer;padding:10px 0 0}
 .epmore summary::-webkit-details-marker{display:none}
 .epmore[open] summary{display:none}
+.pinlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 16px;padding:4px 0 6px}

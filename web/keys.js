@@ -41,7 +41,7 @@ const FIXED = { list: [['?', 'These shortcuts'], ['Esc', 'Clear the selection']]
   book: [['Space', 'Next page (pages layout)'], ['Shift Space', 'Previous page'], ['?', 'These shortcuts'], ['Alt-select', 'Select without highlighting'], ['Esc', 'Close, then back to the book page']],
   review: [['Space', 'Show a flashcard’s answer'], ['1 2 3 4', 'Again, hard, good, easy'], ['⌘ Enter', 'Save the note']],
   manga: [['Shift Space', 'Previous page'], ['?', 'These shortcuts'], ['Esc', 'Close, then back']],
-  general: [['⌘K', 'Search everything, or go somewhere'], ['?', 'These shortcuts'], ['Esc', 'Close what’s open']] };
+  general: [['⌘K', 'Search everything, or go somewhere'], ['⌘\\', 'The sidebar: full, mini, hidden'], ['?', 'These shortcuts'], ['Esc', 'Close what’s open']] };
 
 let mine = (() => { try { return JSON.parse(localStorage.getItem('daf.keys') || '{}') || {}; } catch(e){ return {}; } })();
 const K = {};
