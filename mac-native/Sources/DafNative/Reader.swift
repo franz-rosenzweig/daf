@@ -51,6 +51,8 @@ final class ReaderModel {
     @ObservationIgnored var beatsSent = 0
     @ObservationIgnored var placeSent: [Int] = []
     @ObservationIgnored var lastFraction = -1.0
+    /// "12 min left", under the text, as the page says it.
+    var minutesLeft: String?
 
     init(id: String) {
         self.id = id
@@ -61,6 +63,13 @@ final class ReaderModel {
                 self.textView?.backgroundColor = Theme.nsBG
                 self.textView?.enclosingScrollView?.backgroundColor = Theme.nsBG
                 if self.doc != nil { self.compose(keepPlace: true) }
+            }
+        }
+        NotificationCenter.default.addObserver(forName: .dafType, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.doc != nil else { return }
+                self.compose(keepPlace: true)
+                if let tv = self.textView { tv.setFrameSize(tv.frame.size) }
             }
         }
     }
@@ -77,6 +86,8 @@ final class ReaderModel {
             asks = d.a("asks")
             questions = d.strings("questions")
             sentPct = d.d("progress") ?? 0
+            // the time left under the text, for what's read (not a video or an episode)
+            if let m = d.d("mins"), m > 0, d.s("kind") != "video", d.o("episode") == nil, !d.list("blocks").isEmpty { minutesLeft = "\(Int(m.rounded())) min left" } else { minutesLeft = nil }
             if video == nil, let v = player(for: d) {
                 v.onTick = { [weak self] t, playing in self?.syncCue(t, playing) }
                 video = v
@@ -294,15 +305,13 @@ final class ReaderModel {
 
     // MARK: laying it out
 
-    static let column: CGFloat = 680
-    static var serif: NSFont {
-        let base = NSFont.systemFont(ofSize: 19)
-        return NSFont(descriptor: base.fontDescriptor.withDesign(.serif) ?? base.fontDescriptor, size: 19) ?? base
-    }
+    /// The text's width and typeface, from Themes & Settings (ArticleType).
+    static var column: CGFloat { ArticleType.current.column }
+    static var serif: NSFont { ArticleType.current.face() }
 
-    private func para(_ spacing: CGFloat = 14, before: CGFloat = 0, indent: CGFloat = 0, first: CGFloat? = nil, align: NSTextAlignment = .natural, line: CGFloat = 1.38) -> NSParagraphStyle {
+    private func para(_ spacing: CGFloat = 14, before: CGFloat = 0, indent: CGFloat = 0, first: CGFloat? = nil, align: NSTextAlignment = .natural, line: CGFloat? = nil) -> NSParagraphStyle {
         let p = NSMutableParagraphStyle()
-        p.lineHeightMultiple = line
+        p.lineHeightMultiple = line ?? ArticleType.current.spacing
         p.paragraphSpacing = spacing
         p.paragraphSpacingBefore = before
         p.headIndent = indent
@@ -324,7 +333,7 @@ final class ReaderModel {
             NSFont(descriptor: f.fontDescriptor.withSymbolicTraits(.bold), size: size) ?? f
         }
         // the head: title, then where it's from
-        out.append(NSAttributedString(string: d.s("title") ?? "Untitled", attributes: [.font: bold(serif, 30), .foregroundColor: ink, .paragraphStyle: para(8, line: 1.15)]))
+        out.append(NSAttributedString(string: d.s("title") ?? "Untitled", attributes: [.font: bold(serif, serif.pointSize * 30 / 19), .foregroundColor: ink, .paragraphStyle: para(8, line: 1.15)]))
         out.append(NSAttributedString(string: "\n"))
         let by = [d.s("source"), d.s("author"), d.s("kind") == "podcast" ? "episode" : d.i("mins").map { "\($0) min" }].compactMap { $0 }.joined(separator: " · ")
         out.append(NSAttributedString(string: by, attributes: [.font: NSFont.systemFont(ofSize: 13), .foregroundColor: quiet, .paragraphStyle: para(26, line: 1.2)]))
@@ -384,11 +393,11 @@ final class ReaderModel {
             var a: [NSAttributedString.Key: Any] = [.font: serif, .foregroundColor: ink, .paragraphStyle: para()]
             var prefix = ""
             switch t {
-            case "h1", "h2": a[.font] = bold(serif, 25); a[.paragraphStyle] = para(10, before: 16, line: 1.2)
-            case "h3", "h4", "h5", "h6": a[.font] = bold(serif, 21); a[.paragraphStyle] = para(8, before: 12, line: 1.2)
+            case "h1", "h2": a[.font] = bold(serif, serif.pointSize * 25 / 19); a[.paragraphStyle] = para(10, before: 16, line: 1.2)
+            case "h3", "h4", "h5", "h6": a[.font] = bold(serif, serif.pointSize * 21 / 19); a[.paragraphStyle] = para(8, before: 12, line: 1.2)
             case "li": prefix = "•\t"; a[.paragraphStyle] = para(8, indent: 24, first: 4)
             case "blockquote", "quote":
-                a[.font] = NSFont(descriptor: serif.fontDescriptor.withSymbolicTraits(.italic), size: 19) ?? serif
+                a[.font] = NSFont(descriptor: serif.fontDescriptor.withSymbolicTraits(.italic), size: serif.pointSize) ?? serif
                 a[.foregroundColor] = quiet; a[.paragraphStyle] = para(14, indent: 28)
             case "figcaption", "caption": a[.font] = NSFont.systemFont(ofSize: 13); a[.foregroundColor] = quiet; a[.paragraphStyle] = para(20, line: 1.25)
             case "pre", "code": a[.font] = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular); a[.paragraphStyle] = para(14, line: 1.25)
@@ -706,6 +715,11 @@ final class ReaderModel {
     func scrolled(_ fraction: Double) {
         lastActive = Date()
         lastFraction = fraction
+        if minutesLeft != nil, let mins = doc?.d("mins"), mins > 0 {
+            let m = Int((mins * (1 - fraction)).rounded())
+            let said = fraction >= 0.99 ? "The end" : m < 1 ? "Less than a minute left" : "\(m) min left"
+            if said != minutesLeft { minutesLeft = said }
+        }
         let pct = (fraction * 100).rounded()
         guard restored, pct > sentPct else { return }
         // at most every four seconds; the last of a run of scrolls goes once they're up

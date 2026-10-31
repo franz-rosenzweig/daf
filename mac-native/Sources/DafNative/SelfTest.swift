@@ -50,6 +50,51 @@ enum SelfTest {
         for w in NSApp.windows where w.isVisible && w != main && w.level == .normal { w.close() }
     }
 
+    /// The article reaches the top of the window, and what's there over its column is the article's own.
+    static func atTop(_ w: NSWindow, _ tv: NSTextView?) -> Bool {
+        guard let tv, let sv = tv.enclosingScrollView, let frame = w.contentView?.superview else { return false }
+        let r = sv.convert(sv.bounds, to: nil), top = frame.bounds.height
+        guard r.maxY >= top - 1 else { return false }
+        let hit = frame.hitTest(NSPoint(x: r.midX, y: top - 12))
+        return hit == nil || hit!.isDescendant(of: sv)
+    }
+
+    /// What's at the top of a full-screen window, for the log: where the article starts, what a click
+    /// there would land on, the views across the top 60 points, and the windows.
+    static func topReport(_ w: NSWindow, _ tv: NSTextView?) -> String {
+        guard let frame = w.contentView?.superview else { return "-" }
+        let top = frame.bounds.height, band = NSRect(x: 0, y: top - 60, width: frame.bounds.width, height: 60)
+        var bits: [String] = []
+        if let sv = tv?.enclosingScrollView {
+            let r = sv.convert(sv.bounds, to: nil)
+            bits.append("article \(Int(r.minY))-\(Int(r.maxY)) of \(Int(top)), inset \(Int(sv.contentInsets.top)), layout \(Int(w.contentLayoutRect.maxY))")
+            var hit = frame.hitTest(NSPoint(x: r.midX, y: top - 12)), chain: [String] = []
+            while let h = hit, chain.count < 5 { chain.append(String(describing: type(of: h))); hit = h.superview }
+            bits.append("hit " + chain.joined(separator: "<"))
+        }
+        var views: [String] = []
+        func walk(_ v: NSView, _ depth: Int) {
+            let r = v.convert(v.bounds, to: nil)
+            guard depth < 10, r.intersects(band), !v.isHidden, v.alphaValue > 0.01, (v.layer?.opacity ?? 1) > 0.01 else { return }
+            if r.height <= 120 { views.append("\(type(of: v)) \(Int(r.minX))-\(Int(r.maxX))x\(Int(r.minY))-\(Int(r.maxY))") }
+            for s in v.subviews { walk(s, depth + 1) }
+        }
+        walk(frame, 0)
+        bits.append("top views: " + views.prefix(24).joined(separator: ", "))
+        bits.append("windows: " + NSApp.windows.filter(\.isVisible).map { "\(type(of: $0)) \(Int($0.frame.minY))-\(Int($0.frame.maxY)) a\(String(format: "%.1f", $0.alphaValue))" }.joined(separator: ", "))
+        return bits.joined(separator: " | ")
+    }
+
+    /// A colour as the view draws it now (Daf's colours change with light and dark).
+    static func drawn(_ c: NSColor?, in v: NSView?) -> NSColor? {
+        guard let c else { return nil }
+        var out: NSColor?
+        (v?.effectiveAppearance ?? NSApp.effectiveAppearance).performAsCurrentDrawingAppearance { out = c.usingColorSpace(.sRGB) }
+        return out
+    }
+
+    static func rgb(_ c: NSColor) -> String { String(format: "%.0f,%.0f,%.0f", c.redComponent * 255, c.greenComponent * 255, c.blueComponent * 255) }
+
     static func capture(_ name: String, _ which: NSWindow? = nil) {
         guard let w = which ?? window, let v = w.contentView?.superview ?? w.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
         v.cacheDisplay(in: v.bounds, to: rep)
@@ -130,6 +175,49 @@ enum SelfTest {
         check(m.count(.library("inbox")) != nil, "with the counts beside the sidebar")
         capture("02-library")
 
+        // the sidebar, as the page's: full → mini → hidden (⌘\), a hidden one back for a moment
+        if let w = main, let s = Focus.split(w), let side = s.splitViewItems.first {
+            let mode0 = Side.shared.mode
+            let wide = { side.viewController.view.frame.width }
+            Side.shared.mode = "full"
+            _ = await until(3) { !side.isCollapsed && wide() > 150 }
+            Side.shared.cycle()
+            let mini = await until(3) { !side.isCollapsed && wide() < 90 }
+            await pause(0.8)
+            capture("02b-sidebar-mini")
+            Side.shared.cycle()
+            let hidden = await until(3) { side.isCollapsed }
+            Side.shared.button()
+            let peek = await until(3) { !side.isCollapsed && Side.shared.mini }
+            Side.shared.chose()
+            let gone = await until(3) { side.isCollapsed }
+            Side.shared.cycle()
+            let full = await until(3) { !side.isCollapsed && wide() > 150 }
+            check(mini && hidden && peek && gone && full, "the sidebar goes full → mini → hidden, and a hidden one comes back for a moment",
+                  "mini \(mini), hidden \(hidden), back \(peek), gone again \(gone), full \(full) (\(Int(wide())) wide)")
+            Side.shared.mode = mode0
+        }
+        // Library › Articles, with Inbox, Later and Archive
+        await go(m, .kind("article"))
+        let arts = m.items
+        let tab0 = m.libraryTab
+        m.libraryTab = "later"
+        await m.load()
+        let later = m.items
+        m.libraryTab = tab0
+        await m.load()
+        check(!arts.isEmpty && arts.allSatisfy { $0.kind == "article" } && later.allSatisfy { $0.status == "later" && $0.kind == "article" },
+              "Library › Articles lists the articles, and Later the ones saved for later", "\(arts.count), later \(later.count)")
+        // what's pinned, kept in Daf for every device
+        let pins0 = Side.shared.pins(m.today?.o("settings"))
+        await Side.shared.setPins(pins0.filter { $0 != "torah" } + ["sources"])
+        let keptPins = (try? await API.shared.json("/api/settings"))?.raw["nav_pins"] as? [String] ?? []
+        await pause(0.6)
+        capture("02c-sidebar-pins")
+        check(keptPins.contains("sources") && !keptPins.contains("torah") && Side.shared.pins(m.today?.o("settings")) == keptPins, "the sidebar's pins are kept in Daf", keptPins.joined(separator: ", "))
+        await Side.shared.setPins(pins0)
+        await go(m, .library("inbox"))
+
         // its order and filters
         let sort0 = m.sortLibrary
         m.sortLibrary = "short"
@@ -153,6 +241,46 @@ enum SelfTest {
         capture("03-reader")
         guard let r = m.reader, let tv = r.textView else { return finish("the reader didn't open") }
         check(!r.blocks.isEmpty, "its blocks are laid out", "\(r.blocks.count) blocks")
+        // no sidebar while it's read; ⌘\ brings it for a moment
+        if let w = main, let s = Focus.split(w), let side = s.splitViewItems.first {
+            let away = await until(3) { side.isCollapsed }
+            Side.shared.cycle()
+            let back = await until(3) { !side.isCollapsed && Side.shared.mini }
+            await pause(0.6)
+            capture("03b-reading-sidebar")
+            Side.shared.cycle()
+            let again = await until(3) { side.isCollapsed }
+            check(away && back && again, "while an article is read there's no sidebar; ⌘\\ brings it for a moment", "away \(away), back \(back), away again \(again)")
+        }
+        check(r.minutesLeft?.hasSuffix("left") == true || r.minutesLeft == "The end", "the time left shows under the text", r.minutesLeft ?? "-")
+        // Themes & Settings: the text larger, a look picked, both kept
+        let type0 = ArticleType.current
+        var bigger = type0
+        bigger.size += 2
+        bigger.save()
+        await pause(0.8)
+        let at = r.blocks.first { $0.range.length > 60 }?.range.location ?? 0
+        let size1 = (r.storage.attribute(.font, at: at, effectiveRange: nil) as? NSFont)?.pointSize ?? 0
+        type0.save()
+        await pause(0.5)
+        let size2 = (r.storage.attribute(.font, at: r.blocks.first { $0.range.length > 60 }?.range.location ?? 0, effectiveRange: nil) as? NSFont)?.pointSize ?? 0
+        check(abs(size1 - (type0.size + 2)) < 0.5 && abs(size2 - type0.size) < 0.5, "Themes & Settings makes the text larger, and back", "\(Int(type0.size)) → \(Int(size1)) → \(Int(size2))")
+        let th0 = (Theme.shared.mode, Theme.shared.light, Theme.shared.dark)
+        Theme.shared.choose(mode: "light", light: "paper")
+        await pause(0.8)
+        let paperLook = Theme.rgb(Theme.family("paper").light.bg).usingColorSpace(.sRGB)
+        let pageBG = drawn(r.textView?.backgroundColor, in: r.textView)
+        let sheet = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 342, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
+        sheet.contentView = NSHostingView(rootView: ThemesPanel().environment(m))
+        sheet.orderFront(nil)
+        await pause(1)
+        capture("03c-themes", sheet)
+        sheet.close()
+        capture("03d-paper-look")
+        Theme.shared.choose(mode: th0.0, light: th0.1, dark: th0.2)
+        await pause(0.5)
+        check(paperLook != nil && pageBG.map { abs($0.redComponent - paperLook!.redComponent) < 0.02 && abs($0.blueComponent - paperLook!.blueComponent) < 0.02 } == true,
+              "a look (Paper) sets the day's theme, and the article takes it", "\(pageBG.map(rgb) ?? "-") for \(paperLook.map(rgb) ?? "-")")
         // as it opened, the article is as tall as its text, and the wheel scrolls it and it stays
         // (on macOS 27 the view stopped growing to its text: one screen tall, springing back)
         if let sv = tv.enclosingScrollView, let w = tv.window {
@@ -185,10 +313,23 @@ enum SelfTest {
                   "full screen \(full), options \(NSApp.presentationOptions.rawValue), toolbar shown \(w.toolbar?.isVisible ?? false)")
             check(panes() == 1 && m.reader?.textView === textView, "with only the article, the sidebar and the list gone, and the same reader still open", "panes \(panesBefore) → \(panes())")
             capture("70-focus")
+            // nothing over the page at the top of the screen (an empty title bar once stayed, a dark strip)
+            check(atTop(w, textView), "in focus mode the article goes to the top of the screen, no bar over it", topReport(w, textView))
             Focus.shared.leave(w)
             let back = await until(10) { !w.styleMask.contains(.fullScreen) }
             await pause(1.5)
             check(back && !Focus.shared.main && w.toolbar?.isVisible != false, "and leaving it gives the window back as it was")
+            // full screen without focus mode: the same, the bar there when the pointer goes to the top
+            w.toggleFullScreen(nil)
+            let plain = await until(10) { w.styleMask.contains(.fullScreen) }
+            await pause(1.5)
+            check(plain && NSApp.presentationOptions.contains(.autoHideToolbar) && atTop(w, textView),
+                  "full screen hides the toolbar till the top, the article up to the top of the screen",
+                  "options \(NSApp.presentationOptions.rawValue); " + topReport(w, textView))
+            capture("70b-full-screen")
+            w.toggleFullScreen(nil)
+            _ = await until(10) { !w.styleMask.contains(.fullScreen) }
+            await pause(1.5)
 
             // the window is still when nothing happens: no toolbar item drawn over and over (the
             // focus button once was, and scrolling in the lists and articles broke)
@@ -324,11 +465,12 @@ enum SelfTest {
         check(edited && seen == "Edited by the self-test", "Edit the Title and Author changes them", seen ?? "-")
         await r.resetProgress()
         check(((try? await API.shared.json("/api/docs/\(API.enc(r.id))"))?.d("progress") ?? -1) == 0, "Reset Reading Progress starts it again")
-        if let item = m.selected, item.whereIn != "feed" {
+        if let sel = m.selected, sel.whereIn != "feed" {
+            let item = m.items.first { $0.id == sel.id } ?? sel, was = item.j.b("starred")      // an earlier run may have left it on
             await m.star(item)
             let on = (try? await API.shared.json("/api/docs?where=library&tab=inbox&kind=starred&limit=200"))?.a("items").contains { $0.s("id") == item.id } ?? false
             if let again = m.items.first(where: { $0.id == item.id }) { await m.star(again) }
-            check(on, "F puts it on the Shortlist (and off again)")
+            check(on != was, "F puts it on the Shortlist (and off again)", was ? "it was on" : "")
         }
 
         // Ask (the sandbox's stand-in answers; the model is never asked)
@@ -1310,6 +1452,7 @@ enum SelfTest {
         let m1 = (try? await API.shared.json("/api/today"))?.d("counted") ?? 0
         check(m1 > m0, "15 seconds with the book count toward today's minutes", "\(m0) → \(m1)")
 
+        bm.sidebar = "contents"
         bm.showContents = true
         await pause(1)
         capture("31-book-contents", win)
@@ -1352,9 +1495,11 @@ enum SelfTest {
         scroll.flow = "paginated"
         bm.restyle(scroll)
         await pause(0.6)
+        let saves0 = bm.saves
         await bm.forgetPlace()
-        let forgot = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position") == nil
-        check(forgot, "Forget My Place in Daf forgets it")
+        let left = (try? await API.shared.json("/api/ebooks/" + API.enc(bookID)))?.o("position")
+        check(left == nil, "Forget My Place in Daf forgets it",
+              left.map { "kept \(Int(Date().timeIntervalSince1970 - ($0.d("updated") ?? 0))) s ago, saves \(saves0) → \(bm.saves), offline \(Connection.shared.offline), outbox \(Outbox.shared.ops.count), \(bm.error ?? "")" } ?? "")
         Speaker.shared.sleep(after: 15)
         let sleeping = Speaker.shared.sleepAt != nil
         Speaker.shared.sleep(after: nil)

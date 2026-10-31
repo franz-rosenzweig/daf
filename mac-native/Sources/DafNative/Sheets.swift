@@ -68,7 +68,7 @@ struct RouteView: View {
             } else if parts.first == "page", parts.count > 1 {
                 WebPane(route: "#" + parts.dropFirst().map { API.enc($0) }.joined(separator: "/"))
             } else if parts.first == "read", parts.count > 1 {
-                if let reader, reader.doc != nil { if reader.playsMedia { VideoArticle(model: reader) } else { ArticleReader(model: reader) } }
+                if let reader, reader.doc != nil { if reader.playsMedia { VideoArticle(model: reader) } else { ArticleReader(model: reader).overlay(alignment: .bottom) { MinutesLeft(model: reader) } } }
                 else if let e = reader?.error { ContentUnavailableView("It didn't open", systemImage: "exclamationmark.triangle", description: Text(e)) }
                 else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
             } else {

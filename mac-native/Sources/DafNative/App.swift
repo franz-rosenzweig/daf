@@ -14,10 +14,16 @@ struct DafNativeApp: App {
             MainView()
                 .environment(model)
                 .frame(minWidth: 900, minHeight: 560)
+                .windowToolbarFullScreenVisibility(.onHover)        // full screen is for reading: the bar comes at the top
         }
         .defaultSize(width: 1280, height: 820)
         .commands {
-            SidebarCommands()
+            CommandGroup(replacing: .sidebar) {
+                Button("Switch the Sidebar") { Side.shared.cycle() }.keyboardShortcut("\\", modifiers: .command)
+                Picker("Sidebar", selection: Binding(get: { Side.shared.mode }, set: { Side.shared.mode = $0 })) {
+                    ForEach(Side.modes, id: \.0) { Text($0.1).tag($0.0) }
+                }
+            }
             InspectorCommands()
             CommandGroup(after: .toolbar) {
                 Button("Focus Mode") { Focus.shared.toggle() }.keyboardShortcut("f", modifiers: [.command, .shift])
@@ -40,7 +46,7 @@ struct DafNativeApp: App {
                 Divider()
                 Button("Today") { model.place = .today }.keyboardShortcut("1")
                 Button("Review") { model.place = .review }.keyboardShortcut("2")
-                Button("Inbox") { model.place = .library("inbox") }.keyboardShortcut("3")
+                Button("Library") { model.place = .home }.keyboardShortcut("3")
                 Button("Feed") { model.place = .feed(nil) }.keyboardShortcut("4")
                 Button("Highlights") { model.place = .highlights }.keyboardShortcut("5")
                 Button("Books") { model.place = .books }.keyboardShortcut("6")
@@ -115,7 +121,7 @@ struct DafNativeApp: App {
         }
 
         WindowGroup("Daf", id: "route", for: String.self) { $route in
-            if let route { RouteView(route: route).environment(model) }
+            if let route { RouteView(route: route).environment(model).windowToolbarFullScreenVisibility(.onHover) }
         }
         .defaultSize(width: 860, height: 760)
 

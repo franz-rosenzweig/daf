@@ -71,7 +71,7 @@ final class Focus {
     }
 
     /// The split view that holds the main window's sidebar, list and what's open.
-    private static func split(_ w: NSWindow) -> NSSplitViewController? {
+    static func split(_ w: NSWindow) -> NSSplitViewController? {
         func find(_ v: NSView) -> NSSplitView? { (v as? NSSplitView) ?? v.subviews.lazy.compactMap(find).first }
         return w.contentView.flatMap(find)?.delegate as? NSSplitViewController
     }
@@ -86,10 +86,11 @@ final class Focus {
     private func uncollapse(_ w: NSWindow) {
         guard let was = panes.removeValue(forKey: w.windowNumber), let s = Self.split(w) else { return }
         for (item, c) in zip(s.splitViewItems, was) where item.isCollapsed != c { item.animator().isCollapsed = c }
+        if Self.isMain(w) { Side.shared.applySoon() }          // the sidebar as it is now (full, mini, hidden, reading)
     }
 
-    /// The toolbar hidden till the pointer goes to the top: the Mac's own way (with the menu bar)
-    /// when it will, else Daf's.
+    /// The toolbar hidden till the pointer goes to the top: the Mac's own way (with the menu bar;
+    /// every full-screen window has it, App.swift) when it will, else Daf's.
     private func tuck(_ w: NSWindow) {
         NSApp.presentationOptions = Self.options
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -104,6 +105,7 @@ final class Focus {
     private func hideBar(_ w: NSWindow) {
         tucked.insert(w.windowNumber)
         w.toolbar?.isVisible = false
+        w.titlebarAppearsTransparent = true           // else the empty title bar stays, a dark strip over the page
         w.acceptsMouseMovedEvents = true
         guard mouse == nil else { return }
         mouse = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { e in
@@ -120,6 +122,7 @@ final class Focus {
 
     private func untuck(_ w: NSWindow) {
         guard tucked.remove(w.windowNumber) != nil else { return }
+        w.titlebarAppearsTransparent = false
         w.toolbar?.isVisible = true
     }
 

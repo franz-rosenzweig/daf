@@ -6,7 +6,7 @@ struct BookLook: Equatable {
     var size: CGFloat = 19
     var spacing: CGFloat = 1.45
     var justify = false
-    var theme = "auto"          // auto, original, paper, quiet, night
+    var theme = "auto"          // auto (the app's look: Daf, Paper, E-ink, Dusk, Night, Black), or one of the old book themes: original, paper, quiet, night
     var width = "medium"        // the line: narrow, medium, wide
     var flow = "paginated"      // pages, or one long column to scroll ("scrolled"), as the page's Layout
 
@@ -66,7 +66,7 @@ struct BookLook: Equatable {
         case "paper": return NSColor(red: 0.973, green: 0.945, blue: 0.890, alpha: 1)
         case "quiet": return NSColor(red: 0.290, green: 0.290, blue: 0.302, alpha: 1)
         case "night": return NSColor(red: 0.071, green: 0.071, blue: 0.071, alpha: 1)
-        default: return dark ? NSColor(red: 0.118, green: 0.118, blue: 0.122, alpha: 1) : .white
+        default: return Theme.rgb((dark ? Theme.palettes.dark : Theme.palettes.light).bg)
         }
     }
     var ink: NSColor {
@@ -75,7 +75,9 @@ struct BookLook: Equatable {
         case "quiet": return NSColor(red: 0.84, green: 0.84, blue: 0.85, alpha: 1)
         case "night": return NSColor(red: 0.80, green: 0.80, blue: 0.80, alpha: 1)
         case "original": return .black
-        default: return dark ? NSColor(white: 0.86, alpha: 1) : .black
+        default:
+            let p = dark ? Theme.palettes.dark : Theme.palettes.light
+            return Theme.rgb(p.read ?? p.fg)
         }
     }
     var quiet: NSColor { ink.withAlphaComponent(0.6) }

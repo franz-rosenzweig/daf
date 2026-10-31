@@ -35,7 +35,7 @@ enum Links {
             try await API.shared.send("POST", "/api/add/link", body)
             saved.append(link)
             AppModel.shared.say("Saved to the Library")
-            if case .library = AppModel.shared.place { AppModel.shared.reload() }
+            if AppModel.shared.place?.isLibrary == true { AppModel.shared.reload() }
         } catch {
             AppModel.shared.error = "Daf didn't save the link: " + error.localizedDescription
         }
@@ -43,7 +43,7 @@ enum Links {
 
     static func go(_ route: String) {
         let m = AppModel.shared
-        let places: [String: Place] = ["today": .today, "review": .review, "inbox": .library("inbox"), "library": .library("inbox"),
+        let places: [String: Place] = ["today": .today, "review": .review, "inbox": .library("inbox"), "library": .home,
                                        "later": .library("later"), "archive": .library("archive"), "shortlist": .shortlist, "feed": .feed(nil),
                                        "books": .books, "manga": .manga, "torah": .torah, "podcasts": .podcasts, "highlights": .highlights,
                                        "stats": .stats, "sources": .sources, "paper": .paper, "recovery": .recovery]

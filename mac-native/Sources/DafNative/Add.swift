@@ -84,7 +84,7 @@ struct AddSheet: View {
         do {
             let r = J(try await API.shared.send("POST", "/api/add/link", ["url": u]))
             model.say(r?.s("where") == "library" || r?.b("queued") == true ? "Saved to the Library" : "It waits in Daf's inbox and goes in on the next sync")
-            if case .library = model.place { model.reload() }
+            if model.place?.isLibrary == true { model.reload() }
             dismiss()
         } catch { model.error = error.localizedDescription }
     }
@@ -120,7 +120,7 @@ struct AddSheet: View {
                 } else {
                     lines[k] = "\(u.lastPathComponent) is saved to the Library." + (r?.s("id") == nil ? " It shows up after the next sync." : "")
                     opened = r?.s("id") ?? opened
-                    if case .library = model.place { model.reload() }
+                    if model.place?.isLibrary == true { model.reload() }
                 }
             } catch { lines[k] = u.lastPathComponent + ": " + error.localizedDescription }
         }
