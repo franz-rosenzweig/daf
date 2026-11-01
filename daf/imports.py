@@ -35,7 +35,7 @@ from datetime import datetime
 from html.parser import HTMLParser
 
 from . import config, db, pages, reader, review, vaultnotes
-from .sources import freshrss, karakeep
+from .sources import feedsrc, karakeep
 
 MAX_BYTES = 80 * 1024 * 1024
 LABELS = {"instapaper": "Instapaper", "pocket": "Pocket", "omnivore": "Omnivore", "readwise": "Readwise Reader",
@@ -521,10 +521,10 @@ _feeds_have = {}
 
 def _one_feed(c, x, opts):
     if "urls" not in _feeds_have or time.time() - _feeds_have.get("at", 0) > 600:
-        _feeds_have.update(urls={pages.norm_url(s["url"]) for s in freshrss.subscriptions()}, at=time.time())
+        _feeds_have.update(urls={pages.norm_url(s["url"]) for s in feedsrc.get().subscriptions(conn=c)}, at=time.time())
     if pages.norm_url(x["feed"]) in _feeds_have["urls"]:
         return "had", 0
-    freshrss.subscribe(x["feed"], x.get("folder") if opts.get("folders", True) else None)
+    feedsrc.get().subscribe(x["feed"], x.get("folder") if opts.get("folders", True) else None, conn=c)
     _feeds_have["urls"].add(pages.norm_url(x["feed"]))
     return "added", 0
 

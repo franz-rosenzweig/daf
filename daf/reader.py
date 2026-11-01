@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import config, today as T, vaultnotes
-from .sources import freshrss, karakeep
+from .sources import feedsrc, karakeep
 
 log = logging.getLogger("daf.reader")
 KIND_LABEL = {"article": "Article", "video": "Video", "tweet": "Tweet", "pdf": "PDF", "podcast": "Podcast"}
@@ -119,7 +119,8 @@ def counts(conn, settings):
     fc = json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_counts'").fetchone() or ["{}"])[0])
     expired = conn.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added < ?", (exp,)).fetchone()[0]
     return {"feed": {r[0] or "": r[1] for r in feed}, "feed_total": sum(r[1] for r in feed),
-            "freshrss_unread": fc.get("total"), "expired_in_daf": expired,
+            "freshrss_unread": None if feedsrc.daf() else fc.get("total"), "expired_in_daf": expired,
+            "feed_reader": "daf" if feedsrc.daf() else "freshrss",
             "library": {r[0]: r[1] for r in lib},
             "emails_on": bool(settings.get("newsletters")),
             "starred": conn.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'library' AND starred = 1 AND status NOT IN ('archive', 'deleted')").fetchone()[0]}
@@ -127,9 +128,10 @@ def counts(conn, settings):
 
 def feed_sources(conn, settings):
     """The Feed's folders and their feeds, each with what's unseen in it (Daf's window), for the
-    source picker. FreshRSS's list is kept in kv, so the picker still works when it doesn't answer."""
+    source picker. FreshRSS's list is kept in kv, so the picker still works when it doesn't answer
+    (Daf's own list, rss.py, always does)."""
     try:
-        subs = freshrss.subscriptions()
+        subs = feedsrc.get().subscriptions(conn=conn)
         conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('feed_subs', ?)", (json.dumps(subs),))
         for x in subs:      # items synced before Daf kept the feed's id: match them by its title
             conn.execute("UPDATE docs SET feed = ? WHERE where_ = 'feed' AND feed IS NULL AND source = ?", (x["id"], x["title"]))
@@ -170,7 +172,7 @@ def feed_scope_ids(conn, settings, cat=None, feed=None, older=None):
 def mark_feed_seen(conn, settings, cat=None, feed=None, older=None):
     """Mark a folder or a feed seen, here and in FreshRSS. Returns the ids, for an undo."""
     rows = feed_scope_ids(conn, settings, cat, feed, older)
-    freshrss.mark_read([r["ext_id"] for r in rows])
+    feedsrc.get().mark_read([r["ext_id"] for r in rows])
     conn.executemany("UPDATE docs SET status = 'seen' WHERE id = ?", [(r["id"],) for r in rows])
     return [r["id"] for r in rows]
 
@@ -178,7 +180,7 @@ def mark_feed_seen(conn, settings, cat=None, feed=None, older=None):
 def edit_feed(conn, stream, title=None, folder=None, full=None, notify=None):
     """Rename a feed or move it to another folder, in FreshRSS and on the items Daf has from it; and
     Daf's own two switches for it: always load the full article, notify of new posts."""
-    subs = json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])
+    subs = feedsrc.get().subscriptions(conn=conn) if feedsrc.daf() else json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])
     old = next((x for x in subs if x["id"] == stream), None)
     if old is None:
         raise KeyError(stream)
@@ -193,7 +195,7 @@ def edit_feed(conn, stream, title=None, folder=None, full=None, notify=None):
         old["full"], old["notify"] = stream in (s.get("feed_full") or []), stream in (s.get("feed_notify") or [])
     title = " ".join(str(title or "").split())[:200] or None
     folder = None if folder is None else " ".join(str(folder).split())[:80]
-    freshrss.edit_subscription(stream, title if title != old["title"] else None, folder, old["folder"])
+    feedsrc.get().edit_subscription(stream, title if title != old["title"] else None, folder, old["folder"], conn=conn)
     if title:
         conn.execute("UPDATE docs SET source = ? WHERE where_ = 'feed' AND feed = ?", (title, stream))
         old["title"] = title
@@ -206,7 +208,7 @@ def edit_feed(conn, stream, title=None, folder=None, full=None, notify=None):
 
 def unfollow_feed(conn, stream):
     """Stop following a feed in FreshRSS. What's unseen from it leaves the Feed; highlighted items stay."""
-    freshrss.unsubscribe(stream)
+    feedsrc.get().unsubscribe(stream, conn=conn)
     conn.execute("UPDATE docs SET status = 'seen' WHERE where_ = 'feed' AND feed = ? AND status = 'unseen'", (stream,))
     subs = json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])
     conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('feed_subs', ?)", (json.dumps([x for x in subs if x["id"] != stream]),))
@@ -307,7 +309,7 @@ def set_status(conn, doc_id, status):
             raise ValueError(status)
         read = status != "unseen"
         if read != (d["status"] != "unseen"):
-            freshrss.mark_read([d["ext_id"]], read=read)
+            feedsrc.get().mark_read([d["ext_id"]], read=read)
     else:
         if status not in ("inbox", "later", "archive", "deleted"):
             raise ValueError(status)
@@ -461,7 +463,7 @@ def save_to_library(conn, doc_id):
     conn.execute("UPDATE kindle_epubs SET parts = replace(parts, json_quote(?), json_quote(?)) WHERE instr(parts, json_quote(?)) > 0",
                  (doc_id, new_id, doc_id))
     try:
-        freshrss.mark_read([d["ext_id"]])
+        feedsrc.get().mark_read([d["ext_id"]])
     except Exception:  # noqa: BLE001 - saved is what matters
         pass
     conn.execute("UPDATE docs SET status = 'seen' WHERE id = ?", (doc_id,))
@@ -754,6 +756,6 @@ def expire_in_freshrss(conn, settings):
     """Mark everything older than the expiry window read in FreshRSS too (only when you ask)."""
     before = expired_before(settings)
     n = conn.execute("SELECT v FROM kv WHERE k = 'feed_counts'").fetchone()
-    freshrss.mark_all_read_before(before)
+    feedsrc.get().mark_all_read_before(before)
     conn.execute("UPDATE docs SET status = 'seen' WHERE where_ = 'feed' AND status = 'unseen' AND added < ?", (before,))
     return json.loads(n[0]).get("total") if n else None

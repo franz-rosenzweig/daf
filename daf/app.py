@@ -1768,12 +1768,12 @@ async def put_newsletters(request: Request, c=Depends(conn)):
 
 
 @app.get("/api/feed/folders", dependencies=[Depends(user)])
-def feed_folders():
-    from .sources import freshrss
+def feed_folders(c=Depends(conn)):
+    from .sources import feedsrc
     try:
-        return {"folders": freshrss.folders()}
+        return {"folders": feedsrc.get().folders(conn=c)}
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"FreshRSS didn't answer: {e}")
+        raise HTTPException(502, f"{feedsrc.name()} didn't answer: {e}")
 
 
 @app.get("/api/feed/sources", dependencies=[Depends(user)])
@@ -1784,11 +1784,11 @@ def get_feed_sources(c=Depends(conn)):
 
 @app.get("/api/feed/icon/{h}", dependencies=[Depends(user)])
 def get_feed_icon(h: str):
-    from .sources import freshrss
+    from .sources import feedsrc
     if not re.fullmatch(r"[0-9a-f]{4,40}", h):
         raise HTTPException(404, "No such icon")
     try:
-        data, kind = freshrss.icon(h)
+        data, kind = feedsrc.get().icon(h)
     except Exception:  # noqa: BLE001
         raise HTTPException(404, "No icon")
     return Response(data, media_type=kind, headers={"Cache-Control": "private, max-age=604800"})
@@ -1802,21 +1802,24 @@ async def post_feed_seen(request: Request, c=Depends(conn)):
         ids = reader.mark_feed_seen(c, config.load_settings(), str(b.get("cat") or "") or None, str(b.get("feed") or "") or None,
                                     int(b["older"]) if str(b.get("older") or "").isdigit() else None)
     except Exception as e:  # noqa: BLE001 - FreshRSS said no
-        raise HTTPException(502, f"FreshRSS didn't take it: {e}")
+        from .sources import feedsrc
+        raise HTTPException(502, f"{feedsrc.name()} didn't take it: {e}")
     return {"ids": ids}
 
 
 @app.post("/api/feed/refresh", dependencies=[Depends(user)])
 def post_feed_refresh(c=Depends(conn)):
-    """Pull to refresh: ask FreshRSS for what's new now, without waiting for the five-minute sync."""
-    from .sources import freshrss
+    """Pull to refresh: what's new now, without waiting for the five-minute sync (from FreshRSS, or
+    every feed read again when Daf reads them itself)."""
+    from .sources import feedsrc
     if not sync._lock.acquire(timeout=45):
         return {"new": 0, "busy": True}
     try:
-        new, total = freshrss.sync(c, config.load_settings())
+        src = feedsrc.get()
+        new, total = src.sync(c, config.load_settings(), force=True) if feedsrc.daf() else src.sync(c, config.load_settings())
         reader.apply_edits(c)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"FreshRSS didn't answer: {e}")
+        raise HTTPException(502, f"{feedsrc.name()} didn't answer: {e}")
     finally:
         sync._lock.release()
     return {"new": new, "counts": reader.counts(c, config.load_settings())}
@@ -1846,20 +1849,20 @@ def delete_feed_source(feed: str, c=Depends(conn)):
 
 
 @app.post("/api/add/feed", dependencies=[Depends(user)])
-async def add_feed(request: Request):
-    """Follow a site or feed in FreshRSS, in a folder; new posts show up in the Feed."""
-    from .sources import freshrss
+async def add_feed(request: Request, c=Depends(conn)):
+    """Follow a site or feed (in FreshRSS, or Daf itself), in a folder; new posts show up in the Feed."""
+    from .sources import feedsrc
     import asyncio
     b = await _body(request)
     url = str(b.get("url") or "").strip()
     if not re.match(r"^https?://\S+$", url):
         raise HTTPException(400, "A link starting with http:// or https://, please")
     try:
-        name = await asyncio.to_thread(freshrss.subscribe, url, str(b.get("folder") or "").strip() or None)
+        name = await asyncio.to_thread(feedsrc.get().subscribe, url, str(b.get("folder") or "").strip() or None, conn=c)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"FreshRSS didn't take it: {e}")
+        raise HTTPException(502, f"{feedsrc.name()} didn't take it: {e}")
     return {"name": name}
 
 

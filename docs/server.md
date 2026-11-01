@@ -31,7 +31,7 @@ bin/daf set-password --user yourname
 | `DAF_STATE` | the state folder (below) | `/srv/docker/daf` |
 | `DAF_VAULT` | the Obsidian vault Daf writes into | my vault |
 | `DAF_HOSTS`, `DAF_PORT` | the addresses and port to listen on | localhost and my tailnet address, 8440 |
-| `DAF_FRESHRSS_URL` | FreshRSS, for the Feed | `http://127.0.0.1:8080` |
+| `DAF_FRESHRSS_URL` | FreshRSS, for the Feed (until Daf reads the feeds itself: `daf feeds-import`) | `http://127.0.0.1:8080` |
 | `DAF_CWA_INGEST` | Calibre-Web-Automated's import folder, for books you add | `/srv/docker/cwa-ingest` |
 | `DAF_KINDLE_DIR` | where Send to Kindle writes, synced to the Kindle | a `Daf` folder in the Kindle's books |
 | `DAF_KOMGA_CONF`, `DAF_MANGA_ROOT` | Komga's address and keys, and the manga folder | my manga setup |

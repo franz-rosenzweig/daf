@@ -6,7 +6,7 @@ import time
 from . import config, db
 from . import library, vaultnotes
 from . import gpodder, media, reader
-from .sources import audiobookshelf, freshrss, highlights, karakeep, kindle, paper
+from .sources import audiobookshelf, feedsrc, highlights, karakeep, kindle, paper
 
 log = logging.getLogger("daf.sync")
 _lock = threading.Lock()
@@ -91,10 +91,10 @@ def run():
             log.exception("highlights")
         conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
         try:
-            new, total = freshrss.sync(conn, settings)
+            new, total = feedsrc.get().sync(conn, settings)
             reader.apply_edits(conn)
             _status(conn, "freshrss", True, f"{new} new, {total} unread", int(time.time()))
-            report["feed"] = f"{new} new, {total} unread in FreshRSS"
+            report["feed"] = f"{new} new, {total} unread in {feedsrc.name()}"
         except Exception as e:  # noqa: BLE001
             _status(conn, "freshrss", False, str(e))
             report["feed"] = f"failed: {e}"

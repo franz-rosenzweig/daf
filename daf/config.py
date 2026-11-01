@@ -150,6 +150,8 @@ def load_settings():
             s[k] = float(saved[k])
     if isinstance(saved.get("feed_expire_days"), int):
         s["feed_expire_days"] = saved["feed_expire_days"]
+    if saved.get("feed_reader") in ("freshrss", "daf"):    # who reads the feeds: FreshRSS, or Daf itself (sources/rss.py, feedsrc.py)
+        s["feed_reader"] = saved["feed_reader"]
     if saved.get("koinsight") in ("on", "off"):          # "off" since 2026-10-20: the Daf plugin sends the Kindle's pages itself
         s["koinsight"] = saved["koinsight"]
     for k in ("hc_progress", "hc_autostart"):
