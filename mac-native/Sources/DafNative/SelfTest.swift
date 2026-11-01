@@ -42,6 +42,10 @@ enum SelfTest {
         return cond()
     }
 
+    /// This Mac account is the one on the screen (not one switched away from, still logged in behind it):
+    /// only that one's windows go full screen, and only it plays sound.
+    static let onScreen: Bool = (CGSessionCopyCurrentDictionary() as? [String: Any])?[kCGSessionOnConsoleKey as String] as? Bool ?? true
+
     static var window: NSWindow? { main ?? NSApp.windows.first { $0.isVisible && $0.contentView != nil && $0.title != "" } }
     static var main: NSWindow?
 
@@ -298,7 +302,8 @@ enum SelfTest {
         }
 
         // focus mode (Focus.swift): the article on the whole screen, the toolbar away until the top
-        if let w = main {
+        if !onScreen { log("SKIP  focus mode and full screen: this Mac account isn't the one on the screen, so its windows can't go full screen") }
+        if let w = main, onScreen {
             // the panes the window shows, by the split view's subviews wider than nothing
             func panes() -> Int {
                 func split(_ v: NSView) -> NSSplitView? { (v as? NSSplitView) ?? v.subviews.lazy.compactMap(split).first }
@@ -991,6 +996,7 @@ enum SelfTest {
                 check(chapters == 2 && marked && clipped, "an episode's page has its chapters, its transcript marked as it plays, and Clip 30s",
                       "\(chapters) chapters, \(r.highlights.count - before) clipped")
                 for h in r.highlights.dropFirst(before) { if let hid = h.s("id") { await r.remove(highlight: hid) } }
+            } else if !onScreen { log("SKIP  an episode playing: this Mac account isn't the one on the screen, so it has no sound to play to")
             } else { check(false, "an episode opens natively", m.reader?.error ?? "not ready: \(m.reader?.video?.duration ?? -1)") }
         } else { log("INFO  no episode with a transcript in the sandbox (sandbox_more.py makes one)") }
 

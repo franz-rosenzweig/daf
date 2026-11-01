@@ -48,9 +48,19 @@ final class Side {
             if item.isCollapsed != hide {
                 // sized once it's out: sized while it opens, it settled too narrow
                 NSAnimationContext.runAnimationGroup { _ in item.animator().isCollapsed = hide } completionHandler: {
-                    MainActor.assumeIsolated { Side.shared.fit(changed) }
+                    MainActor.assumeIsolated { Side.shared.settle(); Side.shared.fit(changed) }
                 }
             } else { fit(changed) }
+        }
+    }
+
+    /// Shown or hidden as it should be now, once an animation is over: a second ⌘\ pressed while the
+    /// first one's animation runs could be lost.
+    private func settle() {
+        for w in NSApp.windows where Focus.isMain(w) && !Focus.shared.isOn(w) {
+            guard let s = Focus.split(w), s.splitViewItems.count > 1 else { continue }
+            let hide = shown == "hidden"
+            if s.splitViewItems[0].isCollapsed != hide { s.splitViewItems[0].isCollapsed = hide }
         }
     }
 
