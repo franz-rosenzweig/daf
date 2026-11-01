@@ -756,6 +756,30 @@ enum SelfTest {
                 m.selection = b.id
                 await pause(1)
             } else { check(false, "a new shelf holds the book it was made with", m.error ?? "") }
+
+            // the Kindle's shelves: a report as its plugin sends it (with the device token), and its
+            // folder is a shelf in Daf, with the book on it; a Kindle shelf isn't renamed here
+            if let token = DeviceToken.value, let cal = m.items.first(where: { $0.id.hasPrefix("cal:") && !$0.j.b("private") }) {
+                let title = (cal.j.s("title") ?? "Book").replacingOccurrences(of: "/", with: " ")
+                var req = URLRequest(url: API.shared.base.appendingPathComponent("api/kindle/shelves"))
+                req.httpMethod = "POST"
+                req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                let file = "Self-test Kindle shelf/" + title + " (" + cal.id.dropFirst(4) + ").epub"
+                req.httpBody = try? JSONSerialization.data(withJSONObject: ["shelves": ["Self-test Kindle shelf"], "files": [["path": file, "md5": ""]]])
+                _ = try? await URLSession.shared.data(for: req)
+                await m.loadShelves()
+                let ks = m.shelves.first { $0.s("kindle") == "Self-test Kindle shelf" }
+                var held = false
+                if let id = ks?.s("id") { await go(m, .shelf(id)); held = m.items.contains { $0.id == cal.id }; capture("26b-kindle-shelf") }
+                let renamed = await m.renameShelf(ks?.s("id") ?? "", to: "Renamed")
+                m.error = nil
+                check(ks != nil && held && !renamed, "the Kindle's folders are shelves in Daf with its books on them, renamed only on the Kindle",
+                      "\(ks?.s("name") ?? "-"), \(held ? "holds" : "without") \(title)")
+                await go(m, .books)
+                m.selection = b.id
+                await pause(1)
+            }
             await readBook(m, fallback: b)
             closeOthers()
         }

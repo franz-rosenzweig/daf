@@ -198,6 +198,12 @@ CREATE TABLE IF NOT EXISTS book_files (      -- a book file sent to Calibre-Web'
 CREATE TABLE IF NOT EXISTS kindle_queue (    -- files for the Kindle, which its plugin downloads on Wi-Fi (kindlequeue.py)
   id TEXT PRIMARY KEY, kind TEXT NOT NULL, ref TEXT, name TEXT NOT NULL, shelf TEXT NOT NULL, path TEXT NOT NULL,
   size INTEGER, requested INTEGER NOT NULL, delivered INTEGER, error TEXT);
+CREATE TABLE IF NOT EXISTS kindle_files (    -- every book on the Kindle, as its plugin last reported them (kindleshelves.py)
+  path TEXT PRIMARY KEY,                      -- from its home folder: "Recovery/Title - Author (342).pdf"
+  md5 TEXT, book_id TEXT, shelf TEXT NOT NULL DEFAULT '', seen INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS kindle_moves (    -- a book Daf asked the Kindle to move to another shelf, until its plugin has
+  id INTEGER PRIMARY KEY AUTOINCREMENT,       -- (dest "" is the home folder, off every shelf)
+  path TEXT NOT NULL, dest TEXT NOT NULL, book_id TEXT, requested INTEGER NOT NULL, done INTEGER, error TEXT);
 CREATE TABLE IF NOT EXISTS hc_links (        -- Daf books linked to Hardcover by hand (no hardcoverBookId in a vault note)
   book_id TEXT PRIMARY KEY, hc_book_id INTEGER NOT NULL, linked INTEGER);
 CREATE TABLE IF NOT EXISTS doc_edits (       -- titles and authors you corrected; reapplied after every sync
@@ -296,7 +302,7 @@ def connect():
 MIGRATIONS = [("books", "hc_id", "INTEGER"), ("docs", "duration", "INTEGER"), ("audio_bookmarks", "transcribed", "INTEGER"), ("highlights", "color", "TEXT"), ("review_state", "tags", "TEXT"), ("review_state", "fav", "INTEGER"),
               ("docs", "tags", "TEXT"), ("docs", "ai_summary", "TEXT"),
               ("docs", "starred", "INTEGER"), ("sessions", "pages", "INTEGER"),
-              ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("docs", "full", "INTEGER"),
+              ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("shelves", "kindle", "TEXT"), ("docs", "full", "INTEGER"),
               ("docs", "deleted", "INTEGER"),
               # what a feed says about an episode (episodes.parse_feed)
               ("gp_episodes", "guid", "TEXT"), ("gp_episodes", "author", "TEXT"), ("gp_episodes", "image", "TEXT"),

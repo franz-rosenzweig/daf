@@ -60,6 +60,8 @@ Everything KOReader's file browser does with files works here too:
 - **After Cut or Copy**, every shelf you open shows a bar, "Moving: Meditations", with **Put it here** and **Cancel**.
 - **Files ▾** has **New shelf here…**, **Select several…** (KOReader's browser at that folder, ready to pick several books and move or delete them together) and **Open in the file browser**.
 
+These shelves are Daf's too. Each Wi-Fi sync tells Daf which book is on which shelf, and brings back the moves I made in Daf: a book I put on another Kindle shelf in Daf moves there, with its notes, its place in the history and its collections. See [The Kindle's shelves](books-and-shelves.md#the-kindles-shelves).
+
 A book on my private list never shows on Home, in Continue reading or in Lately, and on a shelf it's just its file name with no cover. A few seconds after Home comes up, the Kindle quietly gets every book's shelf cover ready, a few at a time between taps, and it waits whenever I'm reading. Basically, after the first day, every shelf opens with its covers already there. It works with Wi-Fi off from the last answer Daf gave; the Hebrew date and the parasha show once Daf has answered that day.
 
 ## The sleep screen

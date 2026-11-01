@@ -545,7 +545,12 @@ final class AppModel {
     /// A book on a shelf, or off it.
     func shelve(_ book: String, on shelf: String, _ on: Bool) async -> Bool {
         do {
-            try await API.shared.send(on ? "PUT" : "DELETE", "/api/shelves/\(API.enc(shelf))/books/\(API.enc(book))", nil)
+            let r = J(try await API.shared.send(on ? "PUT" : "DELETE", "/api/shelves/\(API.enc(shelf))/books/\(API.enc(book))", nil))
+            switch r?.s("kindle") {           // a Kindle shelf: it moves, or goes, at the Kindle's next sync
+            case "moves": say("It moves there on the Kindle at its next sync")
+            case "sent": say("It goes to the Kindle at its next sync")
+            default: break
+            }
             await loadShelves()
             if place == .shelf(shelf) { await load() }
             return true

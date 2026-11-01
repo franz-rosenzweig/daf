@@ -187,14 +187,19 @@ struct BooksRow: View {
         } else {
             DisclosureGroup(isExpanded: $open) {
                 ForEach(model.shelves, id: \.self) { s in
-                    Label(s.s("name") ?? "Shelf", systemImage: s.b("hardcover") ? "list.star" : "books.vertical")
+                    // a Kindle shelf is a folder on the Kindle: made, renamed and removed there (kindleshelves.py)
+                    let kindle = s.s("kindle") != nil
+                    Label(s.s("name") ?? "Shelf", systemImage: kindle ? "book.closed" : s.b("hardcover") ? "list.star" : "books.vertical")
                         .badge(s.i("count") ?? 0)
                         .tag(Place.shelf(s.s("id") ?? ""))
+                        .help(kindle ? "On the Kindle" : "")
                         .contextMenu {
-                            Button("Rename…") { model.sheet = .renameShelf(s.s("id") ?? "") }
-                            Button("Delete the Shelf", role: .destructive) { Task { await model.deleteShelf(s.s("id") ?? "") } }
-                                .disabled(s.b("hardcover"))
-                            Divider()
+                            if !kindle {
+                                Button("Rename…") { model.sheet = .renameShelf(s.s("id") ?? "") }
+                                Button("Delete the Shelf", role: .destructive) { Task { await model.deleteShelf(s.s("id") ?? "") } }
+                                    .disabled(s.b("hardcover"))
+                                Divider()
+                            }
                             Button("New Shelf…") { model.sheet = .newShelf(nil) }
                         }
                 }
@@ -218,9 +223,14 @@ struct ShelvesMenu: View {
     var body: some View {
         Menu {
             ForEach(model.shelves, id: \.self) { s in
-                let id = s.s("id") ?? ""
-                Toggle(s.s("name") ?? "Shelf", isOn: Binding(get: { on.contains(id) }, set: { v in
-                    Task { if await model.shelve(book, on: id, v) { if v { on.insert(id) } else { on.remove(id) } } }
+                let id = s.s("id") ?? "", kindle = s.s("kindle") != nil
+                Toggle(kindle ? (s.s("name") ?? "Shelf") + " · Kindle" : s.s("name") ?? "Shelf", isOn: Binding(get: { on.contains(id) }, set: { v in
+                    Task {
+                        guard await model.shelve(book, on: id, v) else { return }
+                        // one Kindle shelf at a time, as on the Kindle: it moves off the other
+                        if v, kindle { for k in model.shelves where k.s("kindle") != nil { on.remove(k.s("id") ?? "") } }
+                        if v { on.insert(id) } else { on.remove(id) }
+                    }
                 }))
             }
             if !model.shelves.isEmpty { Divider() }
