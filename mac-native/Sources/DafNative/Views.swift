@@ -39,11 +39,21 @@ struct MainView: View {
         return Sidebar().navigationSplitViewColumnWidth(min: mini ? 54 : 190, ideal: mini ? 58 : 220, max: mini ? 64 : 320)
     }
 
+    /// Shown or hidden (Side), as the split view keeps it: hidden leaves the list and what's open (or
+    /// the page). A pane put away by focus mode doesn't count as hiding it.
+    private func columns(page: Bool) -> Binding<NavigationSplitViewVisibility> {
+        Binding(get: { Side.shared.hidden ? (page ? .detailOnly : .doubleColumn) : .all },
+                set: { v in
+                    let hide = v != .all
+                    if !Focus.shared.main, Side.shared.hidden != hide { Side.shared.hidden = hide }
+                })
+    }
+
     var body: some View {
         @Bindable var model = model
         Group {
             if model.place?.isPage == true {
-                NavigationSplitView {
+                NavigationSplitView(columnVisibility: columns(page: true)) {
                     sidebar
                         .toolbar(removing: .sidebarToggle)          // SidebarButton instead (full, mini, hidden)
                 } detail: {
@@ -53,7 +63,7 @@ struct MainView: View {
                         .toolbar { ToolbarItem(placement: .navigation) { SidebarButton() } }
                 }
             } else {
-                NavigationSplitView {
+                NavigationSplitView(columnVisibility: columns(page: false)) {
                     sidebar
                         .toolbar(removing: .sidebarToggle)
                 } content: {
