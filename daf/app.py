@@ -2082,6 +2082,7 @@ def get_ebook_file(book_id: str, c=Depends(conn)):
 def delete_ebook_position(book_id: str, c=Depends(conn)):
     """Forget my place in Daf: the book opens at its start (or where the Kindle is) next time."""
     c.execute("DELETE FROM book_positions WHERE book_id = ?", (book_id,))
+    c.execute("INSERT OR REPLACE INTO book_forgets (book_id, at) VALUES (?, ?)", (book_id, int(time.time())))
     return {"ok": True}
 
 

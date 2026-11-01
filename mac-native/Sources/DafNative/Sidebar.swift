@@ -43,8 +43,8 @@ final class Side {
         for w in NSApp.windows where Focus.isMain(w) && !Focus.shared.isOn(w) {
             guard let s = Focus.split(w), s.splitViewItems.count > 1 else { continue }
             let item = s.splitViewItems[0], hide = want.isEmpty
-            item.minimumThickness = mini ? 54 : 190
-            item.maximumThickness = mini ? 64 : 320
+            item.minimumThickness = size == "mini" ? 54 : 190       // the kept size, hidden or not
+            item.maximumThickness = size == "mini" ? 64 : 320
             if item.isCollapsed != hide {
                 // sized once it's out: sized while it opens, it settled too narrow
                 NSAnimationContext.runAnimationGroup { _ in item.animator().isCollapsed = hide } completionHandler: {
@@ -72,7 +72,7 @@ final class Side {
             guard let s = Focus.split(w), s.splitViewItems.count > 1, !s.splitViewItems[0].isCollapsed else { continue }
             let item = s.splitViewItems[0], wide = item.viewController.view.frame.width
             if changed || wide < item.minimumThickness - 1 || wide > item.maximumThickness + 1 {
-                s.splitView.setPosition(mini ? 58 : 220, ofDividerAt: 0)
+                s.splitView.setPosition(size == "mini" ? 58 : 220, ofDividerAt: 0)
             }
         }
     }

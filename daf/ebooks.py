@@ -162,6 +162,9 @@ def save_position(conn, book_id, cfi, fraction, chapter=None, at=None):
     """A device's place in the book. One sent late (made offline) doesn't replace a newer one,
     from the Kindle or another device. Returns whether it was kept."""
     t = when(at)
+    forgot = conn.execute("SELECT at FROM book_forgets WHERE book_id = ?", (book_id,)).fetchone()
+    if forgot and t < forgot[0]:                # from before Forget My Place: it stays forgotten
+        return False
     cur = conn.execute("INSERT INTO book_positions (book_id, cfi, fraction, chapter, updated) VALUES (?, ?, ?, ?, ?) "
                        "ON CONFLICT(book_id) DO UPDATE SET cfi = excluded.cfi, fraction = excluded.fraction, "
                        "chapter = excluded.chapter, updated = excluded.updated WHERE excluded.updated >= book_positions.updated",

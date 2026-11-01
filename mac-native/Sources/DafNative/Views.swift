@@ -35,7 +35,7 @@ struct MainView: View {
 
     /// The sidebar, as wide as full or mini asks.
     private var sidebar: some View {
-        let mini = Side.shared.mini
+        let mini = Side.shared.size == "mini"        // its kept size: hidden, it comes back as it was
         return Sidebar().navigationSplitViewColumnWidth(min: mini ? 54 : 190, ideal: mini ? 58 : 220, max: mini ? 64 : 320)
     }
 

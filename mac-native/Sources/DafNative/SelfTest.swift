@@ -193,10 +193,14 @@ enum SelfTest {
             let hidden = await until(3) { side.isCollapsed }
             Side.shared.toggle()
             let back = await until(3) { !side.isCollapsed && wide() < 90 }
+            let backWide = side.isCollapsed ? -1 : Int(wide())
+            let backState = "hidden \(Side.shared.hidden), shown \(Side.shared.shown), thickness \(Int(side.minimumThickness))–\(Int(side.maximumThickness)), split \(Focus.split(w) === s), item \(Focus.split(w)?.splitViewItems.first === side)"
+            await pause(2)
+            let later = side.isCollapsed ? "still collapsed" : "\(Int(wide())) wide"
             Side.shared.size = "full"
             let full = await until(3) { !side.isCollapsed && wide() > 150 }
             check(mini && hidden && back && full, "the sidebar goes mini and full, ⌘\\ hides it, and ⌘\\ brings it back as it was",
-                  "mini \(mini), hidden \(hidden), back \(back), full \(full) (\(Int(wide())) wide)")
+                  "mini \(mini), hidden \(hidden), back \(back) (\(backWide) wide; \(backState); 2 s later \(later)), full \(full) (\(Int(wide())) wide)")
             Side.shared.mode = mode0 == "hidden" ? "full" : mode0         // shown for what follows
         }
         // Library › Articles, with Inbox, Later and Archive
