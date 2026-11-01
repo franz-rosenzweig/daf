@@ -39,12 +39,6 @@ struct MainView: View {
         return Sidebar().navigationSplitViewColumnWidth(min: mini ? 54 : 190, ideal: mini ? 58 : 220, max: mini ? 64 : 320)
     }
 
-    /// An article (or a PDF, a video, an episode) open from the list: no sidebar while it's read.
-    private var reading: Bool {
-        guard model.place?.isPage != true, model.place != .highlights, let item = model.selected else { return false }
-        return item.isDoc
-    }
-
     var body: some View {
         @Bindable var model = model
         Group {
@@ -138,10 +132,8 @@ struct MainView: View {
         .importsItemProviders([.image]) { PaperPages.take($0) }        // Continuity Camera: File › Import from iPhone
         .onChange(of: model.place) { _, _ in
             model.placeChanged()
-            Side.shared.reading = reading
             Side.shared.applySoon()
         }
-        .onChange(of: model.selection) { _, _ in Side.shared.reading = reading }
         .onAppear { Side.shared.applySoon() }
         .task {
             model.reload()

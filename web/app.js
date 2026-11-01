@@ -867,16 +867,22 @@ async function drawDevices(token){
   const box = $('#devlist'); if (!box) return;
   const p = await api('/api/phone');
   const label = { kindle:'The Kindle (Daf plugin)', phone:'The phone (Tasker and the widget)', mac:'Daf for Mac', android:'Daf for Android', safari:'Safari extension (connected by Daf for Mac)' };
+  // each account on a Mac and each extra browser has its own: mac-<account>, safari-<account>, browser-2…
+  const devLabel = n => label[n] || (/^android-./.test(n) ? 'Daf for Android · ' + n.slice(8).toUpperCase()
+    : (/^(mac|safari|browser)-./.test(n) ? { mac:'Daf for Mac', safari:'Safari extension', browser:'Browser extension' }[n.split('-')[0]] + ' · ' + n.slice(n.indexOf('-') + 1) : n));
   const seen = d => 'Connected ' + epochDate(d.created) + (d.last_seen ? ', last used ' + ago(d.last_seen) : ', not used yet'), br = p.devices.find(d => d.name === 'browser');
   box.innerHTML = '<div class="prow"><div class="d"><b>Connected devices</b><span>Each has its own token. Disconnecting one stops it until it connects again.</span></div></div>' +
-    p.devices.filter(d => d.name !== 'browser').map(d => '<div class="prow sub"><div class="d"><b>' + esc(label[d.name] || (/^android-./.test(d.name) ? 'Daf for Android · ' + d.name.slice(8).toUpperCase() : d.name)) + '</b><span>' + seen(d) + '</span></div>' +
+    p.devices.filter(d => d.name !== 'browser').map(d => '<div class="prow sub"><div class="d"><b>' + esc(devLabel(d.name)) + '</b><span>' + seen(d) + '</span></div>' +
       '<button class="btn sm" data-act="devoff" data-name="' + esc(d.name) + '">Disconnect</button></div>').join('') +
     // The browser extension (extension/): a token for the device "browser", shown once, pasted into its options.
     '<div class="prow sub"><div class="d"><b>Browser extension</b><span>' + (br ? seen(br) + '. A new token replaces it.' : 'Highlight on any web page and keep it in Daf. Make a token and paste it into the extension’s options.') +
       ' Download it for <a href="/api/extension/daf-extension.zip" download>Chrome or Arc</a> or <a href="/api/extension/daf-extension.xpi" download>Firefox or Zen</a>.</span></div>' +
-    '<button class="btn sm" id="brtoken">' + (br ? 'New token' : 'Make a token') + '</button>' + (br ? '<button class="btn sm" data-act="devoff" data-name="browser">Disconnect</button>' : '') + '</div>' +
+    '<button class="btn sm" id="brtoken">' + (br ? 'New token' : 'Make a token') + '</button>' + (br ? '<button class="btn sm" id="brmore">Another browser</button><button class="btn sm" data-act="devoff" data-name="browser">Disconnect</button>' : '') + '</div>' +
     (token ? '<div class="kindlenote"><span class="mute tiny">Paste it into the extension’s options now; Daf only shows it once.</span><code class="tok">' + esc(token) + '</code></div>' : '');
-  $('#brtoken').onclick = () => api('/api/devices', { method:'POST', body:JSON.stringify({ name:'browser' }) }).then(r => drawDevices(r.token), e => toast(e.message));
+  const brNew = name => api('/api/devices', { method:'POST', body:JSON.stringify({ name }) }).then(r => drawDevices(r.token), e => toast(e.message));
+  $('#brtoken').onclick = () => brNew('browser');
+  // another browser (another account on the Mac, another computer) gets its own, so the first keeps working
+  if ($('#brmore')) $('#brmore').onclick = () => { let n = 2; while (p.devices.some(d => d.name === 'browser-' + n)) n++; brNew('browser-' + n); };
 }
 // Newsletters: senders found in the Proton mailbox (read-only); the ticked ones come into Library → Emails.
 async function drawNewsletters(fresh){

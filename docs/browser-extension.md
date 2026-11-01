@@ -44,7 +44,7 @@ For Firefox, Zen, Chrome and Arc:
 2. Click the Daf button in the browser's toolbar and choose **Options**.
 3. Type your Daf's address, paste the token, and press **Save and connect**. It should say "Connected to Daf."
 
-If the browser asks whether Daf can read the pages you visit, say yes, because that's how it draws the highlights. If you use it in two browsers, paste the same token into both: making a new token replaces the old one, so both would need the new one.
+If the browser asks whether Daf can read the pages you visit, say yes, because that's how it draws the highlights. If you use it in a second browser, or in a second account on the Mac, press **Another browser** instead: that one gets a token of its own and the first keeps working. **New token** replaces the first browser's.
 
 Safari needs none of this. The Mac app makes the token itself and hands it to the extension, as a device called "safari".
 

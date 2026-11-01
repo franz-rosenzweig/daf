@@ -77,6 +77,6 @@ The extension's files are the same as Zen's; `build.sh` gives Safari's build `sa
 
 If the browser asks whether Daf can read the pages you visit, say yes; that's how it draws the highlights. Zen might ask when you hit "Save and connect". To change Alt+H, it's `about:addons` → gear → "Manage Extension Shortcuts" in Zen, and `chrome://extensions/shortcuts` in Chrome.
 
-If you use it in two browsers, paste the same token into both. Making a new token replaces the old one, which means both browsers need the new one. If you ever lose a laptop, hit "Disconnect" next to the browser extension in Daf and that token stops working right away.
+If you use it in a second browser, or in a second account on the Mac, click "Another browser" instead. That one gets its own token, and the first keeps working. "New token" replaces the first browser's. If you ever lose a laptop, hit "Disconnect" next to the browser extension in Daf and that token stops working right away.
 
 Go make the token in Daf first and keep that tab open while you set up the extension.
