@@ -333,7 +333,9 @@ final class BookModel {
 
     /// Forget my place in Daf: the book opens at its start (or where the Kindle is) next time.
     func forgetPlace() async {
-        saveTask?.cancel()                  // a place waiting to be kept would come back after the forgetting
+        saveTask?.cancel()                  // a place waiting to be kept would come back after the forgetting,
+        let place = "/api/ebooks/\(API.enc(id))/position"   // and so would one kept on this Mac while offline
+        Outbox.shared.drop { $0.method == "PUT" && $0.path == place }
         forget = true
         forgotAt = Date()
         do {

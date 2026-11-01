@@ -50,6 +50,8 @@ final class Side {
                 NSAnimationContext.runAnimationGroup { _ in item.animator().isCollapsed = hide } completionHandler: {
                     MainActor.assumeIsolated { Side.shared.settle(); Side.shared.fit(changed) }
                 }
+                // and again a moment later, should the animation's end come late (or not at all)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { MainActor.assumeIsolated { Side.shared.settle(); Side.shared.fit(changed) } }
             } else { fit(changed) }
         }
     }
