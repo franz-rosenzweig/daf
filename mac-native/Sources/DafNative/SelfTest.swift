@@ -1276,12 +1276,37 @@ enum SelfTest {
         m.sheet = nil
         await pause(0.5)
 
+        await pdfBook(m)
+
         // search
         m.query = "the"
         await go(m, .search)
         check(!m.items.isEmpty, "search finds things in Daf", "\(m.items.count)")
 
         finish(nil)
+    }
+
+    /// A book Calibre has only as a PDF: its pages in the PDF view, its place kept as the book's.
+    static func pdfBook(_ m: AppModel) async {
+        var pdfID: String?
+        for b in ((try? await API.shared.json("/api/ebooks"))?.a("books") ?? []).prefix(400) {
+            guard let id = b.s("id"), !b.b("private") else { continue }
+            if (try? await API.shared.json("/api/ebooks/" + API.enc(id)))?.s("format") == "PDF" { pdfID = id; break }
+        }
+        guard let pdfID else { return log("SKIP  no book here is only a PDF") }
+        m.openRoute = "#ebook/" + API.enc(pdfID)
+        let opened = await until(45) { PDFModel.last?.id == pdfID && PDFModel.last?.book == true && (PDFModel.last?.document?.pageCount ?? 0) > 2 && PDFModel.last?.view != nil }
+        guard opened, let pm = PDFModel.last, let v = pm.view, let d = pm.document else {
+            return check(false, "a book that's only a PDF opens in the PDF view", pdfID + ": " + (PDFModel.last?.error ?? "nothing"))
+        }
+        await pause(1.5)
+        if let w = v.window { capture("73-pdf-book", w) }
+        if let p = d.page(at: 2) { v.go(to: p) }
+        await pause(2)
+        let kept = (try? await API.shared.json("/api/ebooks/" + API.enc(pdfID)))?.o("position")?.s("cfi")
+        check(kept == "pdf:3", "a book that's only a PDF opens in the PDF view, and its page is kept as the book's place", "\(d.pageCount) pages, \(kept ?? "-")")
+        closeOthers()
+        await pause(0.5)
     }
 
     /// The native book reader, on a book with a highlight made in the page's reader when there is one.

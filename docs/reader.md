@@ -9,7 +9,7 @@ Daf's reading view is where books, articles and PDFs open. Whatever I'm reading 
 
 ## Books
 
-Every book in my Calibre library with an EPUB, KEPUB, AZW3, MOBI, FB2 or CBZ file opens in Daf. On a book's page press **Read in Daf**, or **Continue in Daf** with the percent once you've started. The reader is foliate-js, the engine inside the Foliate e-reader.
+Every book in my Calibre library with an EPUB, KEPUB, AZW3, MOBI, FB2 or CBZ file opens in Daf. On a book's page press **Read in Daf**, or **Continue in Daf** with the percent once you've started. The reader is foliate-js, the engine inside the Foliate e-reader. A book Calibre only has as a PDF opens on its pages as printed instead, the way a PDF does (see [PDFs](#pdfs)), and it's still the book: my place, my highlights and my minutes go to the book, and it opens where I left it on any device.
 
 Your place is kept per book on the server, so the phone and the desk agree, and the newest place wins when you open it ("Picked up at 45%"). If the Kindle is further along, Daf says "On the Kindle you're at page 212 of 480", with **Go there** and **Stay here**.
 

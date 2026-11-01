@@ -17,8 +17,11 @@ from . import config, today as T, vaultnotes
 from .db import read_only
 
 FORMATS = ["EPUB", "KEPUB", "AZW3", "MOBI", "FB2", "CBZ"]
+# A book Calibre has only as a PDF opens in the PDF view (pdfview.js), its pages as printed.
+READABLE = FORMATS + ["PDF"]
 MIME = {"EPUB": "application/epub+zip", "KEPUB": "application/epub+zip", "AZW3": "application/vnd.amazon.ebook",
-        "MOBI": "application/x-mobipocket-ebook", "FB2": "application/x-fictionbook+xml", "CBZ": "application/vnd.comicbook+zip"}
+        "MOBI": "application/x-mobipocket-ebook", "FB2": "application/x-fictionbook+xml", "CBZ": "application/vnd.comicbook+zip",
+        "PDF": "application/pdf"}
 
 
 def _calibre(conn, book_id):
@@ -41,7 +44,7 @@ def book_file(conn, book_id):
         c.close()
     if not bp:
         return None, None
-    for fmt in FORMATS:
+    for fmt in READABLE:
         if fmt in files:
             ext = "kepub" if fmt == "KEPUB" else fmt.lower()
             p = db.parent / bp[0] / f"{files[fmt]}.{ext}"
@@ -55,7 +58,7 @@ def readable_ids(conn):
     db = config.CALIBRE_DBS[0]
     c = read_only(db)
     try:
-        cal = {r[0] for r in c.execute(f"SELECT DISTINCT book FROM data WHERE upper(format) IN ({','.join('?' * len(FORMATS))})", FORMATS)}
+        cal = {r[0] for r in c.execute(f"SELECT DISTINCT book FROM data WHERE upper(format) IN ({','.join('?' * len(READABLE))})", READABLE)}
     finally:
         c.close()
     return {r[0] for r in conn.execute("SELECT id, calibre_id FROM books WHERE calibre_id IS NOT NULL") if r[1] in cal}
@@ -166,16 +169,22 @@ def save_position(conn, book_id, cfi, fraction, chapter=None, at=None):
     return cur.rowcount > 0
 
 
-def add_highlight(conn, settings, book_id, cfi, text, chapter=None, fraction=None, note=None, color=None, replaces=None, at=None):
+def add_highlight(conn, settings, book_id, cfi, text, chapter=None, fraction=None, note=None, color=None, replaces=None, at=None, pdf=None):
+    """A highlight in Daf's book reader (its CFI), or on a PDF book's page: pdf = {pg, r}, the page and
+    its boxes as fractions of the page, the shape a PDF document's highlights keep (reader._pdf_pos)."""
+    from .reader import COLORS, _pdf_pos
     text = (text or "").strip()
+    pdf = _pdf_pos(pdf) if pdf else None
+    if pdf and not cfi:              # its place, for the id and for the CFI the other readers look for
+        cfi = "pdf:%d:%s" % (pdf["pg"], ",".join("%.4f" % v for v in pdf["r"][0]))
     if not text or not cfi:
         raise ValueError("Nothing selected")
     hid = "e" + hashlib.sha1(f"{book_id}|{cfi}".encode()).hexdigest()[:16]
-    from .reader import COLORS
     conn.execute("INSERT OR REPLACE INTO highlights (id, book_id, source, text, note, chapter, page, created, pos, seen, deleted, color) "
-                 "VALUES (?, ?, 'epub', ?, NULL, ?, NULL, ?, ?, ?, 0, ?)",
-                 (hid, book_id, text, (chapter or "")[:200] or None, when(at),
-                  json.dumps({"cfi": cfi, "fraction": fraction}), int(time.time()), color if color in COLORS else None))
+                 "VALUES (?, ?, 'epub', ?, NULL, ?, ?, ?, ?, ?, 0, ?)",
+                 (hid, book_id, text, (chapter or "")[:200] or None, str(pdf["pg"]) if pdf else None, when(at),
+                  json.dumps({"cfi": cfi, "fraction": fraction, **({"pdf": pdf} if pdf else {})}), int(time.time()),
+                  color if color in COLORS else None))
     from . import review
     review.carry(conn, hid, replaces, own=("epub",))
     if note:

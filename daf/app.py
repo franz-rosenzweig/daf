@@ -2119,7 +2119,8 @@ async def post_ebook_highlight(book_id: str, request: Request, c=Depends(conn)):
     b = await _body(request)
     try:
         hid = ebooks.add_highlight(c, config.load_settings(), book_id, str(b.get("cfi") or ""), str(b.get("text") or "")[:5000],
-                                   b.get("chapter"), b.get("fraction"), b.get("note"), b.get("color"), b.get("replaces"), b.get("at"))
+                                   b.get("chapter"), b.get("fraction"), b.get("note"), b.get("color"), b.get("replaces"), b.get("at"),
+                                   b.get("pdf") if isinstance(b.get("pdf"), dict) else None)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"id": hid}
