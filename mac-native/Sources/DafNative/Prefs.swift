@@ -73,7 +73,10 @@ struct AccountPrefs: View {
                 LabeledContent {
                     HStack {
                         Button(br == nil ? "Make a Token" : "New Token") { Task { await makeBrowserToken() } }
-                        if br != nil { Button("Disconnect…") { disconnect = "browser" } }
+                        if br != nil {
+                            Button("Another Browser") { Task { await makeBrowserToken(another: true) } }
+                            Button("Disconnect…") { disconnect = "browser" }
+                        }
                     }
                 } label: {
                     Text("Browser extension")
@@ -100,6 +103,9 @@ struct AccountPrefs: View {
     static func label(_ name: String) -> String {
         if let l = labels[name] { return l }
         if name.hasPrefix("android-") { return "Daf for Android · " + name.dropFirst(8).uppercased() }
+        for (k, l) in [("mac-", "Daf for Mac"), ("safari-", "Safari extension"), ("browser-", "Browser extension")] where name.hasPrefix(k) {
+            return l + " · " + name.dropFirst(k.count)
+        }
         return name == "browser" ? "the browser extension" : name
     }
 
@@ -125,9 +131,13 @@ struct AccountPrefs: View {
         catch { model.error = error.localizedDescription }
     }
 
-    private func makeBrowserToken() async {
+    /// The extension's token; another browser (another account on the Mac, another computer) gets one
+    /// of its own, "browser-2" and on, so the first keeps working.
+    private func makeBrowserToken(another: Bool = false) async {
+        let taken = Set(devices.compactMap { $0.s("name") })
+        let name = another ? (2...99).map { "browser-\($0)" }.first { !taken.contains($0) } ?? "browser-99" : "browser"
         do {
-            browserToken = J(try await API.shared.send("POST", "/api/devices", ["name": "browser"]))?.s("token")
+            browserToken = J(try await API.shared.send("POST", "/api/devices", ["name": name]))?.s("token")
             await load()
         } catch { model.error = error.localizedDescription }
     }
@@ -136,7 +146,7 @@ struct AccountPrefs: View {
         disconnect = nil
         do {
             try await API.shared.send("DELETE", "/api/devices/" + API.enc(name), nil)
-            if name == "browser" { browserToken = nil }
+            if name.hasPrefix("browser") { browserToken = nil }
             model.say("Disconnected")
             await load()
         } catch { model.error = error.localizedDescription }

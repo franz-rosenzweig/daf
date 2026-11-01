@@ -55,7 +55,7 @@ struct InstagramSection: View {
     private func state(_ s: J) -> String {
         if let t = s.d("expired") { return "Instagram turned the sign-in away " + TodayView.ago(t) + ". Sign in again to renew it." }
         if s.b("signed_in") {
-            let by = s.s("by").map { Self.by[$0] ?? ($0.hasPrefix("android") ? "the Android app" : $0.hasPrefix("mac") ? "the Mac app" : $0) }
+            let by = s.s("by").map { Self.by[$0] ?? ($0.hasPrefix("android") ? "the Android app" : $0.hasPrefix("mac") ? "the Mac app" : $0.hasPrefix("safari") ? "Safari" : $0.hasPrefix("browser") ? "the browser extension" : $0) }
             return "Signed in. Renewed " + TodayView.ago(s.d("updated")) + (by.map { " by " + $0 } ?? "") + "."
         }
         return "Not signed in yet. Reels need it: Instagram shows almost nothing to a visitor."

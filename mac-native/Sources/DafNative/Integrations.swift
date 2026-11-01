@@ -82,10 +82,17 @@ enum DeviceToken {
         return cached
     }
 
+    /// A device's name for this account on the Mac ("mac-home", "safari-lander"): each account keeps
+    /// its own token, so connecting one doesn't disconnect another (a new token replaces its name's old one).
+    static func name(_ kind: String) -> String {
+        let user = NSUserName().lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+        return String((kind + "-" + (user.isEmpty ? "mac" : user)).prefix(24))
+    }
+
     /// The token, made now with the sign-in if there isn't one.
     static func ensure() async -> String? {
         if let v = value, !v.isEmpty { return v }
-        guard !testing, let r = J(try? await API.shared.send("POST", "/api/devices", ["name": "mac"])), let t = r.s("token") else { return nil }
+        guard !testing, let r = J(try? await API.shared.send("POST", "/api/devices", ["name": name("mac")])), let t = r.s("token") else { return nil }
         let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
         SecItemDelete(base as CFDictionary)
         var add = base
@@ -105,7 +112,7 @@ enum DeviceToken {
 }
 
 /// Daf in Safari (the web extension in DafSafari.appex): the app makes its token, a device of its
-/// own called "safari", with my sign-in, and leaves it with Daf's address in the app group, where
+/// own called "safari-<this Mac account>", with my sign-in, and leaves it with Daf's address in the app group, where
 /// the extension's native half (mac/DafSafari) hands it over. Nothing to paste.
 @MainActor
 enum Safari {
@@ -134,7 +141,7 @@ enum Safari {
         guard let shared = group else { return "This build of Daf isn't signed for Safari. Build it with your Apple Development identity." }
         if !again, let t = shared.string(forKey: "safari.token"), !t.isEmpty, shared.string(forKey: "safari.url") == API.shared.base.absoluteString { return nil }
         do {
-            let r = J(try await API.shared.send("POST", "/api/devices", ["name": "safari"]))
+            let r = J(try await API.shared.send("POST", "/api/devices", ["name": DeviceToken.name("safari")]))
             guard let token = r?.s("token") else { return "Daf didn't give a token." }
             shared.set(token, forKey: "safari.token")
             shared.set(API.shared.base.absoluteString, forKey: "safari.url")

@@ -67,7 +67,7 @@ Two links work from anywhere on the Mac, which makes them good for Shortcuts: `d
 
 ## Safari
 
-The browser extension's Safari version comes inside the app, so there's nothing to download and no token to paste. Open **Daf → Safari Extension…**, tick **Daf** in Safari's extensions, and allow it on every website. See [The browser extension](browser-extension.md) for what it does.
+The browser extension's Safari version comes inside the app, so there's nothing to download and no token to paste. Open **Daf → Safari Extension…**, tick **Daf** in Safari's extensions, and allow it on every website. Each account on the Mac connects its own, so setting it up in a second account doesn't disconnect the first. See [The browser extension](browser-extension.md) for what it does.
 
 ## Settings
 
