@@ -175,27 +175,25 @@ enum SelfTest {
         check(m.count(.library("inbox")) != nil, "with the counts beside the sidebar")
         capture("02-library")
 
-        // the sidebar, as the page's: full → mini → hidden (⌘\), a hidden one back for a moment
+        // the sidebar: ⌘\ hides it and shows it again; full or mini when it shows
         if let w = main, let s = Focus.split(w), let side = s.splitViewItems.first {
             let mode0 = Side.shared.mode
             let wide = { side.viewController.view.frame.width }
             Side.shared.mode = "full"
             _ = await until(3) { !side.isCollapsed && wide() > 150 }
-            Side.shared.cycle()
+            Side.shared.size = "mini"
             let mini = await until(3) { !side.isCollapsed && wide() < 90 }
             await pause(0.8)
             capture("02b-sidebar-mini")
-            Side.shared.cycle()
+            Side.shared.toggle()
             let hidden = await until(3) { side.isCollapsed }
-            Side.shared.button()
-            let peek = await until(3) { !side.isCollapsed && Side.shared.mini }
-            Side.shared.chose()
-            let gone = await until(3) { side.isCollapsed }
-            Side.shared.cycle()
+            Side.shared.toggle()
+            let back = await until(3) { !side.isCollapsed && wide() < 90 }
+            Side.shared.size = "full"
             let full = await until(3) { !side.isCollapsed && wide() > 150 }
-            check(mini && hidden && peek && gone && full, "the sidebar goes full → mini → hidden, and a hidden one comes back for a moment",
-                  "mini \(mini), hidden \(hidden), back \(peek), gone again \(gone), full \(full) (\(Int(wide())) wide)")
-            Side.shared.mode = mode0
+            check(mini && hidden && back && full, "the sidebar goes mini and full, ⌘\\ hides it, and ⌘\\ brings it back as it was",
+                  "mini \(mini), hidden \(hidden), back \(back), full \(full) (\(Int(wide())) wide)")
+            Side.shared.mode = mode0 == "hidden" ? "full" : mode0         // shown for what follows
         }
         // Library › Articles, with Inbox, Later and Archive
         await go(m, .kind("article"))
@@ -241,16 +239,17 @@ enum SelfTest {
         capture("03-reader")
         guard let r = m.reader, let tv = r.textView else { return finish("the reader didn't open") }
         check(!r.blocks.isEmpty, "its blocks are laid out", "\(r.blocks.count) blocks")
-        // no sidebar while it's read; ⌘\ brings it for a moment
+        // the sidebar stays while it's read (it went, and there was no getting it back); ⌘\ still hides and shows it
         if let w = main, let s = Focus.split(w), let side = s.splitViewItems.first {
-            let away = await until(3) { side.isCollapsed }
-            Side.shared.cycle()
-            let back = await until(3) { !side.isCollapsed && Side.shared.mini }
+            let stays = await until(2) { !side.isCollapsed } && !Side.shared.hidden
             await pause(0.6)
             capture("03b-reading-sidebar")
-            Side.shared.cycle()
-            let again = await until(3) { side.isCollapsed }
-            check(away && back && again, "while an article is read there's no sidebar; ⌘\\ brings it for a moment", "away \(away), back \(back), away again \(again)")
+            Side.shared.toggle()
+            let away = await until(3) { side.isCollapsed }
+            Side.shared.toggle()
+            let back = await until(3) { !side.isCollapsed }
+            check(stays && away && back && m.reader?.textView === tv, "opening an article keeps the sidebar, and ⌘\\ hides it and brings it back",
+                  "stays \(stays), hidden \(away), back \(back)")
         }
         check(r.minutesLeft?.hasSuffix("left") == true || r.minutesLeft == "The end", "the time left shows under the text", r.minutesLeft ?? "-")
         // Themes & Settings: the text larger, a look picked, both kept

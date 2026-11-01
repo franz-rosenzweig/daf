@@ -14,7 +14,7 @@ Only Daf loads in the window. Any other link opens in your browser, `obsidian://
 
 The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Review**, **Library** with its kinds, **Books**, **Feed** with its folders and **Highlights**, then what I've pinned, then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
 
-It's full, mini (just the icons) or hidden, and the Mac remembers which. ⌘\ goes round the three, and so does the button at the top left, which also brings a hidden one back for a moment. **View → Sidebar** has them too, and **Settings → General** has them with the pins, which Daf keeps for every device. While an article is open the sidebar goes, so it's just the list and the article, and ⌘\ brings it back for a moment.
+⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (just the icons): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
 
 ## Reading
 

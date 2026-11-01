@@ -53,7 +53,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 
 ## The focused round (2026-10-30)
 
-- here: the sidebar full, mini or hidden on this Mac (⌘\, the button at the top left, View › Sidebar, Settings › General); a hidden one back for a moment; none while an article is read
+- here: the sidebar shown or hidden (⌘\, the button at the top left) and full or mini (View › Sidebar, Settings › General), kept on this Mac; it stays while an article is read (the Mac's list sits beside the article; the page's reader takes the whole page, so it hides there); full or mini by dragging its edge is the page's, not here yet
 - here: Today, Review, Library (its kinds with Inbox, Later and Archive, and the saved views), Books, Feed (its folders), Highlights; Pinned (settings nav_pins, Settings › General); Search ⌘K, Stats, Preferences at the bottom
 - here: the article bar: Aa, Listen, Save (Feed, AntennaPod-only episodes), Done, …, Notebook; Shortlist, Later, the original, Focus Mode and next/previous in the … menu; the time left under the text
 - here: books the Apple Books way: two pages when wide (already), Pages by default (already), the title in the middle, Contents, Aa, Search, Bookmark, …; Listen, Notebook, About, Ask and Focus in …; contents and the panel slide over the pages; the footer fades after a page turn

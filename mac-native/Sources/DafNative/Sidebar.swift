@@ -1,47 +1,40 @@
 import AppKit
 import SwiftUI
 
-/// The sidebar, as the page has it (app.js sideMode): full, mini (its icons) or hidden, kept on this
-/// Mac. ⌘\ goes full → mini → hidden; hidden, the button at the top left brings the mini one back
-/// for a moment. While an article is open there's no sidebar at all, and ⌘\ brings it for a moment.
+/// The sidebar: shown or hidden, and full or mini (its icons) when it shows, kept on this Mac.
+/// ⌘\ and the button at the top left show and hide it; View › Sidebar and Settings › General
+/// choose full or mini. It stays as it is when something is opened: the list is beside the article,
+/// and the way to the rest of Daf shouldn't go with it.
 @MainActor
 @Observable
 final class Side {
     static let shared = Side()
     static let modes = [("full", "Full"), ("mini", "Mini"), ("hidden", "Hidden")]
 
-    var mode = UserDefaults.standard.string(forKey: "sideMode") ?? "full" {
-        didSet {
-            UserDefaults.standard.set(mode, forKey: "sideMode")
-            peeking = false
-            apply()
-        }
+    /// Its size when it shows.
+    var size = UserDefaults.standard.string(forKey: "sideSize") ?? (UserDefaults.standard.string(forKey: "sideMode") == "mini" ? "mini" : "full") {
+        didSet { UserDefaults.standard.set(size, forKey: "sideSize"); apply() }
     }
-    /// Back for a moment over the page, as the mini one.
-    var peeking = false { didSet { if peeking != oldValue { apply() } } }
-    /// An article open in the window: no sidebar then.
-    var reading = false { didSet { if reading != oldValue { peeking = false; apply() } } }
+    var hidden = UserDefaults.standard.object(forKey: "sideHidden") as? Bool ?? (UserDefaults.standard.string(forKey: "sideMode") == "hidden") {
+        didSet { UserDefaults.standard.set(hidden, forKey: "sideHidden"); apply() }
+    }
     /// The width the split view was last given, so a width dragged by hand stays.
     @ObservationIgnored private var widthFor = ""
 
-    /// How it shows now.
-    var shown: String { peeking ? "mini" : reading ? "hidden" : mode }
+    /// Full, mini or hidden, as Settings has it.
+    var mode: String {
+        get { shown }
+        set {
+            if newValue == "hidden" { hidden = true; return }
+            size = newValue
+            hidden = false
+        }
+    }
+    var shown: String { hidden ? "hidden" : size }
     var mini: Bool { shown == "mini" }
 
-    /// ⌘\: full → mini → hidden; while reading, or after a moment, it goes again.
-    func cycle() {
-        if peeking { peeking = false; return }
-        if reading { peeking = true; return }
-        mode = mode == "full" ? "mini" : mode == "mini" ? "hidden" : "full"
-    }
-
-    /// The button at the top left: a hidden sidebar back for a moment, else ⌘\.
-    func button() {
-        if peeking { peeking = false } else if shown == "hidden" { peeking = true } else { cycle() }
-    }
-
-    /// A place picked while it was there for a moment: it goes again.
-    func chose() { if peeking { peeking = false } }
+    /// ⌘\ and the button at the top left.
+    func toggle() { hidden.toggle() }
 
     /// The main window's sidebar as it should be (Focus mode puts it away itself).
     func apply() {
@@ -118,7 +111,7 @@ struct Sidebar: View {
 
     var body: some View {
         let mini = Side.shared.mini
-        List(selection: Binding(get: { model.place }, set: { model.place = $0; Side.shared.chose() })) {
+        List(selection: Binding(get: { model.place }, set: { model.place = $0 })) {
             row(.today, "Today", "sun.max", mini)
             row(.review, "Review", "rectangle.stack", mini)
             if mini {
@@ -165,7 +158,7 @@ struct Sidebar: View {
                         .padding(.vertical, 4)
                 }
                 bottom("Search", "magnifyingglass", "⌘K", mini) { model.sheet = .palette }
-                bottom("Stats", "chart.bar", nil, mini, on: model.place == .stats) { model.place = .stats; Side.shared.chose() }
+                bottom("Stats", "chart.bar", nil, mini, on: model.place == .stats) { model.place = .stats }
                 bottom("Preferences", "gearshape", "⌘,", mini) { openSettings() }
             }
             .labelStyle(SideLabelStyle(mini: mini))
@@ -235,10 +228,22 @@ struct FeedFolders: View {
     }
 }
 
-/// The button at the top left: full → mini → hidden, or a hidden sidebar back for a moment.
+/// The button at the top left: the sidebar shown or hidden.
 struct SidebarButton: View {
     var body: some View {
-        Button { Side.shared.button() } label: { Label("Sidebar", systemImage: "sidebar.left") }
-            .help("Sidebar: full, mini or hidden (⌘\\)")
+        Button { Side.shared.toggle() } label: { Label("Sidebar", systemImage: "sidebar.left") }
+            .help(Side.shared.hidden ? "Show the sidebar (⌘\\)" : "Hide the sidebar (⌘\\)")
+    }
+}
+
+/// View › Show or Hide the Sidebar (⌘\\), and its size.
+struct SidebarMenu: View {
+    var body: some View {
+        Button(Side.shared.hidden ? "Show Sidebar" : "Hide Sidebar") { Side.shared.toggle() }
+            .keyboardShortcut("\\", modifiers: .command)
+        Picker("Sidebar", selection: Binding(get: { Side.shared.size }, set: { Side.shared.size = $0; Side.shared.hidden = false })) {
+            Text("Full").tag("full")
+            Text("Mini").tag("mini")
+        }
     }
 }

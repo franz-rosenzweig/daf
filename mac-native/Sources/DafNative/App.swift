@@ -18,12 +18,7 @@ struct DafNativeApp: App {
         }
         .defaultSize(width: 1280, height: 820)
         .commands {
-            CommandGroup(replacing: .sidebar) {
-                Button("Switch the Sidebar") { Side.shared.cycle() }.keyboardShortcut("\\", modifiers: .command)
-                Picker("Sidebar", selection: Binding(get: { Side.shared.mode }, set: { Side.shared.mode = $0 })) {
-                    ForEach(Side.modes, id: \.0) { Text($0.1).tag($0.0) }
-                }
-            }
+            CommandGroup(replacing: .sidebar) { SidebarMenu() }
             InspectorCommands()
             CommandGroup(after: .toolbar) {
                 Button("Focus Mode") { Focus.shared.toggle() }.keyboardShortcut("f", modifiers: [.command, .shift])
