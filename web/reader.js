@@ -1,7 +1,9 @@
-/* Daf reader (Phases 4–5): the Feed (FreshRSS), the Library (Daf's own; Karakeep's before), the reading
+/* Daf reader (Phases 4–5): the Feed (FreshRSS, or Daf's own reading of the feeds), the Library (Daf's own; Karakeep's before), the reading
    view with highlights, notes, Ask and read-aloud, and ⌘K search. */
 (function(){
 'use strict';
+// Daf reads the feeds itself (rss.py) once it's been moved off FreshRSS; the counts say which.
+const byDaf = () => !!(R.counts && R.counts.feed_reader === 'daf');
 const C = window.DafCore, H = C.HL, K = C.Keys;
 const { api, esc, toast, $, $$, epochDate, ago, shortTitle, I } = C;
 const R = { tabs: { feed: 'unseen', library: 'inbox' }, list: null, sel: null, multi: new Set(), anchor: null, selecting: false, filters: { feed: {}, library: {} }, doc: null, focus: 0, panel: 'info', toc: true,
@@ -98,7 +100,7 @@ document.addEventListener('click', async e => {
   if (e.target.id !== 'addfollow') return;
   const url = $('#addurl').value.trim(), st = $('#addstatus');
   if (!url) { st.textContent = 'Paste the site’s address or its feed first.'; $('#addurl').focus(); return; }
-  st.textContent = 'Asking FreshRSS…'; e.target.disabled = true;
+  st.textContent = byDaf() ? 'Looking for its feed…' : 'Asking FreshRSS…'; e.target.disabled = true;
   try { const r = await api('/api/add/feed', { method:'POST', body:JSON.stringify({ url, folder:$('#addfolder').value }) }); st.innerHTML = 'Following <b>' + esc(r.name) + '</b>. New posts show up in the Feed after the next sync.'; $('#addurl').value = ''; }
   catch(err){ st.textContent = err.message; }
   e.target.disabled = false;
@@ -199,7 +201,7 @@ function infoHTML(d){
   const kv = [['Type', (KIND[d.kind] || 'Article').replace(/s$/, '') + (d.where_ === 'feed' ? ' · RSS' : '')], ['Source', d.source], d.category ? ['Folder', d.category] : null,
     d.url ? ['Domain', d.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]] : null, d.published ? ['Published', epochDate(d.published)] : null,
     ['Added', epochDate(d.added)], d.mins ? ['Length', d.mins + ' min (' + (d.words || 0).toLocaleString() + ' words)'] : null, ['Progress', Math.round(d.progress || 0) + '%'],
-    ['Stored in', d.where_ === 'feed' ? 'FreshRSS' : d.id.startsWith('kk:') ? 'Daf (saved first in Karakeep)' : 'Daf']].filter(Boolean);
+    ['Stored in', d.where_ === 'feed' && !byDaf() ? 'FreshRSS' : d.id.startsWith('kk:') ? 'Daf (saved first in Karakeep)' : 'Daf']].filter(Boolean);
   return '<div class="pbody"><div style="display:flex;flex-direction:column;gap:4px"><b style="font-size:16px;line-height:1.3"' + dirAttr(d.title) + '>' + esc(d.title) + '</b>' +
     (d.author ? '<span class="mute tiny">' + esc(d.author) + '</span>' : '') + '</div>' +
     (d.ai_summary ? '<div class="isum"><span class="lbl">Summary</span><p' + dirAttr(d.ai_summary) + '>' + esc(d.ai_summary) + '</p><span class="mute tiny">Written by AI</span></div>'
@@ -420,7 +422,7 @@ function sourcesHTML(s){
     }).join('') +
     '<div class="sfoot"><label class="shide"><input type="checkbox" data-srchide' + (hide ? ' checked' : '') + '> Hide feeds with nothing new</label>' +
     '<button class="btn sm" data-act="add">Follow a site</button></div>' +
-    (s.stale ? '<p class="mute tiny">FreshRSS didn’t answer; this is the list from before.</p>' : '');
+    (s.stale && !byDaf() ? '<p class="mute tiny">FreshRSS didn’t answer; this is the list from before.</p>' : '');
 }
 async function openSources(){
   const m = $('#modal'); $('#scrim').hidden = false; m.hidden = false; m.classList.add('sheet');
@@ -469,7 +471,7 @@ async function feedEditAct(a, id){
   }
   if (a === 'unfollow') {
     const name = feedTitle(id);
-    if (!confirm('Unfollow “' + name + '”? FreshRSS stops fetching it, and what’s unseen from it leaves the Feed.')) return;
+    if (!confirm('Unfollow “' + name + '”? ' + (byDaf() ? 'Daf' : 'FreshRSS') + ' stops fetching it, and what’s unseen from it leaves the Feed.')) return;
     try {
       await api('/api/feed/sources?feed=' + encodeURIComponent(id), { method: 'DELETE' });
       R.sources = null; toast('Unfollowed ' + name); refreshCounts();
@@ -932,7 +934,7 @@ function editMeta(){
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false;
   m.innerHTML = '<h2>Edit title and author</h2><label class="mute tiny" for="mtitle">Title</label><input class="field" id="mtitle" value="' + esc(d.title || '') + '"' + dirAttr(d.title) + '>' +
     '<label class="mute tiny" for="mauthor">Author</label><input class="field" id="mauthor" value="' + esc(d.author || '') + '">' +
-    '<span class="mute tiny">Stays this way after FreshRSS syncs.</span><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="msave">Save</button></div>';
+    (byDaf() ? '' : '<span class="mute tiny">Stays this way after FreshRSS syncs.</span>') + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="msave">Save</button></div>';
   const t = $('#mtitle'); t.focus(); t.select();
   const save = async () => {
     try { const r = await api('/api/docs/' + encodeURIComponent(d.id) + '/meta', { method:'PUT', body:JSON.stringify({ title:$('#mtitle').value, author:$('#mauthor').value }) });

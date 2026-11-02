@@ -311,6 +311,19 @@ def cmd_karakeep_import(a):
     return 0
 
 
+def cmd_feeds_import(a):
+    """Daf reads the feeds itself from now on: FreshRSS's feeds, folders and icons come over (rss.import_freshrss)."""
+    from .sources import feedsrc, rss
+    if feedsrc.daf() and not a.again:
+        print("Daf reads the feeds already. --again brings FreshRSS's list over once more.")
+        return 0
+    with db.session() as conn:
+        n = rss.import_freshrss(conn, config.load_settings())
+    print(f"Daf reads the feeds now: {n['feeds']} feeds in {n['folders']} folders, {n['icons']} icons, "
+          f"{n['seen']} posts FreshRSS had already brought, {n['settings']} that mark new posts read.")
+    return 0
+
+
 def cmd_podcasts_import(a):
     from . import gpodder
     with db.session() as c:
@@ -345,6 +358,7 @@ def main(argv=None):
     x = sub.add_parser("doctor", help="check every source"); x.add_argument("--json", action="store_true"); x.set_defaults(f=cmd_doctor)
     x = sub.add_parser("backup", help="a consistent copy of daf.db into STATE/backups (cron, 03:00)"); x.set_defaults(f=cmd_backup)
     x = sub.add_parser("karakeep-import", help="Daf takes the Library over from Karakeep, once"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_karakeep_import)
+    x = sub.add_parser("feeds-import", help="Daf reads the feeds itself from now on, FreshRSS's list brought over"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_feeds_import)
     x = sub.add_parser("podcasts-import", help="subscriptions and listening from Nextcloud's GPodder Sync app"); x.add_argument("--user", default="admin"); x.set_defaults(f=cmd_podcasts_import)
     x = sub.add_parser("sync", help="pull every source now"); x.add_argument("--quiet", action="store_true"); x.set_defaults(f=cmd_sync)
     x = sub.add_parser("today", help="today's reading"); x.add_argument("--json", action="store_true"); x.add_argument("--date"); x.set_defaults(f=cmd_today)

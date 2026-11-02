@@ -198,6 +198,13 @@ CREATE TABLE IF NOT EXISTS book_files (      -- a book file sent to Calibre-Web'
 CREATE TABLE IF NOT EXISTS kindle_queue (    -- files for the Kindle, which its plugin downloads on Wi-Fi (kindlequeue.py)
   id TEXT PRIMARY KEY, kind TEXT NOT NULL, ref TEXT, name TEXT NOT NULL, shelf TEXT NOT NULL, path TEXT NOT NULL,
   size INTEGER, requested INTEGER NOT NULL, delivered INTEGER, error TEXT);
+CREATE TABLE IF NOT EXISTS feeds (           -- the feeds Daf reads itself (sources/rss.py), once it's in charge of the Feed
+  id TEXT PRIMARY KEY,                        -- "feed/12", as FreshRSS named them, so posts' docs.feed still points here
+  url TEXT NOT NULL UNIQUE, title TEXT, site TEXT, folder TEXT NOT NULL DEFAULT '', icon TEXT,
+  etag TEXT, modified TEXT, fetched INTEGER, ok INTEGER, error TEXT, errors INTEGER DEFAULT 0,
+  every INTEGER, attrs TEXT, added INTEGER);
+CREATE TABLE IF NOT EXISTS feed_seen (        -- every post a feed has given ("id:<guid>", "link:<url>"), so a forgotten one never comes back
+  feed TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (feed, key));
 CREATE TABLE IF NOT EXISTS kindle_files (    -- every book on the Kindle, as its plugin last reported them (kindleshelves.py)
   path TEXT PRIMARY KEY,                      -- from its home folder: "Recovery/Title - Author (342).pdf"
   md5 TEXT, book_id TEXT, shelf TEXT NOT NULL DEFAULT '', seen INTEGER NOT NULL);

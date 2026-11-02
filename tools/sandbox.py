@@ -31,8 +31,8 @@ karakeep.set_favourited = lambda *a, **k: said("KARAKEEP FAVOURITE", *a)
 karakeep.upload_pdf = lambda name, data, title=None: said("KARAKEEP PDF", name) or {"id": "sbxpdf"}
 karakeep.delete = lambda bid: said("KARAKEEP DELETE", bid) or {}
 freshrss.mark_read = lambda ids, read=True: said("FRESHRSS MARK", ids, read)
-freshrss.subscribe = lambda url, folder=None: said("FRESHRSS SUBSCRIBE", url, folder) or url
-freshrss.subscriptions = lambda: [{"id": "feed/1", "title": "xkcd", "folder": "", "url": "https://xkcd.com/atom.xml", "site": "", "icon": ""}]
+freshrss.subscribe = lambda url, folder=None, conn=None: said("FRESHRSS SUBSCRIBE", url, folder) or url
+freshrss.subscriptions = lambda conn=None: [{"id": "feed/1", "title": "xkcd", "folder": "", "url": "https://xkcd.com/atom.xml", "site": "", "icon": ""}]
 
 
 def _mail(subject, body_html, body_text):

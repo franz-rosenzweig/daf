@@ -4,6 +4,7 @@ python-multipart==0.0.20
 pypdf==5.1.0
 Pillow==12.3.0
 trafilatura==2.3.1
+feedparser==6.0.11        # the Feed, once Daf reads the feeds itself (daf/sources/rss.py)
 # Videos and transcripts (daf/media.py). yt-dlp is left unpinned: sites change and it has to keep up.
 yt-dlp[default]
 faster-whisper==1.2.1

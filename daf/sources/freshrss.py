@@ -1,4 +1,5 @@
-"""The Feed: FreshRSS through its Google Reader API (http://127.0.0.1:8080).
+"""The Feed: FreshRSS through its Google Reader API (http://127.0.0.1:8080), until Daf reads the
+feeds itself (rss.py, which has the same functions; feedsrc.py picks one; conn is for rss's sake).
 
 Daf keeps the newest unread items (back to the expiry window) as `docs` with
 where='feed', and their cleaned text in `doc_content`. Read state is shared both
@@ -86,7 +87,7 @@ def star(item_ids, on=True):
     edit(item_ids, add=STAR if on else None, remove=None if on else STAR)
 
 
-def subscribe(url, folder=None):
+def subscribe(url, folder=None, conn=None):
     """Follow a site or a feed in FreshRSS (it finds the feed on a site's page). Returns its title."""
     fields = [("quickadd", url), ("T", _edit_token())]
     d = json.loads(_req("/reader/api/0/subscription/quickadd", urllib.parse.urlencode(fields).encode()) or b"{}")
@@ -98,7 +99,7 @@ def subscribe(url, folder=None):
     return d.get("streamName") or url
 
 
-def subscriptions():
+def subscriptions(conn=None):
     """The feeds FreshRSS follows: [{id ("feed/12"), title, folder, url, site, icon (f.php's hash)}]."""
     d = _get("/reader/api/0/subscription/list?output=json")
     out = []
@@ -110,7 +111,7 @@ def subscriptions():
     return out
 
 
-def edit_subscription(stream, title=None, folder=None, old_folder=None):
+def edit_subscription(stream, title=None, folder=None, old_folder=None, conn=None):
     """Rename a feed, or move it to another folder ("" for none)."""
     fields = [("ac", "edit"), ("s", stream)]
     if title:
@@ -124,7 +125,7 @@ def edit_subscription(stream, title=None, folder=None, old_folder=None):
     _req("/reader/api/0/subscription/edit", urllib.parse.urlencode(fields).encode())
 
 
-def unsubscribe(stream):
+def unsubscribe(stream, conn=None):
     _req("/reader/api/0/subscription/edit", urllib.parse.urlencode([("ac", "unsubscribe"), ("s", stream), ("T", _edit_token())]).encode())
 
 
@@ -134,7 +135,7 @@ def icon(h):
         return r.read(), r.headers.get("Content-Type", "image/png")
 
 
-def folders():
+def folders(conn=None):
     d = _get("/reader/api/0/tag/list?output=json")
     return sorted(t["id"].split("/label/", 1)[1] for t in d.get("tags", []) if "/label/" in t.get("id", ""))
 

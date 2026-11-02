@@ -115,6 +115,13 @@ def _status(conn, source):
 
 
 def check_freshrss(conn=None):
+    from . import feedsrc
+    if feedsrc.daf():                  # Daf reads the feeds itself (rss.py)
+        st = _status(conn, "freshrss")
+        bad = conn.execute("SELECT COUNT(*) FROM feeds WHERE errors >= 3").fetchone()[0] if conn else 0
+        n = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0] if conn else 0
+        detail = (st["detail"] + ", read " + _age(st["last_ok"])) if st and st["ok"] else (f"last read failed: {st['detail']}" if st else "not read yet")
+        return {"name": "Feeds", "ok": bool(st and st["ok"]), "detail": f"{n} feeds" + (f", {bad} not answering" if bad else "") + "; " + detail, "phase": 4}
     code, body = _http(config.FRESHRSS_URL + "/api/greader.php")
     up = code == 200 and body.strip().startswith(b"OK")
     st = _status(conn, "freshrss")
