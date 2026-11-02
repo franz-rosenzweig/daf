@@ -204,6 +204,8 @@ CREATE TABLE IF NOT EXISTS doc_edits (       -- titles and authors you corrected
   id TEXT PRIMARY KEY, title TEXT, author TEXT, updated INTEGER);
 CREATE TABLE IF NOT EXISTS book_marks (      -- bookmarks in books read in Daf
   id TEXT PRIMARY KEY, book_id TEXT NOT NULL, cfi TEXT NOT NULL, fraction REAL, chapter TEXT, excerpt TEXT, created INTEGER);
+CREATE TABLE IF NOT EXISTS book_forgets (    -- Forget My Place: when, so a place from before it (sent late, kept offline) doesn't bring it back
+  book_id TEXT PRIMARY KEY, at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS book_positions (  -- where you are in a book read in Daf (EPUB CFI)
   book_id TEXT PRIMARY KEY, cfi TEXT, fraction REAL, chapter TEXT, updated INTEGER);
 CREATE TABLE IF NOT EXISTS paper_pages (     -- photos of marked paper pages (Phase 7)

@@ -91,13 +91,15 @@ async function openBook(id, at){
     '<aside class="rpanel" id="bpanel"></aside></div><div class="bscrim" data-bk="closesheets"></div></div>';
   // The file starts coming at once, beside the book's details: from the device when it's been
   // opened before (sw.js), else from Daf.
-  const fileUrl = '/api/ebooks/' + encodeURIComponent(id) + '/file';
-  const fileP = fetch(fileUrl, { credentials: 'same-origin' });
+  const fileUrl = '/api/ebooks/' + encodeURIComponent(id) + '/file', fileStop = new AbortController();
+  const fileP = fetch(fileUrl, { credentials: 'same-origin', signal: fileStop.signal });
   fileP.catch(() => {});
   let d;
   try { d = await api('/api/ebooks/' + encodeURIComponent(id)); }
   catch(e){ $('#bstage').innerHTML = '<div class="placeholder">' + esc(e.message) + ' <a href="#book/' + encodeURIComponent(id) + '">Back to the book</a></div>'; return; }
   if (B.id !== id) return;
+  // A book Calibre has only as a PDF: its pages as printed, in the PDF view (pdfview.js)
+  if (d.format === 'PDF') { fileStop.abort(); location.replace('#pdf/book/' + encodeURIComponent(id) + (at && at.startsWith('hl:') ? '/' + at : '')); return; }
   B.d = d;
   inkLoad(d);
   d.highlights.forEach(h => { h.source = 'epub'; B.byCfi.set(h.pos.cfi, h); });

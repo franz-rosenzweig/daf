@@ -36,31 +36,27 @@ final class Side {
     /// ⌘\ and the button at the top left.
     func toggle() { hidden.toggle() }
 
-    /// The main window's sidebar as it should be (Focus mode puts it away itself).
+    /// The main window's sidebar at its width. Shown or hidden is the split view's own
+    /// (MainView's columnVisibility): set here in AppKit, SwiftUI put it back as it had it.
     func apply() {
         let want = shown == "hidden" ? "" : mini ? "mini" : "full", changed = want != widthFor
         widthFor = want
-        for w in NSApp.windows where Focus.isMain(w) && !Focus.shared.isOn(w) {
-            guard let s = Focus.split(w), s.splitViewItems.count > 1 else { continue }
-            let item = s.splitViewItems[0], hide = want.isEmpty
-            item.minimumThickness = mini ? 54 : 190
-            item.maximumThickness = mini ? 64 : 320
-            if item.isCollapsed != hide {
-                // sized once it's out: sized while it opens, it settled too narrow
-                NSAnimationContext.runAnimationGroup { _ in item.animator().isCollapsed = hide } completionHandler: {
-                    MainActor.assumeIsolated { Side.shared.fit(changed) }
-                }
-            } else { fit(changed) }
-        }
+        guard !want.isEmpty else { return }
+        fit(changed)
+        // and once SwiftUI has brought it out (or made its split view again)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { MainActor.assumeIsolated { Side.shared.fit(changed) } }
     }
 
     /// An open sidebar at its width: as it was dragged, unless it changed size or is out of bounds.
     private func fit(_ changed: Bool) {
         for w in NSApp.windows where Focus.isMain(w) && !Focus.shared.isOn(w) {
             guard let s = Focus.split(w), s.splitViewItems.count > 1, !s.splitViewItems[0].isCollapsed else { continue }
-            let item = s.splitViewItems[0], wide = item.viewController.view.frame.width
+            let item = s.splitViewItems[0]
+            item.minimumThickness = size == "mini" ? 54 : 190
+            item.maximumThickness = size == "mini" ? 64 : 320
+            let wide = item.viewController.view.frame.width
             if changed || wide < item.minimumThickness - 1 || wide > item.maximumThickness + 1 {
-                s.splitView.setPosition(mini ? 58 : 220, ofDividerAt: 0)
+                s.splitView.setPosition(size == "mini" ? 58 : 220, ofDividerAt: 0)
             }
         }
     }

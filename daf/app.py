@@ -2082,6 +2082,7 @@ def get_ebook_file(book_id: str, c=Depends(conn)):
 def delete_ebook_position(book_id: str, c=Depends(conn)):
     """Forget my place in Daf: the book opens at its start (or where the Kindle is) next time."""
     c.execute("DELETE FROM book_positions WHERE book_id = ?", (book_id,))
+    c.execute("INSERT OR REPLACE INTO book_forgets (book_id, at) VALUES (?, ?)", (book_id, int(time.time())))
     return {"ok": True}
 
 
@@ -2119,7 +2120,8 @@ async def post_ebook_highlight(book_id: str, request: Request, c=Depends(conn)):
     b = await _body(request)
     try:
         hid = ebooks.add_highlight(c, config.load_settings(), book_id, str(b.get("cfi") or ""), str(b.get("text") or "")[:5000],
-                                   b.get("chapter"), b.get("fraction"), b.get("note"), b.get("color"), b.get("replaces"), b.get("at"))
+                                   b.get("chapter"), b.get("fraction"), b.get("note"), b.get("color"), b.get("replaces"), b.get("at"),
+                                   b.get("pdf") if isinstance(b.get("pdf"), dict) else None)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"id": hid}

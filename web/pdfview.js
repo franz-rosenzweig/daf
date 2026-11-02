@@ -2,38 +2,51 @@
    select and highlight on, like Readwise Reader's PDF view (#pdf/<doc>[/hl:<id>]).
    A highlight made here keeps its page and boxes (pos.pdf) and, when its words are in the text
    view too, its place there, so it shows in both. Highlights made in the text view are found on
-   the page by their words. Time here counts as reading, and the page read is the progress. */
+   the page by their words. Time here counts as reading, and the page read is the progress.
+   A book Calibre has only as a PDF opens here too (#pdf/book/<book>[/hl:<id>], from book.js): its
+   highlights keep the same pos.pdf, and its place and reading time are the book's. */
 import * as pdfjs from './vendor/pdfjs/pdf.min.mjs';
 
 pdfjs.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.mjs';
 const C = window.DafCore, { api, esc, toast, $, $$ } = C, H = C.HL;
 const P = { id: null, d: null, pdf: null, zoom: 1, base: 1, rendered: new Map(), obs: null, active: Date.now(), page: 1, saveT: 0, found: new Map() };
+// Where a PDF document's or a PDF book's things are.
+const SRC = {
+  doc: id => ({ meta: '/api/docs/' + encodeURIComponent(id) + '?prefetch=1', file: '/api/docs/' + encodeURIComponent(id) + '/pdf',
+                back: '#read/' + encodeURIComponent(id), backLabel: 'Back to the text', hl: '/api/docs/' + encodeURIComponent(id) + '/highlights', beat: { doc_id: id } }),
+  book: id => ({ meta: '/api/ebooks/' + encodeURIComponent(id), file: '/api/ebooks/' + encodeURIComponent(id) + '/file', book: true,
+                 back: '#book/' + encodeURIComponent(id), backLabel: 'Back to the book', hl: '/api/ebooks/' + encodeURIComponent(id) + '/highlights', beat: { book_id: id } }),
+};
 const store = { get(k, d){ try { const v = localStorage.getItem('daf.' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } }, set(k, v){ try { localStorage.setItem('daf.' + k, JSON.stringify(v)); } catch(e){} } };
 
 C.views.pdf = async args => {
+  const book = args[0] === 'book' && args.length > 1; if (book) args = args.slice(1);
   const last = args[args.length - 1] || '', hl = last.startsWith('hl:') && args.length > 1 ? decodeURIComponent(last.slice(3)) : null;
   const id = decodeURIComponent((hl ? args.slice(0, -1) : args).join('/'));
   H.active = ACT;
   if (P.id === id && P.pdf && $('#pdfpages')) { if (hl) goToHl(hl); return; }
   close();
-  P.id = id;
-  $('#main').innerHTML = '<div class="pdfv"><div class="top" id="ptop"><a class="btn sm" href="#read/' + encodeURIComponent(id) + '" title="The text view" aria-label="Back to the text">' + C.I.back + '</a>' +
+  P.id = id; P.src = (book ? SRC.book : SRC.doc)(id);
+  $('#main').innerHTML = '<div class="pdfv"><div class="top" id="ptop"><a class="btn sm" href="' + P.src.back + '" title="' + P.src.backLabel + '" aria-label="' + P.src.backLabel + '">' + C.I.back + '</a>' +
     '<h1 id="ptitle">PDF</h1><span class="spacer"></span><span class="mute tiny" id="ppg"></span>' +
     '<button class="btn sm" data-pv="out" aria-label="Smaller" title="Smaller (−)">−</button><button class="btn sm" data-pv="in" aria-label="Larger" title="Larger (+)">+</button>' +
-    '<a class="btn sm" href="#read/' + encodeURIComponent(id) + '" title="The text, reflowed">Text</a>' +
-    '<a class="btn sm" href="/api/docs/' + encodeURIComponent(id) + '/pdf" download title="The PDF file">Download</a>' + (C.Focus ? C.Focus.button('article') : '') + '</div>' +
+    (book ? '' : '<a class="btn sm" href="#read/' + encodeURIComponent(id) + '" title="The text, reflowed">Text</a>') +
+    '<a class="btn sm" href="' + P.src.file + '" download title="The PDF file">Download</a>' + (C.Focus ? C.Focus.button('article') : '') + '</div>' +
     '<div class="pdfpages" id="pdfpages"><span class="mute" style="padding:24px">Opening the PDF…</span></div></div>';
-  try { P.d = await api('/api/docs/' + encodeURIComponent(id) + '?prefetch=1'); } catch(e){ $('#pdfpages').innerHTML = '<p class="mute" style="padding:24px">' + esc(e.message) + '</p>'; return; }
+  try { P.d = await api(P.src.meta); } catch(e){ $('#pdfpages').innerHTML = '<p class="mute" style="padding:24px">' + esc(e.message) + '</p>'; return; }
   if (P.id !== id) return;
   $('#ptitle').textContent = P.d.title || 'PDF';
   try {
-    P.pdf = await pdfjs.getDocument({ url: '/api/docs/' + encodeURIComponent(id) + '/pdf', withCredentials: true,
+    P.pdf = await pdfjs.getDocument({ url: P.src.file, withCredentials: true,
       standardFontDataUrl: '/vendor/pdfjs/standard_fonts/', cMapUrl: '/vendor/pdfjs/cmaps/', cMapPacked: true }).promise;
   } catch(e){ $('#pdfpages').innerHTML = '<p class="mute" style="padding:24px">Daf couldn’t open this PDF: ' + esc(e.message) + '</p>'; return; }
   if (P.id !== id) return;
   P.zoom = store.get('pdfZoom', 1);
+  P.seen = new Set(); P.pageAt = Date.now();
   await layout();
-  const at = hl ? null : store.get('pdfPage.' + id, 0);
+  // a book's place is kept in Daf for every device ("pdf:<page>"); a document's page on this one
+  const kept = book && P.d.position && /^pdf:(\d+)/.exec(P.d.position.cfi || '');
+  const at = hl ? null : kept ? +kept[1] : store.get('pdfPage.' + id, 0);
   if (hl) goToHl(hl);
   else if (at > 1) scrollToPage(at);
 };
@@ -198,10 +211,11 @@ function textPlace(text){
 async function highlight(info, withNote){
   H.hide(); window.getSelection().removeAllRanges();
   if (!info || !info.r.length) return;
-  const place = textPlace(info.text), color = store.get('hlColor', 'yellow');
-  const body = Object.assign({ text: info.text, color, pdf: { pg: info.pg, r: info.r } }, place || { b: null, s: null, e: null });
+  const place = P.src.book ? null : textPlace(info.text), color = store.get('hlColor', 'yellow');
+  const body = P.src.book ? { text: info.text, color, pdf: { pg: info.pg, r: info.r }, fraction: info.pg / P.pdf.numPages, chapter: 'p. ' + info.pg }
+    : Object.assign({ text: info.text, color, pdf: { pg: info.pg, r: info.r } }, place || { b: null, s: null, e: null });
   try {
-    const r = await api('/api/docs/' + encodeURIComponent(P.id) + '/highlights', { method: 'POST', body: JSON.stringify(body) });
+    const r = await api(P.src.hl, { method: 'POST', body: JSON.stringify(body) });
     const h = { id: r.id, text: info.text, color, pos: Object.assign({}, place || {}, { pdf: { pg: info.pg, r: info.r } }), user_note: '', tags: [] };
     P.d.highlights = (P.d.highlights || []).filter(x => x.id !== h.id).concat([h]);
     drawMarks(info.pg);
@@ -231,8 +245,12 @@ async function removeHl(h){
 }
 function goToHl(id){
   const h = (P.d && P.d.highlights || []).find(x => x.id === id);
-  const go = pl => { scrollToPage(pl.pg, pl.r[0] ? pl.r[0][1] : 0);
-    setTimeout(() => $$('.pmark[data-h="' + CSS.escape(id) + '"]').forEach(m => { m.classList.add('flash'); setTimeout(() => m.classList.remove('flash'), 1800); }), 400); };
+  const go = async pl => {
+    scrollToPage(pl.pg, pl.r[0] ? pl.r[0][1] : 0);
+    // its marks are there once the page is drawn, which can take a moment after the scroll
+    for (let k = 0; k < 15 && !$$('.pmark[data-h="' + CSS.escape(id) + '"]').length; k++) await new Promise(r => setTimeout(r, 200));
+    $$('.pmark[data-h="' + CSS.escape(id) + '"]').forEach(m => { m.classList.add('flash'); setTimeout(() => m.classList.remove('flash'), 1800); });
+  };
   if (!h) { toast('That highlight isn’t on these pages'); return; }
   const pl = placeOf(h);
   if (pl) { go(pl); return; }
@@ -252,8 +270,8 @@ const ACT = {
   rm: ctx => removeHl(ctx.h),
   define: ctx => { H.hide(); C.lookup && C.lookup({ text: ctx.text, rect: $('#selbar').getBoundingClientRect() }, ctx.text, false); },
   translate: ctx => { H.hide(); C.lookup && C.lookup({ text: ctx.text, rect: $('#selbar').getBoundingClientRect() }, ctx.text, true); },
-  ask: () => { H.hide(); toast('Ask works in the text view'); location.hash = 'read/' + encodeURIComponent(P.id); },
-  notebook: () => { H.hide(); location.hash = 'read/' + encodeURIComponent(P.id); },
+  ask: () => { H.hide(); if (P.src.book) { toast('Ask works in a book’s text, not on a PDF’s pages'); return; } toast('Ask works in the text view'); location.hash = 'read/' + encodeURIComponent(P.id); },
+  notebook: () => { H.hide(); location.hash = P.src.book ? 'book/' + encodeURIComponent(P.id) : 'read/' + encodeURIComponent(P.id); },
   changed: h => { const pl = placeOf(h); if (pl) drawMarks(pl.pg); },
   deselect: () => window.getSelection().removeAllRanges(),
   meta: () => ({ title: P.d && P.d.title, author: P.d && (P.d.author || P.d.source) }),
@@ -264,13 +282,22 @@ function onScroll(){
   const box = $('#pdfpages'); if (!box || !P.pdf) return;
   const mid = box.getBoundingClientRect().top + box.clientHeight * 0.35;
   const cur = $$('.pdfpage', box).find(el => { const r = el.getBoundingClientRect(); return r.top <= mid && r.bottom >= mid; });
-  if (cur) P.page = +cur.dataset.pg;
+  if (cur && +cur.dataset.pg !== P.page) {
+    if (Date.now() - P.pageAt >= 5000) P.seen.add('p' + P.page);       // a page in front of me for 5 s counts for page goals
+    P.page = +cur.dataset.pg; P.pageAt = Date.now();
+  }
   const pp = $('#ppg'); if (pp) pp.textContent = 'p. ' + P.page + ' of ' + P.pdf.numPages;
   P.active = Date.now();
   clearTimeout(P.saveT);
   P.saveT = setTimeout(() => {
     if (!P.id || !P.pdf) return;
     store.set('pdfPage.' + P.id, P.page);
+    if (P.src.book) {                     // a book's place, where I am (not the furthest), as its reader keeps it
+      const body = { cfi: 'pdf:' + P.page, fraction: P.page / P.pdf.numPages, chapter: 'p. ' + P.page, at: Math.floor(Date.now() / 1000), pages: [...P.seen] };
+      P.seen = new Set();
+      api('/api/ebooks/' + encodeURIComponent(P.id) + '/position', { method: 'PUT', body: JSON.stringify(body) }).catch(() => {});
+      return;
+    }
     const pct = Math.round(P.page / P.pdf.numPages * 100);
     if (pct > (P.d && P.d.progress || 0)) { P.d.progress = pct; api('/api/docs/' + encodeURIComponent(P.id) + '/progress', { method: 'PUT', body: JSON.stringify({ pct }) }).catch(() => {}); }
   }, 1200);
@@ -296,7 +323,7 @@ document.addEventListener('keydown', e => {
 ['mousemove', 'keydown', 'touchstart', 'wheel'].forEach(ev => document.addEventListener(ev, () => { P.active = Date.now(); }, { passive: true }));
 setInterval(() => {
   if (C.S.route[0] !== 'pdf' || !P.id || !P.pdf || document.hidden || Date.now() - P.active > 90000) return;
-  C.sendBeat && C.sendBeat({ doc_id: P.id, seconds: 15, at: Math.floor(Date.now() / 1000) });
+  C.sendBeat && C.sendBeat(Object.assign({ seconds: 15, at: Math.floor(Date.now() / 1000) }, P.src.beat));
 }, 15000);
 
 window.dispatchEvent(new Event('daf-pdf-ready'));
