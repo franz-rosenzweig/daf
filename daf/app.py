@@ -2775,6 +2775,65 @@ def tools_doc(doc_id: str, b=Depends(json_body), name=Depends(device), c=Depends
     return {"id": doc_id, "archived": r["status"] == "archive", "starred": bool(r["starred"])}
 
 
+# The Feed for local tools (the desk, the office agent; FreshRSS's own API until 2026-11-01).
+
+@app.get("/api/tools/feed")
+def tools_feed(folder: str = "", limit: int = 60, days: int = 0, name=Depends(device), c=Depends(conn)):
+    """What's unseen in the Feed, newest first, in one folder or all of them; days limits it to what
+    came lately. {folders: [{name, unread}], items, unread, feeds, read_24h, open}."""
+    s = config.load_settings()
+    base = config.public_url(s).rstrip("/")
+    since = max(reader.expired_before(s), int(time.time()) - days * 86400 if days > 0 else 0)
+    unseen = "where_ = 'feed' AND status = 'unseen' AND added >= ?"
+    folders = [{"name": r[0], "unread": r[1]} for r in c.execute(
+        f"SELECT category, COUNT(*) n FROM docs WHERE {unseen} AND COALESCE(category, '') != '' GROUP BY category ORDER BY n DESC", (since,))]
+    rows = c.execute(f"SELECT * FROM docs WHERE {unseen}" + (" AND category = ?" if folder else "") +
+                     " ORDER BY COALESCE(published, added) DESC LIMIT ?", (since, *([folder] if folder else []), max(1, min(500, limit)))).fetchall()
+    priv = lambda r: library.is_private(f"{r['title'] or ''} {r['source'] or ''} {r['author'] or ''}", s)
+    items = [{"id": r["id"], "folder": r["category"] or "", "feed": r["source"] or "", "feed_id": r["feed"] or "",
+              "title": (r["title"] or r["url"] or "untitled").strip(), "url": r["url"] or "", "author": r["author"] or "",
+              "summary": (r["summary"] or "").strip(), "published": r["published"] or r["added"], "kind": r["kind"],
+              "open": base + "/#read/" + _urlq(r["id"], safe="")} for r in rows if not priv(r)]
+    from .sources import feedsrc
+    return {"folders": folders, "items": items, "unread": c.execute(f"SELECT COUNT(*) FROM docs WHERE {unseen}", (since,)).fetchone()[0],
+            "feeds": len(feedsrc.get().subscriptions(conn=c)) if feedsrc.daf() else len(json.loads((c.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])),
+            "read_24h": c.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'seen' AND COALESCE(published, added) >= ?",
+                                  (int(time.time()) - 86400,)).fetchone()[0],
+            "open": base + "/#feed"}
+
+
+@app.post("/api/tools/feed/mark")
+def tools_feed_mark(b=Depends(json_body), name=Depends(device), c=Depends(conn)):
+    """{ids, state}: Feed items seen ("read"), unseen again ("unread"), or saved to the Library ("save"). {marked, saved?}."""
+    ids = [str(i) for i in (b.get("ids") or ([b["id"]] if b.get("id") else []))][:200]
+    state = b.get("state", "read")
+    if state not in ("read", "unread", "save"):
+        raise HTTPException(400, "state: read, unread or save")
+    done, saved = 0, {}
+    for i in ids:
+        d = c.execute("SELECT where_ FROM docs WHERE id = ?", (i,)).fetchone()
+        if not d or d["where_"] != "feed":
+            continue
+        try:
+            if state == "save":
+                saved[i] = reader.save_to_library(c, i)
+            else:
+                reader.set_status(c, i, "seen" if state == "read" else "unseen")
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        done += 1
+    return {"marked": done, **({"saved": saved} if state == "save" else {})}
+
+
+@app.post("/api/tools/feed/mark-folder")
+def tools_feed_mark_folder(b=Depends(json_body), name=Depends(device), c=Depends(conn)):
+    """{folder}: everything unseen in a folder seen, as Mark All Seen does. {ids}."""
+    folder = str(b.get("folder") or "")
+    if not folder:
+        raise HTTPException(400, "Which folder?")
+    return {"ids": reader.mark_feed_seen(c, config.load_settings(), folder, None, None)}
+
+
 @app.get("/api/tools/kindle")
 def tools_kindle(days: int = 30, name=Depends(device), c=Depends(conn)):
     """The Kindle's reading for local tools (the desk's Trends, the homepage tile; KoInsight's job
