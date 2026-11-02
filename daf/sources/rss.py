@@ -80,10 +80,26 @@ def folders(conn=None):
         _done(conn, mine)
 
 
+class _Https(urllib.request.HTTPRedirectHandler):
+    """A redirect to plain http is followed over https: plenty of networks don't let port 80 out,
+    and the feeds that send you there serve https too (Chrome Releases → feeds.feedburner.com)."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if newurl.startswith("http://"):
+            newurl = "https://" + newurl[7:]
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def _get(url, headers=None, timeout=25, verify=True):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5", **(headers or {})})
     ctx = None if verify else ssl._create_unverified_context()  # noqa: SLF001 - a feed set to skip the certificate check
-    return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    opener = urllib.request.build_opener(_Https, urllib.request.HTTPSHandler(context=ctx))
+    try:
+        return opener.open(req, timeout=timeout)
+    except urllib.error.URLError as e:
+        if isinstance(e, urllib.error.HTTPError) or not url.startswith("http://"):
+            raise
+        req.full_url = "https://" + url[7:]          # a plain http feed: its https address, the same way
+        return opener.open(req, timeout=timeout)
 
 
 def _parse(data, ctype=""):
