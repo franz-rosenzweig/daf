@@ -57,6 +57,7 @@ function bookCSS(){
     ::selection { background: ${v('--hl-yellow')}; }
     .daf-speaking { background: ${v('--speak')} !important; border-radius: 4px; box-shadow: 0 0 0 4px ${v('--speak')}; }
     ::highlight(daf-speaking) { background-color: ${v('--speak-line')}; }
+    ${H.hlCSS()}
     aside[epub|type~="footnote"], aside[epub|type~="endnote"], aside[epub|type~="rearnote"] { display: none; }
     ${(t.flow || 'paginated') === 'scrolled' ? 'body { padding-bottom: 72px !important; }   /* room under the last line for Next */' : ''}
     @namespace epub "http://www.idpf.org/2007/ops";
@@ -137,8 +138,13 @@ async function openBook(id, at){
     const { draw, annotation, range } = e.detail, v = annotation.value;
     if (INK.by.has(v)) { draw(inkDraw, { cfi: v, range }); return; }
     const h = B.kindleByCfi.get(v) || B.byCfi.get(v);
-    draw(H.draw, { range, color: (h && h.color) || 'yellow', note: !!(h && (h.user_note || h.note)), flash: B.flash === v, soft: !h && B.temp.has(v) });
+    const o = { range, color: (h && h.color) || 'yellow', note: !!(h && (h.user_note || h.note)), flash: B.flash === v, soft: !h && B.temp.has(v) };
+    o.under = underWords(v, range, H.hlName(o.color, o));
+    draw(H.draw, o);
   });
+  // A highlight taken away (or drawn again in another colour) takes its colour from under the words too.
+  const deleteAnnotation = view.deleteAnnotation.bind(view);
+  view.deleteAnnotation = a => { offWords(a && a.value); return deleteAnnotation(a); };
   view.addEventListener('show-annotation', e => {
     const v = e.detail.value, k = B.kindleByCfi.get(v), h = k || B.byCfi.get(v); if (!h) return;
     const doc = e.detail.range.startContainer.ownerDocument;
@@ -172,6 +178,18 @@ async function openBook(id, at){
   if (!at) offerKindle(mine);
   if (PHONE()) setTimeout(hideChrome, 600);
 }
+// The highlights' colours under the words: one CSS highlight per colour in each chapter's page. False where the browser
+// has no CSS highlights (H.draw then paints the colour over the words, as before).
+const UNDER = new Map(); // annotation → { set, range }
+function underWords(v, range, name){
+  offWords(v);
+  const win = range && range.startContainer && range.startContainer.ownerDocument.defaultView;
+  const reg = win && win.CSS && win.CSS.highlights; if (!reg || !win.Highlight) return false;
+  let set = reg.get(name); if (!set) { set = new win.Highlight(); reg.set(name, set); }
+  set.add(range); UNDER.set(v, { set, range });
+  return true;
+}
+function offWords(v){ const u = UNDER.get(v); if (u) { u.set.delete(u.range); UNDER.delete(v); } }
 function findHl(id){ return B.d && (B.d.highlights.find(h => h.id === id) || B.d.other_highlights.find(h => h.id === id)); }
 
 /* ---------- where a highlight is, and going there ---------- */
@@ -289,7 +307,7 @@ async function jumpTo(h){
   else toast('Couldn’t find that passage in this edition');
 }
 function redrawAll(){
-  if (!B.view) return;
+  if (!B.view || !B.view.renderer) return;   // (the look can change before the book has opened)
   const loaded = new Set(B.view.renderer.getContents().map(c => c.index));
   for (const h of B.d ? B.d.highlights : []) if (loaded.has(h.index)) B.view.addAnnotation({ value: h.pos.cfi }).catch(() => {});
   for (const [cfi, h] of B.kindleByCfi) if (loaded.has(h.index)) B.view.addAnnotation({ value: cfi }).catch(() => {});

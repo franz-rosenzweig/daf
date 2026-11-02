@@ -69,6 +69,10 @@ function textRects(range){
   }
   return out;
 }
+// A book's highlight colour goes under the words, in the chapter's own page (CSS highlights, see H.hlCSS and book.js),
+// as a marker's would. Drawn over the page and blended in (multiply), Safari on a Mac painted it solid and hid the
+// words: it keeps the book's page on a layer of its own, and the blend can't reach it. `o.under`: the page has the
+// colour, so this draws only the line under it and a note's dot (and is still what a tap finds).
 H.draw = (rects, o = {}) => {
   const g = svgEl('g'), t = H.tok(o.color), dark = H.isDark();
   g.style.mixBlendMode = dark ? 'screen' : 'multiply';
@@ -76,9 +80,11 @@ H.draw = (rects, o = {}) => {
   const ls = lines(rects);
   for (const r of ls) {
     const h = r.bottom - r.top, pt = Math.max(1, h * 0.06), pb = Math.max(1.5, h * 0.12);
-    const a = svgEl('rect'); a.setAttribute('x', r.left - 1); a.setAttribute('y', r.top - pt); a.setAttribute('width', r.right - r.left + 2); a.setAttribute('height', h + pt + pb);
-    a.setAttribute('fill', o.flash ? t.line : t.fill); if (o.flash) a.setAttribute('fill-opacity', dark ? '.75' : '.55');
-    g.append(a);
+    if (!o.under) {
+      const a = svgEl('rect'); a.setAttribute('x', r.left - 1); a.setAttribute('y', r.top - pt); a.setAttribute('width', r.right - r.left + 2); a.setAttribute('height', h + pt + pb);
+      a.setAttribute('fill', o.flash ? t.line : t.fill); if (o.flash) a.setAttribute('fill-opacity', dark ? '.75' : '.55');
+      g.append(a);
+    }
     if (!o.soft) { const u = svgEl('rect'); u.setAttribute('x', r.left - 1); u.setAttribute('y', r.bottom + pb - 2); u.setAttribute('width', r.right - r.left + 2); u.setAttribute('height', 2); u.setAttribute('fill', t.line); g.append(u); }
   }
   if (o.note && ls.length) {   // a small mark at the end of a highlight with a note
@@ -86,6 +92,11 @@ H.draw = (rects, o = {}) => {
   }
   return g;
 };
+
+// The names of the colours under the words (CSS.highlights in a book's page), and their look for the page's CSS.
+H.hlName = (c, o = {}) => o.soft ? 'daf-soft' : 'daf-' + (COLORS.includes(c) ? c : 'yellow') + (o.flash ? '-flash' : '');
+H.hlCSS = () => COLORS.map(c => { const t = H.tok(c); return '::highlight(daf-' + c + ') { background-color: ' + t.fill + '; }\n::highlight(daf-' + c + '-flash) { background-color: ' + t.line + '; }'; }).join('\n') +
+  '\n::highlight(daf-soft) { background-color: ' + H.tok('yellow').fill + '; }';
 
 /* ---------- the toolbar ---------- */
 const btn = (a, icon, tip, extra) => '<button data-hb="' + a + '" data-tip="' + esc(tip) + '" aria-label="' + esc(tip) + '"' + (extra || '') + '>' + icon + '</button>';
