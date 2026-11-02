@@ -1193,10 +1193,24 @@ async def kindle_inbox_done(qid: str, request: Request, name=Depends(device), c=
 
 @app.post("/api/kindle/shelves")
 async def kindle_shelves_report(request: Request, name=Depends(device), c=Depends(conn)):
-    """{shelves: [folder names in the Kindle's home folder]}, from the plugin."""
-    from . import kindlequeue
+    """{shelves: [folder names in the Kindle's home folder], files: [{path, md5}]}, from the plugin.
+    With files, Daf's Kindle shelves follow it, and the answer has the moves Daf asks of it."""
+    from . import kindlequeue, kindleshelves
     b = await _body(request)
-    return {"shelves": kindlequeue.set_shelves(c, b.get("shelves") or [])}
+    out = {"shelves": kindlequeue.set_shelves(c, b.get("shelves") or [])}
+    if isinstance(b.get("files"), list):
+        out["moves"] = kindleshelves.report(c, b.get("folders") or b.get("shelves") or [], b["files"][:5000])
+    return out
+
+
+@app.post("/api/kindle/moves/{move_id}/done")
+async def kindle_move_done(move_id: int, request: Request, name=Depends(device), c=Depends(conn)):
+    """{path} where the book is now, or {error}: a move Daf asked for, made by the plugin (or not)."""
+    from . import kindleshelves
+    b = await _body(request)
+    if not kindleshelves.done(c, move_id, b.get("error"), b.get("path")):
+        raise HTTPException(404, "No such move")
+    return {"ok": True}
 
 
 @app.get("/api/kindle/shelves", dependencies=[Depends(user)])
@@ -1277,9 +1291,10 @@ def get_book(book_id: str, c=Depends(conn)):
 
 def _shelf_list(c):
     out = []
-    for r in c.execute("SELECT id, name, created, hc_list FROM shelves ORDER BY lower(name)"):
+    for r in c.execute("SELECT id, name, created, hc_list, kindle FROM shelves ORDER BY kindle IS NULL, lower(name)"):
         ids = [x for (x,) in c.execute("SELECT book_id FROM shelf_books WHERE shelf_id = ? ORDER BY added DESC", (r["id"],))]
-        out.append({"id": r["id"], "name": r["name"], "count": len(ids), "covers": ids[:4], "hardcover": bool(r["hc_list"])})
+        out.append({"id": r["id"], "name": r["name"], "count": len(ids), "covers": ids[:4], "hardcover": bool(r["hc_list"]),
+                    "kindle": r["kindle"]})        # the Kindle's folder it is (kindleshelves.py), or None
     return out
 
 
@@ -1308,7 +1323,7 @@ async def post_shelf(request: Request, c=Depends(conn)):
 
 @app.get("/api/shelves/{shelf_id}", dependencies=[Depends(user)])
 def get_shelf(shelf_id: str, c=Depends(conn)):
-    sh = c.execute("SELECT id, name, hc_list FROM shelves WHERE id = ?", (shelf_id,)).fetchone()
+    sh = c.execute("SELECT id, name, hc_list, kindle FROM shelves WHERE id = ?", (shelf_id,)).fetchone()
     if not sh:
         raise HTTPException(404, "No such shelf")
     from . import hardcover
@@ -1316,7 +1331,7 @@ def get_shelf(shelf_id: str, c=Depends(conn)):
     hl = {r[0]: r[1] for r in c.execute("SELECT book_id, COUNT(*) FROM highlights WHERE deleted = 0 GROUP BY book_id")}
     books = [_book_card(r) | {"readable": r["id"] in readable, "highlights": hl.get(r["id"], 0)} for r in c.execute(
         "SELECT b.* FROM shelf_books s JOIN books b ON b.id = s.book_id WHERE s.shelf_id = ? ORDER BY s.added DESC", (shelf_id,))]
-    return {"id": sh["id"], "name": sh["name"], "books": books, "hardcover": bool(sh["hc_list"]),
+    return {"id": sh["id"], "name": sh["name"], "books": books, "hardcover": bool(sh["hc_list"]), "kindle": sh["kindle"],
             "hardcover_url": hardcover.list_url(c, sh["hc_list"]) if sh["hc_list"] else None}
 
 
@@ -1325,6 +1340,8 @@ async def put_shelf(shelf_id: str, request: Request, c=Depends(conn)):
     name = " ".join(str((await _body(request)).get("name") or "").split())[:60]
     if not name:
         raise HTTPException(400, "A name, please")
+    if c.execute("SELECT 1 FROM shelves WHERE id = ? AND kindle IS NOT NULL", (shelf_id,)).fetchone():
+        raise HTTPException(400, "This shelf is a folder on the Kindle. Rename it there, and it's renamed here on the next sync")
     from . import hardcover
     try:
         hardcover.list_rename(c, shelf_id, name)      # a Hardcover list is renamed there too
@@ -1336,6 +1353,8 @@ async def put_shelf(shelf_id: str, request: Request, c=Depends(conn)):
 
 @app.delete("/api/shelves/{shelf_id}", dependencies=[Depends(user)])
 def delete_shelf(shelf_id: str, c=Depends(conn)):
+    if c.execute("SELECT 1 FROM shelves WHERE id = ? AND kindle IS NOT NULL", (shelf_id,)).fetchone():
+        raise HTTPException(400, "This shelf is a folder on the Kindle. Remove it there, and it goes from here on the next sync")
     if c.execute("SELECT 1 FROM shelves WHERE id = ? AND hc_list IS NOT NULL", (shelf_id,)).fetchone():
         raise HTTPException(400, "This shelf is one of your Hardcover lists. Delete the list on Hardcover and the shelf stays here as an ordinary one")
     c.execute("DELETE FROM shelf_books WHERE shelf_id = ?", (shelf_id,))
@@ -1345,8 +1364,15 @@ def delete_shelf(shelf_id: str, c=Depends(conn)):
 
 @app.put("/api/shelves/{shelf_id}/books/{book_id}", dependencies=[Depends(user)])
 def put_shelf_book(shelf_id: str, book_id: str, c=Depends(conn)):
-    if not c.execute("SELECT 1 FROM shelves WHERE id = ?", (shelf_id,)).fetchone() or not c.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone():
+    sh = c.execute("SELECT kindle FROM shelves WHERE id = ?", (shelf_id,)).fetchone()
+    if not sh or not c.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone():
         raise HTTPException(404, "No such shelf or book")
+    if sh["kindle"] is not None:                   # the Kindle's: the book moves there on it, or goes to it
+        from . import kindleshelves
+        try:
+            return {"ok": True, "kindle": kindleshelves.put(c, shelf_id, sh["kindle"], book_id)}
+        except LookupError:
+            raise HTTPException(409, "Daf doesn't have this book's file to send to the Kindle")
     from . import hardcover
     try:
         hardcover.list_add(c, shelf_id, book_id)
@@ -1358,6 +1384,10 @@ def put_shelf_book(shelf_id: str, book_id: str, c=Depends(conn)):
 
 @app.delete("/api/shelves/{shelf_id}/books/{book_id}", dependencies=[Depends(user)])
 def delete_shelf_book(shelf_id: str, book_id: str, c=Depends(conn)):
+    if c.execute("SELECT 1 FROM shelves WHERE id = ? AND kindle IS NOT NULL", (shelf_id,)).fetchone():
+        from . import kindleshelves
+        kindleshelves.take_off(c, shelf_id, book_id)        # to the Kindle's home folder
+        return {"ok": True}
     from . import hardcover
     try:
         hardcover.list_remove(c, shelf_id, book_id)

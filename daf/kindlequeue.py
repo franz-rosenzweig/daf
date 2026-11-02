@@ -37,8 +37,9 @@ def set_shelves(conn, names):
 
 
 def _shelf(name):
-    name = _safe(name or DEFAULT_SHELF, 60)
-    return name if name and name not in (".", "..") else DEFAULT_SHELF
+    """A shelf: a folder in the Kindle's home folder, or one inside it ("Books/Sci-fi", from its shelves)."""
+    parts = [_safe(p, 60) for p in str(name or DEFAULT_SHELF).split("/") if p.strip() and p.strip() not in (".", "..")]
+    return "/".join(parts)[:180] or DEFAULT_SHELF
 
 
 def queue_book(conn, book_id, shelf=None):

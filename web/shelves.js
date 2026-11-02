@@ -1,6 +1,8 @@
 /* Shelves: your own groups of books (a subject, a language, a reading project), like BookOrbit's
    collections. On Books, a row of shelves; #shelf/<id> lists one; a book's page toggles which
-   shelves it's on. They live in Daf (tables shelves, shelf_books). */
+   shelves it's on. They live in Daf (tables shelves, shelf_books). The Kindle's shelves (its
+   folders) are here too (kindleshelves.py): a book is on one of them, as on the Kindle, and moves
+   there on the Kindle at its next sync; they're made, renamed and removed on the Kindle. */
 (() => {
 const C = window.DafCore, { api, esc, toast, $, cover, shortTitle } = C;
 const SH = C.Shelves = {};
@@ -8,7 +10,7 @@ const SH = C.Shelves = {};
 function tile(s){
   const covers = s.covers.map(id => cover({ id, title: '', has_cover: id.startsWith('cal:') }, 'cv shc')).join('');
   return '<a class="shelf" href="#shelf/' + encodeURIComponent(s.id) + '"><span class="shstack">' + (covers || '<span class="shempty"></span>') + '</span>' +
-    '<b>' + esc(s.name) + '</b><span class="mute tiny">' + s.count + ' book' + (s.count === 1 ? '' : 's') + (s.hardcover ? ' · Hardcover list' : '') + '</span></a>';
+    '<b>' + esc(s.name) + '</b><span class="mute tiny">' + s.count + ' book' + (s.count === 1 ? '' : 's') + (s.hardcover ? ' · Hardcover list' : '') + (s.kindle != null ? ' · Kindle' : '') + '</span></a>';
 }
 
 // The Books page: every shelf, and a way to start one.
@@ -35,17 +37,19 @@ SH.forBook = async (b, box) => {
   const on = new Set(b.shelves || []);
   box.innerHTML = '<div class="cardh"><h2>Shelves</h2></div><div class="shchips">' +
     r.shelves.map(s => '<button class="shchip' + (on.has(s.id) ? ' on' : '') + '" data-shelfbook="' + esc(s.id) + '" aria-pressed="' + on.has(s.id) + '"' +
-      (s.hardcover ? ' title="Your Hardcover list: it changes there too"' : '') + '>' + esc(s.name) + (s.hardcover ? ' <span class="tiny mute">· Hardcover</span>' : '') + '</button>').join('') +
+      (s.hardcover ? ' title="Your Hardcover list: it changes there too"' : s.kindle != null ? ' title="A shelf on the Kindle: the book moves there too"' : '') + '>' + esc(s.name) +
+      (s.hardcover ? ' <span class="tiny mute">· Hardcover</span>' : s.kindle != null ? ' <span class="tiny mute">· Kindle</span>' : '') + '</button>').join('') +
     '<button class="shchip add" data-shelf="newfor">+ New shelf</button></div>';
   box.onclick = async e => {
     const t = e.target.closest('[data-shelfbook]');
     if (t) {
-      const id = t.dataset.shelfbook, was = on.has(id);
+      const id = t.dataset.shelfbook, was = on.has(id), kindle = r.shelves.filter(s => s.kindle != null).map(s => s.id);
       try {
-        await api('/api/shelves/' + encodeURIComponent(id) + '/books/' + encodeURIComponent(b.id), { method: was ? 'DELETE' : 'PUT' });
+        const res = await api('/api/shelves/' + encodeURIComponent(id) + '/books/' + encodeURIComponent(b.id), { method: was ? 'DELETE' : 'PUT' });
+        if (!was && kindle.includes(id)) kindle.forEach(k => on.delete(k));      // one Kindle shelf at a time, as on the Kindle
         was ? on.delete(id) : on.add(id); b.shelves = [...on];
-        t.classList.toggle('on', !was); t.setAttribute('aria-pressed', !was);
-        toast(was ? 'Off the shelf' : 'On the shelf');
+        box.querySelectorAll('[data-shelfbook]').forEach(c => { const x = on.has(c.dataset.shelfbook); c.classList.toggle('on', x); c.setAttribute('aria-pressed', x); });
+        toast(was ? 'Off the shelf' : res && res.kindle === 'moves' ? 'It moves there on the Kindle at its next sync' : res && res.kindle === 'sent' ? 'It goes to the Kindle at its next sync' : 'On the shelf');
       } catch(err){ toast(err.message); }
       return;
     }
@@ -61,7 +65,7 @@ C.views.shelf = async args => {
   try { r = await api('/api/shelves/' + encodeURIComponent(id)); } catch(e){ $('#main .page').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
   $('#main .top h1').textContent = r.name;
   $('#main .top').insertAdjacentHTML('beforeend', '<span class="spacer"></span>' + (r.hardcover_url ? '<a class="btn sm" href="' + esc(r.hardcover_url) + '" target="_blank" rel="noopener">On Hardcover</a>' : '') +
-    '<button class="btn sm" data-shelf="rename">Rename</button>' + (r.hardcover ? '' : '<button class="btn sm" data-shelf="delete">Delete</button>'));
+    (r.kindle != null ? '' : '<button class="btn sm" data-shelf="rename">Rename</button>' + (r.hardcover ? '' : '<button class="btn sm" data-shelf="delete">Delete</button>')));
   const rows = r.books.map(b => '<div class="bcell">' + C.bookRow(b, (b.highlights ? '<span class="tiny mute">' + b.highlights + ' highlights</span>' : '')) +
     '<span class="tiny rowacts">' + (b.readable ? '<a class="btn sm primary" href="#ebook/' + encodeURIComponent(b.id) + '">Read</a> ' : '') +
     '<button class="linkbtn" data-shelfout="' + esc(b.id) + '">Take off this shelf</button></span></div>').join('');

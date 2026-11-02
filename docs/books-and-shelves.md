@@ -32,7 +32,7 @@ On a book's page, **The Kindle** has **Put it on the Kindle** and a shelf to put
 
 ## The rest of the Books page
 
-- **Shelves:** your own groups of books, with **New shelf** to make one. A shelf's page has **Rename** and **Delete**.
+- **Shelves:** your own groups of books, with **New shelf** to make one, and the Kindle's shelves, marked "Kindle". A shelf's page has **Rename** and **Delete**, except for the Kindle's, which I rename and remove on the Kindle.
 - **Want to read:** your Want to read shelf on Hardcover, with **Read in Daf** under the ones Calibre has a file for.
 - **Opened lately:** the books you've had open recently, on the Kindle or in Daf, each with **Put on the nightstand**.
 - **Your library:** every book in Calibre, with a search box for the title or the author, and **Show all** for the full list.
@@ -44,6 +44,14 @@ Manga volumes leave this page and live on their own, under [Manga](manga.md).
 On a book's page, the **Shelves** card has a chip for each shelf, and tapping one puts the book on it or takes it off. **+ New shelf** makes a new one with the book already on it.
 
 Every list you made on Hardcover comes into Daf as a shelf, marked "Hardcover list", and it works both ways: putting a book on that shelf in Daf adds it to the list on Hardcover at once, and the same for taking it off or renaming the shelf. Daf never makes a Hardcover list itself, because lists there can be public, and private books never go up.
+
+## The Kindle's shelves
+
+The Kindle's shelves (the folders on its Shelves screen: Books, Nightstand, Recovery and the rest) are shelves in Daf too, marked "Kindle", with the books that are on them. Every time the Kindle syncs over Wi-Fi it tells Daf what's where, so moving a book on the Kindle moves it in Daf.
+
+It works the other way as well. Putting a book on a Kindle shelf in Daf moves it there on the Kindle at its next sync, with its highlights and its place, the same as **Move to shelf…** on the Kindle. If the book isn't on the Kindle yet, it gets sent there, onto that shelf. Taking a book off a Kindle shelf moves it to the Kindle's home folder, off every shelf. A book is only ever on one Kindle shelf at a time, because on the Kindle it's a file in one folder, so turning on another one moves it.
+
+New shelves for the Kindle are made on the Kindle (**Files ▾ → New shelf here…**), and renamed or removed there too; Daf picks it up on the next sync. My own shelves in Daf stay Daf's.
 
 ## A book's page
 
