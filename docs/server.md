@@ -75,6 +75,10 @@ For phones, install-as-app and offline reading, Daf needs an https address. I us
 | `daf sync` | pulls every source now |
 | `daf backup` | a checked, gzipped copy of `daf.db` in `backups/`, the last 14 kept; I run it from cron at 03:00, before the nightly backup takes the state folder |
 | `daf karakeep-import [--again]` | moved the Library over from Karakeep once (notes, highlights, pictures, PDFs, and its lists as tags). Karakeep is retired now (settings `library.karakeep` is "off") |
+| `daf feeds-import [--again]` | moves the Feed over from FreshRSS once: its feeds, folders and icons, and what it had already brought. After that Daf reads the feeds itself |
+| `daf feeds-list [--json]` | the feeds the Feed follows |
+| `daf feeds-add URL [--folder F] [--title T]` | follows a feed. My Substack sync and security watch add theirs this way |
+| `daf feeds-remove URL …` | unfollows them |
 | `daf podcasts-import` | AntennaPod's history from Nextcloud's GPodder Sync app (see [Videos and podcasts](videos-and-podcasts.md)) |
 | `daf today [--json] [--date D]` | today's minutes, by source and sitting |
 | `daf year 30`, `daf year 29` | the year so far |

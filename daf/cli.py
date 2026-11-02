@@ -16,6 +16,9 @@
     daf clip TEXT              a podcast link with a time (shared from AntennaPod): transcribe the minute before it
     daf jobs                   transcripts and clips waiting or done
     daf vault-backfill [--dry-run DIR]   rewrite Daf's article notes in the vault the current way
+    daf feeds-list [--json]    the feeds the Feed follows
+    daf feeds-add URL [--folder F] [--title T]   follow a feed (the Substack sync, the security watch)
+    daf feeds-remove URL ...   unfollow them
 """
 import argparse
 import getpass
@@ -324,6 +327,56 @@ def cmd_feeds_import(a):
     return 0
 
 
+def cmd_feeds_list(a):
+    """The feeds the Feed follows (Daf's own, or FreshRSS's): id, url, title, folder."""
+    from .sources import feedsrc
+    with db.session() as conn:
+        subs = [{k: f.get(k) or "" for k in ("id", "url", "title", "folder")} for f in feedsrc.get().subscriptions(conn=conn)]
+    if a.json:
+        print(json.dumps(subs, ensure_ascii=False))
+    else:
+        for f in subs:
+            print(f"{f['folder'] or '-'}\t{f['title']}\t{f['url']}")
+    return 0
+
+
+def cmd_feeds_add(a):
+    """Follow a feed in a folder (the Substack sync, the security watch); --title names it."""
+    from . import reader
+    from .sources import feedsrc
+    src = feedsrc.get()
+    with db.session() as conn:
+        try:
+            title = src.subscribe(a.url, a.folder, conn=conn)
+        except ValueError as e:
+            print(f"Couldn't follow {a.url}: {e}", file=sys.stderr)
+            return 1
+        f = next((x for x in src.subscriptions(conn=conn) if x["url"] == a.url or x["title"] == title), None)
+        if a.title and f and a.title != f["title"]:
+            reader.edit_feed(conn, f["id"], a.title)
+            title = a.title
+    print(f"Following {title}" + (f" in {a.folder}" if a.folder else ""))
+    return 0
+
+
+def cmd_feeds_remove(a):
+    """Unfollow feeds by their url (or id)."""
+    from . import reader
+    from .sources import feedsrc
+    with db.session() as conn:
+        subs = feedsrc.get().subscriptions(conn=conn)
+        gone = 0
+        for u in a.urls:
+            f = next((x for x in subs if u in (x["url"], x["id"])), None)
+            if f is None:
+                print(f"Not following {u}", file=sys.stderr)
+                continue
+            reader.unfollow_feed(conn, f["id"])
+            gone += 1
+    print(f"Unfollowed {gone}")
+    return 0 if gone == len(a.urls) else 1
+
+
 def cmd_podcasts_import(a):
     from . import gpodder
     with db.session() as c:
@@ -359,6 +412,10 @@ def main(argv=None):
     x = sub.add_parser("backup", help="a consistent copy of daf.db into STATE/backups (cron, 03:00)"); x.set_defaults(f=cmd_backup)
     x = sub.add_parser("karakeep-import", help="Daf takes the Library over from Karakeep, once"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_karakeep_import)
     x = sub.add_parser("feeds-import", help="Daf reads the feeds itself from now on, FreshRSS's list brought over"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_feeds_import)
+    x = sub.add_parser("feeds-list", help="the feeds the Feed follows"); x.add_argument("--json", action="store_true"); x.set_defaults(f=cmd_feeds_list)
+    x = sub.add_parser("feeds-add", help="follow a feed"); x.add_argument("url"); x.add_argument("--folder", default=""); x.add_argument("--title")
+    x.set_defaults(f=cmd_feeds_add)
+    x = sub.add_parser("feeds-remove", help="unfollow feeds"); x.add_argument("urls", nargs="+"); x.set_defaults(f=cmd_feeds_remove)
     x = sub.add_parser("podcasts-import", help="subscriptions and listening from Nextcloud's GPodder Sync app"); x.add_argument("--user", default="admin"); x.set_defaults(f=cmd_podcasts_import)
     x = sub.add_parser("sync", help="pull every source now"); x.add_argument("--quiet", action="store_true"); x.set_defaults(f=cmd_sync)
     x = sub.add_parser("today", help="today's reading"); x.add_argument("--json", action="store_true"); x.add_argument("--date"); x.set_defaults(f=cmd_today)
