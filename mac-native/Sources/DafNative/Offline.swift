@@ -115,6 +115,15 @@ final class Outbox {
         save()
     }
 
+    /// Changes that shouldn't go after all (a book's place, once Daf is told to forget it); the one
+    /// being sent now stays.
+    func drop(_ match: (Op) -> Bool) {
+        let keep = ops.enumerated().filter { (flushing && $0.offset == 0) || !match($0.element) }.map(\.element)
+        guard keep.count != ops.count else { return }
+        ops = keep
+        save()
+    }
+
     func flush() async {
         guard !flushing, !ops.isEmpty else { return }
         flushing = true

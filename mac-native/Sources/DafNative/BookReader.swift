@@ -15,6 +15,8 @@ final class BookModel {
     var error: String?
     /// Not an EPUB (MOBI, AZW3, FB2, comics): Daf's own reader opens it.
     var otherFormat = false
+    /// Calibre has it only as a PDF: the PDF view opens it, its pages as printed.
+    var pdf = false
     var look: BookLook
     /// The look is this book's own, not everyone's.
     var ownLook: Bool
@@ -100,6 +102,7 @@ final class BookModel {
         do {
             let d = try await API.shared.json("/api/ebooks/" + API.enc(id))
             details = d
+            if (d.s("format") ?? "").uppercased() == "PDF" { pdf = true; return }
             guard ["EPUB", "KEPUB"].contains((d.s("format") ?? "").uppercased()) else { otherFormat = true; return }
             highlights = d.a("highlights")
             bookmarks = d.a("bookmarks")
@@ -330,7 +333,9 @@ final class BookModel {
 
     /// Forget my place in Daf: the book opens at its start (or where the Kindle is) next time.
     func forgetPlace() async {
-        saveTask?.cancel()                  // a place waiting to be kept would come back after the forgetting
+        saveTask?.cancel()                  // a place waiting to be kept would come back after the forgetting,
+        let place = "/api/ebooks/\(API.enc(id))/position"   // and so would one kept on this Mac while offline
+        Outbox.shared.drop { $0.method == "PUT" && $0.path == place }
         forget = true
         forgotAt = Date()
         do {
@@ -1048,7 +1053,9 @@ struct BookReaderView: View {
 
     var body: some View {
         Group {
-            if m.otherFormat {
+            if m.pdf {
+                PDFPane(id: m.id, at: m.target, book: true)
+            } else if m.otherFormat {
                 WebPane(route: "#ebook/" + API.enc(m.id))
             } else if let e = m.error, m.epub == nil {
                 ContentUnavailableView("The book didn't open", systemImage: "exclamationmark.triangle", description: Text(e))
@@ -1109,46 +1116,48 @@ struct BookReaderView: View {
                     .frame(maxWidth: 320)            // a long title would push the buttons into »
                     .help(m.title + (m.chapter.isEmpty ? "" : " · " + m.chapter))
             }
-            ToolbarItemGroup {
-                Button { panel("contents") } label: { Label("Contents", systemImage: "list.bullet") }
-                    .help("Contents (⌥⌘T)")
-                    .keyboardShortcut("t", modifiers: [.command, .option])
-                Button { showLook.toggle() } label: { Label("Themes & Settings", systemImage: "textformat.size") }
-                    .help("Themes & Settings")
-                    .popover(isPresented: $showLook, arrowEdge: .bottom) { ThemesPanel(book: m) }
-                Button { m.sidebar = "search"; m.showContents = true; m.focusSearch += 1 } label: { Label("Search the Book", systemImage: "magnifyingglass") }
-                    .help("Search the book (⌘F)")
-                    .keyboardShortcut("f", modifiers: .command)
-                Button { Task { await m.toggleBookmark() } } label: { Label(m.marked ? "Remove the Bookmark" : "Bookmark", systemImage: m.marked ? "bookmark.fill" : "bookmark") }
-                    .help(m.marked ? "Remove the bookmark (B)" : "Bookmark this page (B)")
-                Menu {
-                    Button(Speaker.shared.key == m.listenKey && Speaker.shared.playing ? "Pause Listening" : "Listen from Here") {
-                        if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) }
+            if !m.pdf {                     // a PDF book has the PDF view's own tools
+                ToolbarItemGroup {
+                    Button { panel("contents") } label: { Label("Contents", systemImage: "list.bullet") }
+                        .help("Contents (⌥⌘T)")
+                        .keyboardShortcut("t", modifiers: [.command, .option])
+                    Button { showLook.toggle() } label: { Label("Themes & Settings", systemImage: "textformat.size") }
+                        .help("Themes & Settings")
+                        .popover(isPresented: $showLook, arrowEdge: .bottom) { ThemesPanel(book: m) }
+                    Button { m.sidebar = "search"; m.showContents = true; m.focusSearch += 1 } label: { Label("Search the Book", systemImage: "magnifyingglass") }
+                        .help("Search the book (⌘F)")
+                        .keyboardShortcut("f", modifiers: .command)
+                    Button { Task { await m.toggleBookmark() } } label: { Label(m.marked ? "Remove the Bookmark" : "Bookmark", systemImage: m.marked ? "bookmark.fill" : "bookmark") }
+                        .help(m.marked ? "Remove the bookmark (B)" : "Bookmark this page (B)")
+                    Menu {
+                        Button(Speaker.shared.key == m.listenKey && Speaker.shared.playing ? "Pause Listening" : "Listen from Here") {
+                            if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) }
+                        }
+                        Button("Notebook") { panel("highlights") }
+                        Button("About This Book") { panel("info") }
+                        Button("Ask About This Book") { panel("ask") }
+                        Button("Focus Mode") { Focus.shared.toggle() }
+                        Divider()
+                        Button("Go to the Beginning") { m.goToBeginning() }
+                        Button("Go to the Kindle's Page") { m.goToKindle() }.disabled(m.details?.o("kindle") == nil)
+                        Button("Go to a Percent…") { percent = "\(Int((m.fraction * 100).rounded()))"; showPercent = true }
+                        Divider()
+                        Button("The Book's Page") { app.place = .books; let id = m.id; Task { try? await Task.sleep(nanoseconds: 300_000_000); app.selection = id }; NSApp.activate() }
+                        Button("Export the Highlights…") { Task { await m.exportHighlights() } }
+                        Button("Download the File…") { Task { await m.downloadFile() } }
+                        Divider()
+                        Toggle("Highlight When Selecting", isOn: Binding(get: { HLTools.autoHighlight }, set: { UserDefaults.standard.set($0, forKey: "autoHighlight") }))
+                        Button("Forget My Place in Daf") { Task { await m.forgetPlace() } }
+                    } label: { Label("More", systemImage: "ellipsis.circle") }
+                    .popover(isPresented: $showPercent, arrowEdge: .bottom) {
+                        HStack {
+                            TextField("Percent", text: $percent).frame(width: 70).textFieldStyle(.roundedBorder)
+                                .onSubmit { if let v = Double(percent) { m.go(fraction: max(0, min(100, v)) / 100) }; showPercent = false }
+                            Text("%")
+                            Button("Go") { if let v = Double(percent) { m.go(fraction: max(0, min(100, v)) / 100) }; showPercent = false }
+                        }
+                        .padding(14)
                     }
-                    Button("Notebook") { panel("highlights") }
-                    Button("About This Book") { panel("info") }
-                    Button("Ask About This Book") { panel("ask") }
-                    Button("Focus Mode") { Focus.shared.toggle() }
-                    Divider()
-                    Button("Go to the Beginning") { m.goToBeginning() }
-                    Button("Go to the Kindle's Page") { m.goToKindle() }.disabled(m.details?.o("kindle") == nil)
-                    Button("Go to a Percent…") { percent = "\(Int((m.fraction * 100).rounded()))"; showPercent = true }
-                    Divider()
-                    Button("The Book's Page") { app.place = .books; let id = m.id; Task { try? await Task.sleep(nanoseconds: 300_000_000); app.selection = id }; NSApp.activate() }
-                    Button("Export the Highlights…") { Task { await m.exportHighlights() } }
-                    Button("Download the File…") { Task { await m.downloadFile() } }
-                    Divider()
-                    Toggle("Highlight When Selecting", isOn: Binding(get: { HLTools.autoHighlight }, set: { UserDefaults.standard.set($0, forKey: "autoHighlight") }))
-                    Button("Forget My Place in Daf") { Task { await m.forgetPlace() } }
-                } label: { Label("More", systemImage: "ellipsis.circle") }
-                .popover(isPresented: $showPercent, arrowEdge: .bottom) {
-                    HStack {
-                        TextField("Percent", text: $percent).frame(width: 70).textFieldStyle(.roundedBorder)
-                            .onSubmit { if let v = Double(percent) { m.go(fraction: max(0, min(100, v)) / 100) }; showPercent = false }
-                        Text("%")
-                        Button("Go") { if let v = Double(percent) { m.go(fraction: max(0, min(100, v)) / 100) }; showPercent = false }
-                    }
-                    .padding(14)
                 }
             }
         }

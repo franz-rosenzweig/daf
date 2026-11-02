@@ -7,10 +7,13 @@ import SwiftUI
 /// boxes (pos.pdf) and, when its words are in the text view too, its place there; highlights made in
 /// the text view found on the page by their words. Right-click one for its note, colour, tags and
 /// the rest. Time here counts as reading, and the page read is the progress. − and + zoom.
+/// A book Calibre has only as a PDF opens here too (book: true): its highlights keep the same
+/// pos.pdf, and its place ("pdf:<page>") and reading time are the book's, as the page's PDF view has it.
 @MainActor
 @Observable
 final class PDFModel {
     let id: String
+    let book: Bool
     var doc: J?
     var document: PDFDocument?
     var highlights: [J] = []
@@ -27,18 +30,35 @@ final class PDFModel {
     @MainActor static var kept: [String: PDFDocument] = [:]
     @MainActor static weak var last: PDFModel?
 
-    init(id: String) { self.id = id }
+    /// A book's pages seen for 5 seconds or more since the last save, for page goals.
+    @ObservationIgnored private var seen: Set<String> = []
+    @ObservationIgnored private var page = 0
+    @ObservationIgnored private var pageAt = Date()
 
-    var title: String { doc?.s("title") ?? "PDF" }
+    init(id: String, book: Bool = false) { self.id = id; self.book = book }
+
+    var title: String { doc?.b("private") == true ? "Private reading" : doc?.s("title") ?? "PDF" }
+    private var meta: String { book ? "/api/ebooks/\(API.enc(id))" : "/api/docs/\(API.enc(id))?prefetch=1" }
+
+    /// Where it opens: a book's kept place, or a document's furthest page.
+    func startPage(of document: PDFDocument) -> PDFPage? {
+        guard document.pageCount > 1 else { return nil }
+        if book {
+            guard let cfi = doc?.o("position")?.s("cfi"), cfi.hasPrefix("pdf:"), let n = Int(cfi.dropFirst(4).prefix { $0.isNumber }), n > 1 else { return nil }
+            return document.page(at: min(document.pageCount, n) - 1)
+        }
+        guard let p = doc?.d("progress"), p > 1, p < 99 else { return nil }
+        return document.page(at: min(document.pageCount - 1, Int(p / 100 * Double(document.pageCount)) - 1))
+    }
 
     func load() async {
         Self.last = self
-        doc = try? await API.shared.json("/api/docs/\(API.enc(id))?prefetch=1")
+        doc = try? await API.shared.json(meta)
         highlights = doc?.a("highlights") ?? []
         sentPct = doc?.d("progress") ?? 0
         if let d = Self.kept[id] { document = d } else {
             do {
-                let data = try await API.shared.data("/api/docs/\(API.enc(id))/pdf")
+                let data = try await API.shared.data(book ? "/api/ebooks/\(API.enc(id))/file" : "/api/docs/\(API.enc(id))/pdf")
                 guard let d = PDFDocument(data: data) else { throw APIError(status: 0, message: "That isn't a PDF Daf can show.") }
                 if Self.kept.count > 6 { Self.kept.removeAll() }
                 Self.kept[id] = d
@@ -167,12 +187,17 @@ final class PDFModel {
         let pg = document.index(for: page) + 1
         let colour = HLTools.lastColour
         var body: [String: Any] = ["text": text, "color": colour, "pdf": ["pg": pg, "r": r]]
-        let at = textPlace(text)
-        body["b"] = at?.b ?? NSNull()
-        body["s"] = at?.s ?? NSNull()
-        body["e"] = at?.e ?? NSNull()
+        let at = book ? nil : textPlace(text)
+        if book {
+            body["fraction"] = Double(pg) / Double(max(1, document.pageCount))
+            body["chapter"] = "p. \(pg)"
+        } else {
+            body["b"] = at?.b ?? NSNull()
+            body["s"] = at?.s ?? NSNull()
+            body["e"] = at?.e ?? NSNull()
+        }
         do {
-            let res = J(try await API.shared.send("POST", "/api/docs/\(API.enc(id))/highlights", body))
+            let res = J(try await API.shared.send("POST", book ? "/api/ebooks/\(API.enc(id))/highlights" : "/api/docs/\(API.enc(id))/highlights", body))
             var pos: [String: Any] = ["pdf": ["pg": pg, "r": r]]
             if let at { pos["b"] = at.b; pos["s"] = at.s; pos["e"] = at.e }
             let made: [String: Any] = ["id": res?.s("id") ?? UUID().uuidString, "text": text, "color": colour, "pos": pos]
@@ -188,6 +213,19 @@ final class PDFModel {
     func pageChanged() {
         lastActive = Date()
         guard let v = view, let document, let page = v.currentPage, document.pageCount > 0 else { return }
+        if book {                       // a book's place, where I am (not the furthest), as its reader keeps it
+            let n = document.index(for: page) + 1
+            guard n != self.page else { return }
+            if self.page > 0, Date().timeIntervalSince(pageAt) >= 5 { seen.insert("p\(self.page)") }
+            self.page = n
+            pageAt = Date()
+            let body: [String: Any] = ["cfi": "pdf:\(n)", "fraction": Double(n) / Double(document.pageCount), "chapter": "p. \(n)",
+                                       "at": Int(Date().timeIntervalSince1970), "pages": Array(seen)]
+            seen = []
+            let id = self.id
+            Task { try? await API.shared.send("PUT", "/api/ebooks/\(API.enc(id))/position", body) }
+            return
+        }
         let pct = (Double(document.index(for: page) + 1) / Double(document.pageCount) * 100).rounded()
         guard pct > sentPct else { return }
         sentPct = pct
@@ -198,7 +236,8 @@ final class PDFModel {
     private func beatIfReading() {
         guard let w = view?.window, w.occlusionState.contains(.visible), NSApp.isActive, Date().timeIntervalSince(lastActive) < 90 else { return }
         let id = self.id
-        Task { try? await API.shared.send("POST", "/api/read/beat", ["doc_id": id, "seconds": 15, "at": Int(Date().timeIntervalSince1970)]) }
+        let book = self.book
+        Task { try? await API.shared.send("POST", "/api/read/beat", [book ? "book_id" : "doc_id": id, "seconds": 15, "at": Int(Date().timeIntervalSince1970)]) }
     }
 }
 
@@ -228,10 +267,10 @@ extension PDFModel: HighlightHost {
             try await API.shared.send("DELETE", "/api/highlights/\(API.enc(hid))", nil)
             highlights.removeAll { $0.s("id") == hid }
             draw()
-            let doc = id
+            let meta = self.meta
             AppModel.shared.say("Highlight removed", undo: "Remove Highlight") { [weak self] in
                 _ = try? await API.shared.send("POST", "/api/highlights/\(API.enc(hid))/restore", [:])
-                if let self, let d = try? await API.shared.json("/api/docs/\(API.enc(doc))?prefetch=1") { self.highlights = d.a("highlights"); self.draw() }
+                if let self, let d = try? await API.shared.json(meta) { self.highlights = d.a("highlights"); self.draw() }
             }
         } catch { self.error = error.localizedDescription }
     }
@@ -305,8 +344,7 @@ struct PDFKitView: NSViewRepresentable {
         }
         DispatchQueue.main.async {
             if let hid = model.pendingHighlight { model.pendingHighlight = nil; model.reveal(hid) }
-            else if let p = model.doc?.d("progress"), p > 1, p < 99, document.pageCount > 1,
-                    let page = document.page(at: min(document.pageCount - 1, Int(p / 100 * Double(document.pageCount)) - 1)) { v.go(to: page) }
+            else if let page = model.startPage(of: document) { v.go(to: page) }
         }
         return v
     }
@@ -322,10 +360,10 @@ struct PDFPane: View {
     var at: String? = nil
     @State private var model: PDFModel
 
-    init(id: String, at: String? = nil) {
+    init(id: String, at: String? = nil, book: Bool = false) {
         self.id = id
         self.at = at
-        _model = State(initialValue: PDFModel(id: id))
+        _model = State(initialValue: PDFModel(id: id, book: book))
     }
 
     var body: some View {

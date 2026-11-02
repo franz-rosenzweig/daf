@@ -205,12 +205,20 @@ CREATE TABLE IF NOT EXISTS feeds (           -- the feeds Daf reads itself (sour
   every INTEGER, attrs TEXT, added INTEGER);
 CREATE TABLE IF NOT EXISTS feed_seen (        -- every post a feed has given ("id:<guid>", "link:<url>"), so a forgotten one never comes back
   feed TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (feed, key));
+CREATE TABLE IF NOT EXISTS kindle_files (    -- every book on the Kindle, as its plugin last reported them (kindleshelves.py)
+  path TEXT PRIMARY KEY,                      -- from its home folder: "Recovery/Title - Author (342).pdf"
+  md5 TEXT, book_id TEXT, shelf TEXT NOT NULL DEFAULT '', seen INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS kindle_moves (    -- a book Daf asked the Kindle to move to another shelf, until its plugin has
+  id INTEGER PRIMARY KEY AUTOINCREMENT,       -- (dest "" is the home folder, off every shelf)
+  path TEXT NOT NULL, dest TEXT NOT NULL, book_id TEXT, requested INTEGER NOT NULL, done INTEGER, error TEXT);
 CREATE TABLE IF NOT EXISTS hc_links (        -- Daf books linked to Hardcover by hand (no hardcoverBookId in a vault note)
   book_id TEXT PRIMARY KEY, hc_book_id INTEGER NOT NULL, linked INTEGER);
 CREATE TABLE IF NOT EXISTS doc_edits (       -- titles and authors you corrected; reapplied after every sync
   id TEXT PRIMARY KEY, title TEXT, author TEXT, updated INTEGER);
 CREATE TABLE IF NOT EXISTS book_marks (      -- bookmarks in books read in Daf
   id TEXT PRIMARY KEY, book_id TEXT NOT NULL, cfi TEXT NOT NULL, fraction REAL, chapter TEXT, excerpt TEXT, created INTEGER);
+CREATE TABLE IF NOT EXISTS book_forgets (    -- Forget My Place: when, so a place from before it (sent late, kept offline) doesn't bring it back
+  book_id TEXT PRIMARY KEY, at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS book_positions (  -- where you are in a book read in Daf (EPUB CFI)
   book_id TEXT PRIMARY KEY, cfi TEXT, fraction REAL, chapter TEXT, updated INTEGER);
 CREATE TABLE IF NOT EXISTS paper_pages (     -- photos of marked paper pages (Phase 7)
@@ -301,7 +309,7 @@ def connect():
 MIGRATIONS = [("books", "hc_id", "INTEGER"), ("docs", "duration", "INTEGER"), ("audio_bookmarks", "transcribed", "INTEGER"), ("highlights", "color", "TEXT"), ("review_state", "tags", "TEXT"), ("review_state", "fav", "INTEGER"),
               ("docs", "tags", "TEXT"), ("docs", "ai_summary", "TEXT"),
               ("docs", "starred", "INTEGER"), ("sessions", "pages", "INTEGER"),
-              ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("docs", "full", "INTEGER"),
+              ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("shelves", "kindle", "TEXT"), ("docs", "full", "INTEGER"),
               ("docs", "deleted", "INTEGER"),
               # what a feed says about an episode (episodes.parse_feed)
               ("gp_episodes", "guid", "TEXT"), ("gp_episodes", "author", "TEXT"), ("gp_episodes", "image", "TEXT"),

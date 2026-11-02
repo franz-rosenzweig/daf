@@ -42,6 +42,10 @@ enum SelfTest {
         return cond()
     }
 
+    /// This Mac account is the one on the screen (not one switched away from, still logged in behind it):
+    /// only that one's windows go full screen, and only it plays sound.
+    static let onScreen: Bool = (CGSessionCopyCurrentDictionary() as? [String: Any])?[kCGSessionOnConsoleKey as String] as? Bool ?? true
+
     static var window: NSWindow? { main ?? NSApp.windows.first { $0.isVisible && $0.contentView != nil && $0.title != "" } }
     static var main: NSWindow?
 
@@ -189,10 +193,14 @@ enum SelfTest {
             let hidden = await until(3) { side.isCollapsed }
             Side.shared.toggle()
             let back = await until(3) { !side.isCollapsed && wide() < 90 }
+            let backWide = side.isCollapsed ? -1 : Int(wide())
+            let backState = "hidden \(Side.shared.hidden), shown \(Side.shared.shown), thickness \(Int(side.minimumThickness))–\(Int(side.maximumThickness)), split \(Focus.split(w) === s), item \(Focus.split(w)?.splitViewItems.first === side)"
+            await pause(2)
+            let later = side.isCollapsed ? "still collapsed" : "\(Int(wide())) wide"
             Side.shared.size = "full"
             let full = await until(3) { !side.isCollapsed && wide() > 150 }
             check(mini && hidden && back && full, "the sidebar goes mini and full, ⌘\\ hides it, and ⌘\\ brings it back as it was",
-                  "mini \(mini), hidden \(hidden), back \(back), full \(full) (\(Int(wide())) wide)")
+                  "mini \(mini), hidden \(hidden), back \(back) (\(backWide) wide; \(backState); 2 s later \(later)), full \(full) (\(Int(wide())) wide)")
             Side.shared.mode = mode0 == "hidden" ? "full" : mode0         // shown for what follows
         }
         // Library › Articles, with Inbox, Later and Archive
@@ -298,7 +306,8 @@ enum SelfTest {
         }
 
         // focus mode (Focus.swift): the article on the whole screen, the toolbar away until the top
-        if let w = main {
+        if !onScreen { log("SKIP  focus mode and full screen: this Mac account isn't the one on the screen, so its windows can't go full screen") }
+        if let w = main, onScreen {
             // the panes the window shows, by the split view's subviews wider than nothing
             func panes() -> Int {
                 func split(_ v: NSView) -> NSSplitView? { (v as? NSSplitView) ?? v.subviews.lazy.compactMap(split).first }
@@ -747,6 +756,30 @@ enum SelfTest {
                 m.selection = b.id
                 await pause(1)
             } else { check(false, "a new shelf holds the book it was made with", m.error ?? "") }
+
+            // the Kindle's shelves: a report as its plugin sends it (with the device token), and its
+            // folder is a shelf in Daf, with the book on it; a Kindle shelf isn't renamed here
+            if let token = DeviceToken.value, let cal = m.items.first(where: { $0.id.hasPrefix("cal:") && !$0.j.b("private") }) {
+                let title = (cal.j.s("title") ?? "Book").replacingOccurrences(of: "/", with: " ")
+                var req = URLRequest(url: API.shared.base.appendingPathComponent("api/kindle/shelves"))
+                req.httpMethod = "POST"
+                req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                let file = "Self-test Kindle shelf/" + title + " (" + cal.id.dropFirst(4) + ").epub"
+                req.httpBody = try? JSONSerialization.data(withJSONObject: ["shelves": ["Self-test Kindle shelf"], "files": [["path": file, "md5": ""]]])
+                _ = try? await URLSession.shared.data(for: req)
+                await m.loadShelves()
+                let ks = m.shelves.first { $0.s("kindle") == "Self-test Kindle shelf" }
+                var held = false
+                if let id = ks?.s("id") { await go(m, .shelf(id)); held = m.items.contains { $0.id == cal.id }; capture("26b-kindle-shelf") }
+                let renamed = await m.renameShelf(ks?.s("id") ?? "", to: "Renamed")
+                m.error = nil
+                check(ks != nil && held && !renamed, "the Kindle's folders are shelves in Daf with its books on them, renamed only on the Kindle",
+                      "\(ks?.s("name") ?? "-"), \(held ? "holds" : "without") \(title)")
+                await go(m, .books)
+                m.selection = b.id
+                await pause(1)
+            }
             await readBook(m, fallback: b)
             closeOthers()
         }
@@ -991,6 +1024,7 @@ enum SelfTest {
                 check(chapters == 2 && marked && clipped, "an episode's page has its chapters, its transcript marked as it plays, and Clip 30s",
                       "\(chapters) chapters, \(r.highlights.count - before) clipped")
                 for h in r.highlights.dropFirst(before) { if let hid = h.s("id") { await r.remove(highlight: hid) } }
+            } else if !onScreen { log("SKIP  an episode playing: this Mac account isn't the one on the screen, so it has no sound to play to")
             } else { check(false, "an episode opens natively", m.reader?.error ?? "not ready: \(m.reader?.video?.duration ?? -1)") }
         } else { log("INFO  no episode with a transcript in the sandbox (sandbox_more.py makes one)") }
 
@@ -1270,12 +1304,37 @@ enum SelfTest {
         m.sheet = nil
         await pause(0.5)
 
+        await pdfBook(m)
+
         // search
         m.query = "the"
         await go(m, .search)
         check(!m.items.isEmpty, "search finds things in Daf", "\(m.items.count)")
 
         finish(nil)
+    }
+
+    /// A book Calibre has only as a PDF: its pages in the PDF view, its place kept as the book's.
+    static func pdfBook(_ m: AppModel) async {
+        var pdfID: String?
+        for b in ((try? await API.shared.json("/api/ebooks"))?.a("books") ?? []).prefix(400) {
+            guard let id = b.s("id"), !b.b("private") else { continue }
+            if (try? await API.shared.json("/api/ebooks/" + API.enc(id)))?.s("format") == "PDF" { pdfID = id; break }
+        }
+        guard let pdfID else { return log("SKIP  no book here is only a PDF") }
+        m.openRoute = "#ebook/" + API.enc(pdfID)
+        let opened = await until(45) { PDFModel.last?.id == pdfID && PDFModel.last?.book == true && (PDFModel.last?.document?.pageCount ?? 0) > 2 && PDFModel.last?.view != nil }
+        guard opened, let pm = PDFModel.last, let v = pm.view, let d = pm.document else {
+            return check(false, "a book that's only a PDF opens in the PDF view", pdfID + ": " + (PDFModel.last?.error ?? "nothing"))
+        }
+        await pause(1.5)
+        if let w = v.window { capture("73-pdf-book", w) }
+        if let p = d.page(at: 2) { v.go(to: p) }
+        await pause(2)
+        let kept = (try? await API.shared.json("/api/ebooks/" + API.enc(pdfID)))?.o("position")?.s("cfi")
+        check(kept == "pdf:3", "a book that's only a PDF opens in the PDF view, and its page is kept as the book's place", "\(d.pageCount) pages, \(kept ?? "-")")
+        closeOthers()
+        await pause(0.5)
     }
 
     /// The native book reader, on a book with a highlight made in the page's reader when there is one.
