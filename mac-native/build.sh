@@ -30,7 +30,17 @@ BIN=$(swift build -c release --product DafNative --show-bin-path)/DafNative
 rm -f $OUT/swift-build.log
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Daf"
-[[ -d ../mac/AppIcon.iconset ]] && iconutil -c icns ../mac/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+# The icon, layered as Icon Composer makes them (../mac/AppIcon.icon, from design/icon/export.py), so
+# macOS draws it as it draws its own, light, dark, tinted and clear; actool also writes the .icns.
+# Without actool (it comes with Xcode), the plain icon.
+if xcrun -f actool >/dev/null 2>&1; then
+    # full paths: actool hands the work to a helper that may still be running from another build's folder
+    xcrun actool "${PWD:h}/mac/AppIcon.icon" --compile "${APP:a}/Contents/Resources" --app-icon AppIcon --platform macosx \
+        --minimum-deployment-target $MACOS --output-partial-info-plist "${OUT:a}/icon-partial.plist" >/dev/null
+    rm -f $OUT/icon-partial.plist
+else
+    iconutil -c icns ../mac/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+fi
 
 # Who signs: an Apple Development identity if there is one; its team names the app group the
 # Safari extension shares with the app. Ad hoc there's no team, so no app group and no Safari token.
@@ -53,6 +63,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>$NAME</string>
   <key>CFBundleExecutable</key><string>Daf</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleIconName</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>

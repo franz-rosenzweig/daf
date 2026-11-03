@@ -6,6 +6,7 @@ LARGE is the drawing on Apple's grid (a kit.tile SVG); SMALL is the simpler draw
 Every PNG is rendered by Chromium at its own size, never shrunk from a bigger one.
 
     OUT_DIR/mac/AppIcon.iconset/   the ten macOS sizes, and AppIcon.icns, icon-1024.png
+    OUT_DIR/mac/AppIcon.icon/      the layered icon macOS 26 draws light, dark, tinted and clear
     OUT_DIR/web/                   icon.svg, favicon.svg, favicon.ico (16/32/48), icon-192/512.png,
                                    icon-maskable-512.png, apple-touch-icon.png (180, full square)
     OUT_DIR/android/               adaptive foreground and monochrome per density, legacy launcher
@@ -58,6 +59,27 @@ def render(svg_path, out, size):
     return kit.render(svg_path, out, size)
 
 
+def layered(svg, out):
+    """macOS 26's layered icon, as Icon Composer makes them: the art alone on the tile's square over the
+    tile's white-to-parchment fill. macOS draws it like its own icons: in Dark mode the fill goes dark
+    under the same art, and it works out tinted and clear itself."""
+    root = os.path.join(out, "mac", "AppIcon.icon")
+    shutil.rmtree(root, ignore_errors=True)
+    os.makedirs(f"{root}/Assets")
+    render(write(os.path.join(out, ".src", "art.svg"), placed(svg, round(1024 / 824, 4))), f"{root}/Assets/art.png", 1024)
+    srgb = lambda h: "srgb:" + ",".join(f"{int(h[i:i + 2], 16) / 255:.5f}" for i in (1, 3, 5)) + ",1.00000"
+    doc = {"fill-specializations": [
+               {"value": {"linear-gradient": [srgb(BG), srgb("#F2EFEA")],
+                          "orientation": {"start": {"x": 0.5, "y": 0}, "stop": {"x": 0.5, "y": 1}}}},
+               {"appearance": "dark", "value": "system-dark"}],
+           "groups": [{"layers": [{"image-name": "art.png", "name": "art", "glass": False}],
+                       "shadow": {"kind": "neutral", "opacity": 0.25},
+                       "translucency": {"enabled": False, "value": 0}}],
+           "supported-platforms": {"squares": "shared"}}
+    write(f"{root}/icon.json", json.dumps(doc, indent=2) + "\n")
+    return root
+
+
 def main(large, small, out):
     L, S = open(large).read(), open(small).read()
     tmp = os.path.join(out, ".src")
@@ -84,6 +106,7 @@ def main(large, small, out):
             (("16x16", 16), ("32x32", 32), ("32x32@2x", 64), ("128x128", 128), ("256x256", 256), ("512x512", 512), ("512x512@2x", 1024))}
     imgs[1024].save(os.path.join(out, "mac", "AppIcon.icns"), append_images=[imgs[k] for k in (16, 32, 64, 128, 256, 512)])
     files.append(os.path.join(out, "mac", "AppIcon.icns"))
+    layered(L, out)
 
     # Web.
     web = os.path.join(out, "web")
