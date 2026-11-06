@@ -1403,6 +1403,7 @@ label.pnrow span{width:56px} label.pnrow input[type=range]{flex:1;accent-color:v
 .pnrow .custom input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .pnrow.seg2 button{flex:1;width:auto;height:34px;padding:0 10px;font-size:13px;border:1px solid var(--line-2);border-radius:9px;color:var(--fg)}
 .pnrow.seg2 button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.pnrow.under span{width:56px}
 .pnrow .linkbtn{width:auto;height:32px;display:inline-flex;gap:6px;align-items:center;padding:0 8px;color:var(--accent);font-size:13px}
 /* the round menu: the pen in the middle, size left, colour right, Undo and Redo above, favourites below */
 .penround{position:fixed;z-index:62;width:0;height:0}

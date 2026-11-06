@@ -357,7 +357,7 @@ H.cardEditor = async (x, done) => {
 
 /* ---------- undo ---------- */
 H.undo = (msg, fn) => {
-  const t = $('#toast'); t.innerHTML = esc(msg) + ' <button class="linkbtn" id="undo">Undo</button>'; t.hidden = false;
+  const t = $('#toast'); t.innerHTML = esc(msg) + ' <button class="tundo" id="undo">Undo</button>'; t.hidden = false;     // the reader's Undo look: its accent can be too dark on the toast
   clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 6000);
   $('#undo').onclick = () => { t.hidden = true; fn().catch(e => toast(e.message)); };
 };
