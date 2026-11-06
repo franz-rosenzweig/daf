@@ -26,7 +26,7 @@ The **…** menu has **Listen from here** (l), the **Notebook** (]), **About thi
 **Aa** opens **Themes & Settings**, the same for books and articles. On a phone it comes up from the bottom of the screen.
 
 - **The two A's** make the text smaller or bigger, and a book has **Pages** or **Scroll** beside them. Pages is how a book opens unless I've picked Scroll on that device.
-- **Six looks to tap:** Daf, Paper and E-ink for the day, Dusk, Night and Black for the night. A day look sets the theme Daf uses in light mode and a night look the one for dark mode, so with **Auto** the page still follows the system. **All themes** opens Preferences → Appearance for the other twelve.
+- **Six looks to tap:** Daf, Paper and E-ink for the day, Dusk, Night and Black for the night. A day look sets the theme Daf uses in light mode and a night look the one for dark mode, so with **Auto** the page still follows the system. **All themes** opens Preferences → Appearance for the other eighteen, the rooms among them.
 - **Auto, Light or Dark:** when light and dark apply.
 - **Font** opens the typefaces:
   24 faces in groups, each shown in itself:
@@ -38,9 +38,10 @@ The **…** menu has **Listen from here** (l), the **Notebook** (]), **About thi
   - **For books:** the book's own.
 
   They all come from Daf itself, so they work offline too.
+- **Page turn**, for a book in Pages: **None**, and the next page is just there; **Slide**, and the page slides away as the next one comes in beside it; **Curl**, and the page lifts at its corner and turns over like paper, with the next one underneath. With two pages open the right one turns over onto the left, and a Hebrew book turns the other way. Taps, swipes, the arrow keys and the volume buttons all turn it, a page for each, even in quick succession. A swipe holds the page under my finger: let go past about a third of the way, or with a flick, and it turns; short of that it falls back. It's this device's choice, the same for every book, and if the system asks for reduced motion the pages just turn.
 - **Spacing, margins, justify:** **Font size**, **Line spacing**, **Line width** (Narrow, Medium, Wide), and for books **Justify the text**.
 
-**Just for this book** keeps a book's own typeface, size and layout, while the theme stays the same everywhere.
+**Just for this book** keeps a book's own typeface, size and layout, while the theme and the page turn stay the same everywhere.
 
 Whether the time counts toward your hour isn't shown over the text any more; Today and Stats say it.
 
@@ -49,6 +50,7 @@ Whether the time counts toward your hour isn't shown over the text any more; Tod
 **Preferences → Appearance** picks the colours for all of Daf:
 
 - **The themes:** Daf, Paper (sepia), Nord, GitHub, GitHub dimmed, Cupertino, Solarized, Gruvbox, Catppuccin, Rosé Pine, Tokyo Night, One, Dracula, Everforest, E-ink, High contrast, Black (for OLED screens) and Absolute: pure black on white, or pure white on black, with no grey text or lines anywhere. Each one has a light and a dark version, and the card shows both. Choose Absolute for light, for dark, or both.
+- **The rooms:** four themes that are a place as well as colours. **Wood bookshelf** is oak shelves in a walnut frame, and walnut and ebony at night. **Rustic library** is oxblood leather stitched at its edges, brass and parchment, and dark leather at night. **Gothic library** is stone walls in courses, crimson and gold, with headings in Vollkorn: night stone after dark, pale limestone by day. **Cyberpunk library** is neon on a night grid with scanlines on the bars, and by day a bright terminal with the same neon. In each the sidebar, the top bars and a book's footer are made of that material, the screen behind the cards is a wall of it, and the books on Books and in the Library stand on shelves. What I read stays on a plain page in the room's colours, so it reads as calmly as any other theme.
 - **Light or dark:** Match the system (light by day, dark at night, as the device is set), Always light, or Always dark.
 - **A different theme for dark:** for example GitHub by day and Nord at night.
 - **Your own fonts:** add a TTF, OTF or WOFF file you have, such as Bookerly from a Kindle. Bookerly is Amazon's, so Daf can't ship it, but a copy you add stays on the server and your devices. It then appears under **Yours** in Aa, for articles and books alike.

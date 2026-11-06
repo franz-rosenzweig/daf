@@ -1444,14 +1444,16 @@ setInterval(() => {
 const TYPEFACES = [['serif', 'Source Serif', "'Source Serif 4'"], ['literata', 'Literata', "'Literata'"], ['frank', 'Frank Ruhl Libre', "'Frank Ruhl Libre'"],
   ['atkinson', 'Atkinson Hyperlegible', "'Atkinson Hyperlegible'"], ['sans', 'Figtree', "'Figtree'"]];
 // A book can keep its own settings (BookOrbit does this): typeface, size, spacing, width, layout,
-// justification. The theme stays the app's.
+// justification. The theme and the page turn stay the app's.
 const ownKey = () => { const id = R.aaBook && C.curBook && C.curBook(); return id ? 'bookType.' + id : null; };
-C.typeFor = id => { const g = store.get('type', {}), o = id ? store.get('bookType.' + id, null) : null; return o ? Object.assign({}, g, o, { theme: g.theme }) : g; };
+C.typeFor = id => { const g = store.get('type', {}), o = id ? store.get('bookType.' + id, null) : null; return o ? Object.assign({}, g, o, { theme: g.theme, turn: g.turn }) : g; };
 // Themes & Settings (the Aa button, for articles and books): the text's size, Pages or Scroll for a book,
 // six looks to tap (three for the day, three for the night, from Daf's themes), when light and dark
 // apply, and below them the typeface and the finer settings. A popover under the button; a sheet from
 // the bottom on a phone.
 const LOOKS = [['daf', 'light', 'Daf'], ['paper', 'light', 'Paper'], ['eink', 'light', 'E-ink'], ['paper', 'dark', 'Dusk'], ['eink', 'dark', 'Night'], ['oled', 'dark', 'Black']];
+// How a book's page turns in Pages (pageturn.js): this device's, for every book.
+const TURNS = [['none', 'None'], ['slide', 'Slide'], ['curl', 'Curl']];
 function openAa(anchor, opts){
   const rv = $('#main .rv'); if (rv) rv.classList.remove('chromehide');
   opts = opts || (C.S.route[0] === 'ebook' ? { book: true } : {});
@@ -1466,6 +1468,7 @@ function openAa(anchor, opts){
   const faceBtn = f => (f[3] && f[3] !== lastGroup ? '<span class="facegrp">' + esc(lastGroup = f[3]) + '</span>' : '') +
     '<button class="face' + (cur === f[0] ? ' on' : '') + '" data-type="font" data-v="' + esc(f[0]) + '" style="font-family:' + f[2].replace(/"/g, '') + ',serif">' + esc(f[1]) + '<i></i></button>';
   const TH = C.Themes, th = TH ? TH.get() : { mode: 'system' }, dark = TH ? TH.isDark() : false;
+  const turn = TURNS.find(x => x[0] === store.get('type', {}).turn) || TURNS[0];
   const look = l => { const fam = TH && TH.FAMILIES.find(f => f.id === l[0]); const c = fam ? fam[l[1]] : { bg: '#fff', fg: '#222' };
     const on = l[1] === 'dark' ? dark && th.dark === l[0] : !dark && th.light === l[0];
     return '<button class="look' + (on ? ' on' : '') + '" data-type="look" data-v="' + l[0] + ':' + l[1] + '" style="background:' + c.bg + ';color:' + (c.read || c.fg) + '" aria-pressed="' + on + '"><b>Aa</b><span>' + l[2] + '</span></button>'; };
@@ -1475,6 +1478,8 @@ function openAa(anchor, opts){
     '<div class="looks">' + LOOKS.map(look).join('') + '</div>' +
     seg('thmode', [['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], th.mode) +
     '<details class="aamore2"' + (R.aaOpen === 'font' ? ' open' : '') + ' data-aasec="font"><summary><span>Font</span><span class="aaval" style="font-family:' + curFace[2].replace(/"/g, '') + ',serif">' + esc(curFace[1]) + '</span></summary><div class="faces">' + faces.map(faceBtn).join('') + '</div></details>' +
+    (opts.book && (t.flow || 'paginated') === 'paginated' ? '<details class="aamore2"' + (R.aaOpen === 'turn' ? ' open' : '') + ' data-aasec="turn"><summary><span>Page turn</span><span class="aaval">' + turn[1] + '</span></summary>' +
+      seg('turn', TURNS, turn[0]) + '</details>' : '') +
     '<details class="aamore2"' + (R.aaOpen === 'fine' ? ' open' : '') + ' data-aasec="fine"><summary><span>Spacing, margins, justify</span></summary>' +
       step('size', 'Font size', t.size || 20, 1, v => v + 'px') +
       step('spacing', 'Line spacing', t.spacing || 1.6, 1, v => v.toFixed(1)) +
@@ -1744,7 +1749,7 @@ document.addEventListener('click', e => {
       else { try { localStorage.removeItem('daf.' + ok); } catch(e){} }
       applyType(); openAa($('[data-bk="aa"]') || ty, { book: true }); return;
     }
-    const key = ok && store.get(ok, null) && k !== 'theme' ? ok : 'type';
+    const key = ok && store.get(ok, null) && k !== 'theme' && k !== 'turn' ? ok : 'type';
     const tp = key === 'type' ? store.get('type', {}) : C.typeFor(C.curBook());
     if (k === 'size') tp.size = Math.max(14, Math.min(32, (tp.size || 20) + (+v)));
     else if (k === 'measure') tp.measure = Math.max(26, Math.min(56, (tp.measure || 38) + (+v)));

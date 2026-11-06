@@ -5,13 +5,21 @@
 
    The choice lives on the server (settings.appearance) so every device reads alike, and in localStorage
    (daf.themeVars) so index.html paints it before anything shows. Preferences → Appearance picks;
-   the Aa menu switches light and dark. */
+   the Aa menu switches light and dark.
+
+   Some themes are rooms as well as colours (room: wood, rustic, gothic, cyber): the sidebar, the top
+   bars and a book's footer are made of something (wood, leather, crimson, a night terminal: the
+   frame colours), the screen behind the cards is a wall of it, books stand on shelves, and headings
+   may have their own face. style.css draws them under html[data-room]; the text you read stays on
+   a plain page of the theme's colour. */
 (() => {
 const C = window.DafCore;
 const T = C.Themes = {};
 
 // bg: the page; side: the sidebar and panels; fg: text; accent: links, buttons, the ring; read: the
 // reading text when it should sit a little softer than the UI's; ok/bad; hls: the five highlight hues.
+// A room's also has wall: behind the cards; frame: what the sidebar and the bars are made of, with
+// frameFg its text and frameAccent its own accent (each checked for contrast on its ground).
 const FAMILIES = [
   { id: 'daf', name: 'Daf', note: 'Teal on white; a warm, softer dark',
     light: { bg: '#ffffff', side: '#f7f7f8', fg: '#1d2127', accent: '#1a7da4' },
@@ -67,6 +75,26 @@ const FAMILIES = [
   { id: 'absolute', name: 'Absolute', note: 'Pure black on white and pure white on black, nothing grey',
     light: { bg: '#ffffff', side: '#ffffff', fg: '#000000', accent: '#000000', ok: '#000000', bad: '#000000', pure: true },
     dark: { bg: '#000000', side: '#000000', fg: '#ffffff', accent: '#ffffff', ok: '#ffffff', bad: '#ffffff', pure: true } },
+  // the rooms
+  { id: 'wood', room: 'wood', name: 'Wood bookshelf', note: 'Oak shelves and a walnut frame; walnut at night',
+    light: { bg: '#fbf5ea', side: '#f5ead7', wall: '#efdfc3', fg: '#2e2015', accent: '#86410f', ok: '#3d6b2a', bad: '#a3341f', frame: '#4e3220', frameFg: '#f6ead6', frameAccent: '#f2bb6b',
+      hls: { yellow: '#e2b33c', green: '#88ad62', blue: '#7d9fc0', pink: '#d58a8f', purple: '#a58ab8' } },
+    dark: { bg: '#2b2018', side: '#251b14', wall: '#1d150f', fg: '#efe2cc', read: '#e3d5bd', accent: '#e2a75c', ok: '#8fbf6a', bad: '#e5806a', frame: '#120c08', frameFg: '#f0dfc2', frameAccent: '#e9b268',
+      hls: { yellow: '#d9a83a', green: '#7fa65a', blue: '#6f93b8', pink: '#c97f86', purple: '#9b80b2' } } },
+  { id: 'rustic', room: 'rustic', name: 'Rustic library', note: 'Leather, brass and parchment',
+    light: { bg: '#f9f1e0', side: '#f2e6cc', wall: '#eedfc0', fg: '#33241a', accent: '#862c19', ok: '#4a6b25', bad: '#9e2b1d', frame: '#5a1e18', frameFg: '#f3e3c3', frameAccent: '#dcae5a',
+      hls: { yellow: '#d9ae35', green: '#7fae66', blue: '#7a9fc4', pink: '#d4839a', purple: '#a68bc2' } },
+    dark: { bg: '#2b2019', side: '#261c16', wall: '#1c1511', fg: '#ecdcbf', read: '#e2d1b2', accent: '#d9a75a', ok: '#9fbf6e', bad: '#e3846c', frame: '#3a130f', frameFg: '#f0dcb8', frameAccent: '#e3b562' } },
+  { id: 'gothic', room: 'gothic', name: 'Gothic library', note: 'Stone, crimson and gold',
+    light: { bg: '#f5f2ec', side: '#ece7de', wall: '#e3ded5', fg: '#231b1d', accent: '#8a1b2a', ok: '#3f6a3a', bad: '#a3192b', frame: '#5a0f1e', frameFg: '#f5e6c8', frameAccent: '#e6c36c',
+      hls: { yellow: '#d8b13e', green: '#7ea26f', blue: '#7b93b8', pink: '#c9798c', purple: '#9a7cb5' } },
+    dark: { bg: '#1e1c21', side: '#1b191e', wall: '#131215', fg: '#ebe3d3', read: '#ddd3c1', accent: '#d6b25e', ok: '#8fb87f', bad: '#e0707e', frame: '#3a0b14', frameFg: '#f2e3c4', frameAccent: '#e4bf64',
+      hls: { yellow: '#d6b25e', green: '#7fa274', blue: '#6f8db8', pink: '#c06a80', purple: '#9474b8' } } },
+  { id: 'cyber', room: 'cyber', name: 'Cyberpunk library', note: 'Neon on a night grid; a bright terminal by day',
+    light: { bg: '#f8f9ff', side: '#eef0fa', wall: '#eceff8', fg: '#14162b', accent: '#00687f', ok: '#16794a', bad: '#c2185b', frame: '#11142a', frameFg: '#dfe6ff', frameAccent: '#ff4f9a',
+      hls: { yellow: '#f2d22e', green: '#3ee08f', blue: '#3fb6ff', pink: '#ff5fa8', purple: '#a77bff' } },
+    dark: { bg: '#0f1226', side: '#0c0f20', wall: '#070913', fg: '#dbe3ff', read: '#cdd6f5', accent: '#2ee6e6', ok: '#3ee08f', bad: '#ff5c8a', frame: '#05060e', frameFg: '#d6e0ff', frameAccent: '#ff4f9a',
+      hls: { yellow: '#f2d22e', green: '#3ee08f', blue: '#3fb6ff', pink: '#ff4f9a', purple: '#a77bff' } } },
 ];
 T.FAMILIES = FAMILIES;
 const byId = id => FAMILIES.find(f => f.id === id) || FAMILIES[0];
@@ -104,9 +132,19 @@ T.vars = (p, dark) => {
       '--g1': mix(bg, fg, 0.25), '--g2': mix(bg, fg, 0.5), '--g3': mix(bg, fg, 0.75), '--speak': mix(bg, fg, 0.16), '--speak-line': fg });
     for (const [k, h] of Object.entries(hls)) { v['--hl-' + k] = mix(bg, h, dark ? 0.42 : 0.5); v['--hl-' + k + '-line'] = h; }
   }
+  // A room: its wall, its frame (the sidebar, the bars) with the frame's own text, lines and accent,
+  // and quieter text a shade darker, since some of it sits on the wall rather than on a card.
+  if (p.frame) {
+    const f = p.frame, ff = p.frameFg, fa = p.frameAccent;
+    Object.assign(v, { '--wall': p.wall || bg, '--frame': f, '--frame-fg': ff, '--frame-fg-2': mix(ff, f, .3), '--frame-fg-3': mix(ff, f, .48),
+      '--frame-hover': mix(f, ff, .09), '--frame-active': mix(f, ff, .16), '--frame-line': mix(f, ff, .16), '--frame-line-2': mix(f, ff, .28),
+      '--frame-accent': fa, '--frame-accent-weak': mix(f, fa, .22), '--frame-on-accent': contrast(fa, '#ffffff') >= contrast(fa, '#101418') ? '#ffffff' : '#101418',
+      '--fg-2': mix(fg, bg, .24), '--fg-3': mix(fg, bg, .42) });
+  }
   v['--hl'] = v['--hl-yellow']; v['--hl-2'] = v['--hl-yellow-line'];
   return v;
 };
+const ROOM_KEYS = ['--wall', '--frame', '--frame-fg', '--frame-fg-2', '--frame-fg-3', '--frame-hover', '--frame-active', '--frame-line', '--frame-line-2', '--frame-accent', '--frame-accent-weak', '--frame-on-accent'];
 
 /* ---------- which one, and putting it on ---------- */
 const DEFAULT = { mode: 'system', light: 'daf', dark: 'daf' };
@@ -123,15 +161,19 @@ T.isDark = a => { a = a || T.get(); return a.mode === 'dark' || (a.mode === 'sys
 T.apply = a => {
   a = Object.assign({}, DEFAULT, a || T.get()); cur = a;
   const dark = T.isDark(a), fam = byId(dark ? a.dark : a.light), vars = T.vars(dark ? fam.dark : fam.light, dark), r = document.documentElement;
+  for (const k of ROOM_KEYS) if (!(k in vars)) r.style.removeProperty(k);
   for (const [k, v] of Object.entries(vars)) r.style.setProperty(k, v);
   delete r.dataset.theme;                    // the old fixed themes in style.css stand down
   r.dataset.mode = dark ? 'dark' : 'light'; r.dataset.palette = fam.id;
+  if (fam.room) r.dataset.room = fam.room; else delete r.dataset.room;
+  // the browser's and the Android app's bars: in a room the frame's colour (the top bar is made of it)
   let m = document.querySelector('meta[name="theme-color"]'); if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
-  m.content = vars['--side'];
+  m.content = vars['--frame'] || vars['--side'];
   // For index.html's first paint: both versions, so the system's mode can pick before any script.
   const lf = byId(a.light), df = byId(a.dark);
-  try { localStorage.setItem('daf.themeVars', JSON.stringify({ a, light: T.vars(lf.light, false), dark: T.vars(df.dark, true) })); } catch(e){}
-  window.dispatchEvent(new CustomEvent('daf-theme', { detail: { name: fam.id, dark, bg: vars['--bg'], side: vars['--side'], fg: vars['--fg'], accent: vars['--accent'] } }));
+  try { localStorage.setItem('daf.themeVars', JSON.stringify({ a, light: T.vars(lf.light, false), dark: T.vars(df.dark, true), room: { light: lf.room || '', dark: df.room || '' } })); } catch(e){}
+  window.dispatchEvent(new CustomEvent('daf-theme', { detail: { name: fam.id, dark, bg: vars['--bg'], side: vars['--side'], fg: vars['--fg'], accent: vars['--accent'], room: fam.room || '',
+    bars: vars['--frame'], barsDark: !!vars['--frame'] && lum(vars['--frame']) < .2 } }));
   window.dispatchEvent(new Event('daf-type'));     // the book's pages take the new colours
 };
 T.set = (patch, quiet) => {
@@ -178,10 +220,11 @@ T.fromSettingsFonts = s => { if (s && Array.isArray(s.fonts) && JSON.stringify(s
 
 /* ---------- Preferences → Appearance ---------- */
 // A theme's card: a little window in its light half and its dark half.
-function swatch(p, dark){
+// A room's: its frame for the sidebar, and its wall (style.css draws the material over them).
+function swatch(p, dark, room){
   const v = T.vars(p, dark);
-  return '<span class="thw" style="background:' + v['--bg'] + '"><span class="ths" style="background:' + v['--side'] + ';border-color:' + v['--line'] + '">' +
-    '<i style="background:' + v['--accent'] + '"></i><i style="background:' + v['--fg-3'] + '"></i><i style="background:' + v['--fg-3'] + '"></i></span>' +
+  return '<span class="thw' + (room ? ' room ' + room : '') + '" style="background-color:' + (v['--wall'] || v['--bg']) + '"><span class="ths" style="background-color:' + (v['--frame'] || v['--side']) + ';border-color:' + (v['--frame-line'] || v['--line']) + '">' +
+    '<i style="background:' + (v['--frame-accent'] || v['--accent']) + '"></i><i style="background:' + (v['--frame-fg-3'] || v['--fg-3']) + '"></i><i style="background:' + (v['--frame-fg-3'] || v['--fg-3']) + '"></i></span>' +
     '<span class="thm"><b style="color:' + v['--fg'] + '">Aa</b><i style="background:' + v['--fg-2'] + '"></i><i style="background:' + v['--fg-3'] + '"></i>' +
     '<i class="thh" style="background:' + v['--hl-yellow'] + ';box-shadow:inset 0 -2px 0 ' + v['--hl-yellow-line'] + '"></i><i style="background:' + v['--fg-3'] + '"></i>' +
     '<em style="background:' + v['--accent'] + '"></em></span></span>';
@@ -194,7 +237,7 @@ T.section = box => {
   const card = (f, which) => {
     const on = which === 'both' ? a.light === f.id && a.dark === f.id : a[which] === f.id;
     return '<button type="button" class="thcard' + (on ? ' on' : '') + '" data-thpick="' + f.id + '" data-which="' + which + '" aria-pressed="' + on + '" title="' + esc(f.note || '') + '">' +
-      (which !== 'dark' ? swatch(f.light, false) : '') + (which !== 'light' ? swatch(f.dark, true) : '') + '<span class="thn">' + esc(f.name) + '</span></button>';
+      (which !== 'dark' ? swatch(f.light, false, f.room) : '') + (which !== 'light' ? swatch(f.dark, true, f.room) : '') + '<span class="thn">' + esc(f.name) + '</span></button>';
   };
   const split = box.dataset.split === '1' || a.light !== a.dark;
   box.innerHTML = '<div class="cardh"><h2>Appearance</h2><span class="mute tiny">Every device follows what you pick here</span></div>' +

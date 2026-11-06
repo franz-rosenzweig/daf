@@ -128,6 +128,7 @@ async function openBook(id, at){
   if (B.id !== id) { view.close?.(); return; }
   view.addEventListener('load', onSectionLoad);
   view.addEventListener('relocate', onRelocate);
+  C.PageTurn && C.PageTurn.attach(view);    // Aa → Page turn: None, Slide or Curl (pageturn.js)
   view.addEventListener('create-overlay', e => {
     const { index } = e.detail;
     for (const h of d.highlights) if (h.index === index) view.addAnnotation({ value: h.pos.cfi });
