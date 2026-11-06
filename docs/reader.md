@@ -19,7 +19,7 @@ On a phone the page is all there is: no bar, just the minutes left in the chapte
 
 Footnotes open in a small popover next to the link, so you never lose your place. The screen stays awake while a book is open. Near the end of a book in a series, Daf offers the next one (**Start it**), and at the very end it asks "The end. Mark it read on Hardcover?" with **Finished** and **Not now**.
 
-The **…** menu has **Listen from here** (l), the **Notebook** (]), **About this book**, **Ask about this book** and **Focus mode** (f), then **Go to the beginning**, **Go to the Kindle's page**, **Bookmark this page**, **Book page, notes and nightstand**, **Export highlights (Markdown)**, **Download the file**, **Auto highlight**, **Keyboard shortcuts** and **Forget my place in Daf**. In the Mac and Android apps it also has **Keep on this device**.
+The **…** menu has **Listen from here** (l), **The audiobook from here** when the book has one in Audiobookshelf ([Books and shelves](books-and-shelves.md#the-audiobook)), the **Notebook** (]), **About this book**, **Ask about this book** and **Focus mode** (f), then **Go to the beginning**, **Go to the Kindle's page**, **Bookmark this page**, **Book page, notes and nightstand**, **Export highlights (Markdown)**, **Download the file**, **Auto highlight**, **Keyboard shortcuts** and **Forget my place in Daf**. In the Mac and Android apps it also has **Keep on this device**.
 
 ## How the page looks
 

@@ -2,7 +2,7 @@
 
 # Videos and podcasts
 
-This page covers the things you watch and listen to: YouTube videos and Instagram reels saved to the Library, podcasts, and audiobook bookmarks. Daf doesn't try to be a video app or a podcast app. On the phone I still listen in AntennaPod. What Daf adds is the text, so a good minute of a talk can become a highlight like any line in a book.
+This page covers the things you watch and listen to: YouTube videos and Instagram reels saved to the Library, podcasts, the recordings and audiobooks in Audiobookshelf, and audiobook bookmarks. Daf doesn't try to be a video app. On the phone I still mostly listen in AntennaPod, but the Podcasts tab is where I find things, and anything plays in Daf too. What Daf adds is the text, so a good minute of a talk can become a highlight like any line in a book.
 
 ## Videos
 
@@ -37,11 +37,37 @@ To connect it, go to **Preferences → Podcasts (AntennaPod)**, press **Make a p
 
 If AntennaPod used to sync to Nextcloud's GPodder Sync app, which is how I had it, `daf podcasts-import` on the server brings that history over first: the subscriptions, the ones you dropped, and where you stopped in each episode. It only reads from Nextcloud, never writes, and running it again adds only what's new. Then switch AntennaPod's sync from Nextcloud to Daf.
 
-From then on, the **Podcasts** page in the sidebar shows what I listened to lately and how far I got, my clips, and my shows. A show opens to its episodes. Listening shows up among the day's sittings, but it never counts toward the hour. That was a decision, not a missing feature: the hour is for reading.
+Listening shows up among the day's sittings, but it never counts toward the hour. That was a decision, not a missing feature: the hour is for reading.
+
+## The Podcasts tab
+
+Along the top are the tab's parts:
+
+- **Listening** is what I'm in the middle of, the last one I played first, whether it's an AntennaPod show, one of my recordings or an audiobook, and then **New**: the latest episodes from the shows I follow that I haven't played yet.
+- **Shows** are the ones I follow, with how many episodes I haven't played. They sort by **Recent** (the newest episode first), **A–Z** or **Unplayed**.
+- **Episodes** is every episode of every show I follow, and the chips narrow it to **Unplayed**, **In progress**, **Played**, **Transcribed** or **Clipped**. **Newest**, **Oldest** and **Longest** sort them.
+- **Recordings** and **Audiobooks** come from Audiobookshelf, below.
+- **Clips** are the highlights I've made in episodes.
+
+Every episode row has its date and length, a bar for how far I got (or **Played**), and a tag when it has a transcript or clips. Tapping the row opens the episode's page, and the round button on the right plays it right there, without leaving the list.
+
+A show's page has its picture, what it's about (**More** shows the rest), its website, how many episodes it has and when it last had a new one, and **Follow** or **Following**. Its episodes have the same chips and sorts, and the magnifying glass searches just that show.
+
+## Finding things
+
+The magnifying glass at the top of the tab searches everything at once. First what's mine: my shows, then my episodes, by their titles, their show notes and, when Daf has the transcript, what was actually said in them, the best matches first. Then my recordings and audiobooks in Audiobookshelf. And last, Apple's podcast directory, for shows I don't follow yet and their episodes.
+
+Any episode in the results plays with its round button, and opens to its page like any other. A show from the directory opens to its page, and **Follow** there (or right under it in the results) adds it to my subscriptions. AntennaPod gets those from Daf, so the show turns up in AntennaPod the next time it syncs, and unfollowing one takes it out of AntennaPod the same way. If I don't want to wait, AntennaPod's synchronization settings can sync now.
+
+## Recordings and audiobooks
+
+The things I've put in Audiobookshelf myself are in the tab too, and they never mix with AntennaPod's shows. **Recordings** is Audiobookshelf's podcast library: each set of recordings is a tile, and it opens to its episodes, which sort and filter like a show's (when a recording has no date, **Oldest** goes by its number and then its title). **Audiobooks** is every audiobook, with how much is left; one that's also a book in Daf opens the book's page, and **Read** opens the book itself.
+
+They play in Daf's player the same way an episode does, and an audiobook's files play as one, with its chapters in the player. Where I stop goes back to Audiobookshelf as I listen, the same way its own app does it, so Audiobookshelf and its apps carry on from there, and the time counts the way it always has: audiobooks toward the hour, the recordings not at all.
 
 ## An episode's page
 
-Any episode opens as a page in Daf, whether it's one from **Listened lately**, from a show, or a podcast episode in the Feed. Its play button and the time sit on top, with the show's picture, and the transcript is under it, a line per stretch with the time and who's talking when the transcript knows. It works the way a YouTube video does here:
+Any episode opens as a page in Daf, whether it's from the Podcasts tab, a search, a show, or a podcast episode in the Feed. Its play button and the time sit on top, with the show's picture, and the transcript is under it, a line per stretch with the time and who's talking when the transcript knows. It works the way a YouTube video does here:
 
 - Once it's playing, it plays in Daf's player along the bottom of the screen, so I can go anywhere else in Daf, or leave the app, and it keeps going. The bar has the picture, the title, back 15, play and pause, ahead 30 and ✕. Tapping it (or pulling it up) opens the whole player: the time to drag, the speed, a sleep timer (to the end of the chapter too), the chapters, and **Go to it**, which brings me back to the episode's page. Pulling it down puts it back.
 - Click a line's time and it plays from there. **Follow along** keeps the transcript scrolling with the audio.
@@ -52,7 +78,7 @@ Any episode opens as a page in Daf, whether it's one from **Listened lately**, f
 
 Where I stop goes back to AntennaPod as if I'd played it there, so the phone picks it up the next time AntennaPod syncs. And it works the other way round as well: an episode opens where I last stopped, in Daf or in AntennaPod, and says which.
 
-The show notes come after the transcript. An episode that only lives in AntennaPod gets **Save to Library**, the same as a Feed item, and anything I highlight or clip in a Feed episode saves it to the Library anyway.
+The show notes come after the transcript, and **Show notes** goes straight to them. An episode that only lives in AntennaPod gets **Save to Library**, the same as a Feed item, and anything I highlight or clip in a Feed episode saves it to the Library anyway.
 
 Daf for the Mac has the same page and the same **Podcasts** page. There, P plays and pauses, and the episode shows in Now Playing, so the keyboard's media keys and Control Center work too.
 
@@ -60,7 +86,7 @@ Daf for the Mac has the same page and the same **Podcasts** page. There, P plays
 
 A few shows put their own transcript in the feed (the Podcasting 2.0 tags). When they do, Daf uses theirs, and it's there in seconds, speakers and all. Only a few of mine do.
 
-For everything else, Daf transcribes the episode on the server with faster-whisper. It's automatic for any episode I play, in AntennaPod or in Daf, and for any episode I open. It takes about a quarter of the episode's length, so an hour comes back in about fifteen minutes, and Hebrew works too. If I'd rather it only happened when I ask, I switch off **Transcribe episodes I play or open** in **Preferences → Podcasts**, and then each episode has a **Transcribe** button.
+For everything else, Daf transcribes the episode on the server with faster-whisper. It's automatic for any episode I play, in AntennaPod or in Daf, and for any episode I open from a show I follow. One I've only opened from the directory waits until I play it or press **Transcribe**. It takes about a quarter of the episode's length, so an hour comes back in about fifteen minutes, and Hebrew works too. If I'd rather it only happened when I ask, I switch off **Transcribe episodes I play or open** in **Preferences → Podcasts**, and then each episode has a **Transcribe** button.
 
 Search (⌘K) finds what was said, not just the titles.
 
