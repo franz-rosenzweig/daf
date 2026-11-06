@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.webkit.CookieManager;
+import android.webkit.PermissionRequest;
 import android.webkit.ServiceWorkerClient;
 import android.webkit.ServiceWorkerController;
 import android.webkit.URLUtil;
@@ -376,6 +377,32 @@ public class MainActivity extends Activity {
             notifyAnswer.accept(results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED);
             notifyAnswer = null;
         }
+        if (request == MIC && micAsked != null) {
+            PermissionRequest r = micAsked;
+            micAsked = null;
+            if (results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) r.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+            else r.deny();
+        }
+    }
+
+    // ---- the microphone, for the Sketchbook's dictation (the page records, Daf writes it down) ----
+
+    private static final int MIC = 9;
+    private PermissionRequest micAsked;
+
+    /** The page asks for the microphone (getUserMedia): only Daf's own pages, and only that; Android
+     *  asks once whether the app may record, and the page gets what Android was told. */
+    void askMic(PermissionRequest r) {
+        boolean ours = Server.isOurs(this, r.getOrigin());
+        boolean audioOnly = java.util.Arrays.asList(r.getResources()).equals(java.util.Collections.singletonList(PermissionRequest.RESOURCE_AUDIO_CAPTURE));
+        if (!ours || !audioOnly) { r.deny(); return; }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            r.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+            return;
+        }
+        if (micAsked != null) micAsked.deny();
+        micAsked = r;
+        requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, MIC);
     }
 
     // ---- the manga reader: the whole screen, kept on ----
@@ -610,6 +637,12 @@ public class MainActivity extends Activity {
     }
 
     private final class Chrome extends WebChromeClient {
+        /** The microphone (the Sketchbook's dictation): askMic. Anything else the page asks for, no. */
+        @Override
+        public void onPermissionRequest(PermissionRequest request) {
+            runOnUiThread(() -> askMic(request));
+        }
+
         /** <input type=file>: a photo of a paper page, say. */
         @Override
         public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
