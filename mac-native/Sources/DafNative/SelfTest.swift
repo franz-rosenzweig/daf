@@ -590,7 +590,7 @@ enum SelfTest {
         capture("05-feed")
 
         // several chosen at once: marked seen together, then Undo
-        let some = Array(m.items.filter { $0.id.hasPrefix("fr:") }.prefix(3))
+        let some = Array(m.items.filter { $0.id.hasPrefix("rss:") || $0.id.hasPrefix("fr:") }.prefix(3))
         if some.count >= 2 {
             m.multi = Set(some.map(\.id))
             await pause(1)
@@ -686,7 +686,8 @@ enum SelfTest {
             await pause(0.5)
         }
         await m.refreshFeed()
-        check(m.error == nil && m.toast == "Nothing new", "Check for New Posts asks FreshRSS", m.toast ?? m.error ?? "")
+        check(m.error == nil && (m.toast ?? "").range(of: #"^(Nothing|\d+) new$"#, options: .regularExpression) != nil,
+              "Check for New Posts looks at the feeds", m.toast ?? m.error ?? "")
         m.sheet = .follow
         await pause(1.2)
         capture("24-follow")
@@ -968,9 +969,8 @@ enum SelfTest {
                 m.selection = "sbx:reel2"
                 let shown = await until(10) { m.reader?.id == "sbx:reel2" && m.reader?.doc != nil }
                 await pause(1)
-                capture("69b-reel-waiting")
-                check(shown && m.reader?.video == nil && (m.reader?.doc?.s("content_error") ?? "").contains("sign in again"),
-                      "a reel Daf can't get yet says why, with the way to Instagram in Settings")
+                capture("69b-reel-link")
+                check(shown && m.reader?.video == nil, "a reel Daf has no video of shows just Open on Instagram (see 69b-reel-link)")
             }
         } else { log("INFO  no sandbox reel (sandbox_more.py makes sbx:reel1)") }
 
@@ -991,30 +991,32 @@ enum SelfTest {
             m.selection = eid
             let ready = await until(30) { m.reader?.id == eid && m.reader?.video?.kind == .episode && (m.reader?.video?.duration ?? 0) > 0 && (m.reader?.cues.count ?? 0) > 2 }
             if ready, let r = m.reader, let v = r.video {
-                v.av?.isMuted = true
+                // it plays in Daf's player along the bottom; the page follows it
+                let pl = Player.shared
+                pl.muted = true
                 let resumed = await until(10) { abs(v.time - 75) < 3 }
-                v.av?.play()
-                let playing = await until(20) { v.playing && v.time > 76.5 }
+                v.toggle()
+                let playing = await until(20) { v.playing && v.time > 76.5 && pl.is("ep:" + eid) }
                 let t0 = v.time
                 v.skip(30)
                 let jumped = await until(8) { v.time >= t0 + 28 }
                 await pause(2.5)
-                v.av?.pause()
-                let sent = await until(5) { v.stretches.contains { $0.0 >= Int(t0) + 25 } }
+                pl.pause()
+                let sent = await until(5) { pl.sent.contains { $0.0 >= Int(t0) + 25 } }
                 await pause(1.5)
                 let pos = (try? await API.shared.json("/api/docs/" + API.enc(eid) + "?prefetch=1"))?.o("episode")?.o("position")
                 check(resumed && playing && jumped && sent && (pos?.d("t") ?? 0) >= t0 + 28,
-                      "an episode plays natively from where it was left; +30 jumps, and where it stops goes back in stretches",
-                      String(format: "from %.0f, +30 to %.0f; sent %@; Daf has %.0f", t0, v.time, v.stretches.map { "\($0.0)–\($0.1)" }.joined(separator: " "), pos?.d("t") ?? -1))
+                      "an episode plays in the player from where it was left; +30 jumps, and where it stops goes back in stretches",
+                      String(format: "from %.0f, +30 to %.0f; sent %@; Daf has %.0f", t0, v.time, pl.sent.map { "\($0.0)–\($0.1)" }.joined(separator: " "), pos?.d("t") ?? -1))
                 let r0 = v.rate
                 v.nextRate()
-                let stepped = abs(v.rate - r0) > 0.01 && v.av?.defaultRate == Float(v.rate) && UserDefaults.standard.double(forKey: "podRate") == v.rate
+                let stepped = abs(v.rate - r0) > 0.01 && abs(pl.rate - v.rate) < 0.001 && UserDefaults.standard.double(forKey: "podRate") == v.rate
                 for _ in 0..<VideoPlayer.rates.count where abs(v.rate - r0) > 0.01 { v.nextRate() }
                 check(stepped && abs(v.rate - r0) < 0.01, "the speed steps on and is kept, and comes back round", VideoPlayer.rateLabel(r0))
                 let chapters = r.doc?.o("episode")?.a("chapters").count ?? 0
                 v.seek(125)
                 let marked = await until(8) { v.playing && r.textView?.nowRange != nil }
-                v.av?.pause()
+                pl.pause()
                 await pause(0.8)
                 let before = r.highlights.count
                 await r.clip(30)
@@ -1138,14 +1140,14 @@ enum SelfTest {
             if let w = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) { capture(shot, w); w.close() }
             check(shown, "Settings › \(tab.capitalized) opens (see \(shot))")
         }
-        // Connections, at Instagram: where a reel that needs a sign-in sends you
+        // Connections, at Podcasts: where the Podcasts tab's AntennaPod button sends you
         do {
             let before = Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
-            m.openSettings(tab: "connections", at: "instagram")
+            m.openSettings(tab: "connections", at: "podcasts")
             let shown = await until(6) { NSApp.windows.contains { $0.isVisible && !before.contains(ObjectIdentifier($0)) } }
             await pause(4)
-            if let w = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) { capture("53b-instagram", w); w.close() }
-            check(shown && UserDefaults.standard.string(forKey: "prefsFocus") == nil, "Settings › Connections opens at Instagram (see 53b-instagram)")
+            if let w = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) { capture("53b-podcasts", w); w.close() }
+            check(shown && UserDefaults.standard.string(forKey: "prefsFocus") == nil, "Settings › Connections opens at Podcasts (see 53b-podcasts)")
         }
         UserDefaults.standard.removeObject(forKey: "prefsTab")
         let tagList = (try? await API.shared.json("/api/doc-tags"))?.a("tags") ?? []
@@ -1282,10 +1284,11 @@ enum SelfTest {
         capture("51-books")
         let everyBook = m.shown.count
         if let word = m.items.last?.title.split(separator: " ").first.map(String.init), word.count > 2 {
-            m.booksQuery = word
-            check(!m.shown.isEmpty && m.shown.count <= everyBook && m.shown.allSatisfy { $0.title.lowercased().contains(word.lowercased()) || ($0.j.s("author") ?? "").lowercased().contains(word.lowercased()) },
-                  "and finds a book by title or author", "\(word): \(m.shown.count) of \(everyBook)")
-            m.booksQuery = ""
+            m.findQ = word
+            let foundIt = await until(8) { m.bookSections.map(\.0) == ["Found"] && m.shown.contains { $0.title.lowercased().contains(word.lowercased()) } }
+            check(foundIt && m.shown.count <= everyBook, "and its search finds a book by title (title, author, series and shelves, on the server)", "\(word): \(m.shown.count) of \(everyBook)")
+            m.findQ = ""
+            _ = await until(8) { m.bookSections.map(\.0).contains("Your library") }
         }
 
         // Stats

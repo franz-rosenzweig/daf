@@ -35,6 +35,9 @@ final class BookModel {
     var fraction = 0.0
     var chapter = ""
     var footer = ""
+    /// Where I am, for the status bar.
+    var status = BookPlace()
+    @ObservationIgnored private var marks: [Double]?
     var highlights: [J] = []
     var bookmarks: [J] = []
     var marked = false
@@ -45,6 +48,10 @@ final class BookModel {
     var sheet: HLSheet?
     /// The Kindle is further on than this place: offered as a jump.
     var kindleAhead: Double?
+    /// The book's audiobook in Audiobookshelf (audiomap.py), and its place in the book when I listened
+    /// since I last read: offered as a jump.
+    var audiobook: J?
+    var audioOffer: J?
     /// The Kindle's highlights (KOReader's, with its words), found in this edition by their words.
     var kindle: [J] = []
     var results: [BookHit] = []
@@ -99,6 +106,7 @@ final class BookModel {
 
     func load() async {
         Self.last = self                // the one on screen (SwiftUI may make others it throws away)
+        let opensAt = target != nil
         do {
             let d = try await API.shared.json("/api/ebooks/" + API.enc(id))
             details = d
@@ -127,10 +135,50 @@ final class BookModel {
             if let k = d.o("kindle"), let kf = k.d("fraction"), kf > (d.o("position")?.d("fraction") ?? 0) + 0.02,
                (k.d("at") ?? 0) > (d.o("position")?.d("updated") ?? 0) { kindleAhead = kf }
             startBeats()
+            Task { await audiobookPlace(d.o("position"), offer: !opensAt) }
         } catch { self.error = error.localizedDescription }
     }
 
     private func file(size: Int?) async throws -> Data { try await Self.file(for: id, size: size) }
+
+    /// The book's audiobook, and (opened at my own place) where the audiobook is, when I listened since.
+    private func audiobookPlace(_ mine: J?, offer: Bool) async {
+        let since = Int(mine?.d("updated") ?? mine?.d("at") ?? 0), frac = mine?.d("fraction") ?? -1
+        guard let x = try? await API.shared.json("/api/abs/book/\(API.enc(id))" + (offer ? "?offer=1&since=\(since)&fraction=\(frac)" : "")),
+              x.s("item") != nil else { return }
+        audiobook = x
+        audioOffer = x.o("offer")
+    }
+
+    /// Where I'm reading, for the audiobook to start there: the page's CFI, the fraction, and its words.
+    func place() -> [String: Any]? {
+        guard let epub, let text, let pages else { return nil }
+        let vis = pages.visible
+        guard let local = text.cfi(vis.location, NSMaxRange(vis) > vis.location ? NSMaxRange(vis) : nil) else { return nil }
+        let all = pages.storage.string as NSString
+        let words = all.substring(with: NSIntersectionRange(vis, NSRange(location: 0, length: all.length)))
+        return ["cfi": CFI.join(epub.sections[section].cfi, local), "fraction": fraction, "text": String(words.prefix(600))]
+    }
+
+    /// A place told by its words (the audiobook's), found in the book, or else by its fraction.
+    func go(words: String?, fraction: Double) async {
+        if let words, let epub {
+            let w = words.split(whereSeparator: \.isWhitespace).map(String.init), mid = w.count / 2
+            let tries = [Array(w.prefix(7)), Array(w[max(0, mid - 3)..<min(w.count, mid + 4)]), Array(w.suffix(7))].map { $0.joined(separator: " ") }
+            var seen = Set<String>()
+            for q in tries where q.count > 10 && seen.insert(q).inserted {
+                for k in epub.sections.indices {
+                    if let r = Self.find(q, in: Self.normal(plain(k))) {
+                        open(k, at: r.location)
+                        pages?.flash(r)
+                        return
+                    }
+                    if k % 6 == 5 { await Task.yield() }
+                }
+            }
+        }
+        if fraction >= 0 { go(fraction: fraction) }
+    }
 
     /// A book's file: the copy kept on this Mac when it's the same size as Calibre's (or there's no
     /// connection), else Daf's, kept for next time.
@@ -264,6 +312,7 @@ final class BookModel {
         if let p = printed(at: vis.location) { bits.append("p. " + p.dropFirst()) }
         bits.append("\(Int((fraction * 100).rounded()))%")
         footer = bits.joined(separator: " · ")
+        status = place(vis, pages, sizes, inChapter, inBook)
         if forget && Date().timeIntervalSince(forgotAt) > 2 { forget = false }          // reading on after Forget: the place counts again
         if fraction > 0.985 && !offeredEnd { offeredEnd = true; Task { await nearTheEnd() } }
         marked = bookmarkHere() != nil
@@ -275,6 +324,56 @@ final class BookModel {
             guard !Task.isCancelled else { return }
             await self?.savePosition()
         }
+    }
+
+    /// Where I am in pages, as KOReader numbers them: the printed book's page when the EPUB has its page
+    /// list, else the pages as they are on this screen, the other chapters reckoned from their size.
+    private func place(_ vis: NSRange, _ pages: BookPagesView, _ sizes: [Int], _ chMinutes: Double, _ bookMinutes: Double) -> BookPlace {
+        var p = BookPlace()
+        p.fraction = fraction
+        p.chMinutes = chMinutes
+        p.bookMinutes = bookMinutes
+        p.chapter = chapter
+        p.marks = chapterMarks(sizes)
+        p.paged = !pages.scrolls
+        p.chPages = max(1, pages.pageCount)
+        p.chAt = min(p.chPages, pages.first + 1)
+        p.chLast = min(p.chPages, pages.first + max(1, pages.perSpread))
+        if let epub, !epub.pageList.isEmpty {
+            let top = epub.pageList.compactMap { Int($0.label) }.max()
+            if let c = printed(at: vis.location).map({ String($0.dropFirst()) }) {
+                p.cur = c
+                p.to = printed(at: max(vis.location, NSMaxRange(vis) - 1)).map { String($0.dropFirst()) }
+                p.total = top.map(String.init) ?? epub.pageList.last?.label
+                if let top, let n = Int(p.to ?? c) { p.left = max(0, top - n) }
+                p.printed = true
+            }
+        } else if p.paged {
+            let here = sizes[section], bpp = here > 3000 ? Double(here) / Double(p.chPages) : 2000
+            let counts = sizes.enumerated().map { k, s in k == section ? p.chPages : s > 0 ? max(1, Int((Double(s) / bpp).rounded())) : 0 }
+            let before = counts.prefix(section).reduce(0, +), total = counts.reduce(0, +)
+            p.cur = "\(before + p.chAt)"
+            p.to = "\(before + p.chLast)"
+            p.total = "\(total)"
+            p.left = total - before - p.chLast
+        }
+        return p
+    }
+
+    /// Where the chapters start, for the marks on the line: each entry of the contents that starts its
+    /// own part of the book, never two marks at one place.
+    private func chapterMarks(_ sizes: [Int]) -> [Double] {
+        if let marks { return marks }
+        guard let epub else { return [] }
+        let total = Double(max(1, sizes.reduce(0, +)))
+        var starts: [Double] = [], sum = 0
+        for s in sizes { starts.append(Double(sum) / total); sum += s }
+        var at = Set<Int>()
+        for item in epub.toc.flatMap(\.flat) { if let k = epub.section(of: item.target.path), k > 0, k < starts.count { at.insert(k) } }
+        var out: [Double] = []
+        for f in at.map({ starts[$0] }).filter({ $0 > 0.002 && $0 < 0.998 }).sorted() where out.last.map({ f - $0 > 0.01 }) ?? true { out.append(f) }
+        marks = out
+        return out
     }
 
     private func currentChapter(at char: Int) -> String {
@@ -1063,9 +1162,7 @@ struct BookReaderView: View {
                 ZStack(alignment: panelOnRight ? .trailing : .leading) {
                     BookPages(model: m)
                         .overlay(alignment: .bottom) {
-                            Text(m.footer).font(.caption).foregroundStyle(Color(nsColor: m.look.quiet)).monospacedDigit().padding(.bottom, 12)
-                                .opacity(quiet ? 0 : 1)
-                                .animation(.easeInOut(duration: 0.35), value: quiet)
+                            BookStatusBar(m: m).padding(.bottom, 10)          // it stays while I read, as KOReader's does
                         }
                         .onContinuousHover { phase in
                             if case .active(let p) = phase, quiet, p.y > pagesHeight - 70 { quiet = false }
@@ -1081,7 +1178,7 @@ struct BookReaderView: View {
                             .animation(.snappy, value: m.toast)
                         }
                         .overlay(alignment: .bottom) {
-                            if Speaker.shared.key == m.listenKey { SpeakerBar().padding(.bottom, 72) }
+                            if Player.shared.any { PlayerBar().padding(.bottom, 72) }
                         }
                         .overlay { if m.epub == nil { ProgressView("Opening the book…").padding(40) } }
                     // the panel slides over the pages; a click beside it puts it away
@@ -1133,6 +1230,9 @@ struct BookReaderView: View {
                         Button(Speaker.shared.key == m.listenKey && Speaker.shared.playing ? "Pause Listening" : "Listen from Here") {
                             if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) }
                         }
+                        if let item = m.audiobook?.s("item") {
+                            Button("The Audiobook from Here") { if let p = m.place() { Task { await Player.shared.listen(book: m.id, item: item, place: p) } } }
+                        }
                         Button("Notebook") { panel("highlights") }
                         Button("About This Book") { panel("info") }
                         Button("Ask About This Book") { panel("ask") }
@@ -1163,7 +1263,7 @@ struct BookReaderView: View {
         }
         .sheet(isPresented: $m.finishing) { FinishSheet(bookID: m.id, title: m.title) { m.hardcoverEnd = false }.environment(app) }
         .task { await m.load() }
-        .onDisappear { m.close(); if Speaker.shared.key == m.listenKey { Speaker.shared.stop() } }
+        .onDisappear { m.close() }          // read aloud, it goes on in the player
         .sheet(item: $m.editing) { e in
             NoteSheet(h: e.h, saved: { n in m.changed(e.id) { $0["user_note"] = n } }).environment(app)
         }
@@ -1213,6 +1313,16 @@ struct BookReaderView: View {
 
     @ViewBuilder
     private var kindleBanner: some View {
+        if let o = m.audioOffer {
+            HStack(spacing: 12) {
+                Text("In the audiobook you're at " + (o.s("chapter") ?? "\(Int(((o.d("fraction") ?? 0) * 100).rounded()))%") + ". Go there?").font(.callout).lineLimit(1)
+                Button("Go There") { m.audioOffer = nil; Task { await m.go(words: o.s("words"), fraction: o.d("fraction") ?? -1) } }
+                Button("Stay Here") { m.audioOffer = nil }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .glassEffect(.regular, in: Capsule())
+            .padding(.top, 8)
+        }
         if let k = m.kindleAhead {
             HStack(spacing: 12) {
                 Text("The Kindle is further on, at \(Int((k * 100).rounded()))%").font(.callout)

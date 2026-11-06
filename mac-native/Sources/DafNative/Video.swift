@@ -1,7 +1,6 @@
 import AppKit
 import AVFoundation
 import AVKit
-import MediaPlayer
 import SwiftUI
 import WebKit
 
@@ -10,8 +9,9 @@ import WebKit
 /// - YouTube: its private-mode player (youtube-nocookie) in a web view. With no transcript yet,
 ///   YouTube's captions or a transcription on the server.
 /// - A reel (social.py): Daf's own copy of the video, standing up, in AVPlayer (/api/media/<id>).
-/// - A podcast episode (episodes.py): its audio in AVPlayer, with −15 and +30, the speed and the
-///   chapters. Where you stop goes to Daf in stretches (/api/podcasts/position), for AntennaPod.
+/// - A podcast episode (episodes.py): it plays in Daf's player along the bottom (Player), so it goes
+///   on while you read something else; here are its −15 and +30, the speed and the chapters, and its
+///   transcript follows the player. Where you stop goes to Daf in stretches, for AntennaPod.
 @MainActor
 @Observable
 final class VideoPlayer {
@@ -22,7 +22,7 @@ final class VideoPlayer {
     var time: Double = 0
     var duration: Double = 0
     var follow = true
-    /// An episode's speed, kept for the next one, as the page keeps it.
+    /// An episode's speed: the player's, kept for the next one, as the page keeps it.
     var rate: Double = 1
     /// A reel's shape, width over height, once its video says: Instagram's feed has square and wide ones too.
     var aspect: Double?
@@ -30,42 +30,41 @@ final class VideoPlayer {
     @ObservationIgnored private(set) var av: AVPlayer?
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored var onTick: ((Double, Bool) -> Void)?
-    /// An episode: its doc (for the stretches), what Now Playing shows, and where to start once
-    /// the audio is ready (and whether to play from there).
-    @ObservationIgnored var docID: String?
-    @ObservationIgnored var nowPlaying: (title: String, artist: String)?
+    /// An episode as the player takes it, where to start once it plays (and whether to start at once).
+    @ObservationIgnored private(set) var item: Player.Item?
     @ObservationIgnored var startAt: Double?
     @ObservationIgnored var startPlaying = false
-    @ObservationIgnored private var seg: Double?
-    @ObservationIgnored private var last: Double = 0
-    @ObservationIgnored private var lastTick = Date()
-    @ObservationIgnored private var remote: [(MPRemoteCommand, Any)] = []
-    private static weak var current: VideoPlayer?
-    /// For the self-test: the stretches sent, in whole seconds.
-    @ObservationIgnored private(set) var stretches: [(Int, Int)] = []
+    /// An episode's page, which changes once if it's saved to the Library.
+    var docID: String? {
+        get { item?.doc }
+        set { item?.doc = newValue }
+    }
 
-    static let rates: [Double] = [1, 1.2, 1.4, 1.6, 1.8, 2, 0.8]
+    static let rates = Player.rates
 
     init(ytID: String) {
         kind = .youtube
         self.ytID = ytID
     }
 
-    /// A reel's video or an episode's audio: from Daf with the sign-in, or from the podcast's own server.
+    /// A reel's video: from Daf with the sign-in.
     init(media: String, kind: Kind) {
         self.kind = kind
         ytID = ""
-        let url = API.shared.url(media)
-        var opts: [String: Any] = [:]
-        if url.host == API.shared.base.host, let jar = HTTPCookieStorage.shared.cookies(for: url) { opts[AVURLAssetHTTPCookiesKey] = jar }
-        let p = AVPlayer(playerItem: AVPlayerItem(asset: AVURLAsset(url: url, options: opts)))
-        if kind == .episode {
-            let r = UserDefaults.standard.double(forKey: "podRate")
-            rate = r > 0 ? r : 1
-            p.defaultRate = Float(rate)
-        }
-        av = p
+        av = AVPlayer(playerItem: Player.playerItem(media))
     }
+
+    /// An episode, played by Daf's player.
+    init(episode: Player.Item) {
+        kind = .episode
+        ytID = ""
+        item = episode
+        duration = episode.duration
+        rate = Player.shared.rate
+    }
+
+    /// The episode is the one in the player.
+    private var mine: Bool { item.map { Player.shared.is($0.id) } ?? false }
 
     /// The video's id in a YouTube or Invidious address.
     static func id(_ url: String?) -> String? {
@@ -90,19 +89,21 @@ final class VideoPlayer {
     func start() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.poll() } }
-        if kind == .episode { commands(true) }
+        if kind == .episode, let it = item, !mine {
+            if let t = startAt { time = t }
+            if startPlaying { startPlaying = false; Player.shared.play(it, at: startAt ?? 0) }
+        }
     }
 
-    /// Closed: the stretch played so far goes now, and a reel or an episode stops playing.
+    /// Closed: a reel stops playing; an episode goes on in the player.
     func stop() {
         timer?.invalidate()
         timer = nil
-        if let s = seg { send(s, time); seg = nil }
         av?.pause()
-        if kind == .episode { commands(false) }
     }
 
     private func poll() {
+        if kind == .episode { pollPlayer(); return }
         guard let p = av else { pollWeb(); return }
         if let item = p.currentItem, item.status == .readyToPlay {
             if duration == 0, item.duration.isNumeric, item.duration.seconds > 0 { duration = item.duration.seconds }
@@ -112,21 +113,27 @@ final class VideoPlayer {
                 startAt = nil
                 p.seek(to: CMTime(seconds: at, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                 time = at
-                last = at
-                lastTick = Date()
                 if startPlaying { p.play() }
                 return
             }
         }
         let t = p.currentTime().seconds, now = t.isFinite ? max(0, t) : 0
         let on = p.timeControlStatus != .paused
-        if kind == .episode { track(now, on) }
         time = now
-        if on != playing {
-            playing = on
-            showNowPlaying()
-        }
+        if on != playing { playing = on }
         onTick?(now, on)
+    }
+
+    /// An episode follows the player while it's the one playing there.
+    private func pollPlayer() {
+        let pl = Player.shared
+        if mine {
+            time = pl.time
+            if pl.total > 0 { duration = pl.total }
+            if playing != pl.playing { playing = pl.playing }
+        } else if playing { playing = false }
+        if abs(rate - pl.rate) > 0.001 { rate = pl.rate }
+        onTick?(time, playing)
     }
 
     private func pollWeb() {
@@ -140,117 +147,47 @@ final class VideoPlayer {
         }
     }
 
-    /// Where you stop goes to AntennaPod in stretches, as the page sends them: on a pause, on a jump,
-    /// every two minutes, and when the episode closes.
-    private func track(_ now: Double, _ on: Bool) {
-        let gap = Date().timeIntervalSince(lastTick)
-        lastTick = Date()
-        let expected = last + (playing ? gap * Double(max(av?.rate ?? 1, 0.5)) : 0)
-        if let s = seg, abs(now - expected) > 3 {           // a jump on the player's bar: the stretch ends where it was
-            send(s, last)
-            seg = on ? now : nil
-        } else if on && !playing {
-            seg = now
-        } else if !on, playing, let s = seg {
-            send(s, now)
-            seg = nil
-        } else if on, let s = seg, now - s >= 120 {
-            send(s, now)
-            seg = now
-        }
-        last = now
-    }
-
-    private func send(_ from: Double, _ to: Double) {
-        guard let doc = docID else { return }
-        let a = Int(from), b = Int(to)
-        guard b > a else { return }
-        stretches.append((a, b))
-        var body: [String: Any] = ["doc": doc, "started": a, "position": b]
-        if duration > 0 { body["total"] = Int(duration.rounded()) }
-        Task { _ = try? await API.shared.send("POST", "/api/podcasts/position", body) }
-    }
-
     /// A time picked (a timestamp, a chapter, −15 or +30) plays from there; the slider only moves it.
     func seek(_ t: Double, play: Bool = true) {
+        if kind == .episode, let it = item {
+            if mine {
+                Player.shared.seek(t)
+                if play, !Player.shared.playing { Player.shared.toggle() }
+            } else if play {
+                Player.shared.play(it, at: t)
+            } else {
+                time = t
+                startAt = t
+            }
+            return
+        }
         guard let p = av else { web?.evaluateJavaScript("dafSeek(\(t))"); return }
-        if let s = seg { send(s, time) }
-        seg = nil
         let to = max(0, duration > 1 ? min(t, duration - 1) : t)
         p.seek(to: CMTime(seconds: to, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         time = to
-        last = to
-        lastTick = Date()
-        if p.timeControlStatus != .paused { seg = to } else if play { p.play() }
+        if p.timeControlStatus == .paused, play { p.play() }
     }
 
     func skip(_ s: Double) { seek(max(0, time + s)) }
 
     func toggle() {
+        if kind == .episode, let it = item {
+            if mine { Player.shared.toggle() } else { Player.shared.play(it, at: time) }
+            return
+        }
         guard let p = av else { web?.evaluateJavaScript("dafToggle()"); return }
         if p.timeControlStatus == .paused { p.play() } else { p.pause() }
     }
 
     /// The next speed: 1×, 1.2× and so on to 2×, then 0.8×.
     func nextRate() {
-        let i = Self.rates.firstIndex { abs($0 - rate) < 0.01 } ?? -1
-        rate = Self.rates[(i + 1) % Self.rates.count]
-        UserDefaults.standard.set(rate, forKey: "podRate")
-        av?.defaultRate = Float(rate)
-        if let p = av, p.timeControlStatus != .paused { p.rate = Float(rate) }
-        showNowPlaying()
+        Player.shared.nextRate()
+        rate = Player.shared.rate
     }
 
-    static func rateLabel(_ r: Double) -> String {
-        (abs(r - r.rounded()) < 0.01 ? String(Int(r.rounded())) : String(format: "%.1f", r)) + "×"
-    }
+    static func rateLabel(_ r: Double) -> String { Player.rateLabel(r) }
 
-    // MARK: the Mac's media keys and Now Playing
-
-    private func showNowPlaying() {
-        guard kind == .episode, let np = nowPlaying, Self.current === self else { return }
-        var info: [String: Any] = [MPMediaItemPropertyTitle: np.title, MPMediaItemPropertyArtist: np.artist,
-                                   MPNowPlayingInfoPropertyElapsedPlaybackTime: time, MPNowPlayingInfoPropertyPlaybackRate: playing ? rate : 0]
-        if duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        MPNowPlayingInfoCenter.default().playbackState = playing ? .playing : .paused
-    }
-
-    /// Play and pause, back 15 seconds and ahead 30, from the keyboard's media keys and Control Center.
-    private func commands(_ on: Bool) {
-        for (cmd, target) in remote { cmd.removeTarget(target) }
-        remote = []
-        guard on else {
-            if Self.current === self {
-                Self.current = nil
-                MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-                MPNowPlayingInfoCenter.default().playbackState = .stopped
-            }
-            return
-        }
-        Self.current = self
-        let c = MPRemoteCommandCenter.shared()
-        c.skipBackwardCommand.preferredIntervals = [15]
-        c.skipForwardCommand.preferredIntervals = [30]
-        let acts: [(MPRemoteCommand, @MainActor (VideoPlayer) -> Void)] = [
-            (c.togglePlayPauseCommand, { $0.toggle() }), (c.playCommand, { $0.av?.play() }), (c.pauseCommand, { $0.av?.pause() }),
-            (c.skipBackwardCommand, { $0.skip(-15) }), (c.skipForwardCommand, { $0.skip(30) }),
-        ]
-        for (cmd, act) in acts {
-            cmd.isEnabled = true
-            let target = cmd.addTarget { [weak self] _ in
-                Task { @MainActor in if let self, Self.current === self { act(self) } }
-                return .success
-            }
-            remote.append((cmd, target))
-        }
-        showNowPlaying()
-    }
-
-    static func clock(_ t: Double) -> String {
-        let s = Int(t), h = s / 3600, m = (s % 3600) / 60
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s % 60) : String(format: "%d:%02d", m, s % 60)
-    }
+    static func clock(_ t: Double) -> String { Player.clock(t) }
 }
 
 /// The player itself, in a web view with Daf's address as its page (YouTube's embeds want one).
@@ -345,7 +282,7 @@ struct VideoArticle: View {
                     }
                     Divider()
                 } else if isReel {
-                    reelWaiting(tall: min(420, max(200, g.size.height * 0.45)))
+                    reelLink
                     Divider()
                 }
                 if doc?.list("blocks").isEmpty ?? true {
@@ -416,26 +353,17 @@ struct VideoArticle: View {
         }
     }
 
-    /// No video yet: on its way from Instagram, or why not (and where to sign in again).
-    private func reelWaiting(tall: CGFloat) -> some View {
-        let err = doc?.s("content_error")
-        return VStack(spacing: 0) {
-            VStack(spacing: 12) {
-                Text(doc?.b("preparing") == true ? "Getting the reel from Instagram. It plays here in a moment." : err ?? "Daf doesn't have this video yet.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.85))
-                if err?.contains("sign in again") == true {
-                    Button("Instagram in Settings…") { app.openSettings(tab: "connections", at: "instagram") }
-                }
+    /// A reel Daf has no video of stays its link: Open on Instagram, and nothing else.
+    private var reelLink: some View {
+        HStack {
+            if let u = doc?.s("url").flatMap(URL.init(string:)) {
+                Button("Open on Instagram") { NSWorkspace.shared.open(u) }
+                    .buttonStyle(.borderedProminent)
             }
-            .padding(24)
-            .frame(width: tall * 9 / 16, height: tall)
-            .frame(maxWidth: .infinity)
-            .background(Color.black)
-            HStack { Spacer(); instagramLink }
-                .controlSize(.small)
-                .padding(.horizontal, 16).padding(.vertical, 8)
+            Spacer()
         }
+        .controlSize(.small)
+        .padding(.horizontal, 16).padding(.vertical, 8)
     }
 
     @ViewBuilder private var instagramLink: some View {
@@ -471,6 +399,7 @@ struct VideoArticle: View {
                     }
                     .fixedSize()
                 }
+                if (model.notesBlock ?? 0) > 0 { Button("Show Notes") { model.showNotes() } }
                 transcriptState
                 Spacer()
                 if let feed = episode?.s("feed") {
@@ -519,19 +448,17 @@ struct VideoArticle: View {
         Toggle("Follow Along", isOn: Binding(get: { v.follow }, set: { v.follow = $0 }))
     }
 
-    /// What's on its way, looked for every five seconds as the page does: a reel coming from
-    /// Instagram, an episode's transcript.
+    /// An episode's transcript on its way, looked for every five seconds as the page does.
     private func watch() async {
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard !Task.isCancelled else { return }
-            let reelComing = isReel && doc?.b("preparing") == true
             let tr = (podtr ?? episode?.o("transcript"))?.s("status")
             let trComing = episode != nil && (tr == "queued" || tr == "running")
-            guard reelComing || trComing, let st = try? await API.shared.json("/api/docs/\(API.enc(model.id))/transcript") else { continue }
+            guard trComing, let st = try? await API.shared.json("/api/docs/\(API.enc(model.id))/transcript") else { continue }
             if let p = st.o("podtr") {
                 if st.b("ready") { podtr = nil; await model.load() } else if p.s("status") == "failed" { podtr = p }
-            } else if st.b("ready") || ["done", "failed"].contains(st.o("reel")?.s("status") ?? "") {
+            } else if st.b("ready") {
                 await model.load()
             }
         }

@@ -5,10 +5,40 @@ import SwiftUI
 struct StatsView: View {
     @Environment(AppModel.self) private var model
     @State private var s: J?
+    /// The search: the books waiting, being read and finished, and the highlights from this day, by
+    /// title, author or words; the charts step aside while it's on.
+    @State private var q = ""
 
     var body: some View {
         ScrollView {
-            if let s {
+            if let s, !q.trimmingCharacters(in: .whitespaces).isEmpty {
+                let m = { (l: [J]) in l.filter { Find.match(q, $0.s("title"), $0.s("author")) } }
+                let stalled = m(s.a("stalled")), now = m(s.a("in_progress")), done = m(s.a("finished"))
+                let otd = s.a("on_this_day").filter { Find.match(q, $0.s("text"), $0.s("title")) }
+                VStack(alignment: .leading, spacing: 28) {
+                    books("Waiting for you", stalled)
+                    books("Reading now", now)
+                    if !otd.isEmpty {
+                        Panel("On this day") {
+                            ForEach(otd, id: \.self) { x in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(x.s("text") ?? "").font(.system(.body, design: .serif))
+                                    Text((x.s("title") ?? "") + (x.i("year").map { " · \($0)" } ?? "")).font(.caption).foregroundStyle(.secondary)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { if let o = x.s("open") { model.openRoute = o } }
+                            }
+                        }
+                    }
+                    books("Finished", done)
+                    if stalled.isEmpty, now.isEmpty, done.isEmpty, otd.isEmpty {
+                        Text("Nothing matches").font(.headline).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(40)
+                    }
+                }
+                .padding(28)
+                .frame(maxWidth: 1000)
+                .frame(maxWidth: .infinity)
+            } else if let s {
                 VStack(alignment: .leading, spacing: 28) {
                     numbers(s)
                     let goal = s.d("goal") ?? 60
@@ -66,6 +96,7 @@ struct StatsView: View {
             }
         }
         .navigationTitle("Stats")
+        .searchable(text: $q, placement: .toolbar, prompt: "Search stats")
         .task { s = try? await API.shared.json("/api/stats") }
     }
 

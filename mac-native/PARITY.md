@@ -16,6 +16,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: the page number and the progress line; the page slider and the volumes on either side; the quick settings
 - here: every page as thumbnails; full screen; save this page; auto scroll; the keys ([ ] m t s r d c b a f, Home, End, Esc)
 - here: the place and the reading time as the page keeps them; the screen stays awake while reading
+- not yet: what's drawn on a page with a pen (mink.js, /api/manga/books/<id>/ink), shown over it
 
 ## Books
 
@@ -27,6 +28,10 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: line width and settings just for this book
 - here: the Scroll layout (the chapter as one column), as the Aa panel's Layout
 - here: the player's voice menu and sleep timer
+- here: the status bar under the pages, as KOReader's (book.js drawStatus): the things picked in Themes & Settings › Status Bar (or its right-click), one at a time (a click goes on) or all at once, the line of the book with its chapters marked or of the chapter; the printed book's pages where the EPUB has them
+- not yet: scanned books (scans.js): a book of pictures of its pages read as the printed book, two facing, up close
+- not yet: page turns (pageturn.js: None, Slide, Curl, in Aa) and the rooms (themes.js: wood, rustic, gothic, cyber)
+- not needed: underlining with the pen (underline.js) is the tablet's
 - here: next in the series and the Hardcover "finished" question near the end
 - here: the time left in the chapter and the book, the page and the percent
 - not yet: other formats (MOBI, AZW3, FB2) natively: they open in Daf's own reader
@@ -43,7 +48,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: paragraph focus (j, k) and h or n on it; the page's article keys (h n j k p L e l s f t N d z o J K C R M)
 - here: picture highlights (right-click a picture, or select it and press H), framed in their colour, shown as the picture everywhere
 - here: videos natively (YouTube's private player above the transcript, follow along, a timestamp plays from there, Clip 30s, C), captions or a transcription when there's none
-- here: reels (social.py): Daf's own copy in AVPlayer, standing up, or square and wide in their own shape; the transcript follows along, Clip 30s; on its way from Instagram, or why not, with the way to Instagram in Settings; Open on Instagram
+- here: reels (social.py): Daf's own copy in AVPlayer, standing up, or square and wide in their own shape; the transcript follows along, Clip 30s, Open on Instagram; a reel Daf has no video of stays its link, with just Open on Instagram (Daf never fetches from Instagram)
 - here: a podcast episode's page (episodes.py): its audio from where the last play anywhere stopped (and says where), −15 and +30 (← →), the speed (1× to 2×, 0.8×, kept), chapters, Clip 30s (the server transcribes it when there's no transcript yet), Follow Along, Transcribe and Try Again, P plays and pauses, the media keys and Now Playing; where it stops goes back in stretches (/api/podcasts/position); #read/<doc>/t:<sec>; Save to Library for an episode met only in AntennaPod
 - here: highlights in the PDF view (as you select, H or N, right-click), the text view's found on the page, its zoom keys (− +), its reading time and the page read
 - here: Torah's verses in Hebrew and English, or one of them (the toolbar, or Article › Torah)
@@ -71,13 +76,14 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 ## Pages
 
 - here: Today (the ring, the week, the sittings, keep reading), Review (highlights and flashcards), Highlights, Stats, Books, a book's page, shelves, Torah, Podcasts, Sources, Paper pages, Log paper minutes
-- here: Podcasts as the page has it: Listened lately (how far, a transcript), the clips (each opens its episode 30 seconds before), the shows, a show's episodes; each opens its episode's page
+- here: Podcasts as the page has it (podcasts.js): Listening (Continue, here and in Audiobookshelf; New), Shows, Episodes (All, Unplayed, In progress, Played, Transcribed, Clipped; Newest, Oldest, Longest), Recordings and Audiobooks from Audiobookshelf, Clips; a show's page with Follow, its website and what it's about; its search (my shows and episodes, Audiobookshelf, Apple's directory); a row's round button plays it, the row opens its page
 - here: Today's notices (Shabbat, the Kindle finished a book, a book read off the nightstand), the other goals' chips, minutes by source, the day's review, On this day, the nightstand (or the suggested three), Year 30's year, how fresh the sources are, a goal met or a milestone said once
 - here: Today as a page across the window, with Year 29 under Year 30
 - here: Review by a book or by whatever the Highlights filters show (a tag, favorites, a colour, a search), Review more, another round; a flashcard, tags and share as an image from the review
 - here: Highlights: source, colour, tag, favorites and private filters, sort (newest, by book, oldest), export (Markdown, CSV, JSON, Anki), Review these
 - here: a book's page: a note on the book, audiobook bookmarks, how often its highlights come back in review, export, review these, a fourth book on the nightstand asks which one steps off
-- here: Books: the nightstand, Want to read (from Hardcover), Opened lately, the whole library, a search by title or author
+- here: Books: the nightstand, Want to read (from Hardcover), Opened lately, the whole library, a search by title, author, series or shelf (/api/books/search)
+- here: a book's audiobook (audiobooks.js, audiomap.py): Listen and Listen from Here on its page, "In the audiobook you're at …" on opening it, The Audiobook from Here in its More menu
 - here: Hardcover (link a book, its status and rating, finished)
 - here: Torah's essays from the vault (Reference/torah/<parasha>/), opened in the reader, the time counted and the highlights back in the same note
 
@@ -90,13 +96,18 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: Library tags (rename, merge, remove, the tidy-up)
 - here: Import (Instapaper, Readwise, Raindrop, Pocket, OPML…), dropped or chosen, followed as it goes
 - here: Morning email, Newsletters, Hardcover, Phone, Podcasts (AntennaPod, and Transcribe episodes I play or open)
-- here: Instagram (the sign-in, Sign In to Instagram in a window that keeps nothing, Keep Daf signed in from my browser, the reels waiting, Forget It) and AniList (the client, Connect, the last update)
+- here: AniList (the client, Connect, the last update); the Instagram sign-in is gone, as on the page
+- here: Reader apps (readerapps.js, greader.py): the server, the Google Reader API address and the username, each with Copy; Make a Password (shown once, with Copy), New Password and Remove (each asked first); when it was made and last used
 - here: Send Feedback (Help menu)
 - here: appearance: Daf's themes (a theme for light and one for dark, with the Mac or always one), kept in Daf for every device; books keep their own
 
 ## Everywhere
 
 - here: search, the File menu's Add to Daf and Log Paper Minutes, offline with changes kept, Undo
+- here: the player (player.js): episodes, Audiobookshelf's recordings and audiobooks, and read-aloud, along the bottom of the window, going on wherever I go (a book read aloud goes on after its window closes); a click opens the whole player (the picture, scrubbing, the speed, a sleep timer in minutes or at the end of the chapter, the chapters, the voice, Go to It); the media keys and Now Playing
+- here: a search in every tab (find.js), in the toolbar: the Library and the Feed (on the server, the tabs counting what it finds, widened to All of the Library or All Feeds), Books, Home (the whole Library), Manga, a shelf, Paper pages, Torah, Sources, Stats, Podcasts, Highlights
+- not yet: Recovery's search (asks first: Recovery is his to decide)
+- here: the mini sidebar names each place under its icon, ☰ at its top opens the full one, and Pinned has Edit
 - here: ⌘K: search everything (articles and the words in them, books, highlights, the vault), go anywhere, do something
 - here: adding books and PDFs as files, dropping files and links on the window, pasting a link or copied files
 - here: the shortcuts sheet (Help › Keyboard Shortcuts, ⌘/)

@@ -18,6 +18,8 @@ final class Side {
     var hidden = UserDefaults.standard.object(forKey: "sideHidden") as? Bool ?? (UserDefaults.standard.string(forKey: "sideMode") == "hidden") {
         didSet { UserDefaults.standard.set(hidden, forKey: "sideHidden"); apply() }
     }
+    /// The mini sidebar: wide enough for each place's name under its icon.
+    static let miniWidth: (min: CGFloat, ideal: CGFloat, max: CGFloat) = (68, 74, 84)
     /// The width the split view was last given, so a width dragged by hand stays.
     @ObservationIgnored private var widthFor = ""
 
@@ -52,11 +54,11 @@ final class Side {
         for w in NSApp.windows where Focus.isMain(w) && !Focus.shared.isOn(w) {
             guard let s = Focus.split(w), s.splitViewItems.count > 1, !s.splitViewItems[0].isCollapsed else { continue }
             let item = s.splitViewItems[0]
-            item.minimumThickness = size == "mini" ? 54 : 190
-            item.maximumThickness = size == "mini" ? 64 : 320
+            item.minimumThickness = size == "mini" ? Self.miniWidth.min : 190
+            item.maximumThickness = size == "mini" ? Self.miniWidth.max : 320
             let wide = item.viewController.view.frame.width
             if changed || wide < item.minimumThickness - 1 || wide > item.maximumThickness + 1 {
-                s.splitView.setPosition(size == "mini" ? 58 : 220, ofDividerAt: 0)
+                s.splitView.setPosition(size == "mini" ? Self.miniWidth.ideal : 220, ofDividerAt: 0)
             }
         }
     }
@@ -91,11 +93,18 @@ final class Side {
     }
 }
 
-/// A row's look: its icon and name, or just the icon in the mini sidebar.
+/// A row's look: its icon and name, or in the mini sidebar the icon with its name under it.
 struct SideLabelStyle: LabelStyle {
     let mini: Bool
     func makeBody(configuration: Configuration) -> some View {
-        if mini { configuration.icon.frame(maxWidth: .infinity) } else { Label(configuration) }
+        if mini {
+            VStack(spacing: 2) {
+                configuration.icon.font(.title3)
+                configuration.title.font(.system(size: 9.5, weight: .medium)).lineLimit(1).minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 2)
+        } else { Label(configuration) }
     }
 }
 
@@ -104,6 +113,7 @@ struct Sidebar: View {
     @Environment(\.openSettings) private var openSettings
     @AppStorage("libOpen") private var libOpen = false
     @AppStorage("catsOpen") private var catsOpen = true
+    @State private var editPins = false
 
     var body: some View {
         let mini = Side.shared.mini
@@ -133,9 +143,18 @@ struct Sidebar: View {
             }
             row(.highlights, "Highlights", "highlighter", mini)
             let pins = Side.pinnable.filter { Side.shared.pins(model.today?.o("settings")).contains($0.0) }
-            if !pins.isEmpty {
-                Section(mini ? "" : "Pinned") {
-                    ForEach(pins, id: \.0) { p in row(p.2, p.1, p.3, mini) }
+            Section {
+                ForEach(pins, id: \.0) { p in row(p.2, p.1, p.3, mini) }
+            } header: {
+                if !mini {
+                    HStack {
+                        Text("Pinned")
+                        Spacer()
+                        Button("Edit") { editPins = true }
+                            .buttonStyle(.borderless)
+                            .font(.caption)
+                            .popover(isPresented: $editPins, arrowEdge: .trailing) { PinsEditor() }
+                    }
                 }
             }
             if model.place == .search {
@@ -144,6 +163,14 @@ struct Sidebar: View {
         }
         .listStyle(.sidebar)
         .labelStyle(SideLabelStyle(mini: mini))
+        .safeAreaInset(edge: .top) {
+            if mini {                                   // ☰: the full sidebar
+                Button { Side.shared.size = "full" } label: { Image(systemName: "line.3.horizontal").font(.title3).frame(maxWidth: .infinity) }
+                    .buttonStyle(.borderless)
+                    .help("The full sidebar")
+                    .padding(.top, 4)
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
                 if Connection.shared.offline {
@@ -189,6 +216,25 @@ struct Sidebar: View {
         }
         .buttonStyle(.plain)
         .help(key.map { title + " (" + $0 + ")" } ?? title)
+    }
+}
+
+/// Pinned's Edit: which places sit under the six, kept by Daf for every device.
+struct PinsEditor: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let on = Set(Side.shared.pins(model.today?.o("settings")))
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Pinned").font(.headline)
+            ForEach(Side.pinnable, id: \.0) { p in
+                Toggle(isOn: Binding(get: { on.contains(p.0) }, set: { v in
+                    Task { await Side.shared.setPins(v ? Array(on.union([p.0])) : Array(on.subtracting([p.0]))) }
+                })) { Label(p.1, systemImage: p.3) }
+            }
+        }
+        .padding(16)
+        .frame(width: 220, alignment: .leading)
     }
 }
 

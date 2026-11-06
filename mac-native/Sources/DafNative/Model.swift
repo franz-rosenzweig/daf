@@ -3,6 +3,14 @@ import Foundation
 import Observation
 
 /// A place in the sidebar.
+/// Where the Podcasts page is (web/podcasts.js): a category ("" is Listening), a show by its feed, or
+/// one of Audiobookshelf's recordings by its item.
+enum PodNav: Hashable {
+    case cat(String)
+    case show(String)
+    case abs(String)
+}
+
 enum Place: Hashable {
     case today
     case home                         // the Library's home: its shelves
@@ -114,9 +122,69 @@ final class AppModel {
     /// The list as shown: a Library tag picked in the filters keeps only what has it.
     var shown: [Item] {
         let list = tag.map { t in items.filter { $0.j.strings("tags").contains(t) } } ?? items
-        let q = booksQuery.trimmingCharacters(in: .whitespaces).lowercased()
-        guard place == .books, !q.isEmpty else { return list }
-        return list.filter { $0.title.lowercased().contains(q) || ($0.j.s("author") ?? "").lowercased().contains(q) }
+        let q = findWords
+        guard !q.isEmpty, let p = place, !Self.serverFinds(p) else { return list }
+        return list.filter { Find.match(q, $0.title, $0.j.s("author"), $0.j.s("source"), $0.j.s("name")) }
+    }
+
+    // MARK: the list's search (find.js)
+
+    /// The words searched in the list: the Library and the Feed (and Books) ask the server, which also reads
+    /// the text; the rest (manga, a shelf, paper pages, Torah) filter what's here. A new place starts fresh.
+    var findQ = "" { didSet { if findQ != oldValue { findChanged() } } }
+    /// Searching past the kind, the folder or the feed: the whole Library or the whole Feed.
+    var findEvery = false { didSet { if findEvery != oldValue, !findWords.isEmpty { reload() } } }
+    /// How many the search finds in each tab (inbox, later, archive; unseen, seen).
+    var found: J?
+    var findWords: String { findQ.trimmingCharacters(in: .whitespacesAndNewlines) }
+    @ObservationIgnored private var findTask: Task<Void, Never>?
+
+    static func serverFinds(_ p: Place) -> Bool {
+        switch p {
+        case .library, .kind, .shortlist, .feed, .feedSource, .view, .books: return true
+        default: return false
+        }
+    }
+
+    private func findChanged() {
+        findTask?.cancel()
+        guard let p = place, Self.serverFinds(p) else { return }
+        findTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)      // a moment after the words stop changing
+            guard !Task.isCancelled else { return }
+            reload()
+        }
+    }
+
+    /// The search's prompt, for the place.
+    var findPrompt: String {
+        switch place {
+        case .books: return "Search books"
+        case .manga: return "Search manga"
+        case .shelf: return "Search this shelf"
+        case .paper: return "Search paper pages"
+        case .torah: return "Search Torah"
+        case .feed(nil): return "Search the Feed"
+        case .view(let id): return "Search " + (view(id)?.s("name") ?? "this view")
+        case let p?: return "Search " + title(p)
+        default: return "Search"
+        }
+    }
+
+    /// Where a search can widen from, by name: a kind, a folder, a feed (nil: it's the whole Library or Feed already).
+    var findHere: String? {
+        switch place {
+        case .kind, .shortlist, .feedSource, .view: return title(place)
+        case .feed(let c?): return c
+        case .library: return kind.isEmpty ? nil : Place.kinds.first { $0.0 == kind }?.1
+        default: return nil
+        }
+    }
+
+    /// Books: the search as the page has it.
+    var booksQuery: String {
+        get { findQ }
+        set { findQ = newValue }
     }
     /// Books by section, in the page's order: the nightstand, Want to Read, opened lately, the library.
     var bookSections: [(String, [Item])] {
@@ -127,7 +195,6 @@ final class AppModel {
         }
         return out
     }
-    var booksQuery = ""
 
     // the list's order and filters, as the page has them
     var sortLibrary = UserDefaults.standard.string(forKey: "sort.library") ?? "new" { didSet { UserDefaults.standard.set(sortLibrary, forKey: "sort.library") } }
@@ -220,8 +287,15 @@ final class AppModel {
     var sheet: Sheet?
     /// A route to open in a window of its own ("#ebook/…", "#mread/…"), from code (menus, the self-test).
     var openRoute: String?
-    /// The show open on the Podcasts page (its feed), or nil for the page itself.
-    var podcastShow: String?
+    /// Where the Podcasts page is: a category, a show (its feed), or one of Audiobookshelf's recordings.
+    var podNav: PodNav = .cat("") { didSet { if case .cat(let c) = podNav { podCat = c } } }
+    /// The Podcasts page's last category, for Back from a show.
+    var podCat = ""
+    /// The show open on the Podcasts page (its feed), or nil.
+    var podcastShow: String? {
+        get { if case .show(let f) = podNav { return f } else { return nil } }
+        set { podNav = newValue.map { .show($0) } ?? .cat("") }
+    }
     /// For Add to Daf: a link dropped or pasted, books and PDFs dropped or pasted.
     @ObservationIgnored var addURL: String?
     @ObservationIgnored var addFiles: [URL] = []
@@ -372,6 +446,16 @@ final class AppModel {
                 items = try await docs("feed", tab: feedTab, arg: cat, sort: sortFeed, filter: listFilter.dict)
             case .feedSource(let f):
                 items = try await docs("feed", tab: feedTab, arg: f, sort: sortFeed, filter: listFilter.dict)
+            case .books where !findWords.isEmpty:
+                // every word somewhere in a book's title, its author, its series or a shelf it's on
+                items = try await API.shared.json("/api/books/search?q=" + API.enc(findWords)).a("books").map { b in
+                    var raw = b.raw
+                    raw["type"] = "book"
+                    raw["kind"] = "book"
+                    raw["source"] = b.s("author") ?? b.s("progress_note")
+                    raw["section"] = "Found"
+                    return Item(J(raw))
+                }
             case .books:
                 // Each book once, in the first section it's in. Hardcover's Want to Read: the ones Daf has.
                 async let hc = try? API.shared.json("/api/hardcover/shelf?status=1")
@@ -426,12 +510,18 @@ final class AppModel {
             q += w == "feed" ? (arg.hasPrefix("feed/") ? "&feed=" : "&cat=") + API.enc(arg) : "&kind=" + API.enc(arg)
         }
         for (k, v) in filter.sorted(by: { $0.key < $1.key }) { q += "&\(k)=" + API.enc((v as? Bool).map { $0 ? "1" : "0" } ?? "\(v)") }
-        return try await API.shared.json(q).a("items").map(Item.init)
+        let words = findWords
+        if !words.isEmpty { q += "&q=" + API.enc(words) + (findEvery ? "&every=1" : "") }
+        let j = try await API.shared.json(q)
+        found = words.isEmpty ? nil : j.o("found")
+        return j.a("items").map(Item.init)
     }
 
     /// A new place: nothing chosen, a saved view's tag (or none), the list again.
     func placeChanged() {
         multi = []
+        if !findQ.isEmpty || findEvery { findQ = ""; findEvery = false; findTask?.cancel() }
+        found = nil
         if case .view? = place { viewAsSaved(load: false) } else { tag = nil }
         reload()
     }
@@ -714,12 +804,30 @@ final class AppModel {
 
     /// A show's page on the Podcasts page (episodes.show).
     func showPodcast(_ feed: String) {
-        podcastShow = feed
+        podNav = .show(feed)
         place = .podcasts
         NSApp.activate()
     }
 
-    /// Settings at a tab, scrolled to a section there ("instagram" in Connections).
+    /// Go to It (the player): an episode's or an article's page, a book's, or the Podcasts page.
+    func goTo(_ route: String) {
+        let parts = route.drop { $0 == "#" }.split(separator: "/").map { $0.removingPercentEncoding.map(String.init) ?? String($0) }
+        switch parts.first {
+        case "podcasts":
+            podNav = parts.count > 2 && parts[1] == "abs" ? .abs(parts[2]) : .cat(parts.count > 1 ? parts[1] : "")
+            place = .podcasts
+            NSApp.activate()
+        case "book" where parts.count > 1:
+            place = .books
+            let id = parts[1]
+            Task { try? await Task.sleep(nanoseconds: 300_000_000); selection = id }
+            NSApp.activate()
+        default:
+            openRoute = route
+        }
+    }
+
+    /// Settings at a tab, scrolled to a section there ("podcasts" in Connections).
     func openSettings(tab: String, at section: String? = nil) {
         UserDefaults.standard.set(tab, forKey: "prefsTab")
         UserDefaults.standard.set(section, forKey: "prefsFocus")

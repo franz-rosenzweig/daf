@@ -36,13 +36,14 @@ struct MainView: View {
     /// The sidebar, as wide as full or mini asks.
     private var sidebar: some View {
         let mini = Side.shared.size == "mini"        // its kept size: hidden, it comes back as it was
-        return Sidebar().navigationSplitViewColumnWidth(min: mini ? 54 : 190, ideal: mini ? 58 : 220, max: mini ? 64 : 320)
+        return Sidebar().navigationSplitViewColumnWidth(min: mini ? Side.miniWidth.min : 190, ideal: mini ? Side.miniWidth.ideal : 220, max: mini ? Side.miniWidth.max : 320)
     }
 
     /// Shown or hidden (Side), as the split view keeps it: hidden leaves the list and what's open (or
-    /// the page). A pane put away by focus mode doesn't count as hiding it.
+    /// the page). A pane put away by focus mode doesn't count as hiding it, and while it's on only what's
+    /// open shows, or SwiftUI brings the sidebar back the next time it draws the window.
     private func columns(page: Bool) -> Binding<NavigationSplitViewVisibility> {
-        Binding(get: { Side.shared.hidden ? (page ? .detailOnly : .doubleColumn) : .all },
+        Binding(get: { Focus.shared.main ? .detailOnly : Side.shared.hidden ? (page ? .detailOnly : .doubleColumn) : .all },
                 set: { v in
                     let hide = v != .all
                     if !Focus.shared.main, Side.shared.hidden != hide { Side.shared.hidden = hide }
@@ -95,12 +96,12 @@ struct MainView: View {
                     .glassEffect(.regular, in: Capsule())
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                if Speaker.shared.on { SpeakerBar().transition(.move(edge: .bottom).combined(with: .opacity)) }
+                if Player.shared.any { PlayerBar().transition(.move(edge: .bottom).combined(with: .opacity)) }
             }
             .padding(.bottom, 22)
         }
         .animation(.snappy, value: model.toast)
-        .animation(.snappy, value: Speaker.shared.on)
+        .animation(.snappy, value: Player.shared.any)
         .onDrop(of: [.fileURL, .url], isTargeted: nil) { model.dropped($0) }
         .tint(Theme.shared.accent)
         .onAppear {
@@ -186,16 +187,16 @@ struct ItemList: View {
         .navigationSubtitle(model.shown.isEmpty ? "" : model.multi.count > 1 ? "\(model.multi.count) of \(model.shown.count) chosen" : "\(model.shown.count)")
         .overlay {
             if model.shown.isEmpty && !model.loading {
-                ContentUnavailableView(model.place == .search ? "Nothing found" : "Nothing here", systemImage: "tray")
+                ContentUnavailableView(model.place == .search || !model.findWords.isEmpty ? "Nothing matches" : "Nothing here", systemImage: "tray")
             }
         }
         .toolbar {
             if case .kind = model.place {
                 ToolbarItem {
                     Picker("Show", selection: $model.libraryTab) {
-                        Text("Inbox").tag("inbox")
-                        Text("Later").tag("later")
-                        Text("Archive").tag("archive")
+                        Text("Inbox" + foundIn("inbox")).tag("inbox")
+                        Text("Later" + foundIn("later")).tag("later")
+                        Text("Archive" + foundIn("archive")).tag("archive")
                     }
                     .pickerStyle(.segmented)
                     .fixedSize()
@@ -218,8 +219,8 @@ struct ItemList: View {
             if let p = model.place, isFeed(p) {
                 ToolbarItem {
                     Picker("Show", selection: $model.feedTab) {
-                        Text("Unseen").tag("unseen")
-                        Text("Seen").tag("seen")
+                        Text("Unseen" + foundIn("unseen")).tag("unseen")
+                        Text("Seen" + foundIn("seen")).tag("seen")
                     }
                     .pickerStyle(.segmented)
                     .fixedSize()
@@ -258,11 +259,17 @@ struct ItemList: View {
         .onChange(of: model.sortFeed) { _, _ in model.reload() }
         .onChange(of: model.feedTab) { _, _ in model.reload() }
         .onKeyPress(characters: CharacterSet(charactersIn: "lsftdzjk"), phases: .down) { press in listKey(press.characters) }
+        .searchable(text: $model.findQ, placement: .toolbar, prompt: model.findPrompt)
         .safeAreaInset(edge: .top) {
-            if model.place == .books {
-                TextField("Search by title or author", text: $model.booksQuery)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
+            if !model.findWords.isEmpty, let here = model.findHere {
+                Picker("Where", selection: $model.findEvery) {
+                    Text(here).tag(false)
+                    Text(model.place.map(isFeed) == true ? "All Feeds" : "All of the Library").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .padding(.horizontal, 12).padding(.vertical, 6)
             }
             if let p = model.place, isFeed(p), let n = model.counts?.i("expired_in_daf"), n > 0, model.feedTab == "unseen" {
                 HStack(spacing: 10) {
@@ -291,6 +298,12 @@ struct ItemList: View {
 }
 
 extension ItemList {
+    /// How many a search finds in a tab, while one is on: "Inbox 3".
+    private func foundIn(_ tab: String) -> String {
+        guard let f = model.found else { return "" }
+        return " \(f.i(tab) ?? 0)"
+    }
+
     /// The page's list keys (keys.js, scope list).
     func listKey(_ ch: String) -> KeyPress.Result {
         let item = model.selected
