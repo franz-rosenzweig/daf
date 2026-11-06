@@ -1567,13 +1567,14 @@ const ownKey = () => { const id = R.aaBook && C.curBook && C.curBook(); return i
 C.typeFor = id => { const g = store.get('type', {}), o = id ? store.get('bookType.' + id, null) : null; return o ? Object.assign({}, g, o, { theme: g.theme }) : g; };
 // Themes & Settings (the Aa button, for articles and books): the text's size, Pages or Scroll for a book,
 // six looks to tap (three for the day, three for the night, from Daf's themes), when light and dark
-// apply, and below them the typeface and the finer settings. A popover under the button; a sheet from
-// the bottom on a phone.
+// apply, and below them the typeface, the finer settings and, for a book, its status bar. A popover
+// under the button; a sheet from the bottom on a phone.
 const LOOKS = [['daf', 'light', 'Daf'], ['paper', 'light', 'Paper'], ['eink', 'light', 'E-ink'], ['paper', 'dark', 'Dusk'], ['eink', 'dark', 'Night'], ['oled', 'dark', 'Black']];
 function openAa(anchor, opts){
   const rv = $('#main .rv'); if (rv) rv.classList.remove('chromehide');
   opts = opts || (C.S.route[0] === 'ebook' ? { book: true } : {});
   R.aaBook = !!opts.book;
+  if (opts.open) R.aaOpen = opts.open;          // one section open from the start (the book's status bar: book.js)
   const own = ownKey() && store.get(ownKey(), null);
   const p = $('#pop'), r = anchor.getBoundingClientRect(), t = own ? C.typeFor(C.curBook()) : store.get('type', {});
   const seg = (k, list, cur) => '<div class="seg">' + list.map(o => '<button class="' + ((cur || list[0][0]) === o[0] ? 'on' : '') + '" data-type="' + k + '" data-v="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
@@ -1599,11 +1600,15 @@ function openAa(anchor, opts){
       step('measure', 'Line width', t.measure || 38, 3, v => v <= 32 ? 'Narrow' : v >= 44 ? 'Wide' : 'Medium') +
       (opts.book ? '<label class="aaline"><input type="checkbox" data-type="justify"' + (t.justify ? ' checked' : '') + '> Justify the text</label>' +
         '<label class="aaline"><input type="checkbox" data-type="own"' + (own ? ' checked' : '') + '> Just for this book</label>' : '') + '</details>' +
+    (opts.book && C.StatusBar ? C.StatusBar.aa(R.aaOpen === 'bar') : '') +
     '<a class="aamore" href="#prefs/appearance">All themes</a>';
   p.classList.add('aapop');
   p.hidden = false;
   if (matchMedia('(max-width:700px)').matches) { p.style.left = ''; p.style.top = ''; p.classList.add('aasheet'); }
-  else { p.classList.remove('aasheet'); p.style.left = Math.max(8, Math.min(window.innerWidth - 330, r.left)) + 'px'; p.style.top = (r.bottom + 8) + 'px'; }
+  else {           // under the button, or over it when it's low on the screen (the book's status bar)
+    p.classList.remove('aasheet'); p.style.left = Math.max(8, Math.min(window.innerWidth - 330, r.left)) + 'px';
+    p.style.top = (r.bottom + 8 + p.offsetHeight > window.innerHeight - 8 ? Math.max(8, r.top - p.offsetHeight - 8) : r.bottom + 8) + 'px';
+  }
 }
 // (which of its two sections was open, so a tap inside one keeps it open as the panel redraws)
 document.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.aasec) R.aaOpen = d.open ? d.dataset.aasec : (R.aaOpen === d.dataset.aasec ? null : R.aaOpen); }, true);

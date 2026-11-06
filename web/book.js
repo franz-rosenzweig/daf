@@ -155,6 +155,7 @@ async function openBook(id, at){
   view.addEventListener('link', e => footnotes.handle(view.book, e)?.catch(err => console.warn('footnote', err)));
   for (const h of d.highlights) { try { h.index = view.resolveNavigation(h.pos.cfi)?.index; } catch(err){ h.index = null; } }
   try { B.secFrac = view.getSectionFractions(); } catch(e){ B.secFrac = []; }
+  try { B.marks = chapterMarks(); } catch(e){ B.marks = []; }
   applyBookType();
   drawToc();
   Pens.use(INKSURF);
@@ -448,7 +449,7 @@ function goToSpeaking(){
 function cleanup(){
   inkFlush();
   if (B.tts && B.tts.on && B.tts.unfollow) { B.tts.unfollow(); B.tts.unfollow = null; }   // it reads on, off the page
-  closeNote(); wake(false); H.hide();
+  closeNote(); wake(false); H.hide(); pagesStop();
   if (B.view) { try { savePosition(true); } catch(e){} try { B.view.close(); } catch(e){} B.view.remove(); }
   B.view = null; B.id = null; B.d = null;
   if (H.active === ACT) H.active = null;
@@ -557,12 +558,7 @@ function onRelocate(e){
   const p = $('#rprog'); if (p) p.style.width = pct + '%';
   const sl = $('#bslide'); if (sl && !B.sliding) sl.value = Math.round((l.fraction || 0) * 1000);
   const st = $('#bslidet'); if (st && !B.sliding) st.textContent = (l.time && l.time.section > 0.5 ? fmtMins(l.time.section) + ' left in the chapter · ' : '') + pct + '%';
-  const ch = l.tocItem?.label || '';
-  const f = $('#bfoot');
-  if (f && !f.querySelector('#bjump')) f.innerHTML = '<span class="bch"' + (isRtlText(ch) ? ' dir="rtl"' : '') + '>' + esc(ch) + '</span><span class="spacer"></span>' +
-    (l.time ? (l.time.section > 0.5 ? '<span class="mute">' + fmtMins(l.time.section) + ' left in the chapter</span>' : '') + '<span class="mute bleft"> · ' + fmtMins(l.time.total) + ' left in the book</span>' : '') +
-    (l.pageItem && l.pageItem.label ? '<span class="mute bpage" title="The printed book’s page"> · p. ' + esc(l.pageItem.label) + '</span>' : '') +
-    '<button class="bpct" data-bk="jump" title="Go to a percent">' + pct + '%</button>';
+  drawStatus(); measurePages();
   if (B.d && (l.fraction || 0) > 0.985 && !B.offeredEnd && !B.d.private && C.HC) {
     // The end: offer to mark it read on Hardcover, if it's on your shelves and not Read yet.
     B.offeredEnd = true; const id = B.d.id, title = B.d.title;
@@ -594,6 +590,250 @@ function savePosition(now){
   if (C.outbox && C.outbox.get().length) { late(); C.outbox.flush(); return; }
   fetch(path, { method: 'PUT', credentials: 'same-origin', keepalive: !!now, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, at: Math.floor(Date.now() / 1000) }) })
     .then(r => { if (r.status >= 500) late(); }, late);
+}
+
+/* ---------- the status bar under the page, as KOReader has it ---------- */
+// What's under the page, as in KOReader: the things you pick (Themes & Settings → Status bar) in your
+// order, one at a time with a tap on the bar going on to the next (KOReader's way, and Apple Books'
+// page number and pages left), or all at once; beside them a thin line of the book with its chapters
+// marked. It stays while you read, in focus mode too, and it's the same for every book.
+const SB_ITEMS = [['page', 'Page'], ['chpage', 'Page in chapter'], ['chleft', 'Pages left in chapter'], ['bookleft', 'Pages left in book'],
+  ['pct', 'Percent'], ['chtime', 'Time left in chapter'], ['booktime', 'Time left in book'], ['chapter', 'Chapter'], ['title', 'Book title'],
+  ['clock', 'Clock'], ['battery', 'Battery']];
+// KOReader's defaults, in its order: the page, the clock, the pages left in the chapter, the battery, the
+// percent, and the time left in the book and in the chapter, one at a time, beside the book's line.
+const SB_DEF = { show: 'one', bar: 'book', items: ['page', 'clock', 'chleft', 'battery', 'pct', 'booktime', 'chtime'] };
+const sbGet = () => { const s = Object.assign({}, SB_DEF, store.get('statusBar', {})); s.items = (s.items || []).filter(k => SB_ITEMS.some(i => i[0] === k)); return s; };
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+const bookRtl = () => !!B.view && (B.view.book.dir || (B.view.language && B.view.language.direction)) === 'rtl';
+
+// The battery, where the browser tells it (Chrome and the Android app; Safari doesn't). A computer
+// that's plugged in and full, or has none, shows nothing.
+const BATT = { b: null };
+if (navigator.getBattery) navigator.getBattery().then(b => { BATT.b = b; ['levelchange', 'chargingchange'].forEach(ev => b.addEventListener(ev, () => drawStatus())); }).catch(() => {});
+const battery = () => { const b = BATT.b; return !b || (b.charging && b.level >= 1) ? null : b; };
+const battIcon = lv => '<svg class="bsbatt" width="17" height="9" viewBox="0 0 17 9" aria-hidden="true"><rect x=".5" y=".5" width="14" height="8" rx="2" fill="none" stroke="currentColor"/><rect x="15.3" y="3" width="1.4" height="3" rx=".6" fill="currentColor"/><rect x="2" y="2" width="' + Math.max(1, 11 * lv).toFixed(1) + '" height="5" rx="1" fill="currentColor"/></svg>';
+
+// Pages as KOReader numbers them: the printed book's page when the EPUB has its page list, else the
+// pages as they are on this screen, through the whole book. A page is a column, so two pages side by
+// side are two pages, and in Scroll a page is a screen's height. foliate lays out only the chapter
+// that's open, so a second, hidden paginator lays out the others the same way, one at a time while you
+// read; the counts are kept on this device for this layout (the type, Pages or Scroll, the window's
+// size). Until they're in, the other chapters are reckoned from their size.
+const PG = { run: 0, key: null, counts: null, partial: null, el: null, t: 0, sec: null };
+const colsOf = (r, doc) => { const cs = doc.defaultView.getComputedStyle(doc.documentElement), w = parseFloat(cs.columnWidth) + (parseFloat(cs.columnGap) || 0); return w > 0 ? Math.max(1, Math.round(r.size / w)) : 1; };
+const rtlDoc = doc => doc.body.dir === 'rtl' || doc.documentElement.dir === 'rtl' || doc.defaultView.getComputedStyle(doc.body).direction === 'rtl';
+// The pages a chapter's document makes in a paginator (the main one or the hidden one), measured as foliate does.
+function pagesIn(r, doc){
+  if (r.scrolled) return Math.max(1, Math.ceil((r.viewSize - 1) / r.size));
+  const step = r.size / colsOf(r, doc), root = doc.documentElement.getBoundingClientRect(), range = doc.createRange();
+  range.selectNodeContents(doc.body);
+  const c = range.getBoundingClientRect(), size = (rtlDoc(doc) ? root.right - c.right : c.left - root.left) + c.width;
+  return Math.max(1, Math.ceil((size - 1) / step));
+}
+// The chapter that's open: its pages, the first and the last of them on the screen.
+function secNow(){
+  const r = B.view.renderer, c = r.getContents()[0]; if (!c || !c.doc || !c.doc.body || !r.size) return null;
+  const P = PG.sec, n = P && P.doc === c.doc && P.size === r.size && P.vs === r.viewSize ? P.n : pagesIn(r, c.doc);
+  PG.sec = { doc: c.doc, size: r.size, vs: r.viewSize, n };
+  const cols = r.scrolled ? 1 : colsOf(r, c.doc), at = r.scrolled ? Math.ceil((r.end - 1) / r.size) : (r.page - 1) * cols + 1;
+  const first = Math.max(1, Math.min(n, at));
+  return { index: c.index, n, at: first, last: Math.min(n, first + cols - 1), cols };
+}
+// Where you are in pages: cur (to: the second of two side by side) and total (labels, for a printed page),
+// the pages left after the screen, and the chapter's (sec).
+function pageNow(l){
+  const v = B.view, list = v.book.pageList;
+  if (v.isFixedLayout) { const i = l.section ? l.section.current : 0, n = l.section ? l.section.total : 0; return n ? { cur: i + 1, total: n, left: n - i - 1 } : null; }
+  const s = secNow(), o = { sec: s };
+  if (list && list.length) {
+    // the book's last page is its highest number (a list can end out of order), else its last label
+    if (B.plFor !== list) { B.plFor = list; B.plMax = Math.max(...list.map(p => /^\d+$/.test(p.label) ? +p.label : 0)); }
+    const i = l.pageItem ? list.indexOf(l.pageItem) : -1, cur = i >= 0 ? String(l.pageItem.label) : null;
+    if (i >= 0) Object.assign(o, { cur, total: B.plMax || list[list.length - 1].label, left: B.plMax && /^\d+$/.test(cur) ? Math.max(0, B.plMax - +cur) : list.length - 1 - i, printed: true });
+    return o;
+  }
+  if (!s) return o;
+  const n = sectionPages(s);
+  const before = n.slice(0, s.index).reduce((a, b) => a + b, 0), total = n.reduce((a, b) => a + b, 0);
+  return Object.assign(o, { cur: before + s.at, to: before + s.last, total, left: total - before - s.last });
+}
+// Every chapter's pages: counted, or reckoned at the bytes per page of those counted so far.
+function sectionPages(s){
+  const secs = B.view.book.sections, c = PG.counts || PG.partial || [];
+  let bytes = 0, pages = 0;
+  c.forEach((k, i) => { if (k && secs[i] && secs[i].size) { bytes += secs[i].size; pages += k; } });
+  if (pages < 8 && secs[s.index] && secs[s.index].size > 3000) { bytes += secs[s.index].size; pages += s.n; }
+  const bpp = pages ? bytes / pages : 2000;
+  return secs.map((x, i) => i === s.index ? s.n : c[i] != null ? c[i] : x.linear === 'no' ? 0 : Math.max(1, Math.round((x.size || 0) / bpp)));
+}
+const pagesKey = () => {
+  const r = B.view.renderer, t = C.typeFor ? C.typeFor(B.id) : store.get('type', {}), b = $('#bstage').getBoundingClientRect();
+  return ['1', B.d && B.d.size, r.getAttribute('flow'), t.font || 'serif', t.size || 20, t.spacing || 1.6, t.measure || 38, t.justify ? 1 : 0, r.getAttribute('max-column-count'), Math.round(b.width), Math.round(b.height)].join('|');
+};
+// Only when a page number or the pages left in the book are on the bar, and the book has no printed pages.
+const wantPages = () => { const s = sbGet(), v = B.view; return !!v && !v.isFixedLayout && !(v.book.pageList && v.book.pageList.length) && s.show !== 'off' && s.items.some(k => k === 'page' || k === 'bookleft'); };
+function measurePages(){
+  if (!wantPages() || !$('#bstage')) return;
+  const key = pagesKey(); if (key === PG.key) return;
+  PG.key = key; PG.partial = null; PG.counts = store.get('pages.' + B.id, {})[key] || null;
+  const run = ++PG.run; clearTimeout(PG.t);
+  if (!PG.counts) PG.t = setTimeout(() => countPages(run, key), 1500);   // once the page has settled
+}
+const settled = doc => Promise.race([new Promise(r => setTimeout(r, 2500)), Promise.all([doc.fonts && doc.fonts.ready,
+  ...[...doc.images].filter(i => !i.complete).map(i => new Promise(r => { i.addEventListener('load', r, { once: true }); i.addEventListener('error', r, { once: true }); }))])]);
+const idle = () => new Promise(r => window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 400 }) : setTimeout(r, 30));
+async function countPages(run, key){
+  const v = B.view, id = B.id, live = () => run === PG.run && B.view === v;
+  if (!v || !live()) return;
+  let p = PG.el;
+  if (!p) {
+    p = PG.el = document.createElement('foliate-paginator');
+    p.className = 'bmeasure'; p.setAttribute('aria-hidden', 'true');
+    $('#bstage').append(p); p.open(v.book);
+    // the language's direction, as foliate's view gives its own pages
+    p.addEventListener('load', e => { const d = e.detail.doc, lang = v.language || {}; if (!lang.isCJK && lang.direction) d.documentElement.dir ||= lang.direction; });
+  }
+  for (const a of ['flow', 'max-inline-size', 'max-column-count', 'gap', 'margin']) p.setAttribute(a, v.renderer.getAttribute(a));
+  p.setStyles(bookCSS());
+  const secs = v.book.sections, counts = [];
+  PG.partial = counts;
+  for (let i = 0; i < secs.length; i++) {
+    if (secs[i].linear === 'no') { counts.push(0); continue; }
+    try {
+      await p.goTo({ index: i, anchor: 0 });
+      const c = p.getContents()[0], doc = c && c.doc;
+      let n = 0;
+      if (doc && doc.body) {
+        // laying it out is what asks for its fonts: until they've come, count again
+        await settled(doc); n = pagesIn(p, doc);
+        for (let k = 0; k < 4 && doc.fonts && doc.fonts.status === 'loading'; k++) { await settled(doc); n = pagesIn(p, doc); }
+      }
+      if (!live()) return;
+      counts.push(n);
+    } catch(e){ if (!live()) return; counts.push(0); }
+    await idle();
+    if (!live()) return;
+  }
+  PG.counts = counts; PG.partial = null;
+  const kept = store.get('pages.' + id, {}); kept[key] = counts;
+  Object.keys(kept).slice(0, -4).forEach(k => delete kept[k]);     // the last four layouts (the tablet turned, the desk)
+  store.set('pages.' + id, kept);
+  drawStatus();
+}
+function pagesStop(){
+  PG.run++; clearTimeout(PG.t); PG.key = null; PG.counts = PG.partial = PG.sec = null;
+  if (PG.el) { try { PG.el.destroy(); } catch(e){} PG.el.remove(); PG.el = null; }
+}
+// Where the chapters start, for the marks on the line: each entry of the contents that starts its own
+// part of the book (a chapter's sections inside it share its mark), never two marks at one place.
+function chapterMarks(){
+  const v = B.view, fr = B.secFrac || [], at = new Set();
+  const walk = xs => (xs || []).forEach(x => { try { const r = v.resolveNavigation(x.href); if (r && r.index > 0) at.add(r.index); } catch(e){} walk(x.subitems); });
+  walk(v.book.toc);
+  return [...at].map(i => fr[i]).filter(f => f > 0.002 && f < 0.998).sort((a, b) => a - b).filter((f, i, a) => !i || f - a[i - 1] > 0.01);
+}
+
+function sbText(k, l, P){
+  if (k === 'page') return P && P.cur != null ? esc(P.cur + (P.to > P.cur ? '–' + P.to : '') + ' of ' + P.total) : '';
+  if (k === 'chpage') return P && P.sec ? P.sec.at + (P.sec.last > P.sec.at ? '–' + P.sec.last : '') + ' of ' + P.sec.n + ' in the chapter' : '';
+  if (k === 'chleft') { if (!P || !P.sec) return ''; const n = P.sec.n - P.sec.last; return n > 0 ? plural(n, 'page') + ' left in the chapter' : 'Last page in the chapter'; }
+  if (k === 'bookleft') return P && P.left != null ? (P.left > 0 ? plural(P.left, 'page') + ' left in the book' : 'Last page') : '';
+  if (k === 'pct') return Math.round((l.fraction || 0) * 100) + '%';
+  if (k === 'chtime') return l.time ? (l.time.section < 0.5 ? 'Under a minute' : fmtMins(l.time.section)) + ' left in the chapter' : '';
+  if (k === 'booktime') return l.time ? (l.time.total < 0.5 ? 'Under a minute' : fmtMins(l.time.total)) + ' left in the book' : '';
+  if (k === 'chapter') return esc((l.tocItem && l.tocItem.label || '').trim());
+  if (k === 'title') return B.d ? esc(String(B.d.title || '').split(/:\s/)[0]) : '';
+  if (k === 'clock') return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (k === 'battery') { const b = battery(); return b ? battIcon(b.level) + Math.round(b.level * 100) + '%' : ''; }
+  return '';
+}
+// The line: the book (with its chapters marked), or the chapter you're in.
+function sbLine(kind, l, P){
+  const fr = B.secFrac || [], i = l.section ? l.section.current : 0;
+  let x = l.fraction || 0, marks = B.marks || [];
+  if (kind === 'chapter') { marks = []; x = P && P.sec ? P.sec.last / P.sec.n : fr[i + 1] > fr[i] ? (x - fr[i]) / (fr[i + 1] - fr[i]) : 0; }
+  x = Math.max(0, Math.min(1, x));
+  return '<div class="bsbar" aria-hidden="true"><i style="width:' + (x * 100).toFixed(2) + '%"></i>' +
+    marks.map(m => '<b' + (m <= x ? ' class="on"' : '') + ' style="inset-inline-start:' + (m * 100).toFixed(2) + '%"></b>').join('') + '</div>';
+}
+function drawStatus(){
+  const f = $('#bfoot'), l = B.loc; if (!f || !B.view || !l) return;
+  if (f.querySelector('#bjump')) return;                    // Go to… has the footer for now
+  const s = sbGet(); f.classList.toggle('bsoff', s.show === 'off');
+  if (s.show === 'off') { f.innerHTML = ''; return; }
+  let P = null; try { P = pageNow(l); } catch(e){}
+  let items = s.items.map(k => [k, sbText(k, l, P)]).filter(x => x[1]);
+  if (s.show === 'one' && items.length) {
+    // the one you're on, or the next that has something to say (no battery here, a page before the first printed one)
+    const at = Math.max(0, s.items.indexOf(store.get('statusBarAt', s.items[0])));
+    items = [items.find(x => s.items.indexOf(x[0]) >= at) || items[0]];
+  }
+  // as wide as the text on the page (both pages when there are two), the line ending where the words begin
+  const r = B.view.renderer, c = r.getContents && r.getContents()[0];
+  let w = 0; try { w = r.scrolled ? parseFloat(r.getAttribute('max-inline-size')) : r.size - parseFloat(c.doc.defaultView.getComputedStyle(c.doc.documentElement).columnGap || 0); } catch(e){}
+  const line = s.bar !== 'off' ? sbLine(s.bar, l, P) : '';
+  f.innerHTML = '<div class="bsrow" data-bk="status"><div class="bsin' + (line ? '' : ' noline') + '"' + (bookRtl() ? ' dir="rtl"' : '') + (w > 100 ? ' style="max-width:' + Math.round(w) + 'px"' : '') + '>' + line +
+    (items.length ? '<div class="bsitems">' + items.map(x => '<span dir="auto" data-sbi="' + x[0] + '"' + (x[0] === 'page' && P && P.printed ? ' title="The printed book’s page"' : '') + '>' + x[1] + '</span>').join('<i aria-hidden="true">·</i>') + '</div>' : '') + '</div></div>';
+  // more than fits (a title cut short): the line gives way to the words
+  const it = f.querySelector('.bsitems');
+  if (line && it && [it, ...it.children].some(x => x.scrollWidth > x.clientWidth + 1)) f.querySelector('.bsin').classList.add('tight');
+}
+// A tap on the bar: the next thing (one at a time), else the settings. A long press opens them too.
+function tapStatus(){
+  const s = sbGet(), l = B.loc;
+  if (s.show !== 'one' || s.items.length < 2 || !l) { openStatusAa(); return; }
+  let P = null; try { P = pageNow(l); } catch(e){}
+  const cur = $('#bfoot [data-sbi]'), i = s.items.indexOf(cur ? cur.dataset.sbi : s.items[0]);
+  for (let j = 1; j < s.items.length; j++) { const k = s.items[(i + j) % s.items.length]; if (sbText(k, l, P)) { store.set('statusBarAt', k); break; } }
+  drawStatus();
+}
+function openStatusAa(){ B.aaFromBar = true; if (C.openAa) C.openAa($('#bfoot .bsitems') || $('#bfoot .bsrow') || $('[data-bk="aa"]'), { book: true, open: 'bar' }); }
+// Themes & Settings → Status bar (reader.js openAa): Off, one at a time or all at once; the line; and the
+// things on it, those shown first in their order (a tap takes one off, or puts it at the end).
+function statusAa(open){
+  const s = sbGet(), name = k => SB_ITEMS.find(i => i[0] === k)[1];
+  const seg = (k, list) => '<div class="seg">' + list.map(o => '<button class="' + (s[k] === o[0] ? 'on' : '') + '" data-sb="' + k + '" data-v="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
+  const chip = (k, on) => '<button class="chip' + (on ? ' on' : '') + '" data-sb="item" data-v="' + k + '" aria-pressed="' + on + '">' + name(k) + '</button>';
+  return '<details class="aamore2 sbset"' + (open ? ' open' : '') + ' data-aasec="bar"><summary><span>Status bar</span><span class="aaval">' + { one: 'One at a time', all: 'All at once', off: 'Off' }[s.show] + '</span></summary>' +
+    seg('show', [['off', 'Off'], ['one', 'One at a time'], ['all', 'All at once']]) +
+    '<div class="stepper"><span>Progress bar</span>' + seg('bar', [['off', 'Off'], ['book', 'Book'], ['chapter', 'Chapter']]) + '</div>' +
+    '<div class="sbchips">' + s.items.map(k => chip(k, true)).join('') + SB_ITEMS.filter(i => !s.items.includes(i[0])).map(i => chip(i[0], false)).join('') + '</div></details>';
+}
+C.StatusBar = { aa: statusAa };
+document.addEventListener('contextmenu', e => { if (C.S.route[0] === 'ebook' && e.target.closest && e.target.closest('.bsrow')) { e.preventDefault(); openStatusAa(); } });
+// The clock and the battery move on while the page stays.
+setInterval(() => { if (C.S.route[0] === 'ebook' && B.view && !document.hidden && sbGet().items.some(k => k === 'clock' || k === 'battery')) drawStatus(); }, 15000);
+
+// Go to a page (the printed one, or the screen's) or a percent ("45%"), from the … menu, in the footer.
+function openJump(){
+  const f = $('#bfoot'); if (!f) return;
+  f.innerHTML = '<span class="mute">Go to</span><input id="bjump" class="field" inputmode="decimal" placeholder="120 or 45%" autocomplete="off"><span class="spacer"></span><button class="btn sm" data-bk="jumpcancel">Cancel</button>';
+  if (PHONE()) { B.chrome = false; document.body.classList.add('bookbare'); }     // the slider would sit over it
+  $('#bjump').focus();
+}
+function closeJump(){ const f = $('#bfoot'); if (f) f.innerHTML = ''; drawStatus(); }
+async function goJump(raw){
+  const s = String(raw || '').trim(), v = parseFloat(s.replace(',', '.')), list = B.view.book.pageList, l = B.loc;
+  closeJump();
+  if (!s) return;
+  if (!/%$/.test(s)) {
+    const it = list && list.length && list.find(p => String(p.label).toLowerCase() === s.toLowerCase());
+    if (it) { await B.view.goTo(it.href).catch(() => {}); return; }
+    if (!isNaN(v) && v >= 1 && !(list && list.length) && l) {
+      if (B.view.isFixedLayout) { await B.view.goTo(Math.min(B.view.book.sections.length, Math.round(v)) - 1).catch(() => {}); return; }
+      const sn = secNow(), n = sn && sectionPages(sn);
+      if (n) {
+        let p = Math.min(Math.round(v), n.reduce((a, b) => a + b, 0)), i = 0;
+        while (i < n.length - 1 && p > n[i]) p -= n[i++];
+        // that chapter's screen with the page on it (foliate's anchor is a fraction of the chapter's screens)
+        const screens = Math.max(1, Math.ceil(n[i] / (sn.cols || 1))), at = Math.floor((p - 1) / (sn.cols || 1));
+        await B.view.renderer.goTo({ index: i, anchor: screens > 1 ? at / (screens - 1) : 0 }).catch(() => {});
+        return;
+      }
+    }
+  }
+  if (!isNaN(v)) await B.view.goToFraction(Math.max(0, Math.min(100, v)) / 100).catch(() => {});
 }
 
 /* ---------- bookmarks ---------- */
@@ -1193,6 +1433,7 @@ function openMore(anchor){
     '<button data-bm="ask">Ask about this book</button>' +
     (C.Focus ? '<button data-bm="focus">' + (C.Focus.on() ? 'Leave focus mode' : 'Focus mode') + '<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'focus') : 'f') + '</span></button>' : '') + '<hr>' +
     '<button data-bm="start">Go to the beginning</button>' +
+    '<button data-bm="goto">Go to a page or a percent</button>' +
     '<button data-bm="kindle"' + (B.d.kindle ? '' : ' disabled') + '>Go to the Kindle’s page</button>' +
     '<button data-bm="mark">' + (markHere() ? 'Remove the bookmark' : 'Bookmark this page') + '<span class="kbd">b</span></button>' +
     '<button data-bm="book">Book page, notes and nightstand</button>' +
@@ -1216,7 +1457,7 @@ function showKeys(){ C.Keys.sheet('book'); }
 function onKey(e){
   if (C.S.route[0] !== 'ebook' || !B.view) return;
   const tag = (e.target.tagName || '').toLowerCase();
-  if (tag === 'input' || tag === 'textarea') { if (e.key === 'Escape') e.target.blur(); return; }
+  if (tag === 'input' || tag === 'textarea') { if (e.key === 'Escape') { if (e.target.id === 'bjump') closeJump(); else e.target.blur(); } return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (!$('#modal').hidden) return;
   const k = e.key, is = a => C.Keys.is(e, 'book', a), paged = document.body.dataset.flow === 'paginated';
@@ -1243,6 +1484,15 @@ document.addEventListener('click', async e => {
   if (C.S.route[0] !== 'ebook') return;
   const t = e.target;
   const bq = t.closest('[data-bkq]'); if (bq) { ask(bq.dataset.bkq, null); return; }
+  const sb = t.closest('[data-sb]');
+  if (sb) {          // Themes & Settings → Status bar
+    const s = sbGet(), k = sb.dataset.sb, v = sb.dataset.v;
+    if (k === 'item') s.items = s.items.includes(v) ? s.items.filter(x => x !== v) : s.items.concat(v);
+    else s[k] = v;
+    store.set('statusBar', s); drawStatus(); measurePages();
+    if (C.openAa) C.openAa((B.aaFromBar && ($('#bfoot .bsitems') || $('#bfoot .bsrow'))) || $('[data-bk="aa"]') || sb, { book: true });
+    return;
+  }
   const bk = t.closest('[data-bk]');
   if (bk) {
     const a = bk.dataset.bk;
@@ -1252,7 +1502,8 @@ document.addEventListener('click', async e => {
     else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); } else if (panelShown()) document.body.classList.remove('bpanelsheet'); else openPanel(); }
     else if (a === 'closesheets') document.body.classList.remove('btocsheet', 'bpanelsheet');
     else if (a === 'pmenu') { if (!$('#pop').hidden && $('#pop .pmenu')) $('#pop').hidden = true; else openPhoneMenu(bk); }
-    else if (a === 'aa') { showChrome(); C.openAa && C.openAa(bk, { book: true }); }
+    else if (a === 'aa') { showChrome(); B.aaFromBar = false; C.openAa && C.openAa(bk, { book: true }); }
+    else if (a === 'status') tapStatus();
     else if (a === 'more') openMore(bk);
     else if (a === 'bookmark') toggleMark();
     else if (a === 'kindle' && B.d.kindle) { $('#bnotice').innerHTML = ''; await B.view.goToFraction(B.d.kindle.fraction); toast('At the Kindle’s page, about ' + Math.round(B.d.kindle.fraction * 100) + '% in'); }
@@ -1261,10 +1512,7 @@ document.addEventListener('click', async e => {
     else if (a === 'hcno') bk.closest('.bnotice').remove();
     else if (a === 'listen') { if (B.tts.on) stopListen(); else startListen(); }
     else if (a === 'closenote') closeNote();
-    else if (a === 'jump') {
-      const f = $('#bfoot'); f.innerHTML = '<span class="mute">Go to</span><input id="bjump" class="field" inputmode="decimal" placeholder="45" style="width:80px"><span class="mute">%</span><span class="spacer"></span><button class="btn sm" data-bk="jumpcancel">Cancel</button>';
-      $('#bjump').focus();
-    } else if (a === 'jumpcancel') { $('#bfoot').innerHTML = ''; if (B.loc) onRelocate({ detail: B.loc }); }
+    else if (a === 'jumpcancel') closeJump();
     else if (a === 'ask') { const q = $('#bask').value.trim(); if (q) { $('#bask').value = ''; ask(q, null); } }
     return;
   }
@@ -1294,6 +1542,7 @@ document.addEventListener('click', async e => {
     else if (a === 'notebook' || a === 'info' || a === 'ask') openPanel(a);
     else if (a === 'focus' && C.Focus) C.Focus.toggle();
     else if (a === 'start') await B.view.goToTextStart().catch(() => {});
+    else if (a === 'goto') openJump();
     else if (a === 'kindle' && B.d.kindle) await B.view.goToFraction(B.d.kindle.fraction);
     else if (a === 'mark') toggleMark();
     else if (a === 'book') location.hash = '#book/' + encodeURIComponent(B.d.id);
@@ -1314,8 +1563,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('keydown', e => {
   if (e.target.id !== 'bjump' || e.key !== 'Enter') return;
-  const v = parseFloat(e.target.value); if (isNaN(v)) return;
-  $('#bfoot').innerHTML = ''; B.view.goToFraction(Math.max(0, Math.min(100, v)) / 100).catch(() => {});
+  goJump(e.target.value);
 });
 let qT = null;
 document.addEventListener('input', e => { if (e.target.id === 'bq') { clearTimeout(qT); qT = setTimeout(() => runSearch(e.target.value), 300); } });
