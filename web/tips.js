@@ -28,6 +28,12 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-06-rooms', date: 'Nov 6', title: 'Library rooms and page turns', text: 'Wood bookshelf, Rustic, Gothic and Cyberpunk libraries in Appearance; in a book, Aa → Page turn slides or curls the page.', go: '#prefs/appearance' },
+  { id: '2026-11-06-manga-pen', date: 'Nov 6', title: 'Draw on manga', text: 'The S Pen draws on a manga page with the same pens as books; it stays on its page through zoom, spreads and the strip.', go: '#manga' },
+  { id: '2026-11-06-underline', date: 'Nov 6', title: 'Underline to highlight', text: 'Draw a line under words with the pen and they become a highlight. Tap the pen again for Highlight, Ask or Ink.' },
+  { id: '2026-11-06-status', date: 'Nov 6', title: 'A book’s status bar', text: 'Page numbers, time left, the clock and the battery along the bottom, as KOReader has them. Tap it for the next one; hold it to choose.' },
+  { id: '2026-11-06-scans', date: 'Nov 6', title: 'Scanned books read as pages', text: 'A book of scanned pages opens as the printed book, two pages side by side; double-tap a page to read it up close.', go: '#books' },
+  { id: '2026-11-06-divrei', date: 'Nov 6', title: 'Divrei Torah', text: 'The Torah page’s divrei Torah come from their own feed folder now, with a Listen card for the week’s episodes.', go: '#torah' },
   { id: '2026-11-05-player', date: 'Nov 5', title: 'It plays on', text: 'Podcasts and read-aloud play in a bar along the bottom, wherever you go in Daf and with the app closed. Tap it for the whole player.', go: '#podcasts' },
   { id: '2026-11-05-search', date: 'Nov 5', title: 'Search in every tab', text: 'The magnifier in the top bar searches what that tab has: books by title, author, series or shelf; articles and posts by their words.', go: '#books' },
   { id: '2026-11-05-feed-pics', date: 'Nov 5', title: 'Pictures in the Feed', text: 'Each post shows its site’s icon, and its own picture when it has one.', go: '#feed' },
