@@ -1163,14 +1163,11 @@ const ytId = u => (String(u || '').match(/(?:v=|youtu\.be\/|\/shorts\/|\/embed\/
 // few words (getCurrentTime, seekTo, playVideo, pauseVideo), so the transcript, Clip and the keys
 // work the same.
 function reelHead(d){
-  const wait = d.preparing ? 'Getting the reel from Instagram. It plays here in a moment.'
-    : d.content_error ? esc(d.content_error) : 'Daf doesn’t have this video yet.';
-  const signIn = /sign in again/.test(d.content_error || '') ? ' <a href="#prefs/instagram">Instagram in Preferences</a>' : '';
-  return '<div class="vhead"><div class="vframe tall">' + (d.media
-      ? '<video id="lvp" controls playsinline preload="metadata"' + (d.thumb ? ' poster="' + esc(d.thumb) + '"' : '') + ' src="' + esc(d.media) + '"></video>'
-      : '<div class="vwait"><span id="trstatus">' + wait + '</span>' + signIn + '</div>') + '</div><div class="vctl">' +
-    (d.media ? '<button class="btn sm" data-vclip="30" title="Highlight the last 30 seconds (c)">Clip 30s</button>' +
-      '<label class="tiny mute" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="vfollow" checked> Follow along</label>' : '') +
+  if (!d.media) return '<div class="vhead"><div class="vctl"><a class="btn sm primary" href="' + esc(d.url) + '" target="_blank" rel="noopener">Open on Instagram</a></div></div>';
+  return '<div class="vhead"><div class="vframe tall">' +
+      '<video id="lvp" controls playsinline preload="metadata"' + (d.thumb ? ' poster="' + esc(d.thumb) + '"' : '') + ' src="' + esc(d.media) + '"></video></div><div class="vctl">' +
+    '<button class="btn sm" data-vclip="30" title="Highlight the last 30 seconds (c)">Clip 30s</button>' +
+      '<label class="tiny mute" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="vfollow" checked> Follow along</label>' +
     '<span class="spacer"></span><a class="tiny" href="' + esc(d.url) + '" target="_blank" rel="noopener">Open on Instagram</a></div></div>';
 }
 function startReel(){

@@ -277,30 +277,11 @@ def get_instagram(c=Depends(conn)):
     return social.status(c)
 
 
-@app.put("/api/instagram", dependencies=[Depends(user)])
-async def put_instagram(request: Request, c=Depends(conn)):
-    """{from_browser}: whether the extension keeps Daf signed in to Instagram."""
-    from . import social
-    b = await _body(request)
-    s = config.load_settings()
-    if "from_browser" in b:
-        s["instagram"] = {"from_browser": bool(b["from_browser"])}
-        config.save_settings(s)
-    return social.status(c)
-
-
 @app.post("/api/instagram/cookies")
-async def post_instagram_cookies(request: Request, c=Depends(conn)):
-    """An Instagram session for the reels: {cookies: [{name, value, domain, path, expires, secure}]}
-    from a browser, or {cookie_header: "a=1; b=2"} from an app's sign-in. Signed in, or a device."""
+def post_instagram_cookies():
+    """Daf keeps no Instagram sign-in (social.py): an older app's Sign in to Instagram gets told so."""
     from . import social
-    by = "web"
-    if not auth.check_cookie(request.cookies.get(auth.COOKIE)):
-        by = device(request, c)
-    try:
-        return social.save_cookies(c, await _body(request), by)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    raise HTTPException(410, social.OFF)
 
 
 @app.delete("/api/instagram/cookies", dependencies=[Depends(user)])

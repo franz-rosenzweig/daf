@@ -120,9 +120,10 @@ def save_page(c, url, title=None, added=None):
         new_id_ = make_id()
         c.execute("INSERT INTO docs (id, kind, where_, status, title, author, source, category, url, added) "
                   "VALUES (?, ?, 'library', 'inbox', ?, '', ?, '', ?, ?)",
-                  (new_id_, karakeep.kind_of(url, None), title or url, host(url), url, int(added or time.time())))
-        from . import media
-        media.queue(c, "reel" if social.is_reel(url) else "page", new_id_)
+                  (new_id_, karakeep.kind_of(url, None), title or ("Instagram reel" if social.is_reel(url) else url), host(url), url, int(added or time.time())))
+        if not social.is_reel(url):                  # a reel stays its link: Daf never fetches from Instagram
+            from . import media
+            media.queue(c, "page", new_id_)
     else:
         b = karakeep.save(url, title)
         if not b.get("id"):

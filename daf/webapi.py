@@ -132,25 +132,15 @@ def _own(c, hl_id):
 
 
 @router.get("/instagram")
-def get_instagram(c=Depends(conn)):
-    """Whether this browser should keep Daf signed in to Instagram (Preferences → Instagram), and
-    which session Daf has: a hash of it, never the session itself."""
-    from . import social
-    st = social.status(c)
-    return {"want": st["from_browser"], "hash": st["hash"], "expired": bool(st["expired"])}
+def get_instagram():
+    """An older extension asks whether to send Instagram's sign-in: never (social.py)."""
+    return {"want": False, "hash": None, "expired": False}
 
 
 @router.post("/instagram")
-def post_instagram(b=Depends(_body), c=Depends(conn), name=Depends(device)):
-    """{cookies}: instagram.com's cookies from the browser, for the reels (social.py)."""
+def post_instagram():
     from . import social
-    if not social.status(c)["from_browser"]:
-        raise HTTPException(403, "Daf isn't taking Instagram's sign-in from the browser (Preferences → Instagram)")
-    try:
-        st = social.save_cookies(c, b, name)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    return {"ok": True, "restarted": st.get("restarted", 0), "same": bool(st.get("same"))}
+    raise HTTPException(410, social.OFF)
 
 
 @router.get("/tags")

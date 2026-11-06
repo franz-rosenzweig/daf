@@ -18,16 +18,7 @@ Video time doesn't count toward the hour unless you switch on **Videos** in **Pr
 
 ## Instagram reels
 
-A reel worth keeping goes to Daf the same way a link does: **Share → Daf** in the Instagram app on the phone, the toolbar button or a highlight in the browser, or its link pasted into Daf. A minute later it's under **Videos** with everything that matters about it: the video itself, kept on my server (a reel can vanish from Instagram, so Daf doesn't count on it), its picture, the account it's from, the caption, and below the caption a transcript of what's said, with the time beside each line.
-
-It plays standing up in Daf, and the rest works like a YouTube video: click a line to jump there, **Follow along**, **Clip 30s**, and highlights that go to the review and to the vault, in `Reference/instagram`, with the caption and the whole transcript. A reel with no speech, just words on the screen, has the caption and no transcript.
-
-Instagram shows almost nothing to someone who isn't signed in, so Daf uses my own sign-in, which it keeps on the server and nowhere else. **Preferences → Instagram** has it:
-
-- **Keep Daf signed in from my browser.** With that on, the [browser extension](browser-extension.md) sends instagram.com's cookies to Daf whenever I'm on instagram.com and they've changed. That's how Daf's sign-in never runs out: as long as I'm signed in to Instagram in Zen, so is Daf. Only Instagram's cookies, only to my Daf, and only when the switch is on.
-- If Instagram does turn Daf's sign-in away, the reel waits instead of failing, the card says so, and so does the reel's page and the Sources page. Visiting instagram.com in Zen renews it, and every reel that waited comes in by itself.
-- **Forget it** removes the sign-in from the server.
-- In the apps, it's **Sign in to Instagram**: in Daf for Android (0.5.5 and later) on this same card, and in Daf for the Mac under **Settings → Connections → Instagram**. It opens Instagram's own sign-in page in a window of the app's, and once I'm in, the app hands the sign-in to Daf and closes the window. The app keeps nothing of Instagram itself.
+A reel I share to Daf (**Share → Daf** in the Instagram app, the browser's toolbar button, or its link pasted in) is kept as its link, under **Videos**, and opens on Instagram. Daf doesn't fetch anything from Instagram itself: Instagram takes a sign-in used from a server for a stolen one and locks the account, so Daf keeps no Instagram sign-in at all. A reel Daf kept whole before that still plays in Daf, with its transcript.
 
 ## Podcasts
 

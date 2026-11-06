@@ -350,22 +350,14 @@ def get_doc(conn, doc_id, prefetch=False):
             d["content_error"] = st["error"]
     if d["kind"] == "video" and d["url"]:
         from . import social
-        if social.is_reel(d["url"]):                 # a reel: Daf's own copy, its caption and transcript
+        if social.is_reel(d["url"]):                 # a reel: its link, or a copy Daf kept before (social.py)
             d["reel"] = True
             if social.media_path(doc_id).exists():
                 from urllib.parse import quote
                 d["media"] = "/api/media/" + quote(doc_id, safe="")
-            if not blocks and not prefetch:
-                from . import media
-                st = media.job_status(conn, "reel", doc_id)
-                if not st or (st["status"] == "failed" and st.get("error") != social.LOGIN_ERROR
-                              and time.time() - (st.get("finished") or 0) > 3600):
-                    media.queue(conn, "reel", doc_id)
-                    d["preparing"] = True
-                elif st["status"] in ("queued", "running"):
-                    d["preparing"] = True
-                elif st.get("error"):
-                    d["content_error"] = st["error"]
+            elif not blocks:
+                d.pop("preparing", None)
+                d["content_error"] = social.OFF
     if d["kind"] == "podcast" and d.get("enclosure"):
         from . import episodes                       # its transcript in front of the show notes, and its player's details
         blocks = episodes.blocks(conn, d, blocks)
