@@ -97,6 +97,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: Import (Instapaper, Readwise, Raindrop, Pocket, OPML…), dropped or chosen, followed as it goes
 - here: Morning email, Newsletters, Hardcover, Phone, Podcasts (AntennaPod, and Transcribe episodes I play or open)
 - here: AniList (the client, Connect, the last update); the Instagram sign-in is gone, as on the page
+- here: Reader apps (readerapps.js, greader.py): the server, the Google Reader API address and the username, each with Copy; Make a Password (shown once, with Copy), New Password and Remove (each asked first); when it was made and last used
 - here: Send Feedback (Help menu)
 - here: appearance: Daf's themes (a theme for light and one for dark, with the Mac or always one), kept in Daf for every device; books keep their own
 

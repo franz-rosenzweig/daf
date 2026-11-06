@@ -184,6 +184,7 @@ struct ConnectionsPrefs: View {
                 NewslettersSection()
                 digestSection
                 AniListSection()
+                ReaderAppsSection()
             }
             .formStyle(.grouped)
             .task {

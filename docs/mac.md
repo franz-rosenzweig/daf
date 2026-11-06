@@ -42,7 +42,7 @@ Podcast episodes, Audiobookshelf's recordings and audiobooks, and anything read 
 
 Every list and page has a search in its toolbar. In the Library and the Feed it asks Daf, which reads the text too, and the Inbox, Later and Archive (or Unseen and Seen) say how many it found; inside a kind or a folder it can widen to **All of the Library** or **All Feeds**. Books looks through titles, authors, series and shelves, Home through the whole Library, and the rest filter as I type. ⌘K still searches everything at once.
 
-**Settings → Connections** has **AniList**, for the manga tracker. Daf doesn't sign in to Instagram any more: a reel I share stays its link and opens on Instagram, and the ones Daf kept whole before still play here.
+**Settings → Connections** has **AniList**, for the manga tracker, and **Reader Apps**, where I make the password an outside RSS app signs in to my Feed with (see [Reader apps](reader-apps.md)). Daf doesn't sign in to Instagram any more: a reel I share stays its link and opens on Instagram, and the ones Daf kept whole before still play here.
 
 ## With no connection
 
