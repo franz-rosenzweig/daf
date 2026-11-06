@@ -146,6 +146,7 @@ def follow(conn, feed_url, on=True):
     if on:
         conn.execute("INSERT INTO gp_subs (url, added, removed) VALUES (?, ?, NULL) ON CONFLICT(url) DO UPDATE SET added = excluded.added, removed = NULL",
                      (feed_url, now))
+        conn.commit()                                  # not holding the write lock while the feed comes
         title = episodes.read_feed(conn, feed_url, max_age=3600)
         if title:
             conn.execute("UPDATE gp_subs SET title = ?, checked = ? WHERE url = ?", (title, now, feed_url))

@@ -2418,6 +2418,7 @@ def post_podcast_open(b=Depends(json_body), c=Depends(conn)):
             podcasts.found(c, {**b["found"], "audio": audio})
         except ValueError as e:
             raise HTTPException(400, str(e))
+        c.commit()                                # doc_for reads its feed next: not with the write lock held
     return {"id": episodes.doc_for(c, audio)}
 
 

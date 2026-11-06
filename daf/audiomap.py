@@ -563,12 +563,16 @@ def _learned(conn, book_id, B):
     return [tuple(x) for x in d.get("at", [])] if d.get("text") == B["total"] else []
 
 
-def _learn(conn, book_id, B, c, t):
-    """Keep a place found by its words: the map is surer there from now on."""
+def _learn(book_id, B, c, t):
+    """Keep a place found by its words: the map is surer there from now on. On a connection of its
+    own, written at once: the request's would hold the database's write lock through the next
+    whisper, and a page turn saved meanwhile would find it locked."""
     import json
-    have = [x for x in _learned(conn, book_id, B) if abs(x[1] - t) > 120 and (x[0] - c) * (x[1] - t) > 0]
-    have = sorted(have + [(int(c), round(float(t), 1))])[-200:]
-    conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", (_key(book_id), json.dumps({"text": B["total"], "at": have})))
+    from . import db
+    with db.session() as conn:
+        have = [x for x in _learned(conn, book_id, B) if abs(x[1] - t) > 120 and (x[0] - c) * (x[1] - t) > 0]
+        have = sorted(have + [(int(c), round(float(t), 1))])[-200:]
+        conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", (_key(book_id), json.dumps({"text": B["total"], "at": have})))
 
 
 def _setup(conn, book_id):
@@ -611,7 +615,7 @@ def from_book(conn, book_id, place, exact=False):
                 if not got:
                     break
                 tt, cc = min(got, key=lambda x: abs(x[1] - c))
-                _learn(conn, book_id, B, cc, tt)
+                _learn(book_id, B, cc, tt)
                 t, how = tt + (c - cc) / pace(A, c), "words"
                 if abs(c - cc) < 400:                 # within a sentence or two of the place
                     break
@@ -634,7 +638,7 @@ def to_book(conn, book_id, t, exact=False):
             got = _found(B, S["item"], max(0.0, t - WINDOW + 4))
             if got:
                 tt, cc = min(got, key=lambda x: abs(x[0] - t))
-                _learn(conn, book_id, B, cc, tt)
+                _learn(book_id, B, cc, tt)
                 c, how = int(cc + (t - tt) * pace(A, cc)), "words"
         except Exception as e:  # noqa: BLE001
             log.info("to_book %s: %s", book_id, e)
