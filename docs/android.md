@@ -15,7 +15,7 @@ Sign in once inside the app, and it connects itself: the widget, the share sheet
 
 ## On a tablet
 
-On a tablet the sidebar is the mini one, a strip of icons, and a book held sideways opens as two pages side by side. On the phone a book is just the page, and one tap in the middle brings its menu (see [The reader](reader.md)).
+On a tablet the sidebar starts as the mini one, a strip of icons with their names under them (the three lines at the top open the full one), and a book held sideways opens as two pages side by side. On the phone a book is just the page, and one tap in the middle brings its menu (see [The reader](reader.md)).
 
 With an S Pen you can write on articles and books, highlight with the pen and take notes in the margin, and the pen's button opens the round menu of pens: see [Writing with a pen](reader.md#writing-with-a-pen). **[ ]** in a reader's bar puts it on the whole screen, with the status and navigation bars gone and the screen kept on: see [Focus mode](reader.md#focus-mode).
 

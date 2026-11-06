@@ -28,6 +28,7 @@ const I = {
   paper:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3.5h7l3 3v10H5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 9v5M7.5 11.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
   moon:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M15 12.5A6.5 6.5 0 0 1 7.5 4a6.5 6.5 0 1 0 8.6 7.6c-.35.33-.72.63-1.1.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   sync:'<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 0 1-10.4 4.1M4 10a6 6 0 0 1 10.4-4.1M14.5 2.5v3.5H11M5.5 17.5V14H9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  menu:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   sidebar:'<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 4v12" stroke="currentColor" stroke-width="1.6"/></svg>',
   back:'<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
@@ -253,9 +254,9 @@ function cover(b, cls){
 function bar(p){ return '<span class="pbar"><i style="width:' + Math.max(0, Math.min(100, p || 0)) + '%"></i></span>'; }
 
 /* ---------- sidebar ---------- */
-// One button, always in the top left corner, shows and hides the sidebar (so does ⌘\). Shown, it's mini
-// (a strip of icons) or full, and its edge is dragged to change that: wider for full, narrower for
-// mini, and further for hidden. It never changes by itself: a touch screen starts mini, a mouse full,
+// One button, always in the top left corner: in the mini sidebar (icons, each with its name under it)
+// it opens the full one, and in the full one it makes it mini again. ⌘\ shows and hides it, and its
+// edge is dragged too: wider for full, narrower for mini, and further for hidden. It never changes by itself: a touch screen starts mini, a mouse full,
 // and turning a tablet round keeps what was chosen. A swipe in from the left edge brings it over the
 // page for a moment, mini, and further, full. Reading something (an article, a book, a PDF, manga) hides
 // it, as in Readwise; the same swipe brings it. Below 780 px wide the phone's tab bar and its More
@@ -276,10 +277,20 @@ function railMode(){
   r.classList.toggle('sidehid', m === 'hidden');
   r.classList.toggle('reading', READING.has((S.route || [])[0]));
   if (sd && m !== 'phone' && !sd.matches(':hover')) sd.classList.remove('open', 'peek');
+  sideButton();
   let b = $('#sideshow');
   if (m === 'hidden' && !READING.has((S.route || [])[0])) {
     if (!b) { document.body.insertAdjacentHTML('beforeend', '<button class="sideshow" id="sideshow" data-act="sidetoggle" aria-label="Show the sidebar" title="Show the sidebar (⌘\\)">' + I.sidebar + '</button>'); }
   } else if (b) b.remove();
+}
+// The corner button says what it will do: open the full sidebar from the mini one (here, or over a
+// reading screen), or make the full one mini.
+function sideButton(){
+  const b = $('#side .sidetog'), sd = $('#side'); if (!b) return;
+  const m = sideMode(), wide = m === 'full' || (sd && sd.classList.contains('open'));
+  const label = wide ? (m === 'full' ? 'Make the sidebar narrower' : 'Close the sidebar') : 'Show the whole sidebar';
+  if (b.getAttribute('aria-label') === label) return;
+  b.innerHTML = wide ? I.sidebar : I.menu; b.setAttribute('aria-label', label); b.title = label + ' (⌘\\ hides it)';
 }
 window.addEventListener('resize', () => { clearTimeout(railMode.t); railMode.t = setTimeout(railMode, 120); });
 function setSide(shown, size){
@@ -377,19 +388,34 @@ function renderSide(){
     mob('library', 'Library', I.books, 'library') + '<button class="mb' + (window.DafCore && window.DafCore.Tips && window.DafCore.Tips.unseen() ? ' hasnew' : '') + '" data-act="more"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>More</span></button></div>';
   const D = window.DafCore || {}, on = pinsOn(), route = (S.route || []).join('/');
   const pins = PINS().filter(p => on.includes(p[0])).map(p => '<button class="nv' + (route === p[2] || v === p[2] || (p[0] === 'manga' && v === 'mread') ? ' on' : '') + '" data-go="' + p[2] + '">' + p[3] + '<span>' + p[1] + '</span></button>').join('');
-  $('#side').innerHTML = mobbar + '<div class="sidegrip" aria-hidden="true"></div><div class="navfull"><div class="brand"><button class="ib sidetog" data-act="sidetoggle" aria-label="Hide the sidebar" title="Hide the sidebar (⌘\\). Drag its edge for mini or full.">' + I.sidebar + '</button><b>Daf</b><span class="spacer"></span>' +
+  $('#side').innerHTML = mobbar + '<div class="sidegrip" aria-hidden="true"></div><div class="navfull"><div class="brand"><button class="ib sidetog" data-act="sidetoggle"></button><b>Daf</b><span class="spacer"></span>' +
       '<button class="ib sidebtn" data-act="add" aria-label="Add to Daf" title="Add a link, a book or a PDF"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>' +
     '<div class="nav">' +
     n('today', 'Today', I.today, '<span class="ct">' + mins + '</span>') +
     n('review', 'Review', I.review, '<span class="ct">' + (rv || (rv === 0 ? '✓' : '')) + '</span>') +
     (D.navLibrary ? D.navLibrary() : n('library', 'Library', I.books)) + n('books', 'Books', I.books) + (D.navFeed ? D.navFeed() : n('feed', 'Feed', I.sources)) + n('highlights', 'Highlights', I.hl) + '</div>' +
-    (pins ? '<div class="navh"><span>Pinned</span></div><div class="nav pins">' + pins + '</div>' : '') +
+    '<div class="navh"><span>Pinned</span><button class="linkbtn tiny" data-act="pins" aria-label="Edit what’s pinned">Edit</button></div>' + (pins ? '<div class="nav pins">' + pins + '</div>' : '') +
     '<div class="nav navbot">' + (D.navSearch ? D.navSearch() : '') +
     n('stats', 'Stats', '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16V9M8.7 16V4M13.3 16v-5M18 16H2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>', d && d.streak && d.streak.goal ? '<span class="ct" title="Days in a row ' + atWord(d.goal) + '">' + d.streak.goal + '</span>' : '') +
     n('prefs', 'Preferences', I.prefs) + (D.Tips ? D.Tips.navItem() : '') + '</div></div>';
   // As a strip of icons, each one says what it is.
   $$('#side .navfull .nv').forEach(b => { const t = b.querySelector('span'); if (t && !b.title) { b.title = t.textContent.trim(); b.setAttribute('aria-label', b.title); } });
+  sideButton();
 }
+// What's pinned, from the sidebar itself: Edit by Pinned, or a long press (a right click) on a pinned place.
+function pinsPop(anchor){
+  const p = $('#pop'), r = anchor.getBoundingClientRect(), on = pinsOn();
+  p.innerHTML = '<div class="aahead"><b>Pinned</b></div><div class="pinpop">' +
+    PINS().map(x => '<label class="aaline"><input type="checkbox" data-pin="' + x[0] + '"' + (on.includes(x[0]) ? ' checked' : '') + '> ' + x[3] + ' ' + x[1] + '</label>').join('') + '</div>';
+  p.hidden = false; p.style.right = 'auto'; p.style.bottom = 'auto';
+  p.style.left = Math.max(8, Math.min(r.right + 8, innerWidth - p.offsetWidth - 8)) + 'px';
+  p.style.top = Math.max(8, Math.min(r.top - 8, innerHeight - p.offsetHeight - 8)) + 'px';
+}
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-act="pins"]'); if (b) { e.stopPropagation(); pinsPop(b); } }, true);
+document.addEventListener('contextmenu', e => {
+  const b = e.target.closest && e.target.closest('#side .pins .nv'); if (!b) return;
+  e.preventDefault(); pinsPop(b);
+});
 
 /* ---------- today ---------- */
 function bookRow(b, extra){
@@ -1062,9 +1088,12 @@ document.addEventListener('click', async e => {
   const go = e.target.closest('[data-go]');
   if (go){ $('#side').classList.remove('open', 'peek'); location.hash = go.dataset.go; return; }
   if (e.target.closest('[data-act="sidetoggle"]')){
-    const sd = $('#side');
-    if (sd.classList.contains('peek') || sd.classList.contains('open')) sd.classList.remove('peek', 'open');   // over the page: put it away
+    const sd = $('#side'), m = sideMode(), inSide = !!e.target.closest('#side');
+    if (sd.classList.contains('open')) sd.classList.remove('peek', 'open');                    // full over the page: put it away
+    else if (sd.classList.contains('peek')) { sd.classList.remove('peek'); sd.classList.add('open'); }   // mini over the page: full
+    else if (inSide && (m === 'mini' || m === 'full')) setSide(true, m === 'mini' ? 'full' : 'mini');
     else toggleSide();
+    sideButton();
     return;
   }
   const more = e.target.closest('[data-act="more"]'); if (more){ $('#side').classList.toggle('open'); return; }

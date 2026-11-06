@@ -1168,18 +1168,23 @@ body[data-view="mread"] .mobbar{display:none!important}
 .railbtn:hover{background:var(--hover);color:var(--fg)}
 /* html.rail is set by app.js (railMode): a tablet in portrait, a narrow window, or a reader on a screen
    under 1400 wide, where every column counts. */
-html.rail:not(.shell-mac) .app:not(.loggedout){grid-template-columns:60px minmax(0,1fr)}
+html.rail:not(.shell-mac) .app:not(.loggedout){grid-template-columns:76px minmax(0,1fr)}
 html.rail:not(.shell-mac) .side{overflow:visible;position:relative;z-index:41}
 html.rail:not(.shell-mac) .side:not(.open) .navfull{overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
 html.rail:not(.shell-mac) .side:not(.open) .brand{justify-content:center;padding:12px 0 6px}
 html.rail:not(.shell-mac) .side:not(.open) .brand b,
-html.rail:not(.shell-mac) .side:not(.open) .nv>span,
+html.rail:not(.shell-mac) .side:not(.open) .nv>.ct,
 html.rail:not(.shell-mac) .side:not(.open) .navh,
 html.rail:not(.shell-mac) .side:not(.open) .nv.sub,
 html.rail:not(.shell-mac) .side:not(.open) .sidefoot,
 html.rail:not(.shell-mac) .side:not(.open) .soon{display:none}
-html.rail:not(.shell-mac) .side:not(.open) .nav{padding:2px 8px}
-html.rail:not(.shell-mac) .side:not(.open) .nv{justify-content:center;padding:0;min-height:44px}
+html.rail:not(.shell-mac) .side:not(.open) .nav{padding:2px 6px}
+/* each icon with its name under it, as Material's navigation rail */
+html.rail:not(.shell-mac) .side:not(.open) .nv{flex-direction:column;justify-content:center;gap:2px;padding:6px 0 5px;min-height:52px}
+html.rail:not(.shell-mac) .side:not(.open) .nv>span:not(.ct){display:block;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:10.5px;line-height:1.2;color:var(--fg-2);text-align:center}
+html.rail:not(.shell-mac) .side:not(.open) .nv.on>span:not(.ct){color:var(--fg);font-weight:600}
+html.rail:not(.shell-mac) .side:not(.open) .nvrow{justify-content:center}
 html.rail:not(.shell-mac) .side:not(.open) .nav+.nav{border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
 html.rail:not(.shell-mac) .railbtn{display:inline-grid}
 html.rail:not(.shell-mac) .side.open .navfull{position:fixed;left:0;top:0;bottom:0;width:280px;overflow:auto;background:var(--side);border-right:1px solid var(--line);
@@ -1216,9 +1221,9 @@ html.rail:not(.shell-mac) .side.open .sidegrip{position:fixed;left:273px;right:a
 @media (max-width:780px){ .sidegrip{display:none} }
 html.sidehid:not(.shell-mac) .app:not(.loggedout){grid-template-columns:minmax(0,1fr)}
 html.sidehid:not(.shell-mac) .side{display:none}
-html.sidehid:not(.shell-mac) .side.peek,html.sidehid:not(.shell-mac) .side.open{display:flex;position:fixed;left:0;top:0;bottom:0;width:60px;z-index:46;box-shadow:var(--shadow)}
+html.sidehid:not(.shell-mac) .side.peek,html.sidehid:not(.shell-mac) .side.open{display:flex;position:fixed;left:0;top:0;bottom:0;width:76px;z-index:46;box-shadow:var(--shadow)}
 html.sidehid:not(.shell-mac) .side.peek{animation:sidein .18s ease-out}
-html.sidehid:not(.shell-mac) .side.peek::after{content:"";position:fixed;inset:0 0 0 60px;background:rgba(10,12,16,.16);z-index:-1}
+html.sidehid:not(.shell-mac) .side.peek::after{content:"";position:fixed;inset:0 0 0 76px;background:rgba(10,12,16,.16);z-index:-1}
 html.sidehid:not(.shell-mac) .side.open{background:transparent;box-shadow:none;width:0}
 @keyframes sidein{from{transform:translateX(-100%)}to{transform:none}}
 .sideshow{display:none}
@@ -1583,3 +1588,9 @@ body.btocsheet .bscrim,body.bpanelsheet .bscrim{display:block;position:fixed;ins
    made the panel only as tall as what's in it (the tablet's empty-looking strip, 2026-10-31). ---------- */
 @media (max-width:1180px){ .rvgrid.withpanel .rpanel{align-self:stretch} }
 body.btocsheet .rv.ebook .btoc,body.bpanelsheet .rv.ebook .rpanel,html.focus.fpanel .rvgrid > .rpanel,html.focus.ftoc .rvgrid > .toc{align-self:stretch}
+
+/* Pinned: its Edit, and the list it opens from the sidebar (app.js pinsPop) */
+.navh .linkbtn{font-size:11.5px;letter-spacing:0;text-transform:none;font-weight:500;padding:2px 4px}
+.pinpop{display:flex;flex-direction:column;gap:2px;margin-top:8px;min-width:200px}
+.pinpop .aaline{min-height:40px;gap:10px}
+.pinpop .aaline svg{color:var(--fg-2)}
