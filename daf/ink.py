@@ -1,8 +1,11 @@
-"""Ink: what's written with a pen on an article (web/ink.js) or a book (web/book.js), the pens being
-web/pens.js. Each stroke keeps the place it was written (an article's paragraph, or a book's CFI; the
-letter it started on, and where it sat beside it), so it follows the text when the type or the column
-changes, and its points with the pen's pressure. The page makes each stroke's id, so a stroke written
-offline and sent twice is kept once, and undo removes it by its id.
+"""Ink: what's written with a pen on an article (web/ink.js), a book (web/book.js) or a manga page
+(web/mink.js), the pens being web/pens.js. Each stroke keeps the place it was written (an article's
+paragraph, or a book's CFI; the letter it started on, and where it sat beside it), so it follows the
+text when the type or the column changes, and its points with the pen's pressure. A manga volume's
+strokes are kept as doc "manga:<Komga book id>", each with its page's number (at.pg) and its points
+and width in thousandths of the page's width, so they stay on the drawing however the page is shown.
+The page makes each stroke's id, so a stroke written offline and sent twice is kept once, and undo
+removes it by its id.
 
 A stroke is {id, v, tool: the pen (fountain, calligraphy, pen, pencil, brush, marker, highlighter),
 color ("ink", a highlight colour or #rrggbb), size (its width in px as written), o (opacity), at, pts},
@@ -55,7 +58,9 @@ def _clean(s):
     color = s.get("color") if s.get("color") in COLORS or HEX.match(str(s.get("color") or "")) else "ink"
     a = s.get("at") if isinstance(s.get("at"), dict) else {}
     at = {"f": _num(a.get("f") or 16, 4, 200), "x": round(_num(a.get("x") or 0, -10000, 10000), 1), "y": round(_num(a.get("y") or 0, -100000, 100000), 1)}
-    if a.get("cfi"):                            # a book's: the letter it started on, as a CFI, in its section
+    if a.get("pg") is not None:                 # a manga page's: its number (the points are on the page itself)
+        at = {"pg": int(_num(a["pg"], 1, 100000))}
+    elif a.get("cfi"):                          # a book's: the letter it started on, as a CFI, in its section
         at.update(cfi=str(a["cfi"])[:2000], s=int(a.get("s") or 0))
     else:                                       # an article's: its paragraph, and the letter in it
         at.update(b=int(a.get("b") or 0), q=str(a.get("q") or "")[:40], w=_num(a.get("w") or 1, 1, 10000), h=_num(a.get("h") or 1, 1, 100000))
@@ -70,7 +75,7 @@ def _clean(s):
             raise ValueError("Bad point")
         clean.append([round(_num(p[0], -10000, 10000), 1), round(_num(p[1], -100000, 100000), 1),
                       round(_num(p[2] if len(p) > 2 else 0.5, 0, 1), 2)])
-    out = {"id": s["id"], "tool": tool, "color": color, "size": round(_num(s.get("size") or 2.5, 0.3, 80), 1), "at": at, "pts": clean}
+    out = {"id": s["id"], "tool": tool, "color": color, "size": round(_num(s.get("size") or 2.5, 0.3, 200), 1), "at": at, "pts": clean}
     if v:
         out["v"], out["o"] = v, round(_num(s.get("o") if s.get("o") is not None else 1, 0.05, 1), 2)
     if s.get("sh"):

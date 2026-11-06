@@ -26,6 +26,12 @@ Tap the middle of the page for the bars. **Reading settings** (S) has four tabs:
 
 The **…** sheet has **Full screen**, **Show the tap zones**, **Save this page** and **Keys**. In the Android app, the volume keys turn pages too (**Volume keys** in Controls: Turn pages, Inverted or Off). On the Mac, **Full screen** uses the Mac's own full screen.
 
+## Drawing on a page
+
+I can doodle on a manga page with the S Pen the same way I write on a book or an article: the same pens, the round menu on the pen's button, the eraser, the lasso, and Undo and Redo (see [Writing with a pen](reader.md#writing-with-a-pen)). The pen draws, and my fingers still turn the pages, scroll the strip and pinch to zoom. A hand resting on the screen while the pen is near doesn't turn the page, and a tap with the pen does what a tap with a finger does. The pen button on the top bar puts the pen's tools away, so the pen turns pages like a finger, and brings them back. It's there once a pen has touched the screen on that device.
+
+What I draw stays on the drawing itself: zoomed in, fitted to the screen or the width, two pages side by side or one, split halves, the long strip, cropped borders, the tablet turned either way, and on the phone. Each volume's drawings are kept on the server, so they're on every device, and drawn with no connection they wait on the device and go once it's back. The pen's "text colour" is black on a manga page, and the reader's filters (night invert, sepia) apply to the ink too, as if it were printed on the page.
+
 ## Keys
 
 | Key | Does |

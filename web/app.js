@@ -66,12 +66,13 @@ window.addEventListener('error', e => noteErr((e.message || 'error') + (e.filena
 window.addEventListener('unhandledrejection', e => noteErr('unhandled: ' + ((e.reason && e.reason.message) || e.reason)));
 /* ---------- writes made offline ---------- */
 // Without a signal (a book on a plane), a book's place, its highlights and their notes, colours and
-// tags, bookmarks, and a manga's page and reading time wait here, in order, and go when the network is back, with the time they were
-// made. Highlight and bookmark ids are the server's own (a hash of the book and the place), so what's
-// made offline keeps its id and can be changed again before it's sent.
+// tags, bookmarks, and a manga's page, what's drawn on it and reading time wait here, in order, and
+// go when the network is back, with the time they were made. Highlight and bookmark ids are the
+// server's own (a hash of the book and the place), so what's made offline keeps its id and can be
+// changed again before it's sent.
 // Articles too: their highlights (the id is the server's own hash, as for books), status, progress,
 // star, note, tags and title; reading time; the daily review and cards; paper minutes; reading notes.
-const OUTBOX = /^\/api\/(ebooks\/[^/?]+\/(position|highlights|bookmarks(\/[^/?]+)?|ink)|highlights\/[^/?]+(\/(color|note|fav|tags|restore))?|manga\/books\/[^/?]+\/progress|manga\/beat|docs\/[^/?]+\/(highlights|status|progress|star|note|tags|meta|ink)|docs\/bulk|read\/beat|review\/[^/?]+|cards\/[^/?]+\/grade|paper|notes|feedback|tips|books\/[^/?]+\/review)$/;
+const OUTBOX = /^\/api\/(ebooks\/[^/?]+\/(position|highlights|bookmarks(\/[^/?]+)?|ink)|highlights\/[^/?]+(\/(color|note|fav|tags|restore))?|manga\/books\/[^/?]+\/(progress|ink)|manga\/beat|docs\/[^/?]+\/(highlights|status|progress|star|note|tags|meta|ink)|docs\/bulk|read\/beat|review\/[^/?]+|cards\/[^/?]+\/grade|paper|notes|feedback|tips|books\/[^/?]+\/review)$/;
 // The day of a moment in Daf's own time zone (home_tz), as the server counts it, whatever this device is set to.
 const dayIn = at => { const tz = (S.data && S.data.settings && S.data.settings.home_tz) || (S.settings && S.settings.home_tz);
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz || undefined, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at * 1000)); } catch(e){ return isoOf(new Date(at * 1000)); } };

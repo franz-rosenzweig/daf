@@ -154,6 +154,7 @@ M.open = async (bid, page, opts) => {
     '<div class="mtop" hidden></div><div class="mbot" hidden></div><div class="msheet" hidden></div>';
   wire(el);
   layout(Math.min(Math.max(0, start), n - 1));
+  if (M.ink) M.ink.open(RD);                         // what's drawn on the pages with a pen (mink.js)
   el.focus();
   try { RD.wake = await navigator.wakeLock.request('screen'); } catch(e){}
   if (!(opts && opts.quiet)) toast(label(MODES, RD.p.mode) + (paged(RD.p.mode) && RD.p.mode !== 'vertical' && RD.units.some(u => u.pages && u.pages.length > 1) ? ' · two pages' : ''));
@@ -162,6 +163,7 @@ M.open = async (bid, page, opts) => {
 function close(quiet){
   if (!RD) { const old = $('#mreader'); if (old) old.remove(); return; }
   const r = RD; save(false); autoStop(); RD = null;
+  if (M.ink) M.ink.close();
   if (io) { io.disconnect(); io = null; }
   try { r.wake && r.wake.release(); } catch(e){}
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -171,6 +173,7 @@ function close(quiet){
   }
 }
 M.close = close;
+M.reader = () => RD;
 async function otherVolume(id, atEnd){
   if (!id || !RD) return;
   await save(RD.units[RD.k].t === 'end');
@@ -353,6 +356,7 @@ function drawBars(){
   top.innerHTML = '<button class="mic" data-mr="close" aria-label="Close" title="Close (Esc)">' + I.back + '</button>' +
     '<span class="mtitle"><b>' + esc(b.series.name || '') + '</b><span>' + esc(b.name) + '</span></span>' +
     '<span class="mcount"></span>' +
+    (M.ink ? M.ink.button() : '') +
     '<button class="mic" data-mr="thumbs" aria-label="All pages" title="All pages (T)">' + I.grid + '</button>' +
     '<button class="mic" data-mr="settings" aria-label="Reading settings" title="Reading settings (S)">' + I.gear + '</button>' +
     '<button class="mic" data-mr="more" aria-label="More" title="More">' + I.more + '</button>';
@@ -502,6 +506,7 @@ function clampPan(){ const z = RD.z, mx = innerWidth * (z.s - 1) / 2, my = inner
 /* ---------- touch, mouse, keys ---------- */
 function wire(el){
   const pts = new Map(); let g = null, pinch = null, lastTap = { t: 0, x: 0, y: 0 };
+  RD.tapAt = (x, y) => tap(x, y);                    // a pen's tap is a finger's (mink.js)
   // A page bigger than the screen (fit width, original size) is panned first; at its edge the drag turns the page.
   const scroller = () => { const s = el.querySelector('.mslot.cur'); return s && (s.scrollHeight > s.clientHeight + 2 || s.scrollWidth > s.clientWidth + 2) ? s : null; };
   el.addEventListener('pointerdown', e => {
@@ -610,6 +615,7 @@ function wire(el){
     else if (a === 'sheetclose') closeSheet();
     else if (a === 'showzones') { closeSheet(); toggleBar(false); showZones(); }
     else if (a === 'fullscreen') { closeSheet(); fullscreen(); }
+    else if (a === 'pens' && M.ink) M.ink.toggle();
     else if (a === 'forall') { layoutForAll(); drawSettings(); }
     else if (a === 'resetfilters') { ['brightness', 'contrast', 'saturate', 'sepia', 'grayscale', 'invertc'].forEach(k => setPref(k, DEF[k])); applyLook(); drawSettings(); }
   });
