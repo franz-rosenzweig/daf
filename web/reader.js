@@ -1258,9 +1258,12 @@ function podHead(d){
     '<button class="btn sm" data-vclip="30" title="Highlight the last 30 seconds (c)">Clip 30s</button>' +
     '<label class="tiny mute" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="vfollow" checked> Follow along</label>' +
     (chs.length ? '<select class="field sm" id="pchap" aria-label="Chapters"><option value="">Chapters</option>' + chs.map(c => '<option value="' + c.t + '">' + fmtT(c.t) + '  ' + esc(c.title) + '</option>').join('') + '</select>' : '') +
+    (notesAt(d) > 0 ? '<button class="btn sm" data-pod="notes">Show notes</button>' : '') +
     '<span id="trstatus">' + podStatusHTML(e.transcript) + '</span><span class="spacer"></span>' +
     (e.feed ? '<a class="tiny" href="#podcasts/' + encodeURIComponent(e.feed) + '">' + esc(e.podcast || 'The show') + '</a>' : '') + '</div></div>';
 }
+// Where the show notes start, after a transcript (episodes.blocks): Show notes goes there.
+const notesAt = d => d.blocks.findIndex(b => b.t === 'h3' && b.x === 'Show notes');
 // The episode as the player takes it: where it plays from, and what it tells the server as it goes.
 function episodeItem(d){
   const e = d.episode; let seg = null;
@@ -1282,6 +1285,8 @@ function episodeItem(d){
   };
   return item;
 }
+// The Podcasts tab plays an episode from its row (podcasts.js), as its page would.
+C.Episode = { item: episodeItem, id: epId };
 // Play this episode (from at), or go on with it if it's the one playing.
 function playEpisode(d, at){
   if (Pl.is(epId(d))) { if (at != null) Pl.seek(at); if (!Pl.playing()) Pl.toggle(); return; }
@@ -1340,6 +1345,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest && e.target.closest('[data-pod]'); if (!b || !R.doc) return;
   const a = b.dataset.pod, d = R.doc, mine = d.episode && Pl.is(epId(d));
   if (a === 'play' && d.episode) { if (mine) Pl.toggle(); else playEpisode(d); drawEp(); }
+  else if (a === 'notes') { const n = $('#docbody [data-i="' + notesAt(d) + '"]'); if (n) { if ($('#vfollow')) $('#vfollow').checked = false; V.follow = false; n.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }
   else if (a === 'back') seek(Math.max(0, curTime() - 15));
   else if (a === 'fwd') seek(curTime() + 30);
   else if (a === 'rate') {
@@ -1650,46 +1656,6 @@ function palGo(i){ const x = palItems[i]; closePalette(); if (!x) return; if (x.
 C.sendBeat = sendBeat; C.openAa = openAa;
 C.Reader = { getSel, highlight, removeHl, moved: movedToLibrary,   // for the pen (ink.js)
   remark: h => { unmark(h.id); markHl(h); drawPanel(); } };
-// Podcasts: what you listened to lately and your clips, each opening its episode's page, and the
-// shows; #podcasts/<feed> is a show with its episodes (episodes.show).
-const podTime = r => r.duration && r.at != null ? (r.at >= r.duration - 60 ? 'Finished' : fmtT(r.at) + ' of ' + fmtT(r.duration))
-  : r.duration ? Math.round(r.duration / 60) + ' min' : r.seconds ? Math.round(r.seconds / 60) + ' min' : '';
-const epRow = (r, sub) => '<button class="nrow eprow" data-ep="' + esc(r.audio || '') + '"' + (r.doc ? ' data-epdoc="' + esc(r.doc) + '"' : '') + '><b' + dirAttr(r.title) + '>' + esc(r.title || 'Podcast episode') + '</b>' +
-  '<span class="mute tiny">' + [sub, podTime(r), r.published ? epochDate(r.published) : r.start ? epochDate(r.start) : ''].filter(Boolean).map(esc).join(' · ') +
-  (r.transcript ? ' · <span class="eptag">Transcript</span>' : '') + '</span></button>';
-C.views.podcasts = async args => {
-  R.doc = null;
-  if (args && args[0]) return podShow(decodeURIComponent(args[0]));
-  $('#main').innerHTML = '<div class="top"><h1>Podcasts</h1></div><div class="page" id="podpage"><span class="mute">Loading…</span></div>';
-  const p = await api('/api/podcasts');
-  let h = '';
-  if (!p.subs.length) h += '<section class="card"><h2>AntennaPod isn’t syncing yet</h2><a class="btn" href="#prefs/podcasts" style="align-self:flex-start">Preferences → Podcasts</a></section>';
-  if (p.recent.length) h += '<section class="card"><h2>Listened lately</h2>' + p.recent.slice(0, 8).map(r => epRow(r, r.author)).join('') +
-    (p.recent.length > 8 ? '<details class="epmore"><summary class="linkbtn tiny">More</summary>' + p.recent.slice(8).map(r => epRow(r, r.author)).join('') + '</details>' : '') + '</section>';
-  if (p.clips.length) h += '<section class="card"><div class="cardh"><h2>Clips</h2><span class="mute tiny">' + p.clips.length + '</span></div>' + p.clips.map(c => {
-    const pos = (() => { try { return JSON.parse(c.pos).t; } catch(e){ return null; } })();
-    const href = c.doc ? '#read/' + encodeURIComponent(c.doc) + (pos != null ? '/t:' + Math.max(0, Math.floor(pos) - 30) : '') : null;
-    return '<div class="hlc"><q' + dirAttr(c.text) + '>' + esc(c.text) + '</q><div class="meta tiny mute">' + (href ? '<a href="' + href + '">' : '') + esc(c.title || '') + (href ? '</a>' : '') +
-      (c.author ? ' · ' + esc(c.author) : '') + (pos != null ? ' · ' + fmtT(pos) : '') + ' · ' + epochDate(c.created) + '</div></div>'; }).join('') + '</section>';
-  if (p.subs.length) h += '<section class="card"><h2>Shows</h2><div class="shows">' + p.subs.map(x => '<a class="show" href="#podcasts/' + encodeURIComponent(x.url) + '">' +
-    (x.image ? '<img alt="" loading="lazy" src="' + esc(x.image) + '">' : '<span class="noimg"></span>') + '<span' + dirAttr(x.title || '') + '>' + esc(x.title || x.url) + '</span></a>').join('') + '</div>' +
-    '<span class="mute tiny">AntennaPod synced ' + ago(p.last_sync) + '</span></section>';
-  $('#podpage').innerHTML = h;
-};
-async function podShow(feed){
-  $('#main').innerHTML = '<div class="top"><a class="ib" href="#podcasts" aria-label="Podcasts">' + I.back + '</a><h1 id="showt">…</h1></div><div class="page" id="podpage"><span class="mute">Loading…</span></div>';
-  let x;
-  try { x = await api('/api/podcasts/show?feed=' + encodeURIComponent(feed)); } catch(e){ $('#podpage').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
-  $('#showt').textContent = x.title || 'Podcast'; $('#showt').dir = 'auto';
-  $('#podpage').innerHTML = '<section class="card">' + (x.image ? '<img class="showimg" alt="" src="' + esc(x.image) + '">' : '') +
-    (x.episodes.length ? x.episodes.map(r => epRow(Object.assign({}, r, { at: r.played }), '')).join('') : '<span class="mute">No episodes in the feed.</span>') + '</section>';
-}
-document.addEventListener('click', async e => {
-  const b = e.target.closest && e.target.closest('[data-ep]'); if (!b) return;
-  if (b.dataset.epdoc) { location.hash = 'read/' + encodeURIComponent(b.dataset.epdoc); return; }
-  try { const r = await api('/api/podcasts/open', { method: 'POST', body: JSON.stringify({ audio: b.dataset.ep }) }); location.hash = 'read/' + encodeURIComponent(r.id); }
-  catch(err){ toast(err.message); }
-});
 C.views.feed = args => { R.doc = null; R.view = null; R.tag = null; return listView('feed', args[0] ? decodeURIComponent(args[0]) : null); };   // a Library tag doesn't follow into the Feed
 C.views.library = args => { R.doc = null; R.view = null; R.tag = null; return args[0] ? listView('library', args[0]) : homeView(); };
 // A saved view: a list with its tab, tag and order, kept in settings so every device has it.
