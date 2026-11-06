@@ -41,8 +41,9 @@ From then on, the **Podcasts** page in the sidebar shows what I listened to late
 
 ## An episode's page
 
-Any episode opens as a page in Daf, whether it's one from **Listened lately**, from a show, or a podcast episode in the Feed. The player sits on top, with the show's picture, and the transcript is under it, a line per stretch with the time and who's talking when the transcript knows. It works the way a YouTube video does here:
+Any episode opens as a page in Daf, whether it's one from **Listened lately**, from a show, or a podcast episode in the Feed. Its play button and the time sit on top, with the show's picture, and the transcript is under it, a line per stretch with the time and who's talking when the transcript knows. It works the way a YouTube video does here:
 
+- Once it's playing, it plays in Daf's player along the bottom of the screen, so I can go anywhere else in Daf, or leave the app, and it keeps going. The bar has the picture, the title, back 15, play and pause, ahead 30 and ✕. Tapping it (or pulling it up) opens the whole player: the time to drag, the speed, a sleep timer (to the end of the chapter too), the chapters, and **Go to it**, which brings me back to the episode's page. Pulling it down puts it back.
 - Click a line's time and it plays from there. **Follow along** keeps the transcript scrolling with the audio.
 - **−15** and **+30** skip the way AntennaPod does, and so do ← and →. The **1×** button steps through the speeds, and Daf remembers the last one.
 - **Chapters**, when the episode has them, are headings in the transcript and a menu in the player.

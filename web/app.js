@@ -1243,7 +1243,7 @@ $('#scrim').addEventListener('click', closeModal);
 // or half typed. The place in the address stays.
 const MYVER = (document.querySelector('meta[name="daf-version"]') || {}).content || '';
 let awayAt = 0, freshing = false;
-const settled = () => !['read', 'ebook', 'mread', 'paper'].includes(route()[0]) && !busy() && !document.body.classList.contains('playing') && !$('#bplayer');
+const settled = () => !['read', 'ebook', 'mread', 'paper'].includes(route()[0]) && !busy() && !document.body.classList.contains('playing');
 function newer(now){
   if (!MYVER || !navigator.onLine) return;
   if (S.stale) { if (now && settled()) fresh(); return; }

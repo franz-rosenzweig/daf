@@ -350,6 +350,9 @@ async function wake(on){
 document.addEventListener('visibilitychange', () => { if (!document.hidden && B.view) wake(true); });
 
 /* ---------- Listen: Kokoro reads the book a paragraph at a time ---------- */
+// It shows in Daf's player (player.js) and reads on when you leave the book: its paragraphs are kept,
+// and the next chapter comes from the book itself (T.book), not the page on screen. Back in the same
+// book, the paragraph it's reading is marked again; the player's Go to it opens the book there.
 B.tts = { on: false, playing: false, els: [], i: 0, audio: null, rate: 1, sleepAt: 0, index: null };
 const BLOCKS = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, dd, dt, figcaption, pre';
 function paragraphs(doc){
@@ -365,26 +368,36 @@ async function startListen(){
   const els = paragraphs(c.doc); if (!els.length) { toast('Nothing to read on this page'); return; }
   let start = 0; const vis = B.loc && B.loc.range;
   if (vis) { const k = els.findIndex(el => { try { return vis.intersectsNode(el); } catch(e){ return false; } }); if (k >= 0) start = k; }
-  Object.assign(T, { on: true, playing: true, els, i: start, index: c.index });
+  Object.assign(T, { on: true, playing: true, els, i: start, index: c.index, bookId: B.id, book: B.view.book, title: (B.d && B.d.title) || 'Book',
+    art: B.d && B.d.has_cover ? '/api/cover/' + encodeURIComponent(B.id) : '' });
   if (!C.Voices.cur) C.Voices.load().then(() => { if (T.on) drawPlayer(); });
   drawPlayer(); playPara();
 }
 // Another voice chosen while it reads: the paragraph starts again in it.
 window.addEventListener('daf-voice', () => { const T = B.tts; T.cache = null; if (T.on) playPara(); });
+const here = () => B.view && B.id === B.tts.bookId;      // the book being read aloud is the one on screen
+// A paragraph on the page now (a chapter read from the book itself, or a page that's gone, has no window).
+const onPage = el => !!(el && el.isConnected && el.ownerDocument.defaultView);
 async function playPara(){
   const T = B.tts; if (!T.on) return;
   if (T.sleepAt && Date.now() > T.sleepAt) { stopListen(); toast('Sleep timer: stopped reading'); return; }
   if (T.i >= T.els.length) {             // end of the section: on to the next one
     const next = (T.index ?? 0) + 1;
-    if (!B.view.book.sections[next]) { stopListen(); return; }
-    await B.view.goTo(next).catch(() => {});
-    const c = B.view.renderer.getContents()[0]; if (!c) { stopListen(); return; }
-    T.els = paragraphs(c.doc); T.i = 0; T.index = c.index;
+    if (!T.book.sections[next]) { stopListen(); return; }
+    if (here()) {
+      await B.view.goTo(next).catch(() => {});
+      const c = B.view.renderer.getContents()[0]; if (!c) { stopListen(); return; }
+      T.els = paragraphs(c.doc); T.index = c.index;
+    } else {                              // away from the book: the chapter from the book itself
+      const doc = await Promise.resolve(T.book.sections[next].createDocument()).catch(() => null);
+      T.els = doc && doc.body ? paragraphs(doc) : []; T.index = next;
+    }
+    T.i = 0;
     if (!T.els.length) { T.i = 0; T.els = []; return playPara(); }
   }
   const el = T.els[T.i];
   T.els.forEach(x => x.classList.remove('daf-speaking')); el.classList.add('daf-speaking');
-  try { const rg = el.ownerDocument.createRange(); rg.selectNodeContents(el); B.view.renderer.scrollToAnchor?.(rg); } catch(e){}
+  if (here() && onPage(el)) { try { const rg = el.ownerDocument.createRange(); rg.selectNodeContents(el); B.view.renderer.scrollToAnchor?.(rg); } catch(e){} }
   B.lastActive = Date.now();
   try {
     const url = T.cache && T.cache.i === T.i && T.cache.index === T.index ? T.cache.url : await speech(el.textContent.replace(/\s+/g, ' ').trim());
@@ -392,7 +405,7 @@ async function playPara(){
     if (T.audio) T.audio.pause();
     T.audio = new Audio(url); T.audio.playbackRate = T.rate;
     if (T.unfollow) T.unfollow();
-    T.unfollow = H.follow(T.audio, el);
+    T.unfollow = here() && onPage(el) ? H.follow(T.audio, el) : null;
     T.audio.onended = () => { T.i++; playPara(); };
     T.audio.onerror = () => { T.i++; playPara(); };
     if (T.playing) await T.audio.play();
@@ -406,20 +419,35 @@ function stopListen(){
   if (T.unfollow) { T.unfollow(); T.unfollow = null; }
   if (T.audio) { T.audio.pause(); T.audio = null; }
   T.els.forEach(x => x.classList.remove('daf-speaking'));
-  const p = $('#bplayer'); if (p) p.remove();
+  C.Player.clear('btts:' + T.bookId); T.book = null;
   if (B.loc) onRelocate({ detail: B.loc });
 }
 function drawPlayer(){
   const T = B.tts; if (!T.on) return;
-  let p = $('#bplayer');
-  if (!p) { p = document.createElement('div'); p.id = 'bplayer'; p.className = 'bplayer'; $('#bfoot').replaceChildren(p); }
   const left = T.sleepAt ? Math.max(0, Math.round((T.sleepAt - Date.now()) / 60000)) : 0;
-  p.innerHTML = '<button class="btn sm" data-bt="prev" aria-label="Previous paragraph">‹ ¶</button><button class="round" data-bt="play" aria-label="' + (T.playing ? 'Pause' : 'Play') + '">' + (T.playing ? '❚❚' : '▶') + '</button><button class="btn sm" data-bt="next" aria-label="Next paragraph">¶ ›</button>' +
-    '<button class="btn sm" data-bt="rate">' + T.rate + '×</button><button class="btn sm" data-bt="voice" aria-label="Voice: ' + esc(C.Voices.cur ? C.Voices.label(C.Voices.cur) : 'choose one') + '">' + esc(C.Voices.cur ? C.Voices.name(C.Voices.cur) : 'Voice') + '</button><button class="btn sm" data-bt="sleep">' + (T.sleepAt ? 'Sleep in ' + left + ' min' : 'Sleep timer') + '</button><span class="spacer"></span><span class="mute tiny">Kokoro · counts as reading</span><button class="ib" data-bt="stop" aria-label="Stop">×</button>';
+  C.Player.drive({ id: 'btts:' + T.bookId, title: T.title, sub: 'Read aloud by Kokoro', art: T.art, open: '#ebook/' + encodeURIComponent(T.bookId),
+    playing: T.playing, at: T.i, of: T.els.length, rate: T.rate, sleep: left, voice: C.Voices.cur ? C.Voices.name(C.Voices.cur) : 'Voice',
+    act: {
+      play: () => { T.playing = !T.playing; if (T.audio) T.playing ? T.audio.play().catch(() => {}) : T.audio.pause(); drawPlayer(); },
+      next: () => { T.i++; T.cache = null; playPara(); },
+      prev: () => { T.i = Math.max(0, T.i - 1); T.cache = null; playPara(); },
+      close: stopListen,
+      voice: b => C.Voices.menu(b),
+      rate: () => { T.rate = T.rate >= 2 ? 0.75 : Math.round((T.rate + 0.25) * 100) / 100; if (T.audio) T.audio.playbackRate = T.rate; drawPlayer(); },
+      sleep: () => { const steps = [0, 15, 30, 45, 60], cur = T.sleepAt ? Math.round((T.sleepAt - Date.now()) / 60000) : 0; const nx = steps.find(m => m > cur + 1) || 0; T.sleepAt = nx ? Date.now() + nx * 60000 : 0; drawPlayer(); },
+      open: () => { if (here()) goToSpeaking(); else { T.goThere = true; location.hash = 'ebook/' + encodeURIComponent(T.bookId); } },
+    } });
+}
+// The page with the paragraph it's reading.
+function goToSpeaking(){
+  const T = B.tts; if (!T.on || !here()) return;
+  const el = T.els[T.i];
+  if (onPage(el)) { try { const rg = el.ownerDocument.createRange(); rg.selectNodeContents(el); B.view.renderer.scrollToAnchor?.(rg); } catch(e){} }
+  else B.view.goTo(T.index).catch(() => {});
 }
 function cleanup(){
   inkFlush();
-  if (B.tts && B.tts.on) stopListen();
+  if (B.tts && B.tts.on && B.tts.unfollow) { B.tts.unfollow(); B.tts.unfollow = null; }   // it reads on, off the page
   closeNote(); wake(false); H.hide();
   if (B.view) { try { savePosition(true); } catch(e){} try { B.view.close(); } catch(e){} B.view.remove(); }
   B.view = null; B.id = null; B.d = null;
@@ -438,6 +466,12 @@ function offerKindle(mine){
 function onSectionLoad(e){
   const { doc, index } = e.detail;
   Pens.listen(doc, INKSURF);
+  const T = B.tts;
+  if (T.on && T.bookId === B.id && index === T.index && !onPage(T.els[0])) {   // back in the book it's reading: mark its paragraph here
+    T.els = paragraphs(doc); const el = T.els[T.i];
+    if (el) { el.classList.add('daf-speaking'); if (T.audio) { if (T.unfollow) T.unfollow(); T.unfollow = H.follow(T.audio, el); } }
+    if (T.goThere) { T.goThere = false; setTimeout(goToSpeaking, 50); }
+  } else if (T.on && T.goThere === true && T.bookId === B.id) { T.goThere = 'chapter'; B.view.goTo(T.index).catch(() => {}); }   // then the paragraph, above
   const active = () => { B.lastActive = Date.now(); };
   ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(ev => doc.addEventListener(ev, active, { passive: true }));
   doc.addEventListener('keydown', onKey);
@@ -525,7 +559,7 @@ function onRelocate(e){
   const st = $('#bslidet'); if (st && !B.sliding) st.textContent = (l.time && l.time.section > 0.5 ? fmtMins(l.time.section) + ' left in the chapter · ' : '') + pct + '%';
   const ch = l.tocItem?.label || '';
   const f = $('#bfoot');
-  if (f && !B.tts.on && !f.querySelector('#bjump')) f.innerHTML = '<span class="bch"' + (isRtlText(ch) ? ' dir="rtl"' : '') + '>' + esc(ch) + '</span><span class="spacer"></span>' +
+  if (f && !f.querySelector('#bjump')) f.innerHTML = '<span class="bch"' + (isRtlText(ch) ? ' dir="rtl"' : '') + '>' + esc(ch) + '</span><span class="spacer"></span>' +
     (l.time ? (l.time.section > 0.5 ? '<span class="mute">' + fmtMins(l.time.section) + ' left in the chapter</span>' : '') + '<span class="mute bleft"> · ' + fmtMins(l.time.total) + ' left in the book</span>' : '') +
     (l.pageItem && l.pageItem.label ? '<span class="mute bpage" title="The printed book’s page"> · p. ' + esc(l.pageItem.label) + '</span>' : '') +
     '<button class="bpct" data-bk="jump" title="Go to a percent">' + pct + '%</button>';
@@ -1232,18 +1266,6 @@ document.addEventListener('click', async e => {
       $('#bjump').focus();
     } else if (a === 'jumpcancel') { $('#bfoot').innerHTML = ''; if (B.loc) onRelocate({ detail: B.loc }); }
     else if (a === 'ask') { const q = $('#bask').value.trim(); if (q) { $('#bask').value = ''; ask(q, null); } }
-    return;
-  }
-  const bt = t.closest('[data-bt]');
-  if (bt) {
-    const T = B.tts, a = bt.dataset.bt;
-    if (a === 'play') { T.playing = !T.playing; if (T.audio) T.playing ? T.audio.play() : T.audio.pause(); drawPlayer(); }
-    else if (a === 'next') { T.i++; T.cache = null; playPara(); }
-    else if (a === 'prev') { T.i = Math.max(0, T.i - 1); T.cache = null; playPara(); }
-    else if (a === 'voice') C.Voices.menu(bt);
-    else if (a === 'rate') { T.rate = T.rate >= 2 ? 0.75 : Math.round((T.rate + 0.25) * 100) / 100; if (T.audio) T.audio.playbackRate = T.rate; drawPlayer(); }
-    else if (a === 'sleep') { const steps = [0, 15, 30, 45, 60], cur = T.sleepAt ? Math.round((T.sleepAt - Date.now()) / 60000) : 0; const nx = steps.find(m => m > cur + 1) || 0; T.sleepAt = nx ? Date.now() + nx * 60000 : 0; drawPlayer(); }
-    else if (a === 'stop') stopListen();
     return;
   }
   if (!t.closest('#fnote') && $('#fnote') && !$('#fnote').hidden) closeNote();

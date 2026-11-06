@@ -142,6 +142,7 @@ function closeFront(){
   if (shown('#palette')) { $('#palette').hidden = true; if ($('#modal').hidden) $('#scrim').hidden = true; return true; }
   if (shown('#modal')) { C().closeModal(); return true; }
   if (shown('#pop')) { $('#pop').hidden = true; return true; }
+  if (C().Player && C().Player.close()) return true;        // the whole player, back to its bar (player.js)
   if (shown('#selbar') && C().HL) { C().HL.hide(); return true; }
   if (C().Focus && C().Focus.close()) return true;          // focus mode's drawer or bar (focus.js)
   const b = document.body.classList;
@@ -153,7 +154,7 @@ function closeFront(){
 // the article's side panel, when the window is narrow enough that it's a sheet over the text
 function sheetPanel(){ return innerWidth <= 1180 && view() === 'read' && !!$('.rvgrid.withpanel'); }
 const closeAll = () => { for (let i = 0; i < 6 && closeFront(); i++); };
-const front = () => shown('#palette') || shown('#modal') || shown('#pop') || shown('#selbar') ||
+const front = () => shown('#palette') || shown('#modal') || shown('#pop') || shown('#selbar') || !!(C().Player && C().Player.big) ||
   document.body.classList.contains('btocsheet') || document.body.classList.contains('bpanelsheet') || sheetPanel();
 window.dafBack = () => {
   if (closeFront()) return true;
@@ -197,9 +198,9 @@ const CMD = {
   // read-aloud's own buttons, for the lock screen, the headphones and the menus
   'listen:play': () => listenBtn('Play'),
   'listen:pause': () => listenBtn('Pause'),
-  'listen:next': () => press('[data-tts="next"], [data-bt="next"]'),
-  'listen:prev': () => press('[data-tts="prev"], [data-bt="prev"]'),
-  'listen:stop': () => press('[data-tts="close"], [data-bt="stop"]'),
+  'listen:next': () => press('#player [data-tts="next"]'),
+  'listen:prev': () => press('#player [data-tts="prev"]'),
+  'listen:stop': () => press('#player [data-tts="close"]'),
   export: () => {
     closeAll();
     if (view() !== 'highlights') location.hash = 'highlights';
@@ -209,7 +210,7 @@ const CMD = {
 };
 // Play or Pause, only if that's what the player's button would do now.
 function listenBtn(want){
-  const b = $('[data-tts="play"], [data-bt="play"]');
+  const b = $('#player [data-tts="play"]');
   if (!b) return false;
   if (b.getAttribute('aria-label') === want) b.click();
   return true;
@@ -410,10 +411,10 @@ if (!mac) {
     clearTimeout(soon);
     soon = setTimeout(() => {
       if (!can('media') || !document.body) return;
-      const ap = $('#player:not([hidden])'), bp = $('#bplayer'), btn = $('[data-tts="play"], [data-bt="play"]');
-      const state = !(ap || bp) ? 'stopped' : btn && btn.getAttribute('aria-label') === 'Pause' ? 'playing' : 'paused';
-      const title = ap ? (($('#player .pt b') || {}).textContent || '') : ((window.dafState && dafState().title) || 'Daf');
-      const sub = ap ? (($('#player .pt .mute') || {}).textContent || '') : 'Read aloud by Kokoro';
+      const ap = $('#player:not([hidden])'), btn = $('#player [data-tts="play"]');
+      const state = !ap ? 'stopped' : btn && btn.getAttribute('aria-label') === 'Pause' ? 'playing' : 'paused';
+      const title = ap ? (($('#player .pt b') || {}).textContent || '') : 'Daf';
+      const sub = ap ? (($('#player .pt .mute') || {}).textContent || '') : '';
       const now = JSON.stringify({ state, title, sub });
       if (now === said || (state === 'stopped' && !said)) return;
       said = state === 'stopped' ? '' : now;

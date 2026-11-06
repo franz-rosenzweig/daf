@@ -701,7 +701,7 @@ async function docAct(act, id){
       if (L && !(L.arg === KIND_STAR && !on)) { drawRows(); return; }
     }
     else if (act === 'save') { const r = await api('/api/docs/' + encodeURIComponent(id) + '/save', { method:'POST' }); toast('Saved to the Library');
-      if (R.doc && R.doc.id === id) { const el = $('#lvp'); if (el && el.currentTime > 1) { R.podAt = el.currentTime; R.podPlay = !el.paused; podFlush(); } location.hash = 'read/' + encodeURIComponent(r.id); return; } }
+      if (R.doc && R.doc.id === id) { if (Pl.cur && Pl.cur.doc === id) { Pl.cur.doc = r.id; Pl.cur.open = '#read/' + encodeURIComponent(r.id); } location.hash = 'read/' + encodeURIComponent(r.id); return; } }
     else {
       const status = act === 'seen' ? (d.status === 'seen' ? 'unseen' : 'seen') : act === 'later' ? (d.status === 'later' ? 'inbox' : 'later') : act === 'archive' ? (d.status === 'archive' ? 'inbox' : 'archive') : act === 'delete' ? 'deleted' : act;
       const before = d.status;
@@ -956,7 +956,7 @@ function tagDoc(id, anchor){
 }
 async function readView(id){
   stopSel();
-  if (P.doc) { podFlush(); P.doc = null; }          // an episode that was playing: where it stopped, before its player goes
+  P.doc = null;                                     // an episode's page: the episode itself plays on in the player
   $('#main').innerHTML = '<div class="rv"><div class="top" id="rtop"><button class="ib" data-ract="back" aria-label="Back">' + I.back + '</button></div><div class="docwrap"><div class="doc"><span class="mute">Loading…</span></div></div></div>';
   let d;
   try { d = await api('/api/docs/' + encodeURIComponent(id)); } catch(e){ $('.doc').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
@@ -1120,8 +1120,8 @@ function startPlayer(d){
 function curTime(){ try { return V.player && V.player.getCurrentTime ? V.player.getCurrentTime() : 0; } catch(e){ return 0; } }
 function cueAt(t){ const d = R.doc; let best = -1; if (!d) return -1; d.blocks.forEach((b, i) => { if (b.t === 'cue' && b.ts <= t) best = i; }); return best; }
 function syncCue(){
-  if (C.S.route[0] !== 'read' || !R.doc || !['video', 'podcast'].includes(R.doc.kind) || (P.doc && R.doc.id !== P.doc.id) || (P.doc && !$('#lvp'))) {
-    clearInterval(V.timer); if (P.doc) { podFlush(P.last); P.doc = null; } return; }
+  if (C.S.route[0] !== 'read' || !R.doc || !['video', 'podcast'].includes(R.doc.kind) || (P.doc && R.doc.id !== P.doc.id)) {
+    clearInterval(V.timer); P.doc = null; return; }
   if (V.playing) R.lastActive = Date.now();
   const i = cueAt(curTime()); if (i === V.cur) return;
   V.cur = i; $$('#docbody .tl.now').forEach(x => x.classList.remove('now'));
@@ -1141,13 +1141,17 @@ async function clipVideo(sec){
   toast('Clipped ' + fmtT(cues[0][0].ts) + '–' + fmtT(now) + ' · in the Notebook and the vault');
 }
 
-/* ---------- podcast episodes (episodes.py): Daf's own player over the transcript ---------- */
-// V.player speaks the YouTube player's few words over an <audio>, so the transcript, Follow along, Clip
-// and the keys work as they do for a video. Where you stop goes to AntennaPod in stretches (on pause, on
-// a jump, every two minutes, when the page goes), and Daf starts where the last play anywhere stopped.
-const P = { doc: null, seg: null, last: 0 };
+/* ---------- podcast episodes (episodes.py): Daf's player over the transcript ---------- */
+// The episode plays in Daf's player (player.js), along the bottom, so it goes on while you read
+// something else. Here V.player speaks the YouTube player's few words over it, so the transcript,
+// Follow along, Clip and the keys work as they do for a video. Where you stop goes to AntennaPod in
+// stretches (on pause, on a jump, every two minutes, when the app goes to the background), and Daf
+// starts where the last play anywhere stopped.
+const P = { doc: null };
 const RATES = [1, 1.2, 1.4, 1.6, 1.8, 2, 0.8];
 const rateLabel = r => (Math.round(r * 10) / 10) + '×';
+const Pl = C.Player;
+const epId = d => 'ep:' + d.id;
 function podStatusHTML(st){
   st = st || {};
   if (st.status === 'done') return '';
@@ -1158,7 +1162,9 @@ function podStatusHTML(st){
 function podHead(d){
   const e = d.episode, chs = e.chapters || [], rate = +store.get('podRate', 1) || 1;
   return '<div class="vhead phead"><div class="pplay">' + (e.image ? '<img class="pcover" alt="" src="' + esc(e.image) + '" loading="lazy">' : '') +
-      '<audio id="lvp" controls preload="metadata" src="' + esc(e.audio) + '"></audio></div><div class="vctl">' +
+      '<div class="epctl"><button class="round epplay" data-pod="play" aria-label="Play">' + ICON.play + '</button>' +
+      '<div class="epseekw"><input type="range" id="epseek" min="0" max="1000" step="1" value="0" aria-label="Where it is">' +
+      '<div class="eptimes"><span id="epnow">0:00</span><span id="epleft">' + (e.duration ? fmtT(e.duration) : '') + '</span></div></div></div></div><div class="vctl">' +
     '<button class="btn sm" data-pod="back" title="Back 15 seconds (←)">−15</button>' +
     '<button class="btn sm" data-pod="fwd" title="Ahead 30 seconds (→)">+30</button>' +
     '<button class="btn sm" data-pod="rate" id="prate" title="Speed">' + rateLabel(rate) + '</button>' +
@@ -1168,46 +1174,65 @@ function podHead(d){
     '<span id="trstatus">' + podStatusHTML(e.transcript) + '</span><span class="spacer"></span>' +
     (e.feed ? '<a class="tiny" href="#podcasts/' + encodeURIComponent(e.feed) + '">' + esc(e.podcast || 'The show') + '</a>' : '') + '</div></div>';
 }
+// The episode as the player takes it: where it plays from, and what it tells the server as it goes.
+function episodeItem(d){
+  const e = d.episode; let seg = null;
+  const item = { id: epId(d), doc: d.id, kind: 'episode', title: d.title, sub: e.podcast || d.source || '', art: e.image || '', url: e.audio,
+    duration: e.duration || 0, chapters: (e.chapters || []).map(c => ({ t: c.t, title: c.title })), open: '#read/' + encodeURIComponent(d.id) };
+  // A stretch played, to the server: AntennaPod picks it up as a play on its next sync.
+  const post = (from, to, beacon) => {
+    if (!(to > from)) return;
+    const body = { doc: item.doc, started: Math.floor(from), position: Math.floor(to), total: Math.round(Pl.total()) || null };
+    if (beacon && navigator.sendBeacon) navigator.sendBeacon('/api/podcasts/position', new Blob([JSON.stringify(body)], { type: 'application/json' }));
+    else api('/api/podcasts/position', { method: 'POST', body: JSON.stringify(body) }).catch(() => {});
+  };
+  item.save = (ev, x) => {
+    if (ev === 'play') { seg = x.at; R.lastActive = Date.now(); }
+    else if (ev === 'seek') { if (seg != null) post(seg, x.from); seg = Pl.playing() ? x.to : null; }
+    else if (ev === 'tick') { if (seg != null && x.at - seg >= 120) { post(seg, x.at); seg = x.at; } }
+    else if (ev === 'hidden') { if (seg != null) { post(seg, x.at, x.beacon); seg = Pl.playing() ? x.at : null; } }
+    else if (seg != null) { post(seg, x.at); seg = null; }          // pause, ended, stop
+  };
+  return item;
+}
+// Play this episode (from at), or go on with it if it's the one playing.
+function playEpisode(d, at){
+  if (Pl.is(epId(d))) { if (at != null) Pl.seek(at); if (!Pl.playing()) Pl.toggle(); return; }
+  Pl.play(episodeItem(d), { at: at != null ? at : P.from || 0 });
+}
 function startPod(d){
-  const el = $('#lvp'); if (!el) return;
-  clearInterval(V.timer); V.cur = -1; V.playing = false;
-  P.doc = d; P.seg = null; P.last = 0;
-  el.playbackRate = +store.get('podRate', 1) || 1;
-  V.player = { getCurrentTime: () => el.currentTime || 0, seekTo: t => { el.currentTime = t; },
-               playVideo: () => { const p = el.play(); if (p && p.catch) p.catch(() => {}); }, pauseVideo: () => el.pause() };
+  if (!$('.epctl')) return;
+  clearInterval(V.timer); V.cur = -1;
+  P.doc = d;
+  const mine = () => Pl.is(epId(d));
+  V.player = { getCurrentTime: () => mine() ? Pl.time() : P.from || 0,
+               seekTo: t => { if (mine()) Pl.seek(t); else { P.from = t; drawEp(); } },
+               playVideo: () => playEpisode(d), pauseVideo: () => { if (mine()) Pl.pause(); } };
   const e = d.episode, pos = e.position, asked = R.podAt != null, play = R.podPlay;
   const at = asked ? R.podAt : pos && pos.t > 15 && (!e.duration || pos.t < e.duration - 30) ? pos.t : null;
-  R.podAt = null; R.podPlay = false;
-  if (at != null) el.addEventListener('loadedmetadata', () => { el.currentTime = at; if (play) V.player.playVideo(); }, { once: true });
-  if (at != null && !asked && !play) toast('From ' + fmtT(at) + ', where ' + (pos.from || 'AntennaPod') + ' left off');
-  el.addEventListener('play', () => { V.playing = true; P.seg = el.currentTime; R.lastActive = Date.now(); });
-  el.addEventListener('pause', () => { V.playing = false; podFlush(); });
-  el.addEventListener('ended', () => { V.playing = false; podFlush(); });
-  el.addEventListener('timeupdate', () => { if (!el.seeking) P.last = el.currentTime; });
-  el.addEventListener('seeking', () => { if (P.seg != null) podFlush(P.last); });
-  el.addEventListener('seeked', () => { if (!el.paused) P.seg = el.currentTime; });
-  el.addEventListener('ratechange', () => { store.set('podRate', el.playbackRate); const b = $('#prate'); if (b) b.textContent = rateLabel(el.playbackRate); });
-  if ('mediaSession' in navigator) {                  // the Mac's media keys and the lock screen
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: d.title, artist: e.podcast || d.source || '', artwork: e.image ? [{ src: e.image }] : [] });
-      navigator.mediaSession.setActionHandler('seekbackward', () => seek(Math.max(0, curTime() - 15)));
-      navigator.mediaSession.setActionHandler('seekforward', () => seek(curTime() + 30));
-    } catch(err){}
-  }
-  V.timer = setInterval(() => { syncCue(); if (V.playing && P.seg != null && el.currentTime - P.seg >= 120) podFlush(); }, 500);
+  R.podAt = null; R.podPlay = false; P.from = at || 0;
+  if (mine()) { if (asked) Pl.seek(at); }
+  else if (play) playEpisode(d, at);
+  else if (at != null) toast('From ' + fmtT(at) + ', where ' + (pos.from || 'AntennaPod') + ' left off');
+  drawEp();
+  V.timer = setInterval(() => { V.playing = mine() && Pl.playing(); if (V.playing) R.lastActive = Date.now(); syncCue(); drawEp(); }, 500);
 }
-// A stretch played, to the server: AntennaPod picks it up as a play on its next sync.
-function podFlush(end, beacon){
-  const d = P.doc, el = $('#lvp'); if (!d || P.seg == null) return;
-  const pos = end != null ? end : el ? el.currentTime : P.last;
-  const body = { doc: d.id, started: Math.floor(P.seg), position: Math.floor(pos), total: el && isFinite(el.duration) ? Math.round(el.duration) : null };
-  P.seg = el && !el.paused && !el.seeking ? el.currentTime : null;
-  if (!(body.position > body.started)) return;
-  if (beacon && navigator.sendBeacon) navigator.sendBeacon('/api/podcasts/position', new Blob([JSON.stringify(body)], { type: 'application/json' }));
-  else api('/api/podcasts/position', { method: 'POST', body: JSON.stringify(body) }).catch(() => {});
+// The page's own controls follow the player: its button, where it is, and how long is left.
+function drawEp(){
+  const d = P.doc; if (!d || !R.doc || R.doc.id !== d.id) return;
+  const b = $('.epplay'), mine = Pl.is(epId(d)), on = mine && Pl.playing();
+  if (b && b.getAttribute('aria-label') !== (on ? 'Pause' : 'Play')) { b.setAttribute('aria-label', on ? 'Pause' : 'Play'); b.innerHTML = on ? ICON.pause : ICON.play; }
+  const T = mine ? Pl.total() : d.episode.duration || 0, t = mine ? Pl.time() : P.from || 0;
+  const s = $('#epseek'); if (s && !P.seeking) s.value = Math.round(T ? t / T * 1000 : 0);
+  const n = $('#epnow'), l = $('#epleft'); if (n && !P.seeking) n.textContent = fmtT(t); if (l && T) l.textContent = '−' + fmtT(Math.max(0, T - t));
+  const r = $('#prate'), rate = mine ? Pl.audio.playbackRate : +store.get('podRate', 1) || 1; if (r) r.textContent = rateLabel(rate);
 }
-window.addEventListener('pagehide', () => podFlush(null, true));
-document.addEventListener('visibilitychange', () => { if (document.hidden) podFlush(null, true); });
+document.addEventListener('input', e => { if (e.target.id !== 'epseek' || !P.doc) return; P.seeking = true; const T = Pl.is(epId(P.doc)) ? Pl.total() : P.doc.episode.duration || 0; const n = $('#epnow'); if (n) n.textContent = fmtT(+e.target.value / 1000 * T); });
+document.addEventListener('change', e => {
+  if (e.target.id !== 'epseek' || !P.doc) return;
+  P.seeking = false; const d = P.doc, T = Pl.is(epId(d)) ? Pl.total() : d.episode.duration || 0, t = +e.target.value / 1000 * T;
+  if (Pl.is(epId(d))) Pl.seek(t); else { P.from = t; drawEp(); }
+});
 // Clip before there's a transcript: the server transcribes that stretch into a highlight.
 async function podClip(d, now, sec){
   try {
@@ -1226,10 +1251,15 @@ async function podClip(d, now, sec){
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest && e.target.closest('[data-pod]'); if (!b || !R.doc) return;
-  const a = b.dataset.pod, el = $('#lvp');
-  if (a === 'back') seek(Math.max(0, curTime() - 15));
+  const a = b.dataset.pod, d = R.doc, mine = d.episode && Pl.is(epId(d));
+  if (a === 'play' && d.episode) { if (mine) Pl.toggle(); else playEpisode(d); drawEp(); }
+  else if (a === 'back') seek(Math.max(0, curTime() - 15));
   else if (a === 'fwd') seek(curTime() + 30);
-  else if (a === 'rate' && el) { const i = RATES.findIndex(r => Math.abs(r - el.playbackRate) < 0.01); el.playbackRate = RATES[(i + 1) % RATES.length]; }
+  else if (a === 'rate') {
+    const cur = mine ? Pl.audio.playbackRate : +store.get('podRate', 1) || 1, nx = RATES[(RATES.findIndex(r => Math.abs(r - cur) < 0.01) + 1) % RATES.length];
+    if (mine) Pl.audio.playbackRate = nx; else store.set('podRate', nx);
+    drawEp();
+  }
   else if (a === 'tr') {
     try { const r = await api('/api/podcasts/transcribe', { method: 'POST', body: JSON.stringify({ doc: R.doc.id }) });
       const x = $('#trstatus'); if (x) x.innerHTML = podStatusHTML({ status: r.status === 'done' ? 'done' : 'queued' }); pollTranscript(R.doc.id); } catch(err){ toast(err.message); }
@@ -1379,7 +1409,7 @@ function startTTS(){
   const d = R.doc; if (!d) return;
   const T = R.tts;
   if (!T.audio) { T.audio = new Audio(); T.audio.addEventListener('ended', () => { if (T.playing) nextTTS(1); }); T.audio.addEventListener('error', () => { if (T.playing) { toast('Kokoro didn’t answer for that paragraph; skipping'); nextTTS(1); } }); }
-  T.on = true; T.doc = d.id; T.title = d.title; T.blocks = ttsBlocks(); T.i = Math.max(0, T.blocks.indexOf(R.focus)); T.playing = true;
+  T.on = true; T.doc = d.id; T.title = d.title; T.art = d.thumb || ''; T.blocks = ttsBlocks(); T.i = Math.max(0, T.blocks.indexOf(R.focus)); T.playing = true;
   if (!C.Voices.cur) C.Voices.load().then(() => { if (T.on) drawPlayer(); });
   playTTS();
 }
@@ -1406,13 +1436,14 @@ function markSpeaking(){
   const el = $('#docbody [data-i="' + T.blocks[T.i] + '"]');
   if (el) { el.classList.add('speaking'); if (T.playing) { const r = el.getBoundingClientRect(); if (r.top < 80 || r.bottom > window.innerHeight - 100) el.scrollIntoView({ block:'center', behavior:'smooth' }); } }
 }
+// Read-aloud shows in Daf's player (player.js), whose buttons call these; it reads on wherever you go.
 function drawPlayer(){
-  const p = $('#player'), T = R.tts;
-  if (!T.on) { p.hidden = true; document.body.classList.remove('playing'); return; }
-  p.hidden = false; document.body.classList.add('playing');
-  p.innerHTML = '<div class="pt"><b>' + esc(shortTitle(T.title)) + '</b><span class="mute">Read aloud by Kokoro on the server · ¶ ' + Math.min(T.i + 1, T.blocks.length) + ' of ' + T.blocks.length + '</span></div>' +
-    '<button class="btn sm" data-tts="prev" aria-label="Previous paragraph">‹ ¶</button><button class="round" data-tts="play" aria-label="' + (T.playing ? 'Pause' : 'Play') + '">' + (T.playing ? ICON.pause : ICON.play) + '</button><button class="btn sm" data-tts="next" aria-label="Next paragraph">¶ ›</button>' +
-    '<button class="btn sm" data-tts="rate">' + (T.rate || 1) + '×</button><button class="btn sm" data-tts="voice" aria-label="Voice: ' + esc(C.Voices.cur ? C.Voices.label(C.Voices.cur) : 'choose one') + '">' + esc(C.Voices.cur ? C.Voices.name(C.Voices.cur) : 'Voice') + '</button>' + (R.doc && R.doc.id !== T.doc ? '<a class="btn sm" href="#read/' + encodeURIComponent(T.doc) + '">Back to it</a>' : '') + '<button class="ib" data-tts="close" aria-label="Close">' + ICON.close + '</button>';
+  const T = R.tts, id = 'tts:' + T.doc;
+  if (!T.on) { C.Player.clear(id); return; }
+  C.Player.drive({ id, title: shortTitle(T.title), sub: 'Read aloud by Kokoro', art: T.art || '', open: '#read/' + encodeURIComponent(T.doc),
+    playing: T.playing, at: T.i, of: T.blocks.length, rate: T.rate || 1, voice: C.Voices.cur ? C.Voices.name(C.Voices.cur) : 'Voice',
+    act: { play: () => T.playing ? pauseTTS() : resumeTTS(), next: () => nextTTS(1), prev: () => nextTTS(-1), close: stopTTS,
+           voice: b => C.Voices.menu(b), rate: () => { T.rate = (T.rate || 1) >= 2 ? 1 : (T.rate || 1) + 0.25; if (T.audio) T.audio.playbackRate = T.rate; drawPlayer(); } } });
 }
 
 /* ---------- reading time ---------- */
@@ -1769,8 +1800,6 @@ document.addEventListener('click', e => {
   const dt = t.closest('[data-dtag]'); if (dt) { R.tag = dt.dataset.dtag || null; if (C.S.route[0] === 'library' && R.list) drawRows(); else { location.hash = 'library/article'; } return; }
   const jp = t.closest('[data-jump]'); if (jp) { const fig = $('#docbody figure[data-img="' + (+jp.dataset.jump) + '"]'); if (fig) fig.scrollIntoView({ block:'center', behavior:'smooth' }); else setFocus(+jp.dataset.jump, true); return; }   // a picture isn't a paragraph to focus
   const aq = t.closest('[data-askq]'); if (aq) { ask(aq.dataset.askq); return; }
-  const tt = t.closest('[data-tts]');
-  if (tt) { const a = tt.dataset.tts, T = R.tts; if (a === 'play') T.playing ? pauseTTS() : resumeTTS(); else if (a === 'next') nextTTS(1); else if (a === 'prev') nextTTS(-1); else if (a === 'close') stopTTS(); else if (a === 'voice') C.Voices.menu(tt); else if (a === 'rate') { T.rate = (T.rate || 1) >= 2 ? 1 : (T.rate || 1) + 0.25; if (T.audio) T.audio.playbackRate = T.rate; drawPlayer(); } return; }
   const tl = t.closest('[data-tlang]'); if (tl) { setTL(tl.dataset.tlang); return; }
   if (t.closest('[data-tlcycle]')) { const order = ['both', 'he', 'en'], cur = store.get('torahLang', 'both'); setTL(order[(order.indexOf(cur) + 1) % 3]); return; }
   const sk = t.closest('[data-seek]'); if (sk) { seek(+sk.dataset.seek); return; }
@@ -1848,7 +1877,7 @@ function pollTranscript(id){
     if (!R.doc || R.doc.id !== id) return;
     try { const st = await api('/api/docs/' + encodeURIComponent(id) + '/transcript');
       if (st.podtr) {
-        if (st.ready) { const el = $('#lvp'); if (el && el.currentTime > 1) { R.podAt = el.currentTime; R.podPlay = !el.paused; podFlush(); } readView(id); return; }
+        if (st.ready) { readView(id); return; }
         if (st.podtr.status === 'failed') { const x = $('#trstatus'); if (x) x.innerHTML = podStatusHTML(st.podtr); return; }
         pollTranscript(id); return;
       }

@@ -19,7 +19,7 @@ const TIPS = [
   { id: 'drop', on: v => !touch() && v === 'library', at: '#main .top h1', text: () => 'Drop links, PDFs or books anywhere here to save them.', event: 'drop' },
   { id: 'select', on: v => v === 'library', at: '[data-ract="selmode"]', text: () => 'Select several to archive, tag or delete them at once.' },
   { id: 'sources', on: v => v === 'feed', at: '[data-ract="sources"]', text: () => 'Read one feed or folder at a time.' },
-  { id: 'voice', on: () => true, at: '#player:not([hidden]) [data-tts="voice"], #bplayer [data-bt="voice"]', text: () => 'Press the name to hear other voices and pick one.' },
+  { id: 'voice', on: () => true, at: '#player:not([hidden]) [data-pl="voice"]', text: () => 'Press the name to hear other voices and pick one.' },
   { id: 'listen', on: v => v === 'read', at: '[data-ract="listen"]', text: () => 'Daf reads it to you, and the time counts toward today.' },
   { id: 'article-panel', on: v => v === 'read', at: '[data-ract="panel"]', text: () => 'Your highlights, notes and Ask about this article open here.' },
   { id: 'book-aa', on: v => v === 'ebook', at: '[data-bk="aa"]', text: () => 'Change the typeface, size, theme, and scrolling or pages.' },
