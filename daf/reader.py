@@ -451,6 +451,9 @@ def set_starred(conn, doc_id, starred):
     if doc_id.startswith("kk:"):
         karakeep.set_favourited(d["ext_id"], starred)
     conn.execute("UPDATE docs SET starred = ? WHERE id = ?", (1 if starred else 0, doc_id))
+    if d["url"]:
+        # its post in the Feed follows, so a reader app's star (greader.py) says what the Shortlist says
+        conn.execute("UPDATE docs SET starred = ? WHERE where_ = 'feed' AND url = ?", (1 if starred else 0, d["url"]))
 
 
 def set_doc_tags(conn, doc_id, tags):

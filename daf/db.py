@@ -242,6 +242,9 @@ CREATE TABLE IF NOT EXISTS feeds (           -- the feeds Daf reads itself (sour
   every INTEGER, attrs TEXT, added INTEGER);
 CREATE TABLE IF NOT EXISTS feed_seen (        -- every post a feed has given ("id:<guid>", "link:<url>"), so a forgotten one never comes back
   feed TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (feed, key));
+CREATE TABLE IF NOT EXISTS greader_ids (       -- each Feed item's id in the reader apps' Google Reader API (greader.py)
+  gid INTEGER PRIMARY KEY,                    -- a microsecond, as FreshRSS's ids are: an fr: item's own, else when Daf got it
+  doc TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS kindle_files (    -- every book on the Kindle, as its plugin last reported them (kindleshelves.py)
   path TEXT PRIMARY KEY,                      -- from its home folder: "Recovery/Title - Author (342).pdf"
   md5 TEXT, book_id TEXT, shelf TEXT NOT NULL DEFAULT '', seen INTEGER NOT NULL);

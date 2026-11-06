@@ -861,6 +861,7 @@ async function renderPrefs(){
     '<section class="card" id="nlcard"><h2>Newsletters</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="digestcard"><h2>Morning email</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="alcard"><h2>AniList</h2><span class="mute">Loading…</span></section>' +
+    '<section class="card" id="gracard"><h2>Reader apps</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="aicard"><h2>AI</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="keyscard"><h2>Keyboard</h2></section>' +
     '<section class="card" id="importcard"><h2>Import</h2><span class="mute">Loading…</span></section>' +
@@ -882,7 +883,7 @@ async function renderPrefs(){
 const PREF_GROUPS = [
   ['Reading', [['goalscard', 'Goals'], ['countcard', 'What counts'], ['reviewcard', 'Daily review'], ['readercard', 'Reader'], ['dayscard', 'Days']]],
   ['Look', [['appearcard', 'Appearance'], ['sidecard', 'Sidebar'], ['keyscard', 'Keyboard']]],
-  ['Connections', [['phonecard', 'Phone'], ['podcard', 'Podcasts'], ['hccard', 'Hardcover'], ['nlcard', 'Newsletters'], ['digestcard', 'Morning email'], ['alcard', 'AniList']]],
+  ['Connections', [['phonecard', 'Phone'], ['podcard', 'Podcasts'], ['hccard', 'Hardcover'], ['nlcard', 'Newsletters'], ['digestcard', 'Morning email'], ['alcard', 'AniList'], ['gracard', 'Reader apps']]],
   ['AI', [['aicard', 'AI']]],
   ['Library', [['tagscard', 'Library tags'], ['importcard', 'Import']]],
   ['Help', [['tipscard', 'Tips'], ['fbcard', 'Feedback']]],
@@ -1087,7 +1088,7 @@ function show(quiet){
 
 // The cards from their own files, and #prefs/<card> scrolls to one.
 function prefsMore(){
-  const D = window.DafCore, cards = { keys: [D.Keys, 'keyscard'], ai: [D.AI, 'aicard'], digest: [D.Digest, 'digestcard'], import: [D.Imports, 'importcard'], feedback: [D.Feedback, 'fbcard'], tags: [D.TagMan, 'tagscard'], tips: [D.Tips, 'tipscard'], anilist: [D.AniList, 'alcard'] };
+  const D = window.DafCore, cards = { keys: [D.Keys, 'keyscard'], ai: [D.AI, 'aicard'], digest: [D.Digest, 'digestcard'], import: [D.Imports, 'importcard'], feedback: [D.Feedback, 'fbcard'], tags: [D.TagMan, 'tagscard'], tips: [D.Tips, 'tipscard'], anilist: [D.AniList, 'alcard'], readerapps: [D.ReaderApps, 'gracard'] };
   for (const [name, [mod, id]] of Object.entries(cards)) {
     const card = $('#' + id); if (!mod || !card) continue;
     // The cards above it are still loading and push it down: once more after they've come.

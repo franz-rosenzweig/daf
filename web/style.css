@@ -717,6 +717,11 @@ q.go:hover{background:color-mix(in srgb,var(--hl-yellow) 60%,transparent)}
 [data-bk="bookmark"].on{color:var(--accent)}
 @media (max-width:760px){.hlfilters .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}.hlfilters .chips::-webkit-scrollbar{display:none}.hlfilters .chip{flex:0 0 auto}}
 .prow.sub{padding-left:14px;border-left:2px solid var(--line);margin-left:2px}
+/* Preferences → Reader apps (readerapps.js): each value under its label, so a long address wraps on a phone */
+.grrow .d .tok{align-self:flex-start;max-width:100%;margin-top:4px}
+.grrow .grpw{width:100%;max-width:22em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:15px;letter-spacing:.02em}
+.gracts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:600px){.grrow{flex-wrap:wrap}.grrow .gracts{width:100%;justify-content:flex-start}}
 /* Info panel: Claude's summary and Karakeep's tags */
 .isum{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .isum p{margin:0;font-size:13.5px;line-height:1.5}
