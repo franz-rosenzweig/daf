@@ -176,6 +176,7 @@ async function openBook(id, at){
   else if (words) await goToWords(words);
   if (!at && mine && (mine.fraction || 0) > 0.01) toast('Picked up at ' + Math.round(mine.fraction * 100) + '%' + (mine.chapter ? ' · ' + mine.chapter : ''));
   if (!at) offerKindle(mine);
+  window.dispatchEvent(new CustomEvent('daf-book-open', { detail: { id, mine, at } }));   // its audiobook, and the audiobook's place (audiobooks.js)
   if (PHONE()) setTimeout(hideChrome, 600);
 }
 // The highlights' colours under the words: one CSS highlight per colour in each chapter's page. False where the browser
@@ -1188,6 +1189,7 @@ function openMore(anchor){
   const p = $('#pop'), r = anchor.getBoundingClientRect();
   p.innerHTML = '<div class="menu">' +
     '<button data-bm="listen">' + (B.tts.on ? 'Stop listening' : 'Listen from here') + '<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'listen') : 'l') + '</span></button>' +
+    (C.Audiobooks ? C.Audiobooks.menu(B.d.id) : '') +
     '<button data-bm="notebook">Notebook<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'panel') : ']') + '</span></button>' +
     '<button data-bm="info">About this book</button>' +
     '<button data-bm="ask">Ask about this book</button>' +
@@ -1346,4 +1348,12 @@ C.views.ebook = args => {
   return openBook(id, at);
 };
 C.curBook = () => (C.S.route[0] === 'ebook' ? B.id : null);
+// For the audiobook beside the book (audiobooks.js): the page you're on, and going to a place by its words.
+C.BookPlace = {
+  here: () => B.id && B.loc ? { cfi: B.loc.cfi, fraction: B.loc.fraction || 0, text: B.loc.range ? String(B.loc.range).slice(0, 600) : '' } : null,
+  go: async (words, fraction) => {
+    const cfi = words ? await findText(words) : null;
+    if (cfi) { await B.view.goTo(cfi).catch(() => {}); centerIt(); } else if (fraction >= 0) await B.view.goToFraction(fraction).catch(() => {});
+  },
+};
 window.dispatchEvent(new Event('daf-ebook-ready'));

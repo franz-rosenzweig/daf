@@ -143,13 +143,16 @@ def start_worker():
     return stop
 
 
-def whisper(path, start=None, duration=None):
+def whisper(path, start=None, duration=None, model=None, timeout=7200):
+    """model: another faster-whisper model than the default (audiomap.py asks for the quick base.en)."""
     cmd = WHISPER + [path]
     if start is not None:
         cmd += ["--start", str(start)]
     if duration is not None:
         cmd += ["--duration", str(duration)]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+    if model:
+        cmd += ["--model", model]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     try:
         out = json.loads(r.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError):

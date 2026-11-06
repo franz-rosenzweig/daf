@@ -2646,7 +2646,8 @@ async def gp_episodes_post(username: str, request: Request, c=Depends(conn)):
     return out
 
 
-# ---- Audiobookshelf (absapi.py): its audiobooks and podcast libraries in Daf's player ----------
+# ---- Audiobookshelf (absapi.py): its audiobooks and podcast libraries in Daf's player, and a book's
+# audiobook beside it (audiomap.py) ----------------------------------------------------------
 
 def _abs(f, *a):
     from . import absapi
@@ -2749,6 +2750,57 @@ def get_abs_search(q: str = ""):
         return absapi.search(q.strip())
     except (absapi.Unavailable, OSError) as e:
         return {"audiobooks": [], "recordings": [], "episodes": [], "error": str(e)}
+
+
+@app.get("/api/abs/book/{book_id}", dependencies=[Depends(user)])
+def get_abs_book(book_id: str, offer: int = 0, since: int = 0, fraction: float = -1, c=Depends(conn)):
+    """A book's audiobook: where you are in it, and with `offer`, the same place in the book when the
+    audiobook was played after `since` (the book's own place, which is at `fraction`)."""
+    from . import absapi, audiomap
+    item = absapi.for_book(c, book_id)
+    if not item:
+        return {"item": None}
+    p = _abs(absapi.playable, item)
+    pos = c.execute("SELECT fraction, chapter, updated FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
+    out = {"item": item, "title": p["title"], "duration": p["duration"], "at": p["at"], "done": p["done"], "last": p["last"],
+           "chapter": audiomap.audio_chapter([{"start": x["t"], "title": x["title"]} for x in p["chapters"]], p["at"] or 0),
+           "reading": dict(pos) if pos else None}
+    if offer and p["at"] and p["at"] > 30 and not p["done"] and (p["last"] or 0) > since:
+        try:
+            m = audiomap.to_book(c, book_id, p["at"], exact=True)
+        except Exception:  # noqa: BLE001
+            log.exception("audiobook place for %s", book_id)
+            m = None
+        if m and (fraction < 0 or abs(m["fraction"] - fraction) > 0.004):
+            out["offer"] = m
+    return out
+
+
+@app.get("/api/abs/book/{book_id}/place", dependencies=[Depends(user)])
+def get_abs_book_place(book_id: str, t: float, exact: int = 1, c=Depends(conn)):
+    """The place in the book for a second of its audiobook: {words, fraction, chapter, how}."""
+    from . import audiomap
+    r = audiomap.to_book(c, book_id, t, exact=bool(exact))
+    if not r:
+        raise HTTPException(404, "No audiobook and EPUB for this book")
+    return r
+
+
+@app.post("/api/abs/book/{book_id}/start", dependencies=[Depends(user)])
+def post_abs_book_start(book_id: str, b=Depends(json_body), c=Depends(conn)):
+    """{cfi, fraction, text, exact}: where in the audiobook a place in the book is (the reader's page;
+    without one, the book's kept place) → {t, chapter, how}."""
+    from . import audiomap
+    place = {k: b.get(k) for k in ("cfi", "fraction", "text") if b.get(k) is not None}
+    if not place:
+        pos = c.execute("SELECT cfi, fraction FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
+        if not pos:
+            raise HTTPException(404, "No place in this book yet")
+        place = dict(pos)
+    r = audiomap.from_book(c, book_id, place, exact=b.get("exact", True) is not False)
+    if not r:
+        raise HTTPException(404, "No audiobook and EPUB for this book")
+    return r
 
 
 # ---- paper pages (Phase 7) -------------------------------------------------------
