@@ -564,6 +564,11 @@ body.bookbare .rv.ebook .top,body.bookbare .progress{opacity:0;pointer-events:no
 .fnote{position:fixed;z-index:60;background:var(--bg);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
 .fnote .fnh{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 0 14px}
 .fnote foliate-view{display:block;width:100%;height:240px}
+/* a scanned book's page up close (scans.js): over everything, the page where it was, then bigger */
+.pzoom{position:fixed;inset:0;z-index:66;background-color:transparent;transition:background-color .2s;touch-action:none;overflow:hidden;user-select:none;-webkit-user-select:none;outline:0;cursor:zoom-out}
+.pzoom.on{background-color:var(--bg)}
+.pzoom img{position:absolute;max-width:none;max-height:none;transform-origin:0 0;-webkit-user-drag:none;pointer-events:none}
+.pzoom.dim img{filter:brightness(.9)}
 
 /* ---------- highlight colors ---------- */
 .hlc q, .nb q{border-left:3px solid var(--hl-yellow-line);padding-left:10px}
