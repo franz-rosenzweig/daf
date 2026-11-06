@@ -11,6 +11,9 @@
    pen writes, and a hand resting on the screen while the pen is near doesn't scroll. With the tools
    put away the pen is a finger again. Nothing shows until a pen has touched the screen on this device.
 
+   An underline written with a pen highlights the words over it (underline.js), as the pen's panel
+   says: Highlight, Ask or Ink.
+
    The lasso holds the handwriting it's drawn round: To text reads it (English with Grape, in a
    worker, on any device; Hebrew with Google's reader in the Android app, as Moshe reads it) into a
    card to fix, then makes it a note on the passage beside it, or typed text in its place.
@@ -53,6 +56,7 @@ const T = {
   eraser: Object.assign({ mode: 'stroke', size: 24 }, saved.eraser || {}),                       // mode: stroke | area
   favorites: saved.favorites || [],                                                                // [{pen, size, color, opacity}]
   recent: saved.recent || ['ink', '#1971c2', '#e03131'],
+  under: saved.under || 'highlight',                                                                // what an underline does: highlight | ask | ink
 };
 const P = { on: get('on', old('on') !== false), seen: get('seen', !!old('seen')), surface: null, live: null, near: 0, lastPen: 0, penUp: 0, tapping: false, docs: new Set(), button: null };
 let keepT = 0;
@@ -341,6 +345,7 @@ function listen(doc, surf){
   doc.__dafPens = true; P.docs.add(doc);
   const off = () => surf.off ? surf.off(doc) : [0, 0];
   doc.addEventListener('pointerdown', e => {
+    if (C.Underline) C.Underline.down(e);
     if (doc !== document && e.pointerType !== 'pen') { closePop(); closeRound(); }   // a book's page: its own window, where the page's never hears a tap
     if (e.pointerType !== 'pen') return;
     seenPen();
@@ -356,6 +361,7 @@ function listen(doc, surf){
     // the pen's button held (2) or an eraser end (32) erases, whatever tool is chosen
     const tool = T.tool === 'eraser' || (e.buttons & 34) || e.button === 2 || e.button === 5 ? 'eraser' : T.tool;
     P.live = { id: e.pointerId, surf, doc, tool, brush: tool === 'eraser' ? null : brush(tool), pts: [], t0: Date.now(), x0: x, y0: y, moved: false, erased: [], added: [], hls: new Set() };
+    if (C.Underline) C.Underline.start(P.live);
     try { (e.target.setPointerCapture ? e.target : doc.documentElement).setPointerCapture(e.pointerId); } catch(_){}
     feed(e, o);
   }, true);
@@ -382,7 +388,8 @@ function listen(doc, surf){
     if (e.type === 'pointercancel' && L.pts.length < 3) return;
     if (L.tool === 'highlighter' && !L.snapped && surf.highlight && surf.highlight(L)) return;
     if (L.brush && L.brush.pen !== 'highlighter') used(L.brush.color);
-    surf.stroke(L);
+    const s = surf.stroke(L);
+    if (s && L.tool === 'pen' && C.Underline) C.Underline.end(L, s, surf);    // an underline: the words over it highlighted
   };
   doc.addEventListener('pointerup', up, true);
   doc.addEventListener('pointercancel', up, true);
@@ -474,7 +481,7 @@ const KIND_ROW = (cur, size) => WRITING.map(k => '<button class="kind" data-kind
 // The panel for the tool in hand: the pen's kinds, its size, opacity and colour (any colour), or
 // the highlighter's, or how the eraser erases. In the round menu too.
 function panelHTML(tool, parts){
-  parts = parts || ['kinds', 'size', 'opacity', 'colors', 'fav'];
+  parts = parts || ['kinds', 'size', 'opacity', 'colors', 'under', 'fav'];
   let h = '';
   if (tool === 'lasso') return '<div class="pnrow">Draw round handwriting with the lasso to read it as text or erase it.</div><div class="pnrow"><button class="linkbtn" data-hw="all">' + IC.text + 'Read all the handwriting here</button></div>';
   if (tool === 'eraser') {
@@ -492,6 +499,8 @@ function panelHTML(tool, parts){
     h += '<div class="pnrow colors">' + list.map(c => '<button data-c="' + c + '" aria-pressed="' + (c === cur) + '" title="' + (HLNAME[c] || (c === 'ink' ? 'The text’s colour' : c)) + '" aria-label="' + (HLNAME[c] || (c === 'ink' ? 'The text’s colour' : 'Colour ' + c)) + '">' + dot(c, 22, isPale(c)) + '</button>').join('') +
       (pen === 'highlighter' ? '' : '<label class="custom" title="Any colour"><input type="color" value="' + (/^#/.test(cur) ? cur : '#1e1e1e') + '" data-set="color" aria-label="Any colour"><span></span></label>') + '</div>';
   }
+  if (tool === 'pen' && parts.includes('under')) h += '<div class="pnrow seg2 under" role="group" aria-label="Underline"><span>Underline</span>' +
+    [['highlight', 'Highlight'], ['ask', 'Ask'], ['ink', 'Ink']].map(m => '<button data-ul="' + m[0] + '" aria-pressed="' + (T.under === m[0]) + '">' + m[1] + '</button>').join('') + '</div>';
   if (parts.includes('fav') && tool !== 'eraser') h += '<div class="pnrow"><button class="linkbtn" data-fav="+">' + IC.plus + 'Keep this pen as a favourite</button></div>';
   return h;
 }
@@ -503,6 +512,7 @@ function wirePanel(el, after){
     else if (b.dataset.c) setColor(b.dataset.c);
     else if (b.dataset.er === 'all') { if (P.surface && P.surface.eraseAll) P.surface.eraseAll(); }
     else if (b.dataset.er) { T.eraser.mode = b.dataset.er; keep(); }
+    else if (b.dataset.ul) { T.under = b.dataset.ul; keep(); }
     else if (b.dataset.fav === '+') addFavorite();
     else return;
     after();
@@ -734,9 +744,9 @@ C.Pens = {
   T, KINDS, COLORS, HLS, across, brush, colorOf, kindOf, opacityOf, writingOf, shape, layer, sample, snapShape, readInk, languages,
   listen, arm,
   // the surface the tools belong to now (an article, a book), or none
-  use(s){ P.surface = s; closePop(); closeRound(); unhold(); closeReadout(); drawPal(); },
+  use(s){ P.surface = s; closePop(); closeRound(); unhold(); closeReadout(); if (C.Underline) C.Underline.drop(); drawPal(); },
   surface: () => P.surface,
-  redraw, closeRound, openRound, writing, on: () => P.on, seen: () => P.seen,
-  state: () => ({ tool: T.tool, pen: T.pen, on: P.on, seen: P.seen, round: !!P.roundEl, eraser: T.eraser.mode, held: P.held ? P.held.strokes.length : 0, readout: P.ro ? { status: P.ro.status, text: P.ro.text, note: P.ro.note, lang: P.ro.lang } : null }),
+  redraw, closeRound, openRound, writing, on: () => P.on, seen: () => P.seen, busy: () => !!P.live,
+  state: () => ({ tool: T.tool, pen: T.pen, under: T.under, on: P.on, seen: P.seen, round: !!P.roundEl, eraser: T.eraser.mode, held: P.held ? P.held.strokes.length : 0, readout: P.ro ? { status: P.ro.status, text: P.ro.text, note: P.ro.note, lang: P.ro.lang } : null }),
 };
 })();

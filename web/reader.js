@@ -1422,7 +1422,7 @@ async function highlight(info, withNote, quiet){
   }
   const text = merged.length ? spanText(b, s, be, e) : info.text;
   try {
-    const color = merged.find(m => m.color)?.color || H.color();
+    const color = merged.find(m => m.color)?.color || info.color || H.color();
     const r = await api('/api/docs/' + encodeURIComponent(d.id) + '/highlights', { method:'POST', body:JSON.stringify({ b, s, e, be: be !== b ? be : null, text, t:info.t, color, replaces: merged.map(m => m.id) }) });
     merged.forEach(m => unmark(m.id));
     const notes = merged.map(m => m.user_note).filter(Boolean);

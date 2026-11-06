@@ -1038,7 +1038,7 @@ async function highlightSel(withNote, quiet){
   if (merged.length) { try { cfi = B.view.getCFI(s.index, range); text = range.toString().trim(); } catch(e){ merged.length = 0; } }
   const chapter = B.loc?.tocItem?.label || null, fraction = B.loc ? B.loc.fraction : null;
   try {
-    const color = merged.find(m => m.color)?.color || H.color();
+    const color = merged.find(m => m.color)?.color || s.color || H.color();
     const r = await api('/api/ebooks/' + encodeURIComponent(B.d.id) + '/highlights', { method: 'POST', body: JSON.stringify({ cfi, text, chapter, fraction, color, replaces: merged.map(m => m.id) }) });
     for (const m of merged) { B.byCfi.delete(m.pos.cfi); B.view.deleteAnnotation({ value: m.pos.cfi }).catch(() => {}); }
     const notes = merged.map(m => m.user_note).filter(Boolean), tags = [...new Set(merged.flatMap(m => m.tags || []))];
@@ -1180,6 +1180,7 @@ function inkStroke(L){
     at: { cfi, s: index, f, x: r1(x0 - r.left), y: r1(y0 - r.top) }, pts: L.pts.map(p => [r1(p[0] - wx), r1(p[1] - wy), Math.round(p[2] * 100) / 100]) };
   if (L.snapped) s.sh = 1;           // a clean shape, which isn't read as writing
   inkAdd([s]); inkAct({ add: [s] });
+  return s;
 }
 function inkNear(pts, x, y, r){
   for (let i = 0; i < pts.length; i++) {
@@ -1256,13 +1257,29 @@ function inkHighlight(L){
     range.setStart(a.node, a.off); range.setEnd(a.node, a.off);
     if (before(doc, a.node, a.off, b.node, b.off)) range.setEnd(b.node, b.off); else { range.setStart(b.node, b.off); range.setEnd(a.node, a.off); }
   } catch(e){ return false; }
+  if (!inkSel(doc, index, range)) return false;
+  highlightSel(false, true).then(h => { if (h) inkAct({ hl: h.id }); });
+  return true;
+}
+// A range on a chapter's page made the selection, in whole words, as if it had been selected.
+function inkSel(doc, index, range, color){
   snapRange(range);
   const text = range.toString().trim(); if (text.replace(/\s/g, '').length < 2) return false;
   let cfi; try { cfi = B.view.getCFI(index, range); } catch(e){ return false; }
   const block = range.startContainer.parentElement?.closest('p, li, blockquote, div') || range.startContainer.parentElement;
-  B.sel = { doc, index, range, text, cfi, rect: rectFor(doc, range), sentence: block ? block.textContent : text };
-  highlightSel(false, true).then(h => { if (h) inkAct({ hl: h.id }); });
+  B.sel = { doc, index, range, text, cfi, rect: rectFor(doc, range), sentence: block ? block.textContent : text, color };
   return true;
+}
+// An underline written with the pen (underline.js): its words highlighted in its colour, in the
+// strokes' place. Answers with the way back (the toast's Undo), which brings the ink back.
+async function inkUnderline(doc, range, color, strokes){
+  const index = secOf(doc), had = new Set((B.d ? B.d.highlights : []).map(h => h.id));
+  if (index == null || !strokes.every(s => inkAll().includes(s)) || !inkSel(doc, index, range, color)) return null;
+  const h = await highlightSel(false, true); if (!h) return null;
+  inkTake(strokes);
+  const a = had.has(h.id) ? { del: strokes } : { del: strokes, hl: h.id };     // words highlighted already keep their highlight
+  inkAct(a);
+  return () => { const i = INK.done.indexOf(a); if (i < 0) return; INK.done.splice(i, 1); INK.undone.push(a); inkApply(a, true); Pens.redraw(); };
 }
 function inkAct(a){ INK.done.push(a); if (INK.done.length > 200) INK.done.shift(); INK.undone = []; inkApply(a, false); Pens.redraw(); }
 // Does what a records (back = false) or takes it back (true); a highlight's own way for those.
@@ -1359,7 +1376,7 @@ const INKSURF = {
   live: () => !!(B.view && B.d && document.body.dataset.view === 'ebook'),
   takes: (el, doc) => doc !== document,
   off: doc => { const r = frameOf(doc); return r ? [r.left, r.top] : [0, 0]; },
-  stroke: inkStroke, erase: inkErase, erased: inkErased, eraseAll: inkEraseAll, highlight: inkHighlight,
+  stroke: inkStroke, erase: inkErase, erased: inkErased, eraseAll: inkEraseAll, highlight: inkHighlight, underline: inkUnderline,
   palHost: () => document.querySelector('.rv.ebook') || document.body,
   canUndo: () => INK.done.length > 0, canRedo: () => INK.undone.length > 0, undo: inkUndo, redo: inkRedo,
   select: inkSelect, mark: inkMark, typed: inkTyped, noteOnPassage: inkNote,

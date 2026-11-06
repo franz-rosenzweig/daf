@@ -1,6 +1,7 @@
 /* Ink on an article: what's written on it with a pen (the pens themselves are pens.js), in the text
    and beside it, as in a paper book's margins. Over words the highlighter makes a highlight, as
-   selecting them does (it's in Highlights and the review); anywhere else it leaves its stroke.
+   selecting them does (it's in Highlights and the review); anywhere else it leaves its stroke. A
+   pen's underline can make one too (underline.js).
    Each stroke keeps its paragraph and the letter it started on (daf/ink.py), so it stays with its
    words when the type size or the column changes; a note in the margin keeps its distance from the
    column's edge. Margin moves the column over to leave room on the right. Handwriting read as text
@@ -200,9 +201,38 @@ function toHighlight(L){
   const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
   const info = C.Reader.getSel();
   if (!info) { sel.removeAllRanges(); return false; }
-  const color = L.brush.color;
-  C.Reader.highlight(info, false, true).then(h => { if (h) act({ hl: { id: h.id, info, color } }); });
+  info.color = L.brush.color;
+  C.Reader.highlight(info, false, true).then(h => { if (h) act({ hl: { id: h.id, info } }); });
   return true;
+}
+// An underline written with the pen (underline.js): its words highlighted in its colour, in the
+// strokes' place. Answers with the way back (the toast's Undo), which brings the ink back.
+async function underline(doc, range, color, list){
+  if (!C.Reader || !K.doc || !list.every(s => K.strokes.includes(s))) return null;
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  const info = C.Reader.getSel(); if (!info) { sel.removeAllRanges(); return null; }
+  own(info, range); info.color = color;
+  const had = new Set((K.doc.highlights || []).map(h => h.id));
+  const h = await C.Reader.highlight(info, false, true); if (!h) return null;
+  const ids = new Set(list.map(s => s.id));
+  K.strokes = K.strokes.filter(s => !ids.has(s.id)); list.forEach(s => unpaint(s.id));
+  const a = had.has(h.id) ? { del: list } : { del: list, hl: { id: h.id, info } };     // words highlighted already keep their highlight
+  act(a);
+  return () => { const i = K.done.indexOf(a); if (i < 0) return; K.done.splice(i, 1); K.undone.push(a); apply(a, true); Pens.redraw(); };
+}
+// Whole words, but only from the paragraph the line was under: a verse's Hebrew runs straight on
+// into its number and its English, with no space between, and the words would grow into them.
+function own(info, range){
+  const inner = n => (n.nodeType === 1 ? n : n.parentElement).closest('p, li, blockquote, h1, h2, h3, h4, figcaption, [data-i]');
+  const at = (blk, node, o) => { const pre = document.createRange(); pre.selectNodeContents(blk); pre.setEnd(node, o); return pre.toString().length; };
+  const blk = i => K.body.querySelector('[data-i="' + i + '"]'), be = info.be != null ? info.be : info.b, b1 = blk(info.b), b2 = blk(be);
+  if (!b1 || !b2) return;
+  const p1 = inner(range.startContainer), p2 = inner(range.endContainer);
+  if (p1 && p1 !== b1 && b1.contains(p1)) info.s = Math.max(info.s, at(b1, p1, 0));
+  if (p2 && p2 !== b2 && b2.contains(p2)) info.e = Math.min(info.e, at(b2, p2, p2.childNodes.length));
+  const out = [];
+  for (let i = info.b; i <= be; i++) { const t = (blk(i) || {}).textContent || ''; out.push((i === info.b && i === be ? t.slice(info.s, info.e) : i === info.b ? t.slice(info.s) : i === be ? t.slice(0, info.e) : t).trim()); }
+  info.text = out.filter(Boolean).join('\n\n');
 }
 
 /* ---------- undo, and sending ---------- */
@@ -218,7 +248,7 @@ async function apply(a, back, again){
   if (K.doc) K.doc.ink = K.strokes;
   if (a.hl && (back || again) && C.Reader) {
     if (back) await C.Reader.removeHl(a.hl.id, true);
-    else { try { localStorage.setItem('daf.hlColor', JSON.stringify(a.hl.color)); } catch(e){} const h = await C.Reader.highlight(a.hl.info, false, true); if (h) a.hl.id = h.id; }
+    else { const h = await C.Reader.highlight(a.hl.info, false, true); if (h) a.hl.id = h.id; }     // in its own colour (info.color)
   }
   if (a.unhl && (back || again) && C.Reader) {
     for (const u of a.unhl) {
@@ -322,9 +352,9 @@ const surface = {
   live,
   takes: el => !!K.wrap && K.wrap.contains(el),
   off: () => [0, 0],
-  stroke(L){ const s = make(L); if (!s) return; K.strokes.push(s); draw(s); act({ add: [s] }); },
+  stroke(L){ const s = make(L); if (!s) return; K.strokes.push(s); draw(s); act({ add: [s] }); return s; },
   erase, erased, eraseAll,
-  highlight: toHighlight,
+  highlight: toHighlight, underline,
   palHost: () => (K.wrap && K.wrap.closest('.rv')) || document.body,
   canUndo: () => K.done.length > 0, canRedo: () => K.undone.length > 0, undo, redo,
   extras: () => window.innerWidth >= 700 ? [{ k: 'margin', label: 'Room to write in the margin', on: K.mOn }] : [],
