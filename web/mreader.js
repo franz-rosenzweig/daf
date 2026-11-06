@@ -67,10 +67,13 @@ function layoutForAll(){
 
 /* ---------- pages ---------- */
 let RD = null;
+// The reader's own size and corner: the window's, less the Sketchbook beside it or under it (sketchbook.js).
+const vw = () => (RD && RD.el && RD.el.clientWidth) || innerWidth, vh = () => (RD && RD.el && RD.el.clientHeight) || innerHeight;
+const corner = () => { const r = RD && RD.el ? RD.el.getBoundingClientRect() : null; return r ? [r.left, r.top] : [0, 0]; };
 const isWide = p => p.w && p.h && p.w > p.h * 1.1;
 const dpr = () => Math.min(window.devicePixelRatio || 1, 2.5);
 function sizeFor(p){
-  const W = innerWidth, H = innerHeight, r = (p.h || 3) / (p.w || 2);
+  const W = vw(), H = vh(), r = (p.h || 3) / (p.w || 2);
   if (!paged(RD.p.mode)) return Math.min(2400, Math.ceil(stripWidth() * dpr() * Math.max(1, r)));
   if (RD.p.scale === 'width') return Math.min(2400, Math.ceil(W * dpr() * Math.max(1, r)));
   if (RD.p.scale === 'original') return 2400;
@@ -80,7 +83,7 @@ function sizeFor(p){
 M.pageUrl = (bookId, n, size, crop) => '/api/manga/books/' + encodeURIComponent(bookId) + '/pages/' + n + '?size=' + (size || M.downloadSize()) + (crop ? '&crop=1' : '');
 M.downloadSize = M.downloadSize || (() => Math.min(2400, Math.ceil(Math.max(innerWidth, innerHeight) * dpr())));
 const src = (n, size) => M.pageUrl(RD.book.id, n + 1, size || sizeFor(RD.book.pages[n]), RD.p.crop);
-const stripWidth = () => Math.min(innerWidth, innerWidth >= 700 ? Math.max(320, Math.min(980, innerWidth * RD.p.stripw / 100)) : innerWidth) * (RD.sz || 1);
+const stripWidth = () => Math.min(vw(), vw() >= 700 ? Math.max(320, Math.min(980, vw() * RD.p.stripw / 100)) : vw()) * (RD.sz || 1);
 
 // What's on screen at once, in order: the start card (when there's a volume before), the pages
 // (in twos when the layout says so; a wide page alone, or split in two halves), the end card.
@@ -88,7 +91,7 @@ function buildUnits(){
   const ps = RD.book.pages, n = ps.length, us = [];
   const pg = paged(RD.p.mode), side = pg && RD.p.mode !== 'vertical';   // pairs and halves only when pages sit side by side
   if (RD.book.prev && pg) us.push({ t: 'start' });
-  const two = side && (RD.p.layout === 'double' || (RD.p.layout === 'auto' && innerWidth > innerHeight * 1.05));
+  const two = side && (RD.p.layout === 'double' || (RD.p.layout === 'auto' && vw() > vh() * 1.05));
   let i = 0;
   if (two) {
     if (!RD.p.shift && n) { us.push({ t: 'p', pages: [0] }); i = 1; }
@@ -155,6 +158,9 @@ M.open = async (bid, page, opts) => {
   wire(el);
   layout(Math.min(Math.max(0, start), n - 1));
   if (M.ink) M.ink.open(RD);                         // what's drawn on the pages with a pen (mink.js)
+  // the Sketchbook beside it (sketchbook.js): a tab a volume, and its camera takes the page in view
+  if (C.Sketch) C.Sketch.attach({ item: 'manga:' + b.series.id, kind: 'manga', here: () => ({ tab: 'v:' + b.id, title: b.name.replace(/\s*[\(\[][^)\]]*[\)\]]/g, '').trim() || b.name }),
+    shots: () => [...el.querySelectorAll('.mslot.cur .mpg, .mslot.cur .mhalf, .mstrip .mpg')] });
   el.focus();
   try { RD.wake = await navigator.wakeLock.request('screen'); } catch(e){}
   if (!(opts && opts.quiet)) toast(label(MODES, RD.p.mode) + (paged(RD.p.mode) && RD.p.mode !== 'vertical' && RD.units.some(u => u.pages && u.pages.length > 1) ? ' · two pages' : ''));
@@ -238,7 +244,7 @@ function go(d, opts){
 }
 // Slide the track a whole page (from where the finger left it), then rebuild around the new page.
 function slide(d, fromPx){
-  const t = RD.el.querySelector('.mtrack'), size = axis() === 'x' ? innerWidth : innerHeight;
+  const t = RD.el.querySelector('.mtrack'), size = axis() === 'x' ? vw() : vh();
   const target = -d * sgn() * size, left = Math.abs(target - fromPx) / size;
   RD.busy = true;
   t.style.transition = 'transform ' + Math.round(Math.max(110, 280 * left)) + 'ms cubic-bezier(.22,.7,.3,1)';
@@ -258,7 +264,7 @@ function turned(){
   if (u.t === 'end') save(true); else queueSave();
 }
 const next = () => paged(RD.p.mode) ? go(1) : scrollScreen(1), prev = () => paged(RD.p.mode) ? go(-1) : scrollScreen(-1);
-function scrollScreen(d){ $('#mstage').scrollBy({ top: d * innerHeight * 0.85, behavior: RD.p.animate ? 'smooth' : 'auto' }); RD.lastActive = Date.now(); }
+function scrollScreen(d){ $('#mstage').scrollBy({ top: d * vh() * 0.85, behavior: RD.p.animate ? 'smooth' : 'auto' }); RD.lastActive = Date.now(); }
 // Which way "left" and "right" go depends on the reading direction.
 function act(t){
   if (t === 'menu') return toggleBar();
@@ -357,6 +363,7 @@ function drawBars(){
     '<span class="mtitle"><b>' + esc(b.series.name || '') + '</b><span>' + esc(b.name) + '</span></span>' +
     '<span class="mcount"></span>' +
     (M.ink ? M.ink.button() : '') +
+    (C.Sketch ? C.Sketch.button('manga') : '') +
     '<button class="mic" data-mr="thumbs" aria-label="All pages" title="All pages (T)">' + I.grid + '</button>' +
     '<button class="mic" data-mr="settings" aria-label="Reading settings" title="Reading settings (S)">' + I.gear + '</button>' +
     '<button class="mic" data-mr="more" aria-label="More" title="More">' + I.more + '</button>';
@@ -463,7 +470,7 @@ function autoStart(){
         if (!RD || !RD.auto) return;
         const dt = Math.min(64, t - last); last = t;
         const st = $('#mstage');
-        if (!RD.held && !RD.sheet) { RD.acc = (RD.acc || 0) + innerHeight * 0.85 / RD.p.autospeed * dt / 1000; const px = Math.floor(RD.acc); if (px) { st.scrollTop += px; RD.acc -= px; } }
+        if (!RD.held && !RD.sheet) { RD.acc = (RD.acc || 0) + vh() * 0.85 / RD.p.autospeed * dt / 1000; const px = Math.floor(RD.acc); if (px) { st.scrollTop += px; RD.acc -= px; } }
         if (st.scrollTop + st.clientHeight >= st.scrollHeight - 2) { autoStop(); return; }
         RD.autoT = requestAnimationFrame(tick);
       };
@@ -496,12 +503,12 @@ function applyZoom(){
   RD.el.classList.toggle('zoomed', RD.z.s > 1);
 }
 function zoomAt(x, y, s){
-  const z = RD.z, k = s / z.s, cx = innerWidth / 2, cy = innerHeight / 2;
+  const z = RD.z, k = s / z.s, [ex, ey] = corner(), cx = ex + vw() / 2, cy = ey + vh() / 2;
   z.x = (z.x - (x - cx)) * k + (x - cx); z.y = (z.y - (y - cy)) * k + (y - cy); z.s = s;
   if (s <= 1.01) { z.s = 1; z.x = z.y = 0; }
   clampPan(); applyZoom();
 }
-function clampPan(){ const z = RD.z, mx = innerWidth * (z.s - 1) / 2, my = innerHeight * (z.s - 1) / 2; z.x = Math.max(-mx, Math.min(mx, z.x)); z.y = Math.max(-my, Math.min(my, z.y)); }
+function clampPan(){ const z = RD.z, mx = vw() * (z.s - 1) / 2, my = vh() * (z.s - 1) / 2; z.x = Math.max(-mx, Math.min(mx, z.x)); z.y = Math.max(-my, Math.min(my, z.y)); }
 
 /* ---------- touch, mouse, keys ---------- */
 function wire(el){
@@ -564,7 +571,7 @@ function wire(el){
     if (pinch) { if (!pts.size) pinch = null; g = null; return; }
     const s = g; g = null; if (!s) return;
     if (s.drag) {
-      const size = axis() === 'x' ? innerWidth : innerHeight, v = axis() === 'x' ? s.vx : s.vy;
+      const size = axis() === 'x' ? vw() : vh(), v = axis() === 'x' ? s.vx : s.vy;
       const toward = -(s.d || 0) * sgn() / size, fling = -v * sgn();
       const d = toward > 0.16 || (fling > 0.45 && toward > 0.02) ? 1 : toward < -0.16 || (fling < -0.45 && toward < -0.02) ? -1 : 0;
       if (!d) { snapBack(); return; }
@@ -583,9 +590,10 @@ function wire(el){
     clearTimeout(RD.tapT);
     if (double) { lastTap.t = 0; if (paged(RD.p.mode)) zoomAt(x, y, RD.z.s > 1 ? 1 : 2.2); else { RD.sz = RD.sz > 1 ? 1 : 1.8; layout(curPages()[0]); } return; }
     lastTap = { t: now, x, y };
-    const run = () => { if (!RD) return; if (RD.z.s > 1) { toggleBar(); return; } act(zoneAt(x / innerWidth, y / innerHeight)); };   // zoomed in, taps only bring the bars
+    const [ex, ey] = corner(), fx = (x - ex) / vw(), fy = (y - ey) / vh();
+    const run = () => { if (!RD) return; if (RD.z.s > 1) { toggleBar(); return; } act(zoneAt(fx, fy)); };   // zoomed in, taps only bring the bars
     // With double tap on, a single tap waits a moment to be sure; the middle (the menu) doesn't wait.
-    const t = zoneAt(x / innerWidth, y / innerHeight);
+    const t = zoneAt(fx, fy);
     if (!RD.p.dbltap || (t === 'menu' && !paged(RD.p.mode))) run(); else RD.tapT = setTimeout(run, 230);
   }
   el.addEventListener('wheel', e => {
@@ -670,7 +678,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (RD.sheet) closeSheet();
     else if (!RD.el.querySelector('.mzones').hidden) RD.el.querySelector('.mzones').hidden = true;
-    else if (RD.z.s > 1) zoomAt(innerWidth / 2, innerHeight / 2, 1);
+    else if (RD.z.s > 1) { const [ex, ey] = corner(); zoomAt(ex + vw() / 2, ey + vh() / 2, 1); }
     else if (RD.bar) toggleBar(false);
     else close();
     return;

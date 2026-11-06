@@ -25,6 +25,8 @@ const ICON = {
   ask: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12v8H9l-3.5 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   focus: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
+// The room the book has: the window, less the Sketchbook beside it or under it (sketchbook.js).
+const room = () => C.Sketch && C.Sketch.open() ? C.Sketch.room() : { w: window.innerWidth, h: window.innerHeight };
 const fmtMins = m => { m = Math.max(0, Math.round(m || 0)); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; };
 const xpIndex = xp => { const m = /DocFragment\[(\d+)\]/.exec(xp || ''); return m ? +m[1] - 1 : null; };
 
@@ -70,9 +72,9 @@ function applyBookType(){
   const flow = t.flow || 'paginated';  // pages, as Apple Books has them; Aa → Scroll for one long column
   v.renderer.setAttribute('flow', flow);
   v.renderer.setAttribute('max-inline-size', Math.round((t.measure || 38) * 16 * ((t.size || 20) / 20)) + 'px');
-  v.renderer.setAttribute('max-column-count', flow === 'paginated' && window.innerWidth >= 1180 && window.innerWidth > window.innerHeight ? '2' : '1');   // two pages, as a book opens
+  v.renderer.setAttribute('max-column-count', flow === 'paginated' && room().w >= 1180 && room().w > room().h ? '2' : '1');   // two pages, as a book opens
   v.renderer.setAttribute('gap', '6%');
-  v.renderer.setAttribute('margin', window.innerWidth < 760 ? '24px' : '40px');
+  v.renderer.setAttribute('margin', room().w < 760 ? '24px' : '40px');
   if (B.scans) B.scans.layout();   // a book of scanned pages: a page a picture, as big as fits (scans.js)
   v.renderer.setStyles?.(bookCSS());
   document.body.dataset.flow = flow;
@@ -164,6 +166,7 @@ async function openBook(id, at){
   applyBookType();
   drawToc();
   Pens.use(INKSURF);
+  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, resized: applyBookType });   // the Sketchbook beside it (sketchbook.js)
   // Where to start: a highlight we were sent to, else the newest of here / this device / the Kindle.
   const local = store.get('bookpos.' + id, null);
   const server = d.position;
@@ -506,10 +509,10 @@ function onSectionLoad(e){
     if (ev.target.closest('a[href]') || !doc.getSelection()?.isCollapsed) return;
     // (foliate shows a tapped highlight's bar from its own click: a new bar stays)
     if (bar !== undefined || sel) { setTimeout(() => { if (H.ctx === bar) H.hide(); }, 0); return; }
-    if (window.innerWidth >= 1000 && !(C.Focus && C.Focus.on())) return;
+    if (room().w >= 1000 && !(C.Focus && C.Focus.on())) return;
     // the sides turn the page, in Scroll too (a screen at a time, then on into the next chapter);
     // not when the tap was on a highlight and opened its bar
-    const fx = (doc.defaultView.frameElement.getBoundingClientRect().left + ev.clientX) / window.innerWidth;
+    const fx = (doc.defaultView.frameElement.getBoundingClientRect().left + ev.clientX) / room().w;
     setTimeout(() => {
       if (H.visible()) return;
       if (fx < 0.28) B.view.goLeft(); else if (fx > 0.72) B.view.goRight(); else toggleChrome();
@@ -884,7 +887,7 @@ function drawTop(){
   const d = B.d, tip = a => C.Keys.tip('book', a);
   if (PHONE()) {
     $('#btop').innerHTML = '<a class="ib bclose" href="#book/' + encodeURIComponent(d.id) + '" aria-label="Close the book">' + ICON.x + '</a>' +
-      '<div class="btitle2"' + (isRtlText(d.title) ? ' dir="rtl"' : '') + '><b>' + esc(String(d.title || '').split(/:\s/)[0]) + '</b><span>' + esc(d.author || '') + '</span></div><span class="bgap"></span>';
+      '<div class="btitle2"' + (isRtlText(d.title) ? ' dir="rtl"' : '') + '><b>' + esc(String(d.title || '').split(/:\s/)[0]) + '</b><span>' + esc(d.author || '') + '</span></div>' + (C.Sketch ? C.Sketch.button() : '<span class="bgap"></span>');
     return;
   }
   $('#btop').innerHTML = '<a class="ib" href="#book/' + encodeURIComponent(d.id) + '" aria-label="Back to the book">' + I.back + '</a>' +
@@ -892,7 +895,7 @@ function drawTop(){
     '<button class="ib" data-bk="toc" title="Contents' + tip('toc') + '" aria-label="Contents">' + ICON.toc + '</button>' +
     '<button class="ib aa" data-bk="aa" title="Themes and settings" aria-label="Themes and settings">Aa</button>' +
     '<button class="ib" data-bk="search" title="Search the book' + tip('search') + '" aria-label="Search the book">' + ICON.search + '</button>' +
-    '<button class="ib" data-bk="bookmark" title="Bookmark this page' + tip('bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' +
+    '<button class="ib" data-bk="bookmark" title="Bookmark this page' + tip('bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' + (C.Sketch ? C.Sketch.button() : '') +
     '<button class="ib" data-bk="more" title="More" aria-label="More">' + ICON.more + '</button>';
 }
 const PHONE = () => matchMedia('(max-width:700px)').matches;

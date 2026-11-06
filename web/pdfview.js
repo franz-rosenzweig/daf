@@ -31,7 +31,7 @@ C.views.pdf = async args => {
     '<h1 id="ptitle">PDF</h1><span class="spacer"></span><span class="mute tiny" id="ppg"></span>' +
     '<button class="btn sm" data-pv="out" aria-label="Smaller" title="Smaller (−)">−</button><button class="btn sm" data-pv="in" aria-label="Larger" title="Larger (+)">+</button>' +
     (book ? '' : '<a class="btn sm" href="#read/' + encodeURIComponent(id) + '" data-swap title="The text, reflowed">Text</a>') +
-    '<a class="btn sm" href="' + P.src.file + '" download title="The PDF file">Download</a>' + (C.Focus ? C.Focus.button('article') : '') + '</div>' +
+    '<a class="btn sm" href="' + P.src.file + '" download title="The PDF file">Download</a>' + (C.Sketch ? C.Sketch.button('pdf') : '') + (C.Focus ? C.Focus.button('article') : '') + '</div>' +
     '<div class="pdfpages" id="pdfpages"><span class="mute" style="padding:24px">Opening the PDF…</span></div></div>';
   try { P.d = await api(P.src.meta); } catch(e){ $('#pdfpages').innerHTML = '<p class="mute" style="padding:24px">' + esc(e.message) + '</p>'; return; }
   if (P.id !== id) return;
@@ -44,6 +44,9 @@ C.views.pdf = async args => {
   P.zoom = store.get('pdfZoom', 1);
   P.seen = new Set(); P.pageAt = Date.now();
   await layout();
+  // the Sketchbook beside it (sketchbook.js): its camera takes the page in view
+  if (C.Sketch) C.Sketch.attach({ item: (book ? 'book:' : 'doc:') + id, kind: 'pdf', shots: () => $$('#pdfpages .pdfpage canvas'),
+    resized: () => { const keep = P.page; layout().then(() => scrollToPage(keep)); } });
   // a book's place is kept in Daf for every device ("pdf:<page>"); a document's page on this one
   const kept = book && P.d.position && /^pdf:(\d+)/.exec(P.d.position.cfi || '');
   const at = hl ? null : kept ? +kept[1] : store.get('pdfPage.' + id, 0);

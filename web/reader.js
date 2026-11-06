@@ -961,6 +961,7 @@ function drawReaderTop(){
     (pod ? '' : '<button class="ib" data-dact="' + (feed ? 'seen' : 'archive') + '" data-id="' + esc(d.id) + '" title="Done' + K.tip('article', 'archive') + '" aria-label="Done">' + ICON.done + '</button>') +
     (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" data-swap title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
     '<button class="ib" data-ract="more" title="More actions (m)" aria-label="More actions"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg></button>' +
+    (C.Sketch ? C.Sketch.button() : '') +
     '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" title="Notebook and info' + K.tip('article', 'panel') + '" aria-label="Notebook and info">' + ICON.panel + '</button>';
 }
 // The … menu (Readwise's "More actions"): everything the bar doesn't show, with its key.
@@ -1080,6 +1081,8 @@ async function readView(id){
   main.onscroll = onScroll; R.lastActive = Date.now();
   markSpeaking();
   if (C.Ink) C.Ink.open(d);                           // what's written on it with a pen (ink.js)
+  const timed = d.kind === 'video' || !!d.episode;   // the Sketchbook beside it (sketchbook.js), a video's with its time
+  if (C.Sketch) C.Sketch.attach({ item: 'doc:' + d.id, kind: 'doc', time: timed ? curTime : null, seek: timed ? seek : null });
 }
 function drawToc(){
   const d = R.doc, t = $('#toc'); if (!t || !d) return;

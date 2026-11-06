@@ -13,8 +13,8 @@ const FILES = ["__FILES__"];
 const LIMIT = { [IMG]: 3000, [BOOKS]: 60 };
 // API reads worth having offline. A single doc is stored without its query, so a prefetch
 // (?prefetch=1) and a normal open share one copy.
-const OFFLINE_API = /^\/api\/(me|settings|today|review|goals|feed\/sources|books|highlights|torah|recovery|stats|home|year\/\d+|docs|docs\/counts|docs\/[^/]+|ebooks|ebooks\/[^/]+|manga|manga\/prefs|manga\/series\/[^/]+|manga\/books\/[^/]+|manga\/books\/[^/]+\/crop\/\d+)$/;
-const PICTURE = /^\/api\/(cover\/[^/]+|thumb\/[0-9a-f]+\.jpg|manga\/thumb\/[^/]+\/[^/]+|manga\/books\/[^/]+\/pages\/\d+|feed\/icon\/[^/]+)$/;
+const OFFLINE_API = /^\/api\/(me|settings|today|review|goals|feed\/sources|books|highlights|torah|recovery|stats|home|year\/\d+|docs|docs\/counts|docs\/[^/]+|ebooks|ebooks\/[^/]+|manga|manga\/prefs|manga\/series\/[^/]+|manga\/books\/[^/]+|manga\/books\/[^/]+\/crop\/\d+|sketchbook\/[^/]+)$/;
+const PICTURE = /^\/api\/(cover\/[^/]+|thumb\/[0-9a-f]+\.jpg|manga\/thumb\/[^/]+\/[^/]+|manga\/books\/[^/]+\/pages\/\d+|feed\/icon\/[^/]+|sketchbook\/img\/[0-9a-f]+\.(?:jpg|png|webp))$/;
 const BOOK_FILE = /^\/api\/ebooks\/[^/]+\/file$/;
 const MANGA_PAGE = /^\/api\/manga\/books\/[^/]+\/pages\/\d+$/;
 // Daf for Android keeps books and downloaded volumes itself and answers for them before the network
