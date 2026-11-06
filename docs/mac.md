@@ -12,15 +12,15 @@ Only Daf loads in the window. Any other link opens in your browser, `obsidian://
 
 ## The sidebar
 
-The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Review**, **Library** with its kinds, **Books**, **Feed** with its folders and **Highlights**, then what I've pinned, then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
+The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Review**, **Library** with its kinds, **Books**, **Feed** with its folders and **Highlights**, then what I've pinned (**Edit** beside Pinned picks them), then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
 
-⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (just the icons): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
+⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (the icons, each with its name under it, and ☰ at the top for the full one): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
 
 ## Reading
 
 An article's toolbar has **Themes & Settings** (Aa), **Listen**, **Save to Library** for something from the Feed, **Done**, the **…** menu and the **Notebook**. The **…** menu has the rest: the Shortlist, Read Later, the original, Focus Mode, the next or previous one in the list, and so on. The time left sits quietly under the text.
 
-A book opens the way Apple Books does it: two pages side by side when the window is wide, the title in the middle of the toolbar, and **Contents**, **Aa**, **Search**, **Bookmark** and **…** beside it. Contents and search slide over the pages from the left, and the notebook, the book's details and Ask from the right; a click beside them puts them away. The footer fades once I've turned a page and comes back when the pointer goes near it.
+A book opens the way Apple Books does it: two pages side by side when the window is wide, the title in the middle of the toolbar, and **Contents**, **Aa**, **Search**, **Bookmark** and **…** beside it. Contents and search slide over the pages from the left, and the notebook, the book's details and Ask from the right; a click beside them puts them away. Under the pages is the status bar, set up like KOReader's: **Themes & Settings → Status Bar** (or a right-click on it) picks what's on it, one at a time or all at once, and the line beside it, of the book with its chapters marked or of the chapter. A click on it goes on to the next thing.
 
 **Themes & Settings** is the same for both: two A buttons for smaller and bigger, Pages or Scroll for a book, six looks (Daf, Paper and E-ink for the day; Dusk, Night and Black for the night), Auto, Light or Dark, and under them the typeface and the spacing, the line width and justifying. A day look while it's dark switches to light, and a night look while it's light to dark. **All Themes…** opens Settings → Appearance.
 
@@ -32,7 +32,15 @@ In a window the toolbars stay where they are, the way a Mac window keeps its too
 
 ## Videos, reels and podcasts
 
-A YouTube video, a reel and a podcast episode play in the Mac's own player above the transcript, the same as on the page (see [Videos and podcasts](videos-and-podcasts.md)). A reel stands up, or keeps its own shape when it's square or wide. An episode starts where I last stopped, in Daf or in AntennaPod, and has −15 and +30 (← and →), the speed, its chapters and **Clip 30s**. P plays and pauses, and the episode shows in Now Playing, so the keyboard's media keys and Control Center work too. **Podcasts** in the sidebar has what I listened to lately, my clips and my shows.
+A YouTube video and a reel play in the Mac's own player above the transcript, the same as on the page (see [Videos and podcasts](videos-and-podcasts.md)). A reel stands up, or keeps its own shape when it's square or wide.
+
+Podcast episodes, Audiobookshelf's recordings and audiobooks, and anything read aloud play in Daf's player, a bar along the bottom of the window that keeps playing wherever I go. A click on it opens the whole player: the picture, the time to scrub, the speed, a sleep timer (in minutes, or at the end of the chapter), the chapters, and **Go to It**. An episode starts where I last stopped, in Daf or in AntennaPod; its page has −15 and +30 (← and →), the speed, its chapters, **Clip 30s** and **Show Notes**, and its transcript follows the player. P plays and pauses, and what's playing shows in Now Playing, so the keyboard's media keys and Control Center work too. A book read aloud goes on after I close its window.
+
+**Podcasts** in the sidebar is the page's Podcasts tab: Listening, Shows, Episodes, Recordings, Audiobooks and Clips, a show's page with **Follow**, and a search that finds shows in Apple's directory too. A book that has its audiobook in Audiobookshelf has **Listen** and **Listen from Here** on its page.
+
+## Searching
+
+Every list and page has a search in its toolbar. In the Library and the Feed it asks Daf, which reads the text too, and the Inbox, Later and Archive (or Unseen and Seen) say how many it found; inside a kind or a folder it can widen to **All of the Library** or **All Feeds**. Books looks through titles, authors, series and shelves, Home through the whole Library, and the rest filter as I type. ⌘K still searches everything at once.
 
 **Settings → Connections** has **Instagram**, where **Sign In to Instagram…** opens Instagram's own sign-in in a window that keeps nothing on the Mac and hands the sign-in to Daf, and **AniList**, for the manga tracker.
 

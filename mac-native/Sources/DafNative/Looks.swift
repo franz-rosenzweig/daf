@@ -55,6 +55,7 @@ struct ThemesPanel: View {
     @State private var look = BookLook()
     @State private var fontOpen = false
     @State private var fineOpen = false
+    @State private var barOpen = false
 
     /// The looks: the theme family, whether it's the night's, and its name.
     static let looks = [("daf", false, "Daf"), ("paper", false, "Paper"), ("eink", false, "E-ink"),
@@ -100,6 +101,9 @@ struct ThemesPanel: View {
                 }
             }
             DisclosureGroup("Spacing, margins, justify", isExpanded: $fineOpen) { fine }
+            if book != nil {
+                DisclosureGroup("Status Bar", isExpanded: $barOpen) { StatusBarSettings().padding(.top, 6) }
+            }
             Button("All Themes…") { AppModel.shared.openSettings(tab: "appearance") }
                 .buttonStyle(.link)
         }
