@@ -183,13 +183,12 @@ struct ConnectionsPrefs: View {
                 hcSection
                 NewslettersSection()
                 digestSection
-                InstagramSection()
                 AniListSection()
             }
             .formStyle(.grouped)
             .task {
                 await load()
-                // opened at a section (a reel that needs Instagram, the Podcasts page)
+                // opened at a section (the Podcasts page)
                 if let at = UserDefaults.standard.string(forKey: "prefsFocus") {
                     UserDefaults.standard.removeObject(forKey: "prefsFocus")
                     try? await Task.sleep(nanoseconds: 300_000_000)

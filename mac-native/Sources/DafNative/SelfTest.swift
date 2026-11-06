@@ -968,9 +968,8 @@ enum SelfTest {
                 m.selection = "sbx:reel2"
                 let shown = await until(10) { m.reader?.id == "sbx:reel2" && m.reader?.doc != nil }
                 await pause(1)
-                capture("69b-reel-waiting")
-                check(shown && m.reader?.video == nil && (m.reader?.doc?.s("content_error") ?? "").contains("sign in again"),
-                      "a reel Daf can't get yet says why, with the way to Instagram in Settings")
+                capture("69b-reel-link")
+                check(shown && m.reader?.video == nil, "a reel Daf has no video of shows just Open on Instagram (see 69b-reel-link)")
             }
         } else { log("INFO  no sandbox reel (sandbox_more.py makes sbx:reel1)") }
 
@@ -1140,14 +1139,14 @@ enum SelfTest {
             if let w = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) { capture(shot, w); w.close() }
             check(shown, "Settings › \(tab.capitalized) opens (see \(shot))")
         }
-        // Connections, at Instagram: where a reel that needs a sign-in sends you
+        // Connections, at Podcasts: where the Podcasts tab's AntennaPod button sends you
         do {
             let before = Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
-            m.openSettings(tab: "connections", at: "instagram")
+            m.openSettings(tab: "connections", at: "podcasts")
             let shown = await until(6) { NSApp.windows.contains { $0.isVisible && !before.contains(ObjectIdentifier($0)) } }
             await pause(4)
-            if let w = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) { capture("53b-instagram", w); w.close() }
-            check(shown && UserDefaults.standard.string(forKey: "prefsFocus") == nil, "Settings › Connections opens at Instagram (see 53b-instagram)")
+            if let w = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) { capture("53b-podcasts", w); w.close() }
+            check(shown && UserDefaults.standard.string(forKey: "prefsFocus") == nil, "Settings › Connections opens at Podcasts (see 53b-podcasts)")
         }
         UserDefaults.standard.removeObject(forKey: "prefsTab")
         let tagList = (try? await API.shared.json("/api/doc-tags"))?.a("tags") ?? []

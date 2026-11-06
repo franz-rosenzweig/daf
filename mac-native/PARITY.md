@@ -48,7 +48,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: paragraph focus (j, k) and h or n on it; the page's article keys (h n j k p L e l s f t N d z o J K C R M)
 - here: picture highlights (right-click a picture, or select it and press H), framed in their colour, shown as the picture everywhere
 - here: videos natively (YouTube's private player above the transcript, follow along, a timestamp plays from there, Clip 30s, C), captions or a transcription when there's none
-- here: reels (social.py): Daf's own copy in AVPlayer, standing up, or square and wide in their own shape; the transcript follows along, Clip 30s; on its way from Instagram, or why not, with the way to Instagram in Settings; Open on Instagram
+- here: reels (social.py): Daf's own copy in AVPlayer, standing up, or square and wide in their own shape; the transcript follows along, Clip 30s, Open on Instagram; a reel Daf has no video of stays its link, with just Open on Instagram (Daf never fetches from Instagram)
 - here: a podcast episode's page (episodes.py): its audio from where the last play anywhere stopped (and says where), −15 and +30 (← →), the speed (1× to 2×, 0.8×, kept), chapters, Clip 30s (the server transcribes it when there's no transcript yet), Follow Along, Transcribe and Try Again, P plays and pauses, the media keys and Now Playing; where it stops goes back in stretches (/api/podcasts/position); #read/<doc>/t:<sec>; Save to Library for an episode met only in AntennaPod
 - here: highlights in the PDF view (as you select, H or N, right-click), the text view's found on the page, its zoom keys (− +), its reading time and the page read
 - here: Torah's verses in Hebrew and English, or one of them (the toolbar, or Article › Torah)
@@ -96,7 +96,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: Library tags (rename, merge, remove, the tidy-up)
 - here: Import (Instapaper, Readwise, Raindrop, Pocket, OPML…), dropped or chosen, followed as it goes
 - here: Morning email, Newsletters, Hardcover, Phone, Podcasts (AntennaPod, and Transcribe episodes I play or open)
-- here: Instagram (the sign-in, Sign In to Instagram in a window that keeps nothing, Keep Daf signed in from my browser, the reels waiting, Forget It) and AniList (the client, Connect, the last update)
+- here: AniList (the client, Connect, the last update); the Instagram sign-in is gone, as on the page
 - here: Send Feedback (Help menu)
 - here: appearance: Daf's themes (a theme for light and one for dark, with the Mac or always one), kept in Daf for every device; books keep their own
 

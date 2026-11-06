@@ -827,7 +827,7 @@ final class AppModel {
         }
     }
 
-    /// Settings at a tab, scrolled to a section there ("instagram" in Connections).
+    /// Settings at a tab, scrolled to a section there ("podcasts" in Connections).
     func openSettings(tab: String, at section: String? = nil) {
         UserDefaults.standard.set(tab, forKey: "prefsTab")
         UserDefaults.standard.set(section, forKey: "prefsFocus")

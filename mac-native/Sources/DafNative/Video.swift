@@ -282,7 +282,7 @@ struct VideoArticle: View {
                     }
                     Divider()
                 } else if isReel {
-                    reelWaiting(tall: min(420, max(200, g.size.height * 0.45)))
+                    reelLink
                     Divider()
                 }
                 if doc?.list("blocks").isEmpty ?? true {
@@ -353,26 +353,17 @@ struct VideoArticle: View {
         }
     }
 
-    /// No video yet: on its way from Instagram, or why not (and where to sign in again).
-    private func reelWaiting(tall: CGFloat) -> some View {
-        let err = doc?.s("content_error")
-        return VStack(spacing: 0) {
-            VStack(spacing: 12) {
-                Text(doc?.b("preparing") == true ? "Getting the reel from Instagram. It plays here in a moment." : err ?? "Daf doesn't have this video yet.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.85))
-                if err?.contains("sign in again") == true {
-                    Button("Instagram in Settings…") { app.openSettings(tab: "connections", at: "instagram") }
-                }
+    /// A reel Daf has no video of stays its link: Open on Instagram, and nothing else.
+    private var reelLink: some View {
+        HStack {
+            if let u = doc?.s("url").flatMap(URL.init(string:)) {
+                Button("Open on Instagram") { NSWorkspace.shared.open(u) }
+                    .buttonStyle(.borderedProminent)
             }
-            .padding(24)
-            .frame(width: tall * 9 / 16, height: tall)
-            .frame(maxWidth: .infinity)
-            .background(Color.black)
-            HStack { Spacer(); instagramLink }
-                .controlSize(.small)
-                .padding(.horizontal, 16).padding(.vertical, 8)
+            Spacer()
         }
+        .controlSize(.small)
+        .padding(.horizontal, 16).padding(.vertical, 8)
     }
 
     @ViewBuilder private var instagramLink: some View {
@@ -457,19 +448,17 @@ struct VideoArticle: View {
         Toggle("Follow Along", isOn: Binding(get: { v.follow }, set: { v.follow = $0 }))
     }
 
-    /// What's on its way, looked for every five seconds as the page does: a reel coming from
-    /// Instagram, an episode's transcript.
+    /// An episode's transcript on its way, looked for every five seconds as the page does.
     private func watch() async {
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard !Task.isCancelled else { return }
-            let reelComing = isReel && doc?.b("preparing") == true
             let tr = (podtr ?? episode?.o("transcript"))?.s("status")
             let trComing = episode != nil && (tr == "queued" || tr == "running")
-            guard reelComing || trComing, let st = try? await API.shared.json("/api/docs/\(API.enc(model.id))/transcript") else { continue }
+            guard trComing, let st = try? await API.shared.json("/api/docs/\(API.enc(model.id))/transcript") else { continue }
             if let p = st.o("podtr") {
                 if st.b("ready") { podtr = nil; await model.load() } else if p.s("status") == "failed" { podtr = p }
-            } else if st.b("ready") || ["done", "failed"].contains(st.o("reel")?.s("status") ?? "") {
+            } else if st.b("ready") {
                 await model.load()
             }
         }
