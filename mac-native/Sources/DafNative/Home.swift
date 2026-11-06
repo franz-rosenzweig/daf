@@ -6,6 +6,9 @@ struct HomeView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @AppStorage("homeHidden") private var hidden = ""
+    /// Its search: the whole Library (inbox, later and archive), found on the server.
+    @State private var q = ""
+    @State private var hits: [Item]?
 
     private static let shelves = [("continue", "Continue Reading"), ("recent", "Recently Added"), ("quick", "Quick Reads"),
                                   ("long", "Long Reads"), ("highlighted", "Recently Highlighted"), ("feed", "New in the Feed")]
@@ -13,7 +16,9 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                if let home = model.home {
+                if !q.trimmingCharacters(in: .whitespaces).isEmpty {
+                    found
+                } else if let home = model.home {
                     ForEach(Self.shelves.filter { !hidden.split(separator: ",").contains(Substring($0.0)) }, id: \.0) { key, title in
                         let list = home.a(key).map(Item.init)
                         if !list.isEmpty {
@@ -34,6 +39,14 @@ struct HomeView: View {
             .padding(28)
         }
         .navigationTitle("Home")
+        .searchable(text: $q, placement: .toolbar, prompt: "Search the Library")
+        .task(id: q) {
+            let words = q.trimmingCharacters(in: .whitespaces)
+            guard !words.isEmpty else { hits = nil; return }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            hits = (try? await API.shared.json("/api/docs?where=library&tab=any&every=1&limit=200&q=" + API.enc(words)))?.a("items").map(Item.init) ?? []
+        }
         .toolbar {
             ToolbarItem {
                 Menu {
@@ -53,6 +66,28 @@ struct HomeView: View {
                     .help("Daf reads every source again")
             }
         }
+    }
+
+    /// What the search found, by where it is: Inbox, Later, Archive.
+    @ViewBuilder private var found: some View {
+        if let hits {
+            if hits.isEmpty { Text("Nothing matches").font(.headline).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(40) }
+            ForEach([("inbox", "Inbox"), ("later", "Later"), ("archive", "Archive")], id: \.0) { key, title in
+                let these = hits.filter { ($0.status ?? "inbox") == key || (key == "inbox" && !["later", "archive"].contains($0.status ?? "")) }
+                if !these.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(title + " · \(these.count)").font(.title3.weight(.semibold))
+                        VStack(spacing: 0) {
+                            ForEach(these) { item in
+                                Button { if let r = model.route(for: item) { openWindow(id: "route", value: r) } } label: { ItemRow(item: item).contentShape(Rectangle()) }
+                                    .buttonStyle(.plain)
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+        } else { ProgressView().frame(maxWidth: .infinity).padding(60) }
     }
 
     private func card(_ item: Item) -> some View {

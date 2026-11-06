@@ -10,6 +10,8 @@ struct BookPage: View {
     @State private var b: J?
     @State private var note = ""
     @State private var swapOut: [J]?
+    /// Its audiobook in Audiobookshelf: where I am in it.
+    @State private var audio: J?
 
     var body: some View {
         ScrollView {
@@ -37,6 +39,7 @@ struct BookPage: View {
                                     Button { openWindow(id: "route", value: "#ebook/" + API.enc(id)) } label: { Label("Read", systemImage: "book") }
                                         .buttonStyle(.borderedProminent)
                                 }
+                                if let x = audio, let item = x.s("item") { listen(b, x, item) }
                                 Button(b.b("on_nightstand") ? "Off the Nightstand" : "On the Nightstand") { Task { await nightstand(!b.b("on_nightstand")) } }
                                 ShelvesMenu(book: id)
                             }
@@ -98,13 +101,32 @@ struct BookPage: View {
                 ProgressView().frame(maxWidth: .infinity).padding(60)
             }
         }
-        .task(id: id) { b = try? await API.shared.json("/api/books/" + API.enc(id)) }
+        .task(id: id) {
+            b = try? await API.shared.json("/api/books/" + API.enc(id))
+            audio = nil
+            if b?.s("kind") ?? "book" == "book", let x = try? await API.shared.json("/api/abs/book/" + API.enc(id)), x.s("item") != nil {
+                audio = x
+                if b?.b("readable") == true, x.o("reading") != nil { Player.audioStart(book: id) }      // finding the place takes a few seconds: start before the click
+            }
+        }
         .confirmationDialog("Which one steps off?", isPresented: Binding(get: { swapOut != nil }, set: { if !$0 { swapOut = nil } })) {
             ForEach(swapOut ?? [], id: \.self) { x in
                 Button(PaperPages.short(x.s("title"))) { Task { await swap(x.s("id")) } }
             }
             Button("Cancel", role: .cancel) { swapOut = nil }
         } message: { Text("The nightstand holds three. The one you take off stays in your library and your vault.") }
+    }
+
+    /// Listen (where the audiobook is), and Listen from Here (where I'm reading).
+    @ViewBuilder
+    private func listen(_ b: J, _ x: J, _ item: String) -> some View {
+        let p = Player.shared, on = p.is(Player.absKey(item)) && p.playing, at = x.d("at") ?? 0
+        Button { Task { await p.playABS(item) } } label: {
+            Label(on ? "Pause" : at > 30 && !x.b("done") ? "Listen · " + Player.hm(at) + " of " + Player.hm(x.d("duration") ?? 0) : "Listen", systemImage: on ? "pause.fill" : "headphones")
+        }
+        if b.b("readable"), x.o("reading") != nil {
+            Button("Listen from Here") { Task { await p.listen(book: id, item: item) } }
+        }
     }
 
     private func stats(_ st: J) -> some View {
@@ -181,11 +203,12 @@ struct SourcesView: View {
     @Environment(AppModel.self) private var model
     @State private var s: J?
     @State private var syncing = false
+    @State private var q = ""
 
     var body: some View {
         List {
             if let s {
-                ForEach(s.a("checks"), id: \.self) { c in
+                ForEach(s.a("checks").filter { Find.match(q, $0.s("name"), $0.s("detail")) }, id: \.self) { c in
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: c.b("ok") ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                             .foregroundStyle(c.b("ok") ? .green : .orange)
@@ -203,6 +226,7 @@ struct SourcesView: View {
             }
         }
         .navigationTitle("Sources")
+        .searchable(text: $q, placement: .toolbar, prompt: "Search sources")
         .toolbar {
             ToolbarItem {
                 Button { Task { await sync() } } label: { Label(syncing ? "Syncing…" : "Sync Now", systemImage: "arrow.triangle.2.circlepath") }
@@ -229,9 +253,15 @@ struct TorahList: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        @Bindable var model = model
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if let t = model.torah {
+                if let t = model.torah, !model.findWords.isEmpty {
+                    let groups = [("This week", t.a("week")), ("Divrei Torah this week", t.a("divrei")), ("Listen", t.a("listen")),
+                                  ("From your vault", AppModel.essays(t)), ("Earlier weeks", t.a("earlier"))].map { ($0.0, find($0.1)) }
+                    ForEach(groups, id: \.0) { title, list in rows(title, list) }
+                    if groups.allSatisfy({ $0.1.isEmpty }) { Text("Nothing matches").font(.headline).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(30) }
+                } else if let t = model.torah {
                     if let p = t.o("parasha") {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(p.s("he") ?? "").font(.system(.largeTitle, design: .serif)).frame(maxWidth: .infinity, alignment: .trailing)
@@ -269,6 +299,11 @@ struct TorahList: View {
             .padding(20)
         }
         .navigationTitle("Torah")
+        .searchable(text: $model.findQ, placement: .toolbar, prompt: "Search Torah")
+    }
+
+    private func find(_ list: [J]) -> [J] {
+        list.filter { Find.match(model.findWords, $0.s("title"), $0.s("source"), $0.s("author"), $0.s("series")) }
     }
 
     @ViewBuilder

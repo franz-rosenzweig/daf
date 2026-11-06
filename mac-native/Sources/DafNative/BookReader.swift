@@ -45,6 +45,10 @@ final class BookModel {
     var sheet: HLSheet?
     /// The Kindle is further on than this place: offered as a jump.
     var kindleAhead: Double?
+    /// The book's audiobook in Audiobookshelf (audiomap.py), and its place in the book when I listened
+    /// since I last read: offered as a jump.
+    var audiobook: J?
+    var audioOffer: J?
     /// The Kindle's highlights (KOReader's, with its words), found in this edition by their words.
     var kindle: [J] = []
     var results: [BookHit] = []
@@ -99,6 +103,7 @@ final class BookModel {
 
     func load() async {
         Self.last = self                // the one on screen (SwiftUI may make others it throws away)
+        let opensAt = target != nil
         do {
             let d = try await API.shared.json("/api/ebooks/" + API.enc(id))
             details = d
@@ -127,10 +132,50 @@ final class BookModel {
             if let k = d.o("kindle"), let kf = k.d("fraction"), kf > (d.o("position")?.d("fraction") ?? 0) + 0.02,
                (k.d("at") ?? 0) > (d.o("position")?.d("updated") ?? 0) { kindleAhead = kf }
             startBeats()
+            Task { await audiobookPlace(d.o("position"), offer: !opensAt) }
         } catch { self.error = error.localizedDescription }
     }
 
     private func file(size: Int?) async throws -> Data { try await Self.file(for: id, size: size) }
+
+    /// The book's audiobook, and (opened at my own place) where the audiobook is, when I listened since.
+    private func audiobookPlace(_ mine: J?, offer: Bool) async {
+        let since = Int(mine?.d("updated") ?? mine?.d("at") ?? 0), frac = mine?.d("fraction") ?? -1
+        guard let x = try? await API.shared.json("/api/abs/book/\(API.enc(id))" + (offer ? "?offer=1&since=\(since)&fraction=\(frac)" : "")),
+              x.s("item") != nil else { return }
+        audiobook = x
+        audioOffer = x.o("offer")
+    }
+
+    /// Where I'm reading, for the audiobook to start there: the page's CFI, the fraction, and its words.
+    func place() -> [String: Any]? {
+        guard let epub, let text, let pages else { return nil }
+        let vis = pages.visible
+        guard let local = text.cfi(vis.location, NSMaxRange(vis) > vis.location ? NSMaxRange(vis) : nil) else { return nil }
+        let all = pages.storage.string as NSString
+        let words = all.substring(with: NSIntersectionRange(vis, NSRange(location: 0, length: all.length)))
+        return ["cfi": CFI.join(epub.sections[section].cfi, local), "fraction": fraction, "text": String(words.prefix(600))]
+    }
+
+    /// A place told by its words (the audiobook's), found in the book, or else by its fraction.
+    func go(words: String?, fraction: Double) async {
+        if let words, let epub {
+            let w = words.split(whereSeparator: \.isWhitespace).map(String.init), mid = w.count / 2
+            let tries = [Array(w.prefix(7)), Array(w[max(0, mid - 3)..<min(w.count, mid + 4)]), Array(w.suffix(7))].map { $0.joined(separator: " ") }
+            var seen = Set<String>()
+            for q in tries where q.count > 10 && seen.insert(q).inserted {
+                for k in epub.sections.indices {
+                    if let r = Self.find(q, in: Self.normal(plain(k))) {
+                        open(k, at: r.location)
+                        pages?.flash(r)
+                        return
+                    }
+                    if k % 6 == 5 { await Task.yield() }
+                }
+            }
+        }
+        if fraction >= 0 { go(fraction: fraction) }
+    }
 
     /// A book's file: the copy kept on this Mac when it's the same size as Calibre's (or there's no
     /// connection), else Daf's, kept for next time.
@@ -1081,7 +1126,7 @@ struct BookReaderView: View {
                             .animation(.snappy, value: m.toast)
                         }
                         .overlay(alignment: .bottom) {
-                            if Speaker.shared.key == m.listenKey { SpeakerBar().padding(.bottom, 72) }
+                            if Player.shared.any { PlayerBar().padding(.bottom, 72) }
                         }
                         .overlay { if m.epub == nil { ProgressView("Opening the book…").padding(40) } }
                     // the panel slides over the pages; a click beside it puts it away
@@ -1133,6 +1178,9 @@ struct BookReaderView: View {
                         Button(Speaker.shared.key == m.listenKey && Speaker.shared.playing ? "Pause Listening" : "Listen from Here") {
                             if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) }
                         }
+                        if let item = m.audiobook?.s("item") {
+                            Button("The Audiobook from Here") { if let p = m.place() { Task { await Player.shared.listen(book: m.id, item: item, place: p) } } }
+                        }
                         Button("Notebook") { panel("highlights") }
                         Button("About This Book") { panel("info") }
                         Button("Ask About This Book") { panel("ask") }
@@ -1163,7 +1211,7 @@ struct BookReaderView: View {
         }
         .sheet(isPresented: $m.finishing) { FinishSheet(bookID: m.id, title: m.title) { m.hardcoverEnd = false }.environment(app) }
         .task { await m.load() }
-        .onDisappear { m.close(); if Speaker.shared.key == m.listenKey { Speaker.shared.stop() } }
+        .onDisappear { m.close() }          // read aloud, it goes on in the player
         .sheet(item: $m.editing) { e in
             NoteSheet(h: e.h, saved: { n in m.changed(e.id) { $0["user_note"] = n } }).environment(app)
         }
@@ -1213,6 +1261,16 @@ struct BookReaderView: View {
 
     @ViewBuilder
     private var kindleBanner: some View {
+        if let o = m.audioOffer {
+            HStack(spacing: 12) {
+                Text("In the audiobook you're at " + (o.s("chapter") ?? "\(Int(((o.d("fraction") ?? 0) * 100).rounded()))%") + ". Go there?").font(.callout).lineLimit(1)
+                Button("Go There") { m.audioOffer = nil; Task { await m.go(words: o.s("words"), fraction: o.d("fraction") ?? -1) } }
+                Button("Stay Here") { m.audioOffer = nil }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .glassEffect(.regular, in: Capsule())
+            .padding(.top, 8)
+        }
         if let k = m.kindleAhead {
             HStack(spacing: 12) {
                 Text("The Kindle is further on, at \(Int((k * 100).rounded()))%").font(.callout)

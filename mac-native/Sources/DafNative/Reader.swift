@@ -109,15 +109,13 @@ final class ReaderModel {
     /// A reel's video once Daf has it, an episode's audio from where the last play anywhere
     /// stopped, or YouTube's player.
     private func player(for d: J) -> VideoPlayer? {
-        if let e = d.o("episode"), let audio = e.s("audio") {
-            let v = VideoPlayer(media: audio, kind: .episode)
-            v.docID = id
-            v.nowPlaying = (d.s("title") ?? "", e.s("podcast") ?? d.s("source") ?? "")
+        if let e = d.o("episode"), e.s("audio") != nil {
+            let v = VideoPlayer(episode: Player.episode(doc: id, title: d.s("title") ?? "", source: d.s("source"), episode: e))
             let pos = e.o("position"), dur = e.d("duration") ?? 0
             if let t = podAt {
                 v.startAt = t
                 v.startPlaying = true
-            } else if let t = pos?.d("t"), t > 15, dur == 0 || t < dur - 30 {
+            } else if !Player.shared.is("ep:" + id), let t = pos?.d("t"), t > 15, dur == 0 || t < dur - 30 {
                 v.startAt = t
                 AppModel.shared.say("From " + VideoPlayer.clock(t) + ", where " + (pos?.s("from") ?? "AntennaPod") + " left off")
             }
@@ -691,6 +689,18 @@ final class ReaderModel {
     /// The block a character of the storage is in, or the next one.
     func block(at loc: Int) -> Int? {
         blocks.first { loc < $0.range.location + $0.range.length }?.i
+    }
+
+    /// Where the show notes start, after an episode's transcript (episodes.blocks).
+    var notesBlock: Int? {
+        doc?.list("blocks").firstIndex { J($0)?.s("t") == "h3" && J($0)?.s("x") == "Show notes" }
+    }
+
+    /// Show Notes: the show notes at the top of the window.
+    func showNotes() {
+        guard let n = notesBlock, let b = blocks.first(where: { $0.i == n }), let tv = textView, let lm = tv.layoutManager, let tc = tv.textContainer else { return }
+        let r = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: b.range, actualCharacterRange: nil), in: tc)
+        tv.scroll(NSPoint(x: 0, y: max(0, r.minY + tv.textContainerOrigin.y - 12)))
     }
 
     /// The first place the longest of the words is, as the page's findInDoc.

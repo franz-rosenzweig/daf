@@ -56,9 +56,9 @@ final class Speaker {
     @ObservationIgnored private let ended = Ended()
     @ObservationIgnored private var cache: [Int: Data] = [:]
     @ObservationIgnored private var fetching: [Int: Task<Data?, Never>] = [:]
-    @ObservationIgnored private weak var source: Listenable?
+    /// Kept while it reads, so a book or an article goes on being read after its window closes.
+    @ObservationIgnored private var source: Listenable?
     @ObservationIgnored private var beatTimer: Timer?
-    @ObservationIgnored private var remoteReady = false
     @ObservationIgnored private var failures = 0
     @ObservationIgnored private var generation = 0
 
@@ -69,6 +69,7 @@ final class Speaker {
     /// Starts reading: from a place in it, or from the top of the window.
     func start(_ s: Listenable, at place: Int? = nil) {
         stop()
+        Player.shared.stop()                     // an episode or an audiobook stops for it
         source = s
         key = s.listenKey
         title = s.listenTitle
@@ -242,24 +243,7 @@ final class Speaker {
 
     // MARK: the keyboard's play/pause and skip keys, and Now Playing
 
-    private func remote() {
-        guard !remoteReady else { return }
-        remoteReady = true
-        let c = MPRemoteCommandCenter.shared()
-        func on(_ cmd: MPRemoteCommand, _ f: @escaping @MainActor (Speaker) -> Void) {
-            cmd.isEnabled = true
-            cmd.addTarget { [weak self] _ in
-                guard let self else { return .commandFailed }
-                MainActor.assumeIsolated { f(self) }
-                return .success
-            }
-        }
-        on(c.togglePlayPauseCommand) { $0.toggle() }
-        on(c.playCommand) { $0.resume() }
-        on(c.pauseCommand) { $0.pause() }
-        on(c.nextTrackCommand) { $0.skip(1) }
-        on(c.previousTrackCommand) { $0.skip(-1) }
-    }
+    private func remote() { Player.shared.remote() }
 
     private func nowPlaying() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
@@ -300,57 +284,4 @@ extension ReaderModel: Listenable {
     func listened() { beat() }
 
     func advance() -> Bool { false }
-}
-
-/// The player at the bottom of a window while something is read aloud.
-struct SpeakerBar: View {
-    private let s = Speaker.shared
-
-    var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(s.title).font(.callout.weight(.semibold)).lineLimit(1)
-                Text(s.waiting ? "Getting the paragraph ready…" : "Paragraph \(min(s.index + 1, s.paragraphs.count)) of \(s.paragraphs.count)")
-                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-            }
-            .frame(maxWidth: 240, alignment: .leading)
-            Button { s.skip(-1) } label: { Image(systemName: "backward.fill") }.help("The paragraph before")
-            Button { s.toggle() } label: { Image(systemName: s.playing ? "pause.fill" : "play.fill").font(.title3).frame(width: 22) }
-                .help(s.playing ? "Pause" : "Listen")
-            Button { s.skip(1) } label: { Image(systemName: "forward.fill") }.help("The next paragraph")
-            Menu {
-                ForEach([0.75, 1, 1.25, 1.5, 1.75, 2], id: \.self) { r in
-                    Button { s.rate = Float(r) } label: {
-                        if abs(Double(s.rate) - r) < 0.01 { Label(speed(r), systemImage: "checkmark") } else { Text(speed(r)) }
-                    }
-                }
-            } label: { Text(speed(Double(s.rate))).monospacedDigit() }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            Menu {
-                ForEach(s.voices, id: \.self) { v in
-                    Button { Task { await s.use(voice: v) } } label: {
-                        if v == s.voice { Label(PrefsView.voiceName(v), systemImage: "checkmark") } else { Text(PrefsView.voiceName(v)) }
-                    }
-                }
-            } label: { Text(s.voice.isEmpty ? "Voice" : PrefsView.voiceName(s.voice).components(separatedBy: " · ").first ?? "Voice") }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .task { await s.loadVoices() }
-            Menu {
-                Button("No Sleep Timer") { s.sleep(after: nil) }
-                ForEach([15, 30, 45, 60], id: \.self) { n in Button("In \(n) Minutes") { s.sleep(after: n) } }
-            } label: { Image(systemName: s.sleepAt == nil ? "moon.zzz" : "moon.zzz.fill") }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .help(s.sleepAt.map { "Reading stops at " + $0.formatted(date: .omitted, time: .shortened) } ?? "The sleep timer")
-            Button { s.stop() } label: { Image(systemName: "xmark") }.help("Stop reading aloud")
-        }
-        .buttonStyle(.borderless)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 10)
-        .glassEffect(.regular, in: Capsule())
-    }
-
-    private func speed(_ r: Double) -> String { r == 1 ? "1×" : String(format: "%g×", r) }
 }
