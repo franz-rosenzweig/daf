@@ -139,6 +139,7 @@ window.addEventListener('hashchange', () => {
 });
 // Whatever is in front: search, a dialog, a popover, the highlight bar, a sheet.
 function closeFront(){
+  if (C().Scans && C().Scans.close()) return true;          // a scanned page up close (scans.js)
   if (shown('#palette')) { $('#palette').hidden = true; if ($('#modal').hidden) $('#scrim').hidden = true; return true; }
   if (shown('#modal')) { C().closeModal(); return true; }
   if (shown('#pop')) { $('#pop').hidden = true; return true; }

@@ -3,7 +3,7 @@
    right, highlights anchored by CFI, the Kindle's highlights placed by KOReader's own position,
    the position kept on the server so phone and desktop agree, and time with a book open counting
    toward the hour. */
-import './vendor/foliate-js/view.js';
+import { makeBook } from './vendor/foliate-js/view.js';
 import * as CFI from './vendor/foliate-js/epubcfi.js';
 import { FootnoteHandler } from './vendor/foliate-js/footnotes.js';
 
@@ -60,6 +60,7 @@ function bookCSS(){
     ${H.hlCSS()}
     aside[epub|type~="footnote"], aside[epub|type~="endnote"], aside[epub|type~="rearnote"] { display: none; }
     ${(t.flow || 'paginated') === 'scrolled' ? 'body { padding-bottom: 72px !important; }   /* room under the last line for Next */' : ''}
+    ${B.scans ? B.scans.css() : ''}
     @namespace epub "http://www.idpf.org/2007/ops";
   `];
 }
@@ -72,6 +73,7 @@ function applyBookType(){
   v.renderer.setAttribute('max-column-count', flow === 'paginated' && window.innerWidth >= 1180 && window.innerWidth > window.innerHeight ? '2' : '1');   // two pages, as a book opens
   v.renderer.setAttribute('gap', '6%');
   v.renderer.setAttribute('margin', window.innerWidth < 760 ? '24px' : '40px');
+  if (B.scans) B.scans.layout();   // a book of scanned pages: a page a picture, as big as fits (scans.js)
   v.renderer.setStyles?.(bookCSS());
   document.body.dataset.flow = flow;
 }
@@ -123,9 +125,11 @@ async function openBook(id, at){
   view.id = 'fv';
   $('#bstage').innerHTML = ''; $('#bstage').append(view);
   B.view = view;
-  try { await view.open(file); }
+  // a book of scanned pages is found before foliate opens it: its progress goes a page at a time (scans.js)
+  try { const book = await makeBook(file), scans = C.Scans && await C.Scans.detect(book, id); if (B.id === id) B.scans = scans; await view.open(book); }
   catch(e){ $('#bstage').innerHTML = '<div class="placeholder">This file wouldn’t open: ' + esc(e.message || String(e)) + '</div>'; return; }
   if (B.id !== id) { view.close?.(); return; }
+  if (B.scans) B.scans.attach(view);
   view.addEventListener('load', onSectionLoad);
   view.addEventListener('relocate', onRelocate);
   view.addEventListener('create-overlay', e => {
@@ -422,7 +426,8 @@ function cleanup(){
   if (B.tts && B.tts.on) stopListen();
   closeNote(); wake(false); H.hide();
   if (B.view) { try { savePosition(true); } catch(e){} try { B.view.close(); } catch(e){} B.view.remove(); }
-  B.view = null; B.id = null; B.d = null;
+  if (B.scans) B.scans.close();
+  B.view = null; B.id = null; B.d = null; B.scans = null;
   if (H.active === ACT) H.active = null;
   delete document.body.dataset.flow;
 }
@@ -508,10 +513,12 @@ function toggleChrome(){ if (C.Focus && C.Focus.on()) { C.Focus.bar(); return; }
 
 // Pages for page goals: a page counts once it has been on screen for five seconds, the way
 // KOReader counts the Kindle's. The printed page when the book has one, else foliate's location.
+// Two scanned pages side by side (scans.js) are both read.
+const addPages = key => key.split('\n').forEach(k => (B.pagesNew = B.pagesNew || new Set()).add(k));
 function notePage(l){
-  const key = l.pageItem && l.pageItem.label ? 'p' + l.pageItem.label : l.location && l.location.current != null ? 'l' + l.location.current : null;
+  const key = l.pageItem && l.pageItem.label ? (l.pageItem.pages || [l.pageItem.label]).map(p => 'p' + p).join('\n') : l.location && l.location.current != null ? 'l' + l.location.current : null;
   const now = Date.now();
-  if (B.pageKey && B.pageKey !== key && now - (B.pageAt || now) >= 5000) (B.pagesNew = B.pagesNew || new Set()).add(B.pageKey);
+  if (B.pageKey && B.pageKey !== key && now - (B.pageAt || now) >= 5000) addPages(B.pageKey);
   if (B.pageKey !== key) { B.pageKey = key; B.pageAt = now; }
 }
 function onRelocate(e){
@@ -553,7 +560,7 @@ function savePosition(now){
   const l = B.loc, id = B.id; if (!l || !l.cfi || !id || B.forget) return;
   const body = { cfi: l.cfi, fraction: l.fraction || 0, chapter: l.tocItem?.label || null };
   store.set('bookpos.' + id, { ...body, at: Math.floor(Date.now() / 1000) });
-  if (now && B.pageKey && Date.now() - (B.pageAt || 0) >= 5000) (B.pagesNew = B.pagesNew || new Set()).add(B.pageKey);
+  if (now && B.pageKey && Date.now() - (B.pageAt || 0) >= 5000) addPages(B.pageKey);
   if (B.pagesNew && B.pagesNew.size) { body.pages = [...B.pagesNew]; B.pagesNew = new Set(); }
   // offline (or Daf down), the place waits in the outbox with its time, so a newer one from the Kindle still wins
   const path = '/api/ebooks/' + encodeURIComponent(id) + '/position', late = () => C.outbox && C.outbox.add(path, { method: 'PUT', body: JSON.stringify(body) });
@@ -1161,6 +1168,7 @@ function openMore(anchor){
     '<button data-bm="start">Go to the beginning</button>' +
     '<button data-bm="kindle"' + (B.d.kindle ? '' : ' disabled') + '>Go to the Kindle’s page</button>' +
     '<button data-bm="mark">' + (markHere() ? 'Remove the bookmark' : 'Bookmark this page') + '<span class="kbd">b</span></button>' +
+    (B.scans ? '<button data-bm="pairs">Pair the pages the other way</button>' : '') +
     '<button data-bm="book">Book page, notes and nightstand</button>' +
     '<a href="/api/highlights/export?fmt=md&book=' + encodeURIComponent(B.d.id) + '" download>Export highlights (Markdown)</a>' +
     '<a href="/api/ebooks/' + encodeURIComponent(B.d.id) + '/file" download>Download the file</a>' +
@@ -1274,6 +1282,7 @@ document.addEventListener('click', async e => {
     else if (a === 'start') await B.view.goToTextStart().catch(() => {});
     else if (a === 'kindle' && B.d.kindle) await B.view.goToFraction(B.d.kindle.fraction);
     else if (a === 'mark') toggleMark();
+    else if (a === 'pairs' && B.scans) B.scans.pairs();
     else if (a === 'book') location.hash = '#book/' + encodeURIComponent(B.d.id);
     else if (a === 'auto') { H.setAuto(!H.auto()); toast(H.auto() ? 'Auto highlight on: selecting a passage highlights it' : 'Auto highlight off'); }
     else if (a === 'keys') showKeys();
