@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-05-podcasts', date: 'Nov 5', title: 'Podcasts, rebuilt', text: 'Listening, shows, episodes with filters and sorts, a search that finds new shows too, and Audiobookshelf’s recordings and audiobooks, which keep their place with the book.', go: '#podcasts' },
   { id: '2026-11-05-sketchbook', date: 'Nov 5', title: 'The Sketchbook', text: 'A page beside whatever you read or watch, a tab for each chapter: write with the pen, type, or capture a manga page. It goes to Obsidian as Ink notes.' },
   { id: '2026-11-05-rooms', date: 'Nov 5', title: 'Library rooms and page turns', text: 'Wood bookshelf, Rustic, Gothic and Cyberpunk libraries in Appearance; in a book, Aa → Page turn slides or curls the page.', go: '#prefs/appearance' },
   { id: '2026-11-05-manga-pen', date: 'Nov 5', title: 'Draw on manga', text: 'The S Pen draws on a manga page with the same pens as books; it stays on its page through zoom, spreads and the strip.', go: '#manga' },
