@@ -11,6 +11,8 @@ The Feed is my FreshRSS, read through its API, and it's where my RSS lives now i
 ![The Writing folder of the Feed](images/feed.png)
 *One folder of the Feed, with the info panel on the right.*
 
+Each row shows the site's icon in its little square, or the post's own picture when it has one (the feed's picture for it, or the first big one in the post), and then the icon sits next to the site's name instead. The pictures are kept on my server, like the Library's, so the list doesn't go to the sites for them.
+
 Each list has two tabs, **UNSEEN** and **SEEN**. Opening an item in Daf marks it read in FreshRSS, and anything read somewhere else shows as seen here on the next sync. Anything still unseen after a month moves to Seen by itself, which means the Feed never becomes a pile. **Preferences → Reader → The Feed lets go after** changes that, from a week up to a year, or never: make it longer and the unread items FreshRSS still has come back on the next sync. FreshRSS keeps unread articles for good and read ones for three months. The list's **…** menu has **Mark seen** for everything, or everything older than a day, three days or a week.
 
 The info panel shows the opening of the post and a **Summarize** button. **Save to Library** keeps an item for good, and so does highlighting it: the first highlight on a Feed item saves it to the Library on its own, the way Readwise does it.

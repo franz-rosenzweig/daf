@@ -209,8 +209,18 @@ def loop(stop):
             log.exception("sync")
         manga_index()
         full_articles()
+        feed_pictures()
         extras()
         stop.wait(config.SYNC_EVERY_SECONDS)
+
+
+def feed_pictures():
+    """Outside run() as well: the Feed's new posts' pictures are fetched from their sites (rss.keep_pictures)."""
+    try:
+        from .sources import rss
+        rss.keep_pictures()
+    except Exception:  # noqa: BLE001
+        log.exception("feed pictures")
 
 
 def extras():
