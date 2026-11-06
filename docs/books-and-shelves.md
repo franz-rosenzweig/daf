@@ -35,9 +35,13 @@ On a book's page, **The Kindle** has **Put it on the Kindle** and a shelf to put
 - **Shelves:** your own groups of books, with **New shelf** to make one, and the Kindle's shelves, marked "Kindle". A shelf's page has **Rename** and **Delete**, except for the Kindle's, which I rename and remove on the Kindle.
 - **Want to read:** your Want to read shelf on Hardcover, with **Read in Daf** under the ones Calibre has a file for.
 - **Opened lately:** the books you've had open recently, on the Kindle or in Daf, each with **Put on the nightstand**.
-- **Your library:** every book in Calibre, with a search box for the title or the author, and **Show all** for the full list.
+- **Your library:** every book in Calibre, with **Show all** for the full list.
 
 Manga volumes leave this page and live on their own, under [Manga](manga.md).
+
+## Searching my books
+
+The magnifying glass at the top of **Books** opens a search right in the bar. It finds a book by its title, its author, its series in Calibre or the name of a shelf it's on, so "craft" brings up everything on my Craft shelf. Each result says its series and its shelves, with **Read** when Daf has the file. A shelf's own page has the same search for the books on it. × clears it, and Esc, the arrow or the phone's Back closes it.
 
 ## Shelves and Hardcover lists
 

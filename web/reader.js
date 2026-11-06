@@ -192,9 +192,12 @@ function rowHTML(d){
     '<span class="pick" data-pick="' + esc(d.id) + '" role="checkbox" aria-checked="' + picked + '" aria-label="Select" title="Select (x)"></span>' +
     (feed && d.status === 'unseen' && !d.expired ? '<span class="dot" aria-hidden="true"></span>' : '') + thumb(d) +
     '<div class="rowb"><div class="rowt"><span' + dirAttr(d.title) + '>' + esc(d.kind === 'tweet' && tweetParts(d).lead ? tweetParts(d).title + ': ' + tweetParts(d).lead : d.title) + '</span><span class="when">' + esc(epochDate(d.added)) + '</span></div>' +
-    ((d.ai_summary || d.summary) ? '<div class="snip"' + dirAttr(d.ai_summary || d.summary) + '>' + esc(d.ai_summary || d.summary) + '</div>' : '') + '<div class="meta">' + meta + '</div></div>' +
+    snipHTML(d) + '<div class="meta">' + meta + '</div></div>' +
     '<div class="hov">' + acts.map(a => '<button class="ib" data-dact="' + a[0] + '" data-id="' + esc(d.id) + '" title="' + a[1] + '" aria-label="' + a[1] + '">' + a[2] + '</button>').join('') + '</div></div>';
 }
+// The line under a row's title: the summary, or, for a row a search found in its text, the words around the find.
+const snipHTML = d => d.found ? '<div class="snip found"' + dirAttr(d.found) + '>' + esc(d.found).replace(/\u0002/g, '<mark>').replace(/\u0003/g, '</mark>') + '</div>'
+  : (d.ai_summary || d.summary) ? '<div class="snip"' + dirAttr(d.ai_summary || d.summary) + '>' + esc(d.ai_summary || d.summary) + '</div>' : '';
 const tagsOf = d => { try { return d && d.tags ? (typeof d.tags === 'string' ? JSON.parse(d.tags) : d.tags) : []; } catch(e){ return []; } };
 function infoHTML(d){
   if (!d) return '<div class="pbody mute">Nothing selected.</div>';
@@ -294,19 +297,71 @@ async function listView(where, arg){
     '<button class="btn sm' + (Object.keys(curFilter()).length ? ' on' : '') + '" data-ract="lfilter" title="Filter by source, author, length, date">Filter' + (Object.keys(curFilter()).length ? ' · ' + Object.keys(curFilter()).length : '') + '</button>' +
     '<button class="btn sm' + (R.selecting ? ' on' : '') + '" data-ract="selmode" title="Select several (x)">' + (R.selecting ? 'Done' : 'Select') + '</button>' +
     '<select class="field sm" id="lsort" aria-label="Order">' + [['new', 'Newest'], ['old', 'Oldest'], ['published', 'Published'], ['short', 'Shortest'], ['long', 'Longest'], ['progress', 'Started first']].map(o => '<option value="' + o[0] + '"' + (sort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>' +
+    C.Find.html(findKey(where, arg), 'Search ' + (R.view ? R.view.name : where === 'feed' && !arg ? 'the Feed' : title), findRows, 300) +
     '<button class="ib" data-ract="lmore" aria-label="More for this list" title="More">' + ICON.dots + '</button></div>' + filterChips() + '<div class="lrows" id="rows"><span class="mute" style="padding:20px">Loading…</span></div><div class="bulkbar" id="bulkbar" hidden></div></div><aside class="lvinfo" id="lvinfo"></aside></div>';
-  const q = one ? '&feed=' + encodeURIComponent(arg) : where === 'feed' ? '&cat=' + encodeURIComponent(arg || '') : '&kind=' + encodeURIComponent(arg || 'article');
-  const r = await C.swr('/api/docs?where=' + where + '&tab=' + tab + q + '&sort=' + sort + '&limit=200' + filterQuery(curFilter()));
+  // The list the bar is for, at once: a search typed while it loads is for this one (findRows).
+  const me = R.listing = { where, arg }, url = listURL(where, arg), fq = C.Find.q(findKey(where, arg));
+  // A search isn't kept on the device: every word typed is a new address.
+  const r = await (fq ? api : C.swr)(url);
+  if (R.listing !== me || listURL(where, arg) !== url) return;        // another list since, or the search's answer draws it
   if (one && !R.view && r.items[0] && !feedTitle(arg, true) && $('#ltitle')) $('#ltitle').textContent = r.items[0].source || 'Feed';
   R.counts = r.counts; C.renderSide();
-  R.list = { where, arg, items: r.items };
+  R.list = { where, arg, items: r.items, found: r.found };
   if (!r.items.find(d => d.id === R.sel)) R.sel = r.items[0] ? r.items[0].id : null;
   drawRows();
-  if (where === 'library' && tab !== 'archive') prefetchDocs(r.items);
+  if (where === 'library' && tab !== 'archive' && !fq) prefetchDocs(r.items);
 }
+// A list's address: its kind, folder or feed, its tab, order and filters, and what its search asks.
+function listURL(where, arg){
+  const key = where === 'feed' ? 'feed' : 'library', tab = R.tabs[key], fk = findKey(where, arg), fq = C.Find.q(fk);
+  const sort = R.view && R.view.sort ? R.view.sort : store.get('sort.' + key, 'new');
+  const q = where === 'feed' && isFeedId(arg) ? '&feed=' + encodeURIComponent(arg) : where === 'feed' ? '&cat=' + encodeURIComponent(arg || '') : '&kind=' + encodeURIComponent(arg || 'article');
+  return '/api/docs?where=' + where + '&tab=' + tab + q + '&sort=' + sort + '&limit=200' + filterQuery(curFilter()) +
+    (fq ? '&q=' + encodeURIComponent(fq) + (C.Find.state(fk).every ? '&every=1' : '') : '');
+}
+
+/* ---------- a list's search (find.js): on the server, which also reads the text ---------- */
+// Within the kind, the folder or the feed and the tab, with the filters; the tabs say how many it finds
+// in each, and "All of the Library" or "All feeds" widens it past the kind or the folder.
+const findKey = (where, arg) => R.view ? 'view:' + R.view.id : where + ':' + (arg || '');
+async function findRows(){
+  const W = R.listing; if (!W || !$('#rows')) return;
+  const url = listURL(W.where, W.arg), q = C.Find.q(findKey(W.where, W.arg));
+  const r = await (q ? api : C.swr)(url);
+  if (R.listing !== W || listURL(W.where, W.arg) !== url) return;   // typed on, or went elsewhere, since
+  R.list = { where: W.where, arg: W.arg, items: r.items, found: r.found };
+  if (!r.items.find(d => d.id === R.sel)) R.sel = r.items[0] ? r.items[0].id : null;
+  drawRows();
+  $('#main').scrollTop = 0;
+}
+function findScope(){
+  const L = R.list; if (!L) return '';
+  const fk = findKey(L.where, L.arg); if (!C.Find.q(fk)) return '';
+  const here = R.view ? R.view.name : L.where === 'feed' ? (isFeedId(L.arg) ? feedTitle(L.arg) : L.arg || '') : L.arg === KIND_STAR ? 'Shortlist' : KIND[L.arg] || '';
+  if (!here) return '';                       // the whole Feed already
+  const all = !!C.Find.state(fk).every;
+  return '<div class="findscope" role="radiogroup" aria-label="Where to search">' + [[false, here], [true, L.where === 'feed' ? 'All feeds' : 'All of the Library']].map(x =>
+    '<button class="chip' + (all === x[0] ? ' on' : '') + '" role="radio" aria-checked="' + (all === x[0]) + '" data-findevery="' + (x[0] ? 1 : '') + '">' + esc(x[1]) + '</button>').join('') + '</div>';
+}
+// The tabs' counts while a search is on: INBOX 3 · LATER 0 · ARCHIVE 12.
+function drawTabCounts(){
+  const L = R.list, f = L && C.Find.q(findKey(L.where, L.arg)) ? L.found : null;
+  $$('.lvmain .tabs .tab[data-tab]').forEach(b => {
+    let n = b.querySelector('.tabn');
+    if (!f) { if (n) n.remove(); return; }
+    if (!n) { n = document.createElement('span'); n.className = 'tabn'; b.appendChild(n); }
+    const v = f[b.dataset.tab] || 0; n.textContent = v; n.classList.toggle('zero', !v);
+  });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-findevery]'); if (!b || !R.listing) return;
+  C.Find.state(findKey(R.listing.where, R.listing.arg)).every = !!b.dataset.findevery; findRows().catch(err => toast(err.message));
+});
 function drawRows(){
   const L = R.list; if (!L) return;
   const rows = $('#rows'); if (!rows) return;
+  drawTabCounts();
+  if (!L.items.length && C.Find.q(findKey(L.where, L.arg))) { rows.innerHTML = findScope() + C.Find.none(); $('#lvinfo').innerHTML = ''; drawBulk(); return; }
   if (!L.items.length) {
     const c = R.counts || {};
     rows.innerHTML = '<div class="empty"><b>Nothing here</b><span>' + (L.where === 'feed' && R.tabs.feed === 'unseen' ? 'You’re through the last two weeks of the Feed.' + (c.freshrss_unread ? ' FreshRSS still counts ' + c.freshrss_unread.toLocaleString() + ' unread, mostly older; Daf leaves anything past 14 days in Seen.' : '') : L.where === 'library' && R.tabs.library === 'later' ? 'Things you mark Later wait here.' : 'Nothing to show.') + '</span></div>';
@@ -322,7 +377,7 @@ function drawRows(){
   if (R.tag) extra += '<div class="notice" style="margin:10px 12px"><span style="flex:1">Tagged <b>' + esc(R.tag) + '</b> · ' + items.length + '</span><button class="btn sm" data-dtag="">Show all</button></div>';
   for (const id of [...R.multi]) if (!items.find(d => d.id === id)) R.multi.delete(id);
   rows.classList.toggle('picking', R.selecting || R.multi.size > 0);
-  rows.innerHTML = extra + items.map(rowHTML).join('') + (L.items.length >= 200 ? '<p class="mute tiny" style="text-align:center">Showing the newest 200.</p>' : '');
+  rows.innerHTML = findScope() + extra + items.map(rowHTML).join('') + (L.items.length >= 200 ? '<p class="mute tiny" style="text-align:center">' + (C.Find.q(findKey(L.where, L.arg)) ? 'Showing the first 200.' : 'Showing the newest 200.') + '</p>' : '');
   markOnDevice();
   drawBulk();
   if (!items.find(d => d.id === R.sel)) R.sel = items[0] ? items[0].id : null;
@@ -1603,12 +1658,30 @@ function homeCard(c){
     (c.progress ? ringSVG(c.progress) : '') + '<span class="mute">' + (c.mins ? c.mins + ' min' : c.progress ? Math.round(c.progress) + '%' : '') + '</span></span></a>';
 }
 async function homeView(){
-  $('#main').innerHTML = '<div class="top"><h1>Home</h1><span class="spacer"></span><button class="btn sm" data-home="config">Configure</button></div><div class="page home" id="homepage"><span class="mute">Loading…</span></div>';
-  const h = await C.swr('/api/home');
+  $('#main').innerHTML = '<div class="top"><h1>Home</h1><span class="spacer"></span>' + C.Find.html('home', 'Search the Library', homeFind, 300) + '<button class="btn sm" data-home="config">Configure</button></div><div class="page home" id="homepage"><span class="mute">Loading…</span></div>';
+  R.home = await C.swr('/api/home');
+  if (C.Find.q('home')) return homeFind(C.Find.q('home'));
+  drawHome();
+}
+function drawHome(){
+  const h = R.home, box = $('#homepage'); if (!h || !box) return;
   const hidden = store.get('homeHidden', []);
   const html = SHELVES.filter(s => !hidden.includes(s[0]) && (h[s[0]] || []).length).map(s =>
     '<section class="shelf"><div class="shelfh"><h2>' + s[1] + '</h2><span class="mute tiny">' + s[2] + '</span></div><div class="shelfrow">' + h[s[0]].map(homeCard).join('') + '</div></section>').join('');
-  $('#homepage').innerHTML = html || '<p class="mute">Nothing here yet. Save something to the Library, or open a book.</p>';
+  box.innerHTML = html || '<p class="mute">Nothing here yet. Save something to the Library, or open a book.</p>';
+}
+// Home's search: the whole Library, every kind and every tab, under a heading for each tab. Its rows
+// only open; what's done to one is done in its list.
+async function homeFind(q){
+  if (!q) { drawHome(); return; }
+  const r = await api('/api/docs?where=library&tab=any&every=1&limit=200&q=' + encodeURIComponent(q));
+  const box = $('#homepage'); if (!box || C.Find.q('home') !== q) return;
+  R.multi.clear(); R.selecting = false;
+  const by = { inbox: [], later: [], archive: [] };
+  r.items.forEach(d => (by[d.status] || by.inbox).push(d));
+  box.innerHTML = r.items.length ? '<div class="lrows homefind">' + [['inbox', 'Inbox'], ['later', 'Later'], ['archive', 'Archive']].filter(x => by[x[0]].length)
+    .map(x => '<div class="findh">' + x[1] + ' · ' + by[x[0]].length + '</div>' + by[x[0]].map(rowHTML).join('')).join('') + '</div>' : C.Find.none();
+  $('#main').scrollTop = 0;
 }
 function homeConfig(anchor){
   const hidden = store.get('homeHidden', []), p = $('#pop'), r = anchor.getBoundingClientRect();

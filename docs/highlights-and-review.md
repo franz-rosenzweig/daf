@@ -35,7 +35,7 @@ Every highlight opens where it is. Press the small arrow next to a highlight on 
 
 **Highlights** in the sidebar shows them all, grouped by book or article. At the top:
 
-- a search box for the text, notes, tags and titles;
+- the search, the magnifying glass at the top right, for the text, notes, tags and titles;
 - source chips: **All**, **Kindle**, **Made in Daf**, **Articles**, **Audiobooks**, **Paper** and **Readwise**;
 - the five colors, **Favorites**, and the order (newest, by book in reading order, or oldest);
 - **Review these**, which turns whatever the filters show into a review of its own;

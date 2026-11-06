@@ -27,20 +27,34 @@ function continueCard(s){
     '<span class="mct"><b>' + esc(s.name) + '</b><span class="mute tiny">' + esc(n.name) + '</span><span class="mute tiny">' + where + '</span>' +
     (n.page ? '<span class="mbar"><i style="width:' + pct(n.page, n.pages) + '%"></i></span>' : '') + '</span></a>';
 }
+// The search in the bar finds a series by its name, on the page (every series is here already).
+let shelf = null;
 async function shelfView(){
-  $('#main').innerHTML = '<div class="top"><h1>Manga</h1></div><div class="page"><span class="mute">Asking Komga…</span></div>';
-  let r;
-  try { r = await C.swr('/api/manga'); }
+  $('#main').innerHTML = '<div class="top"><h1>Manga</h1><span class="spacer"></span>' + C.Find.html('manga', 'Search manga', drawShelf) + '</div><div class="page"><span class="mute">Asking Komga…</span></div>';
+  try { shelf = await C.swr('/api/manga'); }
   catch(e){ $('#main .page').innerHTML = '<p class="mute">Komga didn’t answer: ' + esc(e.message) + '</p>'; return; }
-  $('#main .page').innerHTML =
-    (r.continue.length ? '<section class="card"><div class="cardh"><h2>Keep reading</h2></div><div class="mconts">' + r.continue.map(continueCard).join('') + '</div></section>' : '') +
-    '<section class="card"><div class="cardh"><h2>All series</h2><span class="mute tiny">' + r.series.length + '</span></div><div class="mgrid">' + r.series.map(seriesCard).join('') + '</div></section>' +
-    '<p class="mute tiny">From Komga. Reading here moves the Kindle and AniList along too.</p>';
+  drawShelf();
+}
+function drawShelf(){
+  const r = shelf, page = $('#main .page'); if (!r || !page || C.S.route[0] !== 'manga') return;
+  const q = C.Find.q('manga'), F = C.Find;
+  const cont = r.continue.filter(s => F.match(q, s.name, s.next && s.next.name)), series = r.series.filter(s => F.match(q, s.name));
+  page.innerHTML =
+    (cont.length ? '<section class="card"><div class="cardh"><h2>Keep reading</h2></div><div class="mconts">' + cont.map(continueCard).join('') + '</div></section>' : '') +
+    (series.length || !q ? '<section class="card"><div class="cardh"><h2>' + (q ? 'Series' : 'All series') + '</h2><span class="mute tiny">' + series.length + '</span></div><div class="mgrid">' + series.map(seriesCard).join('') + '</div></section>' : '') +
+    (q && !cont.length && !series.length ? F.none() : '') +
+    (q ? '' : '<p class="mute tiny">From Komga. Reading here moves the Kindle and AniList along too.</p>');
 }
 
 /* ---------- one series ---------- */
+// A series' volumes, and the bar's search over their names.
 async function seriesView(sid){
-  $('#main').innerHTML = '<div class="top"><a class="btn sm" href="#manga">' + C.I.back + '</a><h1>Manga</h1></div><div class="page"><span class="mute">Asking Komga…</span></div>';
+  const fk = 'manga:' + sid;
+  $('#main').innerHTML = '<div class="top"><a class="btn sm" href="#manga">' + C.I.back + '</a><h1>Manga</h1><span class="spacer"></span>' + C.Find.html(fk, 'Search the volumes', vq => {
+    $$('.mvols > *').forEach(v => { v.hidden = !C.Find.match(vq, v.textContent); });
+    const none = $('.mvols + .findnone'); if (none) none.remove();
+    if (vq && !$$('.mvols > :not([hidden])').length) $('.mvols').insertAdjacentHTML('afterend', C.Find.none());
+  }) + '</div><div class="page"><span class="mute">Asking Komga…</span></div>';
   let s;
   try { s = await C.swr('/api/manga/series/' + encodeURIComponent(sid)); }
   catch(e){ $('#main .page').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
@@ -55,6 +69,7 @@ async function seriesView(sid){
     (s.summary ? '<p class="msum">' + esc(s.summary.slice(0, 600)) + (s.summary.length > 600 ? '…' : '') + '</p>' : '') +
     (s.next ? '<a class="btn primary" href="#mread/' + encodeURIComponent(s.next.id) + '">' + (s.next.page ? 'Keep reading ' : 'Read ') + esc(s.next.name) + '</a>' : '') + '</div></section>' +
     '<section class="card"><div class="mvols">' + s.books.map(row).join('') + '</div></section>';
+  if (C.Find.q(fk)) $$('.mvols > *').forEach(v => { v.hidden = !C.Find.match(C.Find.q(fk), v.textContent); });
   if (keep) drawDownloads();
 }
 

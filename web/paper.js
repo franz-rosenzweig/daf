@@ -1,7 +1,7 @@
 /* Daf paper pages (Phase 7): photos of marked pages → chosen lines → highlights in the book note. */
 (() => {
 const C = window.DafCore, { api, esc, toast, $, $$, ago } = C;
-const P = { page: null, chosen: new Set(), book: null, newTitle: null, poll: null };
+const P = { page: null, chosen: new Set(), book: null, newTitle: null, poll: null, list: null };
 
 const CAM = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.5-2h5l1.5 2h3v9H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="10.5" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 C.icons = Object.assign(C.icons || {}, { camera: CAM });
@@ -29,13 +29,26 @@ async function upload(files){
 
 async function listView(){
   clearInterval(P.poll);
-  $('#main').innerHTML = '<div class="top"><h1>Paper pages</h1><span class="spacer"></span><label class="btn primary">' + CAM + 'Add a page<input type="file" id="ppfile" accept="image/*" multiple hidden></label></div><div class="page" id="pplist"><span class="mute">Loading…</span></div>';
-  const r = await api('/api/paper/pages');
+  $('#main').innerHTML = '<div class="top"><h1>Paper pages</h1><span class="spacer"></span>' + C.Find.html('paper', 'Search paper pages', drawList) + '<label class="btn primary">' + CAM + 'Add a page<input type="file" id="ppfile" accept="image/*" multiple hidden></label></div><div class="page" id="pplist"><span class="mute">Loading…</span></div>';
+  await loadList();
+}
+// The pages, again every five seconds while one is still being read: only the list, so the bar (and
+// a search being typed in it) stays as it is.
+async function loadList(){
+  P.list = await api('/api/paper/pages');
+  drawList();
+  clearInterval(P.poll);
+  if (P.list.pages.some(p => p.status === 'new')) P.poll = setInterval(() => { if (C.S.route[0] === 'paper' && !C.S.route[1]) loadList(); else clearInterval(P.poll); }, 5000);
+}
+// The search in the bar: a page by its book, its author or its page number, on the page.
+function drawList(){
+  const r = P.list, box = $('#pplist'); if (!r || !box) return;
+  const q = C.Find.q('paper'), pages = r.pages.filter(p => C.Find.match(q, p.book && p.book.title, p.book && p.book.author, p.page ? 'p. ' + p.page + ' ' + p.page : '', statusLine(p)));
   let h = '';
   if (!r.pages.length) h += '<section class="card"><h2>Pencil marks, kept</h2><p style="margin:0">Photograph a page you marked. Send it to Ezer with the caption <b>page</b> (or <b>page 112 middlemarch</b>), share it to Daf from the gallery, or add it here. Daf reads the page, keeps the lines you marked as highlights, and writes them into the book’s note. Anything in the margin becomes the highlight’s note.</p></section>';
-  else h += '<div class="ppgrid">' + r.pages.map(p => '<a class="ppcard" href="#paper/' + esc(p.id) + '"><img src="/api/paper/pages/' + esc(p.id) + '/photo" alt="" loading="lazy"><span class="pt"><b>' + esc(p.book ? short(p.book.title) : 'Which book?') + '</b><span class="mute tiny">' + (p.page ? 'p. ' + p.page + ' · ' : '') + esc(statusLine(p)) + ' · ' + ago(p.created) + '</span></span></a>').join('') + '</div>';
-  $('#pplist').innerHTML = h;
-  if (r.pages.some(p => p.status === 'new')) P.poll = setInterval(() => { if (C.S.route[0] === 'paper' && !C.S.route[1]) listView(); else clearInterval(P.poll); }, 5000);
+  else if (!pages.length) h += C.Find.none();
+  else h += '<div class="ppgrid">' + pages.map(p => '<a class="ppcard" href="#paper/' + esc(p.id) + '"><img src="/api/paper/pages/' + esc(p.id) + '/photo" alt="" loading="lazy"><span class="pt"><b>' + esc(p.book ? short(p.book.title) : 'Which book?') + '</b><span class="mute tiny">' + (p.page ? 'p. ' + p.page + ' · ' : '') + esc(statusLine(p)) + ' · ' + ago(p.created) + '</span></span></a>').join('') + '</div>';
+  box.innerHTML = h;
 }
 
 function bookBox(){

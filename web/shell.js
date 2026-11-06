@@ -144,12 +144,13 @@ function closeFront(){
   if (b.contains('btocsheet') || b.contains('bpanelsheet')) { b.remove('btocsheet', 'bpanelsheet'); return true; }
   if (sheetPanel()) { press('#rtop [data-ract=panel]'); return true; }
   const side = $('#side'); if (side && side.classList.contains('open')) { side.classList.remove('open'); return true; }
+  if (C().Find && C().Find.close()) return true;            // a tab's search (find.js)
   return false;
 }
 // the article's side panel, when the window is narrow enough that it's a sheet over the text
 function sheetPanel(){ return innerWidth <= 1180 && view() === 'read' && !!$('.rvgrid.withpanel'); }
 const closeAll = () => { for (let i = 0; i < 6 && closeFront(); i++); };
-const front = () => shown('#palette') || shown('#modal') || shown('#pop') || shown('#selbar') ||
+const front = () => shown('#palette') || shown('#modal') || shown('#pop') || shown('#selbar') || !!(C() && C().Find && C().Find.isOpen()) ||
   document.body.classList.contains('btocsheet') || document.body.classList.contains('bpanelsheet') || sheetPanel();
 window.dafBack = () => {
   if (closeFront()) return true;

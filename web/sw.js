@@ -67,7 +67,9 @@ self.addEventListener('fetch', e => {
         if (r.ok) keep(BOOKS, url.origin + url.pathname, r.clone()).catch(() => {}); return r; })));
       return;
     }
-    if (!OFFLINE_API.test(url.pathname)) return;
+    // A search (a tab's, ?q=) goes to the network only: every word typed is a new address, and kept, its
+    // answer would stand in for the whole list offline (listKey).
+    if (!OFFLINE_API.test(url.pathname) || url.searchParams.get('q')) return;
     const single = /^\/api\/docs\/[^/]+$/.test(url.pathname) && url.pathname !== '/api/docs/counts';
     const key = single ? url.origin + url.pathname : req.url, any = listKey(url);
     e.respondWith(fetch(req).then(r => {

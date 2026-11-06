@@ -39,27 +39,46 @@ function book(){
     (P.first.length ? '<div id="rcch">' + chapters() + '</div>' : '') + '</section>';
 }
 
-function prayers(){
-  return '<section class="card"><h2>Prayers</h2>' + P.prayers.map(p =>
-    '<details class="rcpr"><summary><b>' + esc(p.title) + '</b><span class="mute tiny">' + esc(p.note || (p.page ? 'Big Book, page ' + p.page : '')) + '</span></summary>' +
+const prayer = p => '<details class="rcpr"><summary><b>' + esc(p.title) + '</b><span class="mute tiny">' + esc(p.note || (p.page ? 'Big Book, page ' + p.page : '')) + '</span></summary>' +
     (p.text ? '<p class="rcprt">' + esc(p.text) + '</p>'
       : '<p class="rcprt">' + esc(p.first) + '</p>' + (P.book ? '<a class="btn sm" href="' + open(P.book.id, words(p.find)) + '">Read it on page ' + esc(p.page) + '</a>' : '')) +
-    '</details>').join('') + '</section>';
+    '</details>';
+function prayers(){
+  return '<section class="card"><h2>Prayers</h2>' + P.prayers.map(prayer).join('') + '</section>';
 }
 
+const hlRow = h => '<div class="hlc"><q class="go" data-open="' + esc(open(P.book.id, 'hl:' + encodeURIComponent(h.id))) + '" role="link" tabindex="0">' + C.HL.quote(h.text) + '</q></div>';
 function highlights(){
   if (!P.book || !P.highlights.length) return '';
   return '<section class="card"><div class="cardh"><h2>Your highlights</h2><a class="tiny" href="#book/' + encodeURIComponent(P.book.id) + '">All ' + P.highlight_count + '</a></div>' +
-    P.highlights.map(h => '<div class="hlc"><q class="go" data-open="' + esc(open(P.book.id, 'hl:' + encodeURIComponent(h.id))) + '" role="link" tabindex="0">' + C.HL.quote(h.text) + '</q></div>').join('') + '</section>';
+    P.highlights.map(hlRow).join('') + '</section>';
 }
 
 function draw(){
-  $('#rcpage').innerHTML = readings() + book() + prayers() + highlights() +
+  const box = $('#rcpage'); if (!box || !P) return;
+  if (C.Find.q('recovery')) { box.innerHTML = found(C.Find.q('recovery')); return; }
+  box.innerHTML = readings() + book() + prayers() + highlights() +
     (P.others.length ? '<section class="card"><h2>More to read</h2><div class="rcmore">' + P.others.map(b => bookRow(b)).join('') + '</div></section>' : '');
+}
+// The search in the bar: the readings, every chapter (the first 164 pages, the stories and the
+// appendices together), the prayers and their words, your highlights and the other books.
+function found(q){
+  const m = C.Find.match, b = P.book;
+  const reads = P.readings.filter(r => m(q, r.title, r.step)), prs = P.prayers.filter(p => m(q, p.title, p.text, p.first, p.note));
+  const chs = b ? [P.first, P.stories, P.appendices].flatMap(l => l || []).filter(c => !c.part && m(q, c.title, c.n)) : [];
+  const hls = b ? P.highlights.filter(h => m(q, h.text)) : [], more = P.others.filter(x => m(q, x.title, x.author));
+  const card = (title, inner) => '<section class="card"><h2>' + title + '</h2>' + inner + '</section>';
+  const h = (reads.length ? card('Readings', reads.map(r => '<a class="nrow tr rcread" href="' + (b ? open(b.id, words(r.find)) : '#recovery') + '"><b>' + esc(r.title) + '</b><span class="mute tiny">' + esc(r.step) + ' · page ' + esc(r.page) + '</span></a>').join('')) : '') +
+    (chs.length ? card('Chapters', '<div class="rchs">' + chs.map(c => '<a class="rch" href="' + open(b.id, encodeURIComponent(c.href)) + '"><span class="rcn">' + esc(c.n || '') + '</span><span class="rct">' + esc(c.title) + '</span>' +
+      '<span class="rcp mute tiny">' + (c.page ? 'p. ' + esc(c.page) : '') + '</span>' + bar(c.read) + '</a>').join('') + '</div>') : '') +
+    (prs.length ? card('Prayers', prs.map(prayer).join('')) : '') +
+    (hls.length ? card('Your highlights', hls.map(hlRow).join('')) : '') +
+    (more.length ? card('More to read', '<div class="rcmore">' + more.map(x => bookRow(x)).join('') + '</div>') : '');
+  return h || C.Find.none();
 }
 
 C.views.recovery = async () => {
-  $('#main').innerHTML = '<div class="top"><h1>Recovery</h1><span class="spacer"></span><span class="mute tiny rcp-hint">Private: never in the review, Signal or on the Kindle</span></div><div class="page rcp-page" id="rcpage"><span class="mute">Loading…</span></div>';
+  $('#main').innerHTML = '<div class="top"><h1>Recovery</h1><span class="spacer"></span><span class="mute tiny rcp-hint">Private: never in the review, Signal or on the Kindle</span>' + C.Find.html('recovery', 'Search Recovery', draw) + '</div><div class="page rcp-page" id="rcpage"><span class="mute">Loading…</span></div>';
   P = await C.swr('/api/recovery');
   if (!P.now && P.first.length) part = 0;
   draw();

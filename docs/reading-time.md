@@ -56,6 +56,6 @@ Daf stores every sitting with its exact time, and decides which day it belongs t
 
 ## When a number looks wrong
 
-Look at the line at the bottom of Today first. It says how fresh each source is, and a Kindle that hasn't slept since you read is the usual answer: wake it, let it sleep again, and the minutes come in. The **Sources** page in the sidebar shows every source and its last answer, and on the server `daf doctor` prints the same thing. Basically, if a source is red there, that's where the missing minutes are.
+Look at the line at the bottom of Today first. It says how fresh each source is, and a Kindle that hasn't slept since you read is the usual answer: wake it, let it sleep again, and the minutes come in. The **Sources** page in the sidebar shows every source and its last answer (its search finds one by name), and on the server `daf doctor` prints the same thing. Basically, if a source is red there, that's where the missing minutes are.
 
 <sub>Next: [Paper books](paper-books.md) →</sub>

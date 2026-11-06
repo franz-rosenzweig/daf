@@ -13,9 +13,28 @@ function bookLine(b, extra){
     '<span class="tiny mute">' + bar(b.progress) + ' ' + Math.round(b.progress) + '% · ' + (extra || '') + '</span></span></a>';
 }
 
+let S0 = null;
 C.views.stats = async () => {
-  $('#main').innerHTML = '<div class="top"><h1>Stats</h1><span class="spacer"></span><span class="mute tiny">Counted minutes, your home time zone</span></div><div class="page" id="statspage"><span class="mute">Loading…</span></div>';
-  const s = await C.swr('/api/stats');
+  $('#main').innerHTML = '<div class="top"><h1>Stats</h1><span class="spacer"></span><span class="mute tiny">Counted minutes, your home time zone</span>' + C.Find.html('stats', 'Search stats', draw) + '</div><div class="page" id="statspage"><span class="mute">Loading…</span></div>';
+  S0 = await C.swr('/api/stats');
+  draw();
+};
+// The search in the bar: the books waiting, being read and finished, and the highlights from this
+// day, by title, author or words; the charts step aside while it's on.
+function found(s, q){
+  const m = C.Find.match, books = l => l.filter(b => m(q, b.title, b.author));
+  const stalled = books(s.stalled), now = books(s.in_progress), done = books(s.finished), otd = s.on_this_day.filter(x => m(q, x.text, x.title));
+  const h = (stalled.length ? '<section class="card"><h2>Waiting for you</h2><div class="brows">' + stalled.map(b => bookLine(b, 'last read ' + b.days_ago + ' days ago')).join('') + '</div></section>' : '') +
+    (now.length ? '<section class="card"><h2>Reading now</h2><div class="brows">' + now.map(b => bookLine(b, b.days_ago ? b.days_ago + ' days ago' : 'today')).join('') + '</div></section>' : '') +
+    (otd.length ? '<section class="card"><h2>On this day</h2>' + otd.map(onThisDay).join('') + '</section>' : '') +
+    (done.length ? '<section class="card"><h2>Finished</h2><div class="libgrid">' + done.map(finished).join('') + '</div></section>' : '');
+  return h || C.Find.none();
+}
+const onThisDay = x => '<div class="hlc"><q' + (x.open ? ' class="go" data-open="' + esc(x.open) + '" role="link" tabindex="0" title="Open at this spot"' : '') + '>' + C.HL.quote(x.text) + '</q><div class="meta tiny mute">' + esc(shortTitle(x.title)) + ' · ' + x.year + ' (' + x.years_ago + ' year' + (x.years_ago === 1 ? '' : 's') + ' ago)</div></div>';
+const finished = b => '<a class="libcard" href="#book/' + encodeURIComponent(b.id) + '">' + cover(b, 'cv lib') + '<b>' + esc(shortTitle(b.title)) + '</b><span class="mute tiny">' + epochDate(b.last_read) + '</span></a>';
+function draw(){
+  const s = S0, page = $('#statspage'); if (!s || !page) return;
+  if (C.Find.q('stats')) { page.innerHTML = found(s, C.Find.q('stats')); return; }
   const t = s.totals, k = s.streak, goal = s.goal || 60, at = goal === 60 ? 'at the hour' : 'at your goal';
   let h = '<div class="sgrid">';
   const lead = k.goal > 0 ? [k.goal, 'in a row ' + at, k.any + ' day' + (k.any === 1 ? '' : 's') + ' in a row with some reading'] : [k.any, 'in a row reading', 'None ' + at + ' yet in this streak'];
@@ -36,9 +55,9 @@ C.views.stats = async () => {
   if (s.stalled.length) h += '<section class="card"><div class="cardh"><h2>Waiting for you</h2><span class="mute tiny">Started, then left for two weeks or more. One sitting might be all it takes.</span></div><div class="brows">' +
     s.stalled.map(b => bookLine(b, 'last read ' + b.days_ago + ' days ago')).join('') + '</div></section>';
   if (s.in_progress.length) h += '<section class="card"><h2>Reading now</h2><div class="brows">' + s.in_progress.map(b => bookLine(b, b.days_ago ? b.days_ago + ' days ago' : 'today')).join('') + '</div></section>';
-  if (s.on_this_day.length) h += '<section class="card"><h2>On this day</h2>' + s.on_this_day.map(x => '<div class="hlc"><q' + (x.open ? ' class="go" data-open="' + esc(x.open) + '" role="link" tabindex="0" title="Open at this spot"' : '') + '>' + C.HL.quote(x.text) + '</q><div class="meta tiny mute">' + esc(shortTitle(x.title)) + ' · ' + x.year + ' (' + x.years_ago + ' year' + (x.years_ago === 1 ? '' : 's') + ' ago)</div></div>').join('') + '</section>';
+  if (s.on_this_day.length) h += '<section class="card"><h2>On this day</h2>' + s.on_this_day.map(onThisDay).join('') + '</section>';
   if (s.finished.length) h += '<section class="card"><h2>Finished</h2><span class="mute tiny">Read to the end on the Kindle, last two years</span><div class="libgrid">' +
-    s.finished.map(b => '<a class="libcard" href="#book/' + encodeURIComponent(b.id) + '">' + cover(b, 'cv lib') + '<b>' + esc(shortTitle(b.title)) + '</b><span class="mute tiny">' + epochDate(b.last_read) + '</span></a>').join('') + '</div></section>';
-  $('#statspage').innerHTML = h;
-};
+    s.finished.map(finished).join('') + '</div></section>';
+  page.innerHTML = h;
+}
 })();

@@ -96,6 +96,22 @@ def series(conn, db, cid):
     return out
 
 
+def all_series():
+    """{calibre id: (series name, its number in the series)} for every book Calibre has in a series,
+    for the Books page's search. Empty when Calibre's library can't be read."""
+    try:
+        c = read_only(config.CALIBRE_DBS[0])
+    except Exception:  # noqa: BLE001
+        return {}
+    try:
+        return {r[0]: (r[1], r[2]) for r in c.execute("SELECT l.book, s.name, b.series_index FROM books_series_link l "
+                                                      "JOIN series s ON s.id = l.series JOIN books b ON b.id = l.book")}
+    except Exception:  # noqa: BLE001
+        return {}
+    finally:
+        c.close()
+
+
 def details(conn, book_id):
     b, db = _calibre(conn, book_id)
     if not b:

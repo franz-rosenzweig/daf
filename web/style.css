@@ -1583,3 +1583,40 @@ body.btocsheet .bscrim,body.bpanelsheet .bscrim{display:block;position:fixed;ins
    made the panel only as tall as what's in it (the tablet's empty-looking strip, 2026-10-31). ---------- */
 @media (max-width:1180px){ .rvgrid.withpanel .rpanel{align-self:stretch} }
 body.btocsheet .rv.ebook .btoc,body.bpanelsheet .rv.ebook .rpanel,html.focus.fpanel .rvgrid > .rpanel,html.focus.ftoc .rvgrid > .toc{align-self:stretch}
+
+/* ---------- the search in a tab's top bar (find.js). Open, its field takes the bar's row in place
+   of the title and the buttons; the button, the arrow and the field are 40 px for a finger but take
+   the room of the bar's own 34 px buttons, so the bar keeps its height and nothing under it moves. ---------- */
+.find{display:inline-flex;align-items:center;flex:0 0 auto;min-width:0}
+.find .ib{width:40px;height:40px;margin:-3px 0;border-radius:10px;flex:none}
+.top:has(> .find.open) > :not(.find):not(.tabs){display:none!important}
+.find.open{flex:1 1 auto;gap:2px;max-width:760px}
+.findbox{position:relative;flex:1 1 auto;min-width:0;display:flex;align-items:center}
+.findbox .findlens{position:absolute;left:12px;color:var(--fg-3);pointer-events:none}
+.findq{width:100%;min-width:0;height:40px;margin:-3px 0;border:1px solid var(--line-2);border-radius:10px;background:var(--bg);color:var(--fg);padding:0 42px 0 36px;font:inherit;font-size:16px;-webkit-appearance:none;appearance:none}
+.findq:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.findq::-webkit-search-cancel-button,.findq::-webkit-search-decoration{-webkit-appearance:none;display:none}
+.findq::placeholder{color:var(--fg-3)}
+.find .findclr{position:absolute;right:0;top:0;margin:-3px 0;color:var(--fg-3)}
+.find .findclr:hover{color:var(--fg)}
+@media (max-width:600px){
+  /* a phone's list bar has the search beside Filter and …: the tags' menu gives it the room, and a
+     long title ends in … rather than pushing … onto a row of its own */
+  .lvmain > .top{column-gap:8px}
+  .lvmain > .top h1{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .lvmain > .top #tagf{max-width:30vw}
+  .lvmain > .top .find{order:3}
+  .lvmain > .top .find.open{order:1}
+}
+/* What a search found: a list's place to look (this kind or folder, or all of it), the tabs' counts,
+   the words around a find in the text, and the headings over the Library's results by where they are. */
+.findscope{display:flex;gap:6px;flex-wrap:wrap;padding:6px 2px 8px}
+.findscope .chip{background:var(--bg);color:var(--fg-2);border:1px solid var(--line-2);padding:0 16px;border-radius:999px;font-size:13.5px;min-height:40px;cursor:pointer}
+.findscope .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tab .tabn{margin-left:6px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums;letter-spacing:0}
+.tab .tabn.zero{color:var(--fg-3)}
+.snip.found mark{background:var(--hl-yellow);color:inherit;border-radius:2px;padding:0 1px}
+.snip.found{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.findh{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);padding:14px 12px 4px}
+.homefind .hov{display:none!important}
+.findnone{margin:40px auto}

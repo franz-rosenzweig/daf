@@ -6,6 +6,7 @@ import logging
 import re
 import threading
 import time
+import unicodedata
 from urllib.parse import quote as _urlq
 from datetime import date, datetime, timedelta
 
@@ -1115,6 +1116,38 @@ async def put_nightstand(request: Request, c=Depends(conn)):
     return {"nightstand": s["nightstand"]}
 
 
+def _folded(s):
+    """Text to search in: lower case, without accents or Hebrew points."""
+    return "".join(ch for ch in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(ch)).casefold()
+
+
+@app.get("/api/books/search", dependencies=[Depends(user)])
+def search_book_list(q: str = "", c=Depends(conn)):
+    """The Books page's search: every word somewhere in a book's title, its author, its series in
+    Calibre or the name of a shelf it's on. The books whose title has the whole search come first,
+    then the ones read last."""
+    words = _folded(q).split()[:12]
+    if not words:
+        return {"books": []}
+    series = ebooks.all_series()
+    shelves = {}
+    for book_id, name in c.execute("SELECT sb.book_id, s.name FROM shelf_books sb JOIN shelves s ON s.id = sb.shelf_id ORDER BY s.name"):
+        shelves.setdefault(book_id, []).append(name)
+    whole, out = " ".join(words), []
+    for r in c.execute("SELECT * FROM books WHERE kind = 'book' AND private = 0 AND id NOT IN (SELECT book_id FROM manga_books) "
+                       "ORDER BY COALESCE(last_read, 0) DESC, title"):
+        ser = series.get(r["calibre_id"]) if r["calibre_id"] else None
+        hay = _folded(" ".join([r["title"] or "", r["author"] or "", ser[0] if ser else "", *shelves.get(r["id"], [])]))
+        if all(w in hay for w in words):
+            out.append((r, ser))
+    out.sort(key=lambda x: whole not in _folded(x[0]["title"]))         # stable: read last stays first within each
+    readable = ebooks.readable_ids(c) if out else set()
+    hl = {r[0]: r[1] for r in c.execute("SELECT book_id, COUNT(*) FROM highlights WHERE deleted = 0 GROUP BY book_id")} if out else {}
+    return {"books": [_book_card(r) | {"readable": r["id"] in readable, "highlights": hl.get(r["id"], 0), "shelves": shelves.get(r["id"], []),
+                                        "series": {"name": ser[0], "index": ser[1]} if ser else None} for r, ser in out[:150]],
+            "count": len(out)}
+
+
 # ---- adding a book: Hardcover's catalog, then its file into Calibre (hardcover.add_book, bookfiles.py) ----
 
 @app.get("/api/books/find", dependencies=[Depends(user)])
@@ -1457,14 +1490,21 @@ async def post_note(request: Request, c=Depends(conn)):
 @app.get("/api/docs", dependencies=[Depends(user)])
 def get_docs(where: str = "feed", tab: str = "", kind: str = "", cat: str = "", feed: str = "", limit: int = 100, offset: int = 0,
              sort: str = "new", source: str = "", author: str = "", minlen: float = 0, maxlen: float = 0, since: int = 0,
-             hl: int = 0, fresh: int = 0, c=Depends(conn)):
+             hl: int = 0, fresh: int = 0, q: str = "", every: int = 0, c=Depends(conn)):
+    """A list. `q` searches it (reader._search) and says how many it finds in each tab (`found`);
+    `every` widens a search from the kind, folder or feed to the whole Library or Feed."""
     s = config.load_settings()
     if where not in ("feed", "library"):
         raise HTTPException(400, "feed or library")
+    if every:
+        kind, cat, feed = "", "", ""
     flt = {"source": source, "author": author, "minlen": minlen, "maxlen": maxlen, "since": since, "hl": hl, "fresh": fresh}
     items = reader.list_docs(c, s, where, tab or ("unseen" if where == "feed" else "inbox"), kind or None, cat or None,
-                             min(max(limit, 1), 300), max(offset, 0), sort, feed or None, flt)
-    return {"items": items, "counts": reader.counts(c, s)}
+                             min(max(limit, 1), 300), max(offset, 0), sort, feed or None, flt, q)
+    out = {"items": items, "counts": reader.counts(c, s)}
+    if q.strip():
+        out["found"] = reader.found_tabs(c, s, where, kind or None, cat or None, feed or None, flt, q)
+    return out
 
 
 @app.get("/api/docs/counts", dependencies=[Depends(user)])
@@ -2298,10 +2338,9 @@ def get_search(q: str = "", c=Depends(conn)):
         "LEFT JOIN review_state s ON s.hl_id = h.id WHERE h.deleted = 0 AND COALESCE(b.private, 0) = 0 "
         "AND (h.text LIKE ? OR s.user_note LIKE ?) LIMIT 10", (like, like))]
     # Inside the text of saved articles, emails and feed items (FTS5); the last word as a prefix.
-    words = [w for w in re.findall(r"[\w'’-]+", q) if w]
+    match = reader.fts_match(q)
     text = []
-    if words:
-        match = " ".join('"' + w.replace('"', '""') + '"' for w in words[:-1]) + (" " if len(words) > 1 else "") + '"' + words[-1].replace('"', '""') + '"*'
+    if match:
         have = {d["id"] for d in docs}
         try:
             for r in c.execute("SELECT f.id, snippet(docs_fts, 2, char(2), char(3), '…', 14) AS snip, d.title, d.source, d.where_ "
