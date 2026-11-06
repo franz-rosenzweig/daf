@@ -28,6 +28,8 @@ The Serenity Prayer and the Eleventh Step prayer (St. Francis) are written out o
 
 **Your highlights** shows the latest three from the Big Book, each opening at its spot, and **All** goes to the rest. **More to read** lists the other A.A. books in your library, like the Plain Language Big Book.
 
+The magnifying glass at the top searches the whole page: the readings, every chapter (the first 164 pages, the stories and the appendices together), the prayers and their words, the highlights and the other books.
+
 Without a Big Book in Calibre, the page says how to add one.
 
 <sub>Next: [Stats](stats.md) →</sub>

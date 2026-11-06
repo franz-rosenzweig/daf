@@ -47,7 +47,7 @@ Daf reads the page in about fifteen seconds, in English or in Hebrew, line by li
 
 ## Fixing what Daf read
 
-Open the page in **Paper pages** to check it. "Tap the lines to keep" shows every line, with ✎ next to the ones Daf saw marked, and you can tap more lines in or out, then press **Save**. **Read again** reads the photo again from scratch, and **Delete** removes the page and its highlights.
+**Paper pages** has a search at the top, for a page by its book, its author or its page number. Open the page in **Paper pages** to check it. "Tap the lines to keep" shows every line, with ✎ next to the ones Daf saw marked, and you can tap more lines in or out, then press **Save**. **Read again** reads the photo again from scratch, and **Delete** removes the page and its highlights.
 
 Daf finds the book from the caption first, then from the running head at the top of the page, then from the last paper page you sent in the past two weeks. If it still can't tell, the page says **Which book?**, and you can search your books or type a new title. A paper book that isn't in Calibre or the vault gets a small note of its own.
 

@@ -33,6 +33,8 @@ This is my favorite card. It lists the books you started and then left for two w
 - **On this day:** highlights you made on this date in earlier years, which open at their spot.
 - **Finished:** the books you read to the end on the Kindle in the last two years, as covers.
 
+The magnifying glass at the top finds a book in these lists, or a highlight from this day, and the charts step aside while it's open.
+
 ## From the command line
 
 On the server, `daf today` prints today's minutes by source and sitting, and `daf year` prints Year 30 so far (`daf year 29` for the year before). Both take `--json`, which is how my dashboard shows a Reading card without opening Daf.

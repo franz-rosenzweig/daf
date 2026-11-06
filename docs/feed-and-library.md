@@ -76,7 +76,9 @@ What it reads:
 
 ## Search
 
-⌘K (or the **Search** button) searches titles, the full text of everything saved, books, highlights and the notes in my vault, which open in Obsidian. Typing a place, like "Highlights" or "Preferences", goes there.
+Every list has its own search: the magnifying glass at the top right of Articles, a Feed folder, Home or a saved view. It opens a field right there in the bar, and the list narrows as I type, by the title, the source, the author and the full text, with the words around a find in the text under the title. It looks in the list I'm on, and the tabs say how many it finds in each (**INBOX 3**, **ARCHIVE 12**), so I can see where the rest are. **All of the Library** or **All feeds**, under the field, takes it past the kind or the folder. On Home it searches the whole Library, Inbox, Later and Archive. × clears it, and Esc, the arrow or the phone's Back closes it. When I open something and come back, the search is still there.
+
+⌘K (or the **Search** button) searches everything at once: titles, the full text of everything saved, books, highlights and the notes in my vault, which open in Obsidian. Typing a place, like "Highlights" or "Preferences", goes there.
 
 ![Search](images/search.png)
 *Search results for "writing": titles first, then matches in the text.*

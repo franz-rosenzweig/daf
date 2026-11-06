@@ -18,6 +18,8 @@ The Torah shelf is the week's Torah reading in Daf: the parasha and the haftarah
 
 On Friday, Today reminds you that Shabbat is coming and that the parasha is waiting here.
 
+The magnifying glass at the top searches everything on the shelf by its title and what's under it. Hebrew works without the vowels, so חיי finds חַיֵּי שָׂרָה.
+
 ## Reading the parasha
 
 The parasha opens verse by verse, the Hebrew (with nikud, without the cantillation marks) beside the JPS English, under a heading for each aliyah: Rishon, Sheni, Shlishi and on to Maftir. The contents on the left jump between them.

@@ -603,13 +603,19 @@ function hlQuery(){
   return q;
 }
 async function renderHighlights(){
-  $('#main').innerHTML = '<div class="top"><h1>Highlights</h1><span class="spacer"></span><input class="field" id="hlq" type="search" placeholder="Search highlights, notes, tags" value="' + esc(S.hlq) + '" style="max-width:280px;min-height:36px" aria-label="Search highlights"><button class="btn sm" data-act="hlreview" title="A review of what the filters show">Review these</button><button class="btn sm" data-act="hlexport">Export</button></div><div class="page" id="hlbody"><span class="mute">Loading…</span></div>';
+  // The words, the notes, the tags and the book's title, on the server (/api/highlights?q=).
+  const F = window.DafCore.Find; S.hlq = F.q('highlights');
+  $('#main').innerHTML = '<div class="top"><h1>Highlights</h1><span class="spacer"></span>' + F.html('highlights', 'Search highlights', q => { S.hlq = q; return drawHighlights(); }, 250) +
+    '<button class="btn sm" data-act="hlreview" title="A review of what the filters show">Review these</button><button class="btn sm" data-act="hlexport">Export</button></div><div class="page" id="hlbody"><span class="mute">Loading…</span></div>';
   await drawHighlights();
 }
 async function drawHighlights(){
   const q = hlQuery(); q.set('sort', S.hlSort);
-  const r = await swr('/api/highlights?' + q.toString());
-  const body = $('#hlbody'); if (!body) return;
+  const want = () => { const x = hlQuery(); x.set('sort', S.hlSort); return x.toString(); };
+  // A search isn't kept on the device (it's a new address for every word typed), and an answer
+  // that comes after the words have changed again is dropped.
+  const r = await (S.hlq ? api : swr)('/api/highlights?' + q.toString());
+  const body = $('#hlbody'); if (!body || want() !== q.toString()) return;
   const C = window.DafCore, H = C.HL;
   let h = '<div class="hlfilters"><div class="chips" role="radiogroup" aria-label="Where from">' + HL_SOURCES.map(x => '<button class="chip' + (S.hlSource === x[0] ? ' on' : '') + '" data-hlsrc="' + x[0] + '" role="radio" aria-checked="' + (S.hlSource === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
     '<div class="hlf2"><span class="hlcolors" aria-label="Color">' + HL_COLORS.map(c => '<button class="cdot' + (S.hlColor === c ? ' on' : '') + '" data-hlcolor="' + c + '" aria-label="Only ' + c + '" title="Only ' + c + '" style="--c:var(--hl-' + c + '-line)"></button>').join('') + '</span>' +
@@ -649,7 +655,8 @@ function hlCard(x){ return window.DafCore.HL.row(x); }
 
 /* ---------- books ---------- */
 async function renderBooks(){
-  $('#main').innerHTML = '<div class="top"><h1>Books</h1><span class="spacer"></span><button class="btn sm primary" data-act="addbook">Add a book</button></div><div class="page"><span class="mute">Loading…</span></div>';
+  $('#main').innerHTML = '<div class="top"><h1>Books</h1><span class="spacer"></span>' + window.DafCore.Find.html('books', 'Search books', findBooks, 250) +
+    '<button class="btn sm primary" data-act="addbook">Add a book</button></div><div class="page"><span class="mute">Loading…</span></div>';
   const r = await swr('/api/books');
   S.books = r;
   const stand = r.nightstand.length ? r.nightstand : [];
@@ -662,11 +669,28 @@ async function renderBooks(){
   h += '<section class="card"><div class="cardh"><h2>Opened lately</h2><span class="mute tiny">Newest first' + (r.manga ? ' · <a href="#manga">manga is on its own page</a>' : '') + '</span></div><div class="bgrid">' + others.map(b => '<div class="bcell">' + bookRow(b, b.highlights ? '<span class="tiny mute">' + b.highlights + ' highlights</span>' : '') +
     '<button class="btn sm" data-act="standon" data-id="' + esc(b.id) + '"' + (stand.length >= 3 ? ' data-full="1"' : '') + '>Put on the nightstand</button></div>').join('') + '</div>' +
     (r.others.length > 24 && !S.booksAll ? '<button class="btn" data-act="booksall" style="align-self:flex-start">Show all ' + r.others.length + '</button>' : '') + '</section>';
-  h += '<section class="card"><div class="cardh"><h2>Your library</h2><span class="mute tiny">Calibre · opens in Daf’s reader</span></div><input class="field" id="libq" placeholder="Search by title or author" autocomplete="off"><div class="libgrid" id="libgrid"><span class="mute">Loading…</span></div></section>';
+  h += '<section class="card"><div class="cardh"><h2>Your library</h2><span class="mute tiny">Calibre · opens in Daf’s reader</span></div><div class="libgrid" id="libgrid"><span class="mute">Loading…</span></div></section>';
   $('#main .page').innerHTML = h;
   if (window.DafCore.HC) window.DafCore.HC.shelf($('#hcwant'));
   if (window.DafCore.Shelves) window.DafCore.Shelves.section();
   drawLibrary('');
+  if (window.DafCore.Find.q('books')) findBooks(window.DafCore.Find.q('books'));
+}
+// The search in Books' bar: every book by its title, its author, its series or a shelf it's on
+// (/api/books/search). Its results take the page's place; the page's own cards wait under them.
+async function findBooks(q){
+  const page = $('#main .page'); if (!page || S.route[0] !== 'books') return;
+  $$('#main .page > section').forEach(s => { s.hidden = !!q; });
+  let box = $('#bfound');
+  if (!q) { if (box) box.remove(); return; }
+  const r = await api('/api/books/search?q=' + encodeURIComponent(q));
+  if (window.DafCore.Find.q('books') !== q || !$('#main .page')) return;          // typed on since
+  if (!(box = $('#bfound'))) { $('#main .page').insertAdjacentHTML('afterbegin', '<div id="bfound"></div>'); box = $('#bfound'); }
+  const ser = s => s ? esc(s.name) + (s.index ? ' #' + (Math.round(s.index * 10) / 10) : '') : '';
+  box.innerHTML = r.books.length ? '<section class="card"><div class="cardh"><h2>' + (r.count === 1 ? 'One book' : r.count + ' books') + '</h2></div><div class="bgrid">' + r.books.map(b => '<div class="bcell">' +
+      bookRow(b, '<span class="tiny mute">' + [ser(b.series), b.shelves.length ? esc(b.shelves.join(', ')) : '', b.highlights ? b.highlights + (b.highlights === 1 ? ' highlight' : ' highlights') : ''].filter(Boolean).join(' · ') + '</span>') +
+      (b.readable ? '<span class="tiny rowacts"><a class="btn sm primary" href="#ebook/' + encodeURIComponent(b.id) + '">Read</a></span>' : '') + '</div>').join('') + '</div></section>'
+    : window.DafCore.Find.none();
 }
 async function drawLibrary(q){
   const r = await api('/api/ebooks?q=' + encodeURIComponent(q));
@@ -731,14 +755,20 @@ async function renderBook(id, hl){
 }
 
 /* ---------- sources & prefs ---------- */
+const SRC_USE = { 'Kindle':'reading time', 'KoInsight':'Kindle history', 'Audiobookshelf':'listening, bookmarks', 'Obsidian vault':'notes', 'Calibre':'books, covers',
+  'Karakeep':'Library', 'FreshRSS':'Feed', 'Feeds':'Feed', 'Kokoro voice':'read-aloud', 'Sefaria':'Torah shelf', 'AntennaPod':'podcasts', 'Transcripts':'videos, clips, pages', 'Host tools':'Ask, transcripts' };
 async function renderSources(){
-  $('#main').innerHTML = '<div class="top"><h1>Sources</h1><span class="spacer"></span><button class="btn sm" data-act="refresh">' + I.sync + ' Sync now</button></div><div class="page"><span class="mute">Checking…</span></div>';
-  const r = await api('/api/sources');
-  const USE = { 'Kindle':'reading time', 'KoInsight':'Kindle history', 'Audiobookshelf':'listening, bookmarks', 'Obsidian vault':'notes', 'Calibre':'books, covers',
-    'Karakeep':'Library', 'FreshRSS':'Feed', 'Feeds':'Feed', 'Kokoro voice':'read-aloud', 'Sefaria':'Torah shelf', 'AntennaPod':'podcasts', 'Transcripts':'videos, clips, pages', 'Host tools':'Ask, transcripts' };
-  $('#main .page').innerHTML = '<section class="card"><div class="srcs">' + r.checks.map(c =>
-    '<div class="src"><span class="dot' + (c.ok ? '' : ' bad') + '" aria-label="' + (c.ok ? 'Working' : 'Not working') + '"></span><b>' + esc(c.name) + '</b><span class="dt mute">' + esc(c.detail) + '</span><span class="mute tiny">' + esc(USE[c.name] || '') + '</span></div>'
-  ).join('') + '</div></section><p class="mute tiny" style="margin:0">Daf only reads these. In the vault it writes the reading log, a “From Daf” section at the end of book notes, and notes for what you highlight or write a note on in Daf, with the full text (Reference/clippings, youtube, podcasts, instagram, torah). Nothing else.</p>';
+  $('#main').innerHTML = '<div class="top"><h1>Sources</h1><span class="spacer"></span>' + window.DafCore.Find.html('sources', 'Search sources', drawSources) + '<button class="btn sm" data-act="refresh">' + I.sync + ' Sync now</button></div><div class="page"><span class="mute">Checking…</span></div>';
+  S.sources = await api('/api/sources');
+  drawSources();
+}
+// The search in the bar: a source by its name, what it says, or what it's for.
+function drawSources(){
+  const page = $('#main .page'), F = window.DafCore.Find; if (!S.sources || !page || S.route[0] !== 'sources') return;
+  const q = F.q('sources'), checks = S.sources.checks.filter(c => F.match(q, c.name, c.detail, SRC_USE[c.name]));
+  page.innerHTML = (checks.length ? '<section class="card"><div class="srcs">' + checks.map(c =>
+    '<div class="src"><span class="dot' + (c.ok ? '' : ' bad') + '" aria-label="' + (c.ok ? 'Working' : 'Not working') + '"></span><b>' + esc(c.name) + '</b><span class="dt mute">' + esc(c.detail) + '</span><span class="mute tiny">' + esc(SRC_USE[c.name] || '') + '</span></div>'
+  ).join('') + '</div></section>' : F.none()) + (q ? '' : '<p class="mute tiny" style="margin:0">Daf only reads these. In the vault it writes the reading log, a “From Daf” section at the end of book notes, and notes for what you highlight or write a note on in Daf, with the full text (Reference/clippings, youtube, podcasts, instagram, torah). Nothing else.</p>');
 }
 /* ---------- read-aloud voices (Kokoro on the server) ---------- */
 // Kokoro's voice names start with two letters for the accent and whose voice it is (af_heart: an
@@ -1066,7 +1096,6 @@ function prefsMore(){
 let noteTimers = {};
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.id === 'hlq') { S.hlq = t.value; clearTimeout(S.hlqT); S.hlqT = setTimeout(() => drawHighlights().catch(err => toast(err.message)), 250); }
   if (t.dataset.note) {
     const id = t.dataset.note; clearTimeout(noteTimers[id]);
     noteTimers[id] = setTimeout(async () => { try { await api('/api/highlights/' + encodeURIComponent(id) + '/note', { method:'PUT', body:JSON.stringify({ note:t.value }) }); toast(t.value.trim() ? 'Note saved to the vault' : 'Note removed'); } catch(err){ toast(err.message); } }, 900);
@@ -1145,7 +1174,7 @@ document.addEventListener('click', async e => {
     else if (act === 'bookexport') { const q = new URLSearchParams(); q.set('book', a.dataset.id); q.set('private', '1'); exportMenu(a, q); }
     else if (act === 'hlfav'){ S.hlFav = !S.hlFav; drawHighlights(); }
     else if (act === 'revagain'){ renderReview(S.route.slice(1)); }
-    else if (act === 'hlclear'){ S.hlq = ''; S.hlSource = ''; S.hlColor = ''; S.hlTag = ''; S.hlFav = false; const q = $('#hlq'); if (q) q.value = ''; drawHighlights(); }
+    else if (act === 'hlclear'){ S.hlq = ''; S.hlSource = ''; S.hlColor = ''; S.hlTag = ''; S.hlFav = false; window.DafCore.Find.set('highlights', ''); drawHighlights(); }
     else if (act === 'hlmore'){ S.hlOpen.add(a.dataset.id); drawHighlights(); }
     else if (act === 'rshare'){ const x = S.rev && S.rev.items[S.revIdx]; if (x) window.DafCore.HL.share(x, { title: x.title, author: x.author }); }
     else if (act === 'rnever'){ reviewAct('never'); }
@@ -1186,9 +1215,7 @@ document.addEventListener('change', async e => {
     if (t.id === 'hlsort'){ S.hlSort = t.value; drawHighlights(); }
   } catch(err){ toast(err.message); }
 });
-let libT = null;
 document.addEventListener('input', e => { if (e.target.id !== 'nlq') return; const q = e.target.value.toLowerCase(); $$('.nlrow').forEach(r => { r.hidden = q && !r.textContent.toLowerCase().includes(q); }); const d = $('.nlmore'); if (d && q) d.open = true; });
-document.addEventListener('input', e => { if (e.target.id === 'libq') { clearTimeout(libT); libT = setTimeout(() => drawLibrary(e.target.value.trim()), 200); } });
 document.addEventListener('submit', async e => {
   if (e.target.id !== 'acctf') return; e.preventDefault();
   const u = $('#au').value.trim().toLowerCase(), np = $('#anp').value, cp = $('#acp').value;

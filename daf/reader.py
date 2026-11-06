@@ -72,38 +72,83 @@ def _filters(flt, args):
     return q
 
 
-def list_docs(conn, settings, where, tab, kind=None, cat=None, limit=200, offset=0, sort="new", feed=None, flt=None):
-    args, q = [], "SELECT * FROM docs WHERE where_ = ? AND status != 'deleted'"
-    args.append(where)
-    exp = expired_before(settings)
+def fts_match(q):
+    """A search's words for docs_fts (FTS5): each one as a phrase, the last also as a prefix, so the
+    list finds "sleep" while it's still "sle". None when there are no words."""
+    words = ['"' + w.replace('"', '""') + '"' for w in re.findall(r"[\w'’-]+", q or "") if w]
+    return " ".join(words) + "*" if words else None
+
+
+TITLED = "(title LIKE ? OR source LIKE ? OR author LIKE ?)"
+
+
+def _search(q, args, text=True):
+    """A list's search (the search in its top bar): the title, the source or the author, or, with
+    `text`, anywhere in what Daf keeps of the text (docs_fts). Returns SQL to AND on."""
+    like = f"%{q}%"
+    args += [like] * 3
+    match = fts_match(q) if text else None
+    if not match:
+        return " AND " + TITLED
+    args.append(match)
+    return " AND (" + TITLED + " OR id IN (SELECT id FROM docs_fts WHERE docs_fts MATCH ?))"
+
+
+def _scope(where, kind, cat, feed, args):
+    """Which of the Library or the Feed a list is, before its tab: a kind, a folder, a feed."""
+    q = ""
     if where == "feed":
-        if tab == "seen":
-            q += " AND (status = 'seen' OR added < ?)"
-            args.append(exp)
-        else:
-            q += " AND status = 'unseen' AND added >= ?"
-            args.append(exp)
         if cat:
             q += " AND category = ?"
             args.append(cat)
         if feed:
             q += " AND feed = ?"
             args.append(feed)
-    elif kind == "starred":
+    elif kind and kind != "starred":
+        q += " AND kind = ?"
+        args.append(kind)
+    return q
+
+
+def _tab(where, tab, kind, exp, args):
+    """A list's tab. "any" is every one of them, for a search across the whole Library (its Home)."""
+    if tab == "any":
+        return ""
+    if where == "feed":
+        args.append(exp)
+        return " AND (status = 'seen' OR added < ?)" if tab == "seen" else " AND status = 'unseen' AND added >= ?"
+    if kind == "starred":
         # The Shortlist, as in Readwise: starred (Karakeep's favourites), whatever the tab, until archived.
-        q += " AND starred = 1 AND status NOT IN ('archive', 'deleted')"
-    else:
-        q += " AND status = ?"
-        args.append(tab or "inbox")
-        if kind:
-            q += " AND kind = ?"
-            args.append(kind)
-    q += _filters(flt, args)
-    q += " ORDER BY " + SORTS.get(sort, SORTS["new"])
-    q += " LIMIT ? OFFSET ?"
-    args += [limit, offset]
+        return " AND starred = 1 AND status NOT IN ('archive', 'deleted')"
+    args.append(tab or "inbox")
+    return " AND status = ?"
+
+
+def list_docs(conn, settings, where, tab, kind=None, cat=None, limit=200, offset=0, sort="new", feed=None, flt=None, q=None):
+    """A list of the Library or the Feed. With `q`, only what it finds (_search), what it finds in
+    the title, the source or the author first; an item found only in its text carries the words
+    around the find (`found`, marked with \\x02 and \\x03, as /api/search's are)."""
+    exp = expired_before(settings)
+    q = (q or "").strip()[:200]
+
+    def select(text):
+        args, sql = [where], "SELECT * FROM docs WHERE where_ = ? AND status != 'deleted'"
+        sql += _scope(where, kind, cat, feed, args) + _tab(where, tab, kind, exp, args)
+        sql += _filters(flt, args)
+        order = SORTS.get(sort, SORTS["new"])
+        if q:
+            sql += _search(q, args, text)
+            order = TITLED + " DESC, " + order
+            args += [f"%{q}%"] * 3
+        return [dict(r) for r in conn.execute(sql + " ORDER BY " + order + " LIMIT ? OFFSET ?", args + [limit, offset])]
+
+    try:
+        rows = select(True)
+    except Exception:  # noqa: BLE001 - an odd search (FTS5 has its own grammar) mustn't break the list
+        if not q:
+            raise
+        rows = select(False)
     hl = _hl_counts(conn)
-    rows = [dict(r) for r in conn.execute(q, args)]
     icons = feed_icons(conn) if where == "feed" else {}
     for r in rows:
         r["highlights"] = hl.get(r["id"], 0)
@@ -113,6 +158,8 @@ def list_docs(conn, settings, where, tab, kind=None, cat=None, limit=200, offset
             r["feed_icon"] = icons.get(r["feed"], "")
             if not (r["thumb"] or "").startswith("/api/thumb/"):
                 r["thumb"] = ""          # its picture isn't kept yet (rss.keep_pictures): the row doesn't fetch it from the site
+    if q:
+        _found_in_text(conn, rows, q)
     return rows
 
 
@@ -125,6 +172,43 @@ def feed_icons(conn):
         return {r[0]: r[1] for r in conn.execute("SELECT id, icon FROM feeds WHERE icon IS NOT NULL") if r[1] in have}
     subs = json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])
     return {x["id"]: x["icon"] for x in subs if x.get("icon")}
+
+
+def _found_in_text(conn, rows, q):
+    """The words around the find, for the rows a search found only in their text."""
+    ql = q.lower()
+    inner = [r["id"] for r in rows if not any(ql in (r.get(k) or "").lower() for k in ("title", "source", "author"))]
+    match = fts_match(q)
+    if not inner or not match:
+        return
+    try:
+        snip = dict(conn.execute(f"SELECT id, snippet(docs_fts, 2, char(2), char(3), '…', 14) FROM docs_fts WHERE docs_fts MATCH ? "
+                                 f"AND id IN ({','.join('?' * len(inner))})", (match, *inner)).fetchall())
+    except Exception:  # noqa: BLE001
+        return
+    for r in rows:
+        if snip.get(r["id"]):
+            r["found"] = snip[r["id"]]
+
+
+def found_tabs(conn, settings, where, kind=None, cat=None, feed=None, flt=None, q=""):
+    """How many a search finds in each of the list's tabs, so the tabs can say where the rest are
+    (INBOX 3 · ARCHIVE 12): {tab: count}."""
+    q = (q or "").strip()[:200]
+    if not q or kind == "starred":
+        return {}
+    exp = expired_before(settings)
+    for text in (True, False):
+        args = [where]
+        sql = " FROM docs WHERE where_ = ? AND status != 'deleted'" + _scope(where, kind, cat, feed, args) + _filters(flt, args) + _search(q, args, text)
+        try:
+            if where == "feed":
+                r = conn.execute("SELECT SUM(status = 'unseen' AND added >= ?), SUM(status = 'seen' OR added < ?)" + sql, [exp, exp, *args]).fetchone()
+                return {"unseen": r[0] or 0, "seen": r[1] or 0}
+            return {s: n for s, n in conn.execute("SELECT status, COUNT(*)" + sql + " GROUP BY status", args)}
+        except Exception:  # noqa: BLE001 - as in list_docs: without the text, then
+            continue
+    return {}
 
 
 def counts(conn, settings):

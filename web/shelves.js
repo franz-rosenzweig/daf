@@ -57,21 +57,27 @@ SH.forBook = async (b, box) => {
   };
 };
 
-// One shelf.
+// One shelf, and the bar's search over its books' titles and authors.
 C.views.shelf = async args => {
-  const id = decodeURIComponent(args[0] || '');
-  $('#main').innerHTML = '<div class="top"><a class="btn sm" href="#books">' + C.I.back + '</a><h1>Shelf</h1></div><div class="page"><span class="mute">Loading…</span></div>';
+  const id = decodeURIComponent(args[0] || ''), fk = 'shelf:' + id;
+  let draw = () => {};           // the search can be typed into before the shelf has come
+  $('#main').innerHTML = '<div class="top"><a class="btn sm" href="#books">' + C.I.back + '</a><h1>Shelf</h1><span class="spacer"></span>' + C.Find.html(fk, 'Search this shelf', () => draw()) + '</div><div class="page"><span class="mute">Loading…</span></div>';
   let r;
   try { r = await api('/api/shelves/' + encodeURIComponent(id)); } catch(e){ $('#main .page').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
   $('#main .top h1').textContent = r.name;
-  $('#main .top').insertAdjacentHTML('beforeend', '<span class="spacer"></span>' + (r.hardcover_url ? '<a class="btn sm" href="' + esc(r.hardcover_url) + '" target="_blank" rel="noopener">On Hardcover</a>' : '') +
+  $('#main .top').insertAdjacentHTML('beforeend', (r.hardcover_url ? '<a class="btn sm" href="' + esc(r.hardcover_url) + '" target="_blank" rel="noopener">On Hardcover</a>' : '') +
     (r.kindle != null ? '' : '<button class="btn sm" data-shelf="rename">Rename</button>' + (r.hardcover ? '' : '<button class="btn sm" data-shelf="delete">Delete</button>')));
-  const rows = r.books.map(b => '<div class="bcell">' + C.bookRow(b, (b.highlights ? '<span class="tiny mute">' + b.highlights + ' highlights</span>' : '')) +
-    '<span class="tiny rowacts">' + (b.readable ? '<a class="btn sm primary" href="#ebook/' + encodeURIComponent(b.id) + '">Read</a> ' : '') +
-    '<button class="linkbtn" data-shelfout="' + esc(b.id) + '">Take off this shelf</button></span></div>').join('');
-  $('#main .page').innerHTML = (r.hardcover ? '<p class="mute tiny" style="margin:0 0 10px">This shelf is your Hardcover list. Put a book on or take one off here and it changes there too; private books stay off it.</p>' : '') +
-    '<section class="card">' + (r.books.length ? '<div class="bgrid">' + rows + '</div>'
-    : '<p class="mute" style="margin:0">Nothing here yet. On a book’s page, under Shelves, switch this one on.</p>') + '</section>';
+  draw = () => {
+    const page = $('#main .page'); if (!page || C.S.route[0] !== 'shelf') return;
+    const q = C.Find.q(fk), books = r.books.filter(b => C.Find.match(q, b.title, b.author));
+    const rows = books.map(b => '<div class="bcell">' + C.bookRow(b, (b.highlights ? '<span class="tiny mute">' + b.highlights + ' highlights</span>' : '')) +
+      '<span class="tiny rowacts">' + (b.readable ? '<a class="btn sm primary" href="#ebook/' + encodeURIComponent(b.id) + '">Read</a> ' : '') +
+      '<button class="linkbtn" data-shelfout="' + esc(b.id) + '">Take off this shelf</button></span></div>').join('');
+    page.innerHTML = (r.hardcover && !q ? '<p class="mute tiny" style="margin:0 0 10px">This shelf is your Hardcover list. Put a book on or take one off here and it changes there too; private books stay off it.</p>' : '') +
+      (q && !books.length ? C.Find.none() : '<section class="card">' + (books.length ? '<div class="bgrid">' + rows + '</div>'
+      : '<p class="mute" style="margin:0">Nothing here yet. On a book’s page, under Shelves, switch this one on.</p>') + '</section>');
+  };
+  draw();
   $('#main').onclick = async e => {
     const a = e.target.closest('[data-shelf],[data-shelfout]'); if (!a) return;
     try {

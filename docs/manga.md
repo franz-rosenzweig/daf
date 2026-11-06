@@ -8,6 +8,8 @@ This page covers reading manga in Daf. My manga live in Komga, which already sca
 
 **Manga** in the sidebar shows **Keep reading**, the series you're partway through, and **All series** under it. Open a series for its volumes, and press **Keep reading** or **Read** on one to open it. Manga volumes don't show up in Books, so they don't crowd your novels.
 
+The magnifying glass at the top finds a series by its name as I type, and on a series' page it finds a volume.
+
 In the Mac and Android apps, every volume on a series page has a download button, which keeps it on the device so it reads with no connection. While it downloads, the button shows how far along it is. On Android, **Settings → Books and manga on this device** shows how much is kept, and on the Mac it's **With no connection** in the app's Settings.
 
 ## The reader
