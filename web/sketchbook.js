@@ -328,8 +328,10 @@ function render(){
     const svg = S.doc.createElementNS(NS, 'svg');
     svg.setAttribute('class', 'skinkl'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('width', W); svg.setAttribute('height', r1(bh));
     el.appendChild(svg);
-    const layer = Pens.layer(svg, dark());
-    layer.hl.style.mixBlendMode = dark() ? 'screen' : 'multiply';
+    // on a picture the ink is dark and the highlighter darkens, as on paper, whatever the theme
+    const onPic = b.kind === 'image', layer = Pens.layer(svg, dark() && !onPic);
+    layer.hl.style.mixBlendMode = dark() && !onPic ? 'screen' : 'multiply';
+    layer.onPic = onPic;
     S.layers.set(b.id, { layer, box });
     for (const s of strokesOf(ms, b.id)) { try { draw(s, box, layer); } catch(e){} }
   }
@@ -344,11 +346,11 @@ function measure(){
     if (box.b) for (const [, g] of S.geo) if (g.blk === box.b.id) { g.pts.forEach(p => { p[1] += d; }); g.box[1] += d; g.box[3] += d; }
   }
 }
-const asPen = m => ({ id: m.id, v: 2, tool: m.tool, color: m.color, size: m.size, o: m.o });
+const asPen = (m, onPic) => ({ id: m.id, v: 2, tool: m.tool, color: onPic && m.color === 'ink' ? '#1e1e1e' : m.color, size: m.size, o: m.o });
 function draw(s, box, layer){
   if (!box) { const l = S.layers.get(s.blk); if (!l) return; box = l.box; layer = l.layer; }
   const k = box.k, local = s.pts.map(p => [(p[0] - box.ox) * k, (p[1] - box.oy) * k, p[2]]);
-  const el = layer.add(asPen(s), local, k);
+  const el = layer.add(asPen(s, layer.onPic), local, k);
   let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
   const pts = local.map(p => [p[0], p[1] + box.top, p[2]]);
   for (const p of pts) { if (p[0] < x1) x1 = p[0]; if (p[0] > x2) x2 = p[0]; if (p[1] < y1) y1 = p[1]; if (p[1] > y2) y2 = p[1]; }

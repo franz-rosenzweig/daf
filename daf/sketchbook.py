@@ -24,7 +24,6 @@ import hashlib
 import json
 import re
 import time
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -43,7 +42,7 @@ MAX_POINTS = 4000
 IMAGES = config.STATE / "sketchbook"          # the pictures on its pages, by their hash
 IMAGE_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 KINDLE_MARK = "Sketchbook"                    # a page on the Kindle is a bookmark whose text starts with this
-DRAWN = "[Drawing in Daf]"                    # and says so when there's more on it than words
+DRAWN = "[Drawing in Daf]"                    # and says so when there's handwriting on it nobody could read
 
 
 def _num(v, lo, hi):
@@ -288,7 +287,8 @@ def kindle_echo(conn, text, note):
 
 # ---- the API ----------------------------------------------------------------------------------------
 
-def _routes():
+def router():
+    """The routes, for app.py to include at its end (they use its conn, device, json_body and user)."""
     from .app import conn, device, json_body, user
     r = APIRouter(prefix="/api/sketchbook")
 
@@ -360,9 +360,5 @@ def _dictate(data, ext):
     return {"text": text, "language": out.get("language")}
 
 
-def router():
-    return _routes()
-
-
 def image_path(name):
-    return Path(IMAGES / name)
+    return IMAGES / name
