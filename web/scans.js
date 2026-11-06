@@ -111,7 +111,9 @@ async function detect(book, id){
     let first = 0;
     while (first < pages.length && cover && pages[first].href === cover) first++;
     if (cover && first < pages.length && await alike(book, cover, pages[first].href)) first++;
-    return make(book, id, secs, first);
+    const api = make(book, id, secs, first);
+    api.count = () => pages.length - first - (api.shifted ? api.shifted() : 0);   // the printed pages, for the status bar (book.js pageNow)
+    return api;
   } catch(e){ console.warn('scans', e); return null; }
 }
 
@@ -207,6 +209,7 @@ function make(book, id, secs, first){
     }
   }
   const api = {
+    shifted: () => S.shift,
     // Before book.js's own listeners, so the place it hears about has the page numbers in it.
     attach(view){
       S.view = view;

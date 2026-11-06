@@ -653,6 +653,11 @@ function pageNow(l){
   const v = B.view, list = v.book.pageList;
   if (v.isFixedLayout) { const i = l.section ? l.section.current : 0, n = l.section ? l.section.total : 0; return n ? { cur: i + 1, total: n, left: n - i - 1 } : null; }
   const s = secNow(), o = { sec: s };
+  // A scanned book: the pages by the numbers printed on them (scans.js)
+  if (B.scans && B.scans.count && l.pageItem && l.pageItem.pages) {
+    const ps = l.pageItem.pages, total = B.scans.count(), last = +ps[ps.length - 1];
+    return Object.assign(o, { cur: ps[0], to: ps.length > 1 ? ps[ps.length - 1] : undefined, total, left: Math.max(0, total - last), printed: true });
+  }
   if (list && list.length) {
     // the book's last page is its highest number (a list can end out of order), else its last label
     if (B.plFor !== list) { B.plFor = list; B.plMax = Math.max(...list.map(p => /^\d+$/.test(p.label) ? +p.label : 0)); }
