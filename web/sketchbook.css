@@ -96,7 +96,10 @@ html.focus .skb .inkpal{display:flex}
 /* ---------- the page (in its frame) ---------- */
 html.skframe{background:var(--bg);height:auto;min-height:100%;scrollbar-width:thin}
 body.skdoc{margin:0;padding:10px 10px 40px;height:auto;min-height:100%;background:transparent;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
-.skpage{position:relative;--sk-rule:color-mix(in srgb,var(--fg) 13%,transparent)}
+.skpage{position:relative;margin:0 auto;--sk-rule:color-mix(in srgb,var(--fg) 13%,transparent)}
+/* a page narrower than the panel: a sheet on the desk */
+html.skframe:has(.skpage.sheet){background:color-mix(in srgb,var(--fg) 4%,var(--bg))}
+.skpage.sheet{background:var(--bg);border-radius:6px;box-shadow:0 0 0 1px var(--line),0 4px 18px rgba(0,0,0,.06)}
 .skblk{position:relative}
 .skblk .skinkl{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .sktext,.skedit{display:block;width:100%;box-sizing:border-box;margin:0;padding:8px 5%;font:16.5px/1.5 var(--ui);color:var(--fg);white-space:pre-wrap;overflow-wrap:anywhere;cursor:text;min-height:1.5em}

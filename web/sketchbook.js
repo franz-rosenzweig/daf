@@ -79,7 +79,8 @@ const byId = id => cur().find(m => m.id === id);
 
 /* ---------- where it sits ---------- */
 // Sideways (and wide enough): beside the reader on the right. Upright: a sheet below it, or above.
-const sideways = () => innerWidth > innerHeight && innerWidth >= 640;
+// (While typing, the keyboard's shorter window doesn't count: the tablet hasn't turned.)
+const sideways = () => innerWidth > (S.editing && S.fullH && innerWidth === S.fullW ? Math.max(innerHeight, S.fullH) : innerHeight) && innerWidth >= 640;
 function sizes(){
   if (sideways()) return { mode: 'side', w: Math.round(clamp(innerWidth * store.get('w', 0.4), 300, Math.max(300, innerWidth - 320))) };
   // the keyboard up while typing in it (the app's window shrinks): most of what's left
@@ -291,11 +292,22 @@ function frameOf(b, W, strokes){
   for (const s of strokes) for (const p of s.pts) low = Math.max(low, p[1] + (s.size || 6) / 2);
   return { k, ox: 0, oy: 0, h: Math.max(3, Math.ceil(low / LINE) + 1) * LINE * k };      // whole lines, one to spare
 }
+// The page is one size on this screen, as paper is: as wide as the panel first opens beside a book
+// (four tenths of the screen's long side), the same upright and sideways. A wider panel leaves room
+// around it and the lines stay as they are; only a panel too narrow for it shows it smaller.
+// A phone's page is its whole width.
+function pageW(room){
+  const w = S.fullW || innerWidth, h = S.fullH || innerHeight;
+  if (Math.min(w, h) < 600) return room;                 // a phone: all of its width
+  return Math.min(room, Math.round(clamp(Math.max(w, h) * 0.4, 300, 720)) - 20);
+}
 function render(){
   if (!S.page || !S.shown) return;
-  const W = S.doc.documentElement.clientWidth - 20; if (W < 50) return;
+  const room = S.doc.documentElement.clientWidth - 20; if (room < 50) return;
+  const W = pageW(room);
   const ms = cur(), bl = blocksOf(ms), last = bl[bl.length - 1];
   S.W = W; S.page.style.width = W + 'px';
+  S.page.classList.toggle('sheet', W < room - 24);
   S.page.style.setProperty('--skl', r2(LINE * W / INK_W) + 'px');
   let h = '';
   const fr = new Map(), ed = S.editing, slot = '<div class="skslot"></div>';
@@ -313,9 +325,24 @@ function render(){
   if (!slotted) h += slot;
   const lh = LINE * W / INK_W, lines = Math.max(last && last.kind === 'ink' && last.type === 'writing' ? 1 : 3, Math.ceil((S.frame.clientHeight || 0) * 0.35 / lh));
   h += '<div class="skblk skend" style="height:' + r2(lines * lh) + 'px"></div>';
-  S.page.innerHTML = h;
-  const sl = S.page.querySelector('.skslot');
-  if (ed) { sl.replaceWith(ed.ta); S.page.appendChild(ed.bar); } else if (sl) sl.remove();
+  if (ed && ed.ta.parentNode === S.page) {
+    // the text being typed stays put while the rest is laid out around it (taken out of the page,
+    // it would lose the keyboard, which is what laying out again when the keyboard comes up did)
+    const t = S.doc.createElement('template'); t.innerHTML = h;
+    for (const n of [...S.page.childNodes]) if (n !== ed.ta && n !== ed.bar) n.remove();
+    const nodes = [...t.content.childNodes], at = nodes.findIndex(n => n.classList && n.classList.contains('skslot'));
+    const tail = ed.bar.parentNode === S.page ? ed.bar : null;
+    nodes.forEach((n, i) => { if (i < at) S.page.insertBefore(n, ed.ta); else if (i > at) S.page.insertBefore(n, tail); });
+    S.page.appendChild(ed.bar);
+  } else {
+    S.page.innerHTML = h;
+    const sl = S.page.querySelector('.skslot');
+    if (ed) { sl.replaceWith(ed.ta); S.page.appendChild(ed.bar); } else if (sl) sl.remove();
+  }
+  // the ruled paper goes down to the bottom of the panel
+  const endEl = S.page.lastElementChild && S.page.lastElementChild.classList.contains('skend') ? S.page.lastElementChild : S.page.querySelector('.skend');
+  const gap = (S.frame.clientHeight || 0) - 50 - S.page.offsetHeight;
+  if (endEl && gap >= lh) endEl.style.height = r2((lines + Math.floor(gap / lh)) * lh) + 'px';
   S.boxes = []; S.geo.clear(); S.layers.clear();
   for (const el of S.page.children) {
     if (!el.classList.contains('skblk')) continue;
