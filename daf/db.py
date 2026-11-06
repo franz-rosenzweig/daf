@@ -70,6 +70,43 @@ CREATE TABLE IF NOT EXISTS ink (           -- what's written on an article with 
   created INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ink_doc ON ink (doc);
+CREATE TABLE IF NOT EXISTS sketch_tabs (    -- the Sketchbook beside what you read (sketchbook.py): a page a tab
+  item TEXT NOT NULL,                       -- book:<book id> | doc:<doc id> | manga:<Komga series id>
+  tab TEXT NOT NULL,                        -- "" (General) | c:<a chapter's href> | v:<Komga book id>
+  title TEXT,
+  pos REAL,                                 -- where it is in the book (0 to 1): the tabs' order, and the Kindle's place for it
+  updated INTEGER NOT NULL,
+  PRIMARY KEY (item, tab)
+);
+CREATE TABLE IF NOT EXISTS sketch_marks (   -- what's on a Sketchbook page: its blocks (text, ink, image) and their strokes
+  id TEXT PRIMARY KEY,                      -- the page's own id for it
+  item TEXT NOT NULL,
+  tab TEXT NOT NULL,
+  kind TEXT NOT NULL,                       -- text | ink | image | stroke
+  data TEXT NOT NULL,                       -- JSON (sketchbook._clean)
+  created INTEGER NOT NULL,
+  updated INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sketch_marks_tab ON sketch_marks (item, tab);
+CREATE TABLE IF NOT EXISTS sketch_notes (   -- each item's Sketchbook note in the vault, as Daf last wrote or read it
+  item TEXT PRIMARY KEY,
+  path TEXT NOT NULL,
+  hash TEXT,                                -- the file's, then: changed since, it was edited in Obsidian
+  base TEXT                                 -- JSON {tab: [[block id, what it said]…]}: what it had then, to merge with
+);
+CREATE TABLE IF NOT EXISTS sketch_files (   -- the vault files a Sketchbook block is (an Ink SVG, a picture), as last written or read
+  path TEXT PRIMARY KEY,
+  item TEXT NOT NULL,
+  blk TEXT NOT NULL,
+  hash TEXT,
+  ids TEXT                                  -- JSON: the stroke ids it had then
+);
+CREATE INDEX IF NOT EXISTS sketch_files_blk ON sketch_files (blk);
+CREATE TABLE IF NOT EXISTS sketch_kindle (  -- a book's Sketchbook pages as the Kindle has them, as bookmarks with a note
+  id TEXT PRIMARY KEY,                      -- <item>|<tab>
+  hash TEXT NOT NULL,
+  at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS highlights (
   id TEXT PRIMARY KEY,
   book_id TEXT,

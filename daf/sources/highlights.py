@@ -17,7 +17,7 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .. import config, library
+from .. import config, library, sketchbook
 from ..db import read_only
 
 
@@ -106,6 +106,8 @@ def import_all(conn, settings):
                 continue
             if not a.get("pos0") and text.startswith("in ") and len(text) < 60 and not note:
                 continue          # a bare bookmark, not a highlight
+            if not a.get("pos0") and sketchbook.kindle_echo(conn, text, note):
+                continue          # a Sketchbook page Daf put there (sketchbook.for_kindle)
             created = _epoch(a.get("datetime"), tz)
             if md5 in daf_epubs:
                 r = on_docs.row(md5, a, text, note, created)
@@ -128,7 +130,7 @@ def import_all(conn, settings):
         try:
             for md5, text, note, chapter, pageno, dt, deleted in k.execute(
                     "SELECT book_md5, text, note, chapter, pageno, datetime, deleted_at FROM annotation"):
-                if deleted or not (text or note):
+                if deleted or not (text or note) or sketchbook.kindle_echo(conn, text, note):
                     continue
                 if md5 in daf_epubs:
                     r = on_docs.row(md5, {"chapter": chapter}, (text or "").strip(), (note or "").strip() or None, _epoch(dt, tz))

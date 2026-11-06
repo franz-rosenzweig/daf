@@ -3098,8 +3098,9 @@ def kindle_book(md5: str = "", name=Depends(device), c=Depends(conn)):
         "SELECT h.id, h.text, h.chapter, h.color, s.user_note AS note FROM highlights h LEFT JOIN review_state s ON s.hl_id = h.id "
         "WHERE h.book_id = ? AND h.source = 'epub' AND h.deleted = 0 AND h.id NOT IN (SELECT hl_id FROM kindle_pushed) "
         "ORDER BY h.created", (bid,))]
+    from . import sketchbook                   # its Sketchbook's pages, as bookmarks with a note (acked at /api/sketchbook/kindle/ack)
     return {"known": True, "book_id": bid, "title": b["title"] if b else None,
-            "daf": dict(pos) if pos else None, "highlights": hls}
+            "daf": dict(pos) if pos else None, "highlights": hls, "sketchbook": sketchbook.for_kindle(c, bid)}
 
 
 @app.post("/api/kindle/highlights/ack")
@@ -3334,6 +3335,8 @@ def post_manga_beat(b=Depends(json_body), c=Depends(conn)):
 
 from . import webapi  # noqa: E402 - the browser extension's routes (/api/web); it uses conn and device from above
 app.include_router(webapi.router)
+from . import sketchbook  # noqa: E402 - the Sketchbook beside the readers (/api/sketchbook)
+app.include_router(sketchbook.router())
 
 
 @app.get("/api/extension/{name}", dependencies=[Depends(user)])

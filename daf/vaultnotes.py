@@ -1,8 +1,9 @@
 """Daf's region in book notes: notes added in Daf on highlights, and reading notes
 (voice or text) filed under a book.
 
-Daf owns only the text between `<!-- daf -->` and `<!-- daf-end -->`. Everything
-else in the note, including koreader-merge's highlight region, stays byte-identical.
+Daf owns only the text between `<!-- daf -->` and `<!-- daf-end -->` (and its Sketchbook's,
+`<!-- daf-sketchbook -->`, sketchvault.py). Everything else in the note, including
+koreader-merge's highlight region, stays byte-identical.
 Each entry ends with a block id (`^daf-…`). If you edit an entry in Obsidian,
 the vault wins: Daf notices the text no longer matches what it last wrote and
 takes your version before writing again.
@@ -420,7 +421,9 @@ def write_article(conn, settings, doc_id, backfill=False):
     rel = b["vault_path"] if b and b["vault_path"] else None
     if rel and not (config.VAULT / rel).exists():
         rel = None
-    if not hls and not m_["note"] and not rel:       # a note already written still loses its last highlight
+    from . import sketchbook
+    sketch = sketchbook.has(conn, "doc:" + doc_id)   # its Sketchbook (sketchvault.py) wants the note as a highlight does
+    if not hls and not m_["note"] and not rel and not sketch:       # a note already written still loses its last highlight
         return "nothing to write"
     if not rel and (rel := _karakeep_note(doc_id)):
         conn.execute("UPDATE books SET vault_path = ? WHERE id = ?", (rel, doc_id))
@@ -446,7 +449,7 @@ def write_article(conn, settings, doc_id, backfill=False):
         outside = text[:m.start()] + text[m.end():] if m else text
         if note and note.strip() in outside:
             note = None
-    if not m and not hls and not note:                # a note of yours Daf has never written in (a vault essay opened in Daf)
+    if not m and not hls and not note and not sketch:   # a note of yours Daf has never written in (a vault essay opened in Daf)
         return "nothing to write"
     kept_note = conn.execute("SELECT v FROM kv WHERE k = ?", ("vault_note:" + doc_id,)).fetchone()
     if m:
@@ -466,7 +469,7 @@ def write_article(conn, settings, doc_id, backfill=False):
             if v and _h(v) != kept_note[0] and _h(v) != _h(note):
                 note = v
                 conn.execute("UPDATE docs SET note = ? WHERE id = ?", (v, doc_id))
-    full = own and bool(hls or note)
+    full = own and bool(hls or note or sketch)
     blocks = []
     if m_["doc"] and (full or m_["kind"] == "torah"):
         from . import episodes                    # an episode's are its transcript and then its show notes
@@ -508,7 +511,7 @@ def write_article(conn, settings, doc_id, backfill=False):
         parts += ["\n".join(lines), ""]
     if note:
         parts += ["## Notes", "", note.strip() + " ^daf-note", ""]
-    if hls or not full:                     # a note with only your note on it has no Highlights heading
+    if hls or not (full or sketch):         # a note with only your note (or a Sketchbook) on it has no Highlights heading
         parts += ["## Highlights", ""]
     for h in hls:
         p = h["p"]
