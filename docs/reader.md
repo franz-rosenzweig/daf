@@ -13,13 +13,13 @@ Every book in my Calibre library with an EPUB, KEPUB, AZW3, MOBI, FB2 or CBZ fil
 
 Your place is kept per book on the server, so the phone and the desk agree, and the newest place wins when you open it ("Picked up at 45%"). If the Kindle is further along, Daf says "On the Kindle you're at page 212 of 480", with **Go there** and **Stay here**.
 
-A book reads the way it does in Apple Books. On a wide screen it opens as two pages side by side, like a real book, and on a phone as one. The bar has back and the title, then **Contents** (t), **Aa**, **Search** (/), the bookmark ribbon (b) and the **…** menu, and it fades as soon as I turn a page. Moving the pointer to the top or the bottom brings it back. The contents and the side panel slide in over the pages and go again with a tap outside them. The footer has the minutes left in the chapter and in the book, the printed page when the EPUB knows it, and the percent. Tap the percent to jump anywhere.
+A book reads the way it does in Apple Books. On a wide screen it opens as two pages side by side, like a real book, and on a phone as one. The bar has back and the title, then **Contents** (t), **Aa**, **Search** (/), the bookmark ribbon (b) and the **…** menu, and it fades as soon as I turn a page. Moving the pointer to the top or the bottom brings it back. The contents and the side panel slide in over the pages and go again with a tap outside them. Under the pages is the [status bar](#the-status-bar), with the page number, and that one stays.
 
-On a phone the page is all there is: no bar, just the minutes left in the chapter at the bottom. One tap in the middle brings ✕ with the title and the author at the top, and at the bottom a slider to go anywhere in the book and a round button. That button opens one menu with **Contents**, **Notebook**, **Search Book**, **Themes & Settings**, **Listen** and **Ask about this book**, and under them the bookmark, focus mode and the full **…** menu. Tap the middle again and it's just the page.
+On a phone the page is all there is: no bar, just the status bar at the bottom. One tap in the middle brings ✕ with the title and the author at the top, and at the bottom a slider to go anywhere in the book and a round button. That button opens one menu with **Contents**, **Notebook**, **Search Book**, **Themes & Settings**, **Listen** and **Ask about this book**, and under them the bookmark, focus mode and the full **…** menu. Tap the middle again and it's just the page.
 
 Footnotes open in a small popover next to the link, so you never lose your place. The screen stays awake while a book is open. Near the end of a book in a series, Daf offers the next one (**Start it**), and at the very end it asks "The end. Mark it read on Hardcover?" with **Finished** and **Not now**.
 
-The **…** menu has **Listen from here** (l), the **Notebook** (]), **About this book**, **Ask about this book** and **Focus mode** (f), then **Go to the beginning**, **Go to the Kindle's page**, **Bookmark this page**, **Book page, notes and nightstand**, **Export highlights (Markdown)**, **Download the file**, **Auto highlight**, **Keyboard shortcuts** and **Forget my place in Daf**. In the Mac and Android apps it also has **Keep on this device**.
+The **…** menu has **Listen from here** (l), the **Notebook** (]), **About this book**, **Ask about this book** and **Focus mode** (f), then **Go to the beginning**, **Go to a page or a percent** (type 120 for a page, or 45%), **Go to the Kindle's page**, **Bookmark this page**, **Book page, notes and nightstand**, **Export highlights (Markdown)**, **Download the file**, **Auto highlight**, **Keyboard shortcuts** and **Forget my place in Daf**. In the Mac and Android apps it also has **Keep on this device**.
 
 ## How the page looks
 
@@ -42,7 +42,23 @@ The **…** menu has **Listen from here** (l), the **Notebook** (]), **About thi
 
 **Just for this book** keeps a book's own typeface, size and layout, while the theme stays the same everywhere.
 
+For a book there's also **Status bar**, below.
+
 Whether the time counts toward your hour isn't shown over the text any more; Today and Stats say it.
+
+## The status bar
+
+Under a book's pages is a status bar like KOReader's, and it stays there while I read, in focus mode too. Out of the box it's set up the way KOReader is: one thing at a time, starting with the page number ("64 of 196"), and a tap on it goes on to the next: the clock, the pages left in the chapter, the battery (in the Android app and in Chrome), the percent, the time left in the book and the time left in the chapter. Beside it is a thin line for the whole book, with a small mark where each chapter starts.
+
+A page is what KOReader calls a page. When the EPUB has the printed book's page numbers, it's the printed page. Otherwise it's the pages as they are on my screen, counted through the whole book: two pages side by side are two pages ("111–112 of 349"), and in Scroll a page is a screen's height. A bigger font or turning the tablet changes how many there are, so Daf counts the book again in the background, and it remembers the count on the device so that only happens the first time.
+
+**Themes & Settings → Status bar** sets it up (holding a finger on the bar opens it too):
+
+- **Off**, **One at a time** or **All at once.** All at once puts everything on one line with dots between them, and then a tap on the bar opens these settings.
+- **Progress bar:** **Off**, the whole **Book**, or the **Chapter** I'm in.
+- **What's on it, in order:** **Page**, **Page in chapter**, **Pages left in chapter**, **Pages left in book**, **Percent**, **Time left in chapter**, **Time left in book**, **Chapter**, **Book title**, **Clock** and **Battery**. The dark ones are on, in the order they come in; tap one to take it off, or to put it back on at the end.
+
+It's the same for every book. When I've picked more than fits on one line, the progress bar makes room first, and then a long chapter title gets cut short.
 
 ## Themes and your own fonts
 
@@ -105,9 +121,9 @@ While the pen is over the screen, a small ring shows where it'll write and how w
 
 ## Focus mode
 
-**Focus mode** in the **…** menu of an article or a book (the **[ ]** button in a PDF's bar) puts it on the whole screen: the sidebar, the bar and the book's footer go, and in the Android app the status and navigation bars go too and the screen stays on. In a browser the window goes full screen. The edges bring back what you need:
+**Focus mode** in the **…** menu of an article or a book (the **[ ]** button in a PDF's bar) puts it on the whole screen: the sidebar and the bar go (a book's status bar stays), and in the Android app the status and navigation bars go too and the screen stays on. In a browser the window goes full screen. The edges bring back what you need:
 
-- **The top or bottom edge:** the bar (and a book's footer), with Aa, the contents, the side panel and the rest. It goes again after a few seconds, or when you touch the page. In a book, a tap in the middle of the page does the same.
+- **The top or bottom edge:** the bar, with Aa, the contents, the side panel and the rest. It goes again after a few seconds, or when you touch the page. In a book, a tap in the middle of the page does the same; the status bar at the very bottom does its own thing when tapped (see [The status bar](#the-status-bar)), and on a phone the slider and the round button come with the bar.
 - **The left edge:** the contents.
 - **The right edge:** the side panel, with Info, the Notebook and Ask.
 

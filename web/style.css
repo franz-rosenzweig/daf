@@ -498,8 +498,6 @@ button.nrow.essay:hover b{color:var(--accent)}
 .bnext[hidden]{display:none}
 .bookload{padding:40px;text-align:center}
 .bookfoot{display:flex;align-items:center;gap:12px;padding:8px 24px;border-top:1px solid var(--line);font-size:12.5px;color:var(--fg-2);min-height:36px;white-space:nowrap;overflow:hidden}
-.bookfoot .bch{overflow:hidden;text-overflow:ellipsis;max-width:45%}
-.bookfoot .bpct{font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
 .bnotice{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 24px 0;padding:10px 14px;border-radius:10px;background:var(--accent-weak);font-size:14px}
 .btitle-top{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:32vw}
 .btoc{gap:1px}
@@ -534,7 +532,7 @@ button.nrow.essay:hover b{color:var(--accent)}
 .ans{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.5}
 .ans q{font-family:var(--read);color:var(--fg-2);quotes:none}
 .ans .answer p{margin:0 0 .6em}
-body.bookbare .rv.ebook .top,body.bookbare .bookfoot,body.bookbare .progress{opacity:0;pointer-events:none}
+body.bookbare .rv.ebook .top,body.bookbare .progress{opacity:0;pointer-events:none}
 .rv.ebook .top,.bookfoot{transition:opacity .2s}
 @media (max-width:1000px){
   .rv.ebook .rvgrid{grid-template-columns:minmax(0,1fr)!important}
@@ -546,7 +544,6 @@ body.bookbare .rv.ebook .top,body.bookbare .bookfoot,body.bookbare .progress{opa
   body[data-view="ebook"] #main{padding-bottom:0}
   .rv.ebook .rvgrid,.bookwrap{height:calc(100dvh - 56px)}
   .btitle-top,#bcounting{display:none}
-  .bookfoot{padding:6px 14px}
 }
 .libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:22px 18px}
 .libcard{display:flex;flex-direction:column;gap:4px;text-decoration:none;color:var(--fg);min-width:0}
@@ -557,14 +554,12 @@ body.bookbare .rv.ebook .top,body.bookbare .bookfoot,body.bookbare .progress{opa
 .libcard:hover .cv.lib{transform:translateY(-2px)}
 .libgrid > .btn{grid-column:1/-1;justify-self:start}
 .rowacts{display:flex;align-items:center;gap:10px}
-.bookfoot .bpct{border:0;background:none;padding:2px 4px;border-radius:6px;cursor:pointer;font:inherit;font-weight:600;color:var(--fg)}
-.bookfoot .bpct:hover{background:var(--hover)}
 .bplayer{display:flex;align-items:center;gap:8px;width:100%}
 .bplayer .round{width:34px;height:34px;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);font-size:12px;cursor:pointer}
 .fnote{position:fixed;z-index:60;background:var(--bg);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
 .fnote .fnh{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 0 14px}
 .fnote foliate-view{display:block;width:100%;height:240px}
-@media (max-width:1000px){.bookfoot .bleft{display:none}.bookfoot .bch{max-width:38%}.bplayer .mute{display:none}}
+@media (max-width:1000px){.bplayer .mute{display:none}}
 
 /* ---------- highlight colors ---------- */
 .hlc q, .nb q{border-left:3px solid var(--hl-yellow-line);padding-left:10px}
@@ -1445,11 +1440,10 @@ html.focus .rvgrid > .docwrap{grid-column:1}
 html.focus .rvgrid > .toc,html.focus .rvgrid > .rpanel{display:none!important}
 html.focus .rv > .top,html.focus .pdfv > .top{position:fixed;left:0;right:0;top:0;z-index:44;transform:translateY(-110%);transition:transform .18s ease;box-shadow:var(--shadow);background:var(--bg)}
 html.focus.fbar .rv > .top,html.focus.fbar .pdfv > .top{transform:none}
-html.focus:not(.fbar) .rv > .top,html.focus:not(.fbar) .pdfv > .top,html.focus:not(.fbar) .bookfoot{box-shadow:none}
+html.focus:not(.fbar) .rv > .top,html.focus:not(.fbar) .pdfv > .top{box-shadow:none}
 html.focus .progress{opacity:0}
 html.focus .rv.ebook .rvgrid,html.focus .bookwrap{height:100vh;height:100dvh}
-html.focus .bookfoot{position:fixed;left:0;right:0;bottom:0;z-index:44;background:var(--bg);transform:translateY(110%);transition:transform .18s ease;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
-html.focus.fbar .bookfoot{transform:none}
+html.focus .rv.ebook .bookfoot{position:relative;z-index:44;height:calc(34px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px)}   /* the status bar stays, over the bottom edge */
 html.focus .inkpal{display:none}
 html.focus.fbar .inkpal{display:flex}
 html.focus.ftoc .rvgrid > .toc{display:flex!important;position:fixed;left:0;top:0;bottom:0;width:min(340px,88vw);z-index:46;max-height:none;background:var(--side);box-shadow:var(--shadow);padding-top:calc(18px + env(safe-area-inset-top,0px))}
@@ -1523,6 +1517,34 @@ body.btocsheet .bscrim,body.bpanelsheet .bscrim{display:block;position:fixed;ins
 .rv.ebook .btitle-top{flex:1;min-width:0;text-align:center;max-width:none;padding:0 12px}
 .rv.ebook .bookfoot{border-top:0;justify-content:center}
 .rv.ebook .bookfoot .spacer{flex:0 0 12px}
+/* ---------- the status bar under a book's page (book.js drawStatus), KOReader's in Apple Books' quiet type:
+   one line of a fixed height (so the pages don't move as it changes), the book's line beside the words,
+   both as wide as the text; it stays while you read. ---------- */
+.rv.ebook .bookfoot{height:34px;min-height:0;padding:0 24px;font-size:12.5px;color:var(--fg-3)}
+@media (max-width:1000px){ .rv.ebook .bookfoot{padding:0 16px} }
+.rv.ebook .bookfoot:has(#bplayer){height:auto;padding-block:8px}
+.rv.ebook .bookfoot .field{min-height:0;height:28px;padding:3px 10px;width:120px}
+.bookfoot.bsoff:not(:has(#bjump,#bplayer)){display:none}
+.bsrow{flex:1;min-width:0;height:100%;display:flex;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.bsin{flex:1;min-width:0;margin:0 auto;display:flex;align-items:center;gap:14px}
+.bsin.noline{justify-content:center}
+.bsbar{position:relative;flex:1 1 0;min-width:15%;height:3px;border-radius:2px;background:var(--line)}
+.bsbar i{position:absolute;top:0;bottom:0;inset-inline-start:0;border-radius:2px;background:var(--fg-3)}
+.bsbar b{position:absolute;top:-2px;bottom:-2px;width:1px;margin-inline-start:-.5px;background:var(--fg-3);opacity:.5}
+.bsbar b.on{top:0;bottom:0;background:var(--bg);opacity:1}
+.bsitems{flex:0 1 auto;display:flex;align-items:center;min-width:0;overflow:hidden;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bsitems span{flex:none;overflow:hidden;text-overflow:ellipsis;unicode-bidi:isolate}
+.bsitems span:is([data-sbi="chapter"],[data-sbi="title"]){flex:0 1 auto;min-width:2.5em}   /* a title gives way first */
+.bsitems > i{font-style:normal;margin:0 7px;opacity:.7;flex:none}
+.bsin.tight{justify-content:center} .bsin.tight .bsbar{display:none}
+.bsbatt{vertical-align:-1px;margin-inline-end:4px}
+.bmeasure{position:absolute;inset:0;visibility:hidden;pointer-events:none;z-index:-1}
+.sbset .seg button{padding:7px 2px;font-size:13px}
+.sbset .stepper{gap:14px}
+.sbset .stepper .seg{display:grid;flex:1}
+.sbchips{display:flex;flex-wrap:wrap;gap:6px}
+.sbchips .chip{background:var(--bg);color:var(--fg-2);border:1px solid var(--line-2);padding:4px 11px;border-radius:999px;font-size:13px;cursor:pointer;min-height:30px}
+.sbchips .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 /* ---------- Themes & Settings (reader.js openAa): a popover under Aa, a sheet from the bottom on a phone ---------- */
 #pop.aapop{width:320px;gap:14px;padding:14px 16px 16px;max-height:calc(100vh - 80px);overflow:auto;overscroll-behavior:contain}
 .aahead{display:flex;align-items:center;justify-content:space-between;margin:-2px -6px -4px 0}
@@ -1568,13 +1590,14 @@ body.btocsheet .bscrim,body.bpanelsheet .bscrim{display:block;position:fixed;ins
   .btitle2 b{font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .btitle2 span{font-size:12px;color:var(--fg-3);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .bgap{width:36px;flex:none}
-  body.bookbare .bookfoot{opacity:.85}
-  .rv.ebook .bookfoot .bch,.rv.ebook .bookfoot .bpage{display:none}
   body:not(.bookbare) .rv.ebook .bctl{display:flex;flex-direction:column;gap:6px;position:fixed;left:0;right:0;bottom:0;z-index:30;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px)) 24px;background:var(--bg);border-top:1px solid var(--line)}
   .bctlrow{display:flex;align-items:center;gap:12px}
   .bctlrow span{flex:1;font-size:12.5px;font-variant-numeric:tabular-nums}
   #bslide{width:100%;accent-color:var(--fg);margin:4px 0 0}
   .bctl .bmenu{width:46px;height:46px;flex:none}
+  /* in focus mode they come and go with the bar, over the status bar */
+  html.focus:not(.fbar) .rv.ebook .bctl{display:none}
+  html.focus .rv.ebook .bctl{z-index:45}
 }
 @media (max-width:1000px) and (min-width:701px){ .rv.ebook .btitle-top{display:block} }
 

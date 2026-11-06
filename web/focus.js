@@ -1,9 +1,9 @@
-/* Focus mode: an article, a book or a PDF on the whole screen, and nothing else. The sidebar, the
-   reader's bar and the book's footer go; in the Android app the status and navigation bars go too
-   and the screen stays on (dafShell.screen, as the manga reader has it); in a browser the window
-   goes full screen. The edges bring back what's needed: the top or the bottom edge the bar (and
-   the book's footer), the left edge the contents, the right edge the side panel. Back, Esc or the
-   bar's [ ] button leave it. It stays on for the next thing opened until it's left. */
+/* Focus mode: an article, a book or a PDF on the whole screen, and nothing else. The sidebar and
+   the reader's bar go (a book's status bar stays, as KOReader's does: book.js); in the Android app
+   the status and navigation bars go too and the screen stays on (dafShell.screen, as the manga
+   reader has it); in a browser the window goes full screen. The edges bring back what's needed: the
+   top or the bottom edge the bar, the left edge the contents, the right edge the side panel. Back,
+   Esc or the bar's [ ] button leave it. It stays on for the next thing opened until it's left. */
 (function(){
 'use strict';
 const C = window.DafCore;
@@ -67,8 +67,8 @@ function edges(on){
   });
   document.body.appendChild(e);
 }
-// The bar (and the book's footer), for a few seconds or until the page is touched; kept while its
-// menus are open.
+// The bar (and a phone's slider under a book), for a few seconds or until the page is touched; kept
+// while its menus are open.
 function bar(on){
   clearTimeout(F.barT);
   root.classList.toggle('fbar', !!on);
