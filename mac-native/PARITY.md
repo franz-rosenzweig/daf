@@ -100,3 +100,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: ⌘K: search everything (articles and the words in them, books, highlights, the vault), go anywhere, do something
 - here: adding books and PDFs as files, dropping files and links on the window, pasting a link or copied files
 - here: the shortcuts sheet (Help › Keyboard Shortcuts, ⌘/)
+
+## The Sketchbook (2026-11-05)
+
+- not yet: the Sketchbook beside a book, an article, a video, a PDF and a manga volume (web/sketchbook.js): a panel on the right whose width is dragged, a tab a chapter (following where you are) or a volume and General, typed text blocks (add, edit, move up and down, delete, type below), handwriting and pictures shown (the pen itself is tablet-only), time stamps that seek a video, the camera on a manga or PDF page, dictation (/api/sketchbook/dictate), all through /api/sketchbook

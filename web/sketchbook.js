@@ -289,7 +289,7 @@ function frameOf(b, W, strokes){
   if (b.kind === 'image') return { k, ox: 0, oy: 0, h: (b.h || INK_W) * k };
   let low = 0;
   for (const s of strokes) for (const p of s.pts) low = Math.max(low, p[1] + (s.size || 6) / 2);
-  return { k, ox: 0, oy: 0, h: Math.max(2.5 * LINE, (Math.ceil(low / LINE) + 1.5) * LINE) * k };
+  return { k, ox: 0, oy: 0, h: Math.max(3, Math.ceil(low / LINE) + 1) * LINE * k };      // whole lines, one to spare
 }
 function render(){
   if (!S.page || !S.shown) return;
@@ -311,8 +311,8 @@ function render(){
   }
   // under everything: ruled paper, where writing starts a new handwriting block and a tap types
   if (!slotted) h += slot;
-  const endH = (last && last.kind === 'ink' && last.type === 'writing' ? 1.5 : 3) * LINE * W / INK_W;
-  h += '<div class="skblk skend" style="height:' + r1(Math.max(endH, (S.frame.clientHeight || 0) * 0.35)) + 'px"></div>';
+  const lh = LINE * W / INK_W, lines = Math.max(last && last.kind === 'ink' && last.type === 'writing' ? 1 : 3, Math.ceil((S.frame.clientHeight || 0) * 0.35 / lh));
+  h += '<div class="skblk skend" style="height:' + r2(lines * lh) + 'px"></div>';
   S.page.innerHTML = h;
   const sl = S.page.querySelector('.skslot');
   if (ed) { sl.replaceWith(ed.ta); S.page.appendChild(ed.bar); } else if (sl) sl.remove();
@@ -567,7 +567,7 @@ function sendTo(k, add, rm){
   for (const m of add) { S.q.remove.delete(m.id); S.q.add.set(m.id, m); }
   clearTimeout(S.qT); S.qT = setTimeout(flush, 1200);
 }
-const sent = m => { const o = Object.assign({}, m); delete o.updated; if (o.file && o.src && S.uploaded && S.uploaded.has(o.file)) delete o.src; return o; };
+const sent = m => { const o = Object.assign({}, m); delete o.updated; if (o.file) delete o.src; return o; };
 async function flush(){
   clearTimeout(S.qT);
   const q = S.q; S.q = null;
@@ -575,7 +575,8 @@ async function flush(){
   const body = { tab: q.tab, title: q.title, pos: q.pos != null ? q.pos : undefined, add: [...q.add.values()].map(sent), remove: [...q.remove], at: Math.floor(Date.now() / 1000) };
   try {
     const r = await api('/api/sketchbook/' + encodeURIComponent(q.item), { method: 'POST', body: JSON.stringify(body) });
-    if (r && !r.queued) for (const m of q.add.values()) if (m.file && m.src) (S.uploaded = S.uploaded || new Set()).add(m.file);
+    // a picture sent as itself is kept by the server under a name: the page asks for it by that from now on
+    if (r && r.files) for (const [id, file] of Object.entries(r.files)) for (const list of S.pages.values()) { const m = list.find(x => x.id === id); if (m) { m.file = file; } }
     if (S.ctx && S.ctx.item === q.item) {
       const has = blocksOf(S.pages.get(q.k) || []).length, i = S.tabs.findIndex(t => t.tab === q.tab);
       if (has && i < 0) S.tabs.push({ tab: q.tab, title: q.title, pos: q.pos, n: has });
@@ -823,10 +824,8 @@ async function take(box){
   }
   let src;
   try { src = cv.toDataURL('image/jpeg', 0.85); } catch(e){ toast('That page can’t be taken'); return; }
-  const bytes = Uint8Array.from(atob(src.split(',')[1]), c => c.charCodeAt(0));
-  const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-1', bytes)), b => b.toString(16).padStart(2, '0')).join('');
   const nums = [...new Set(parts.map(p => { const n = p.el.closest('[data-pg]'); return n ? +n.dataset.pg : p.el.dataset.n != null ? +p.el.dataset.n + 1 : null; }).filter(Boolean))].sort((a, b) => a - b);
-  const m = { id: newId('i'), kind: 'image', ord: lastOrd() + 1, h: r1(INK_W * box.height / box.width), file: hash + '.jpg', src,
+  const m = { id: newId('i'), kind: 'image', ord: lastOrd() + 1, h: r1(INK_W * box.height / box.width), src,
               cap: nums.length ? (nums.length > 1 ? 'pp. ' + nums[0] + '–' + nums[nums.length - 1] : 'p. ' + nums[0]) : '' };
   setCur(cur().concat(m)); render(); act({ add: [m] });
   const el = S.page.querySelector('.skblk[data-id="' + m.id + '"]'); if (el) el.scrollIntoView({ block: 'center' });

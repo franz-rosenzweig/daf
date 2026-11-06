@@ -159,7 +159,8 @@ M.open = async (bid, page, opts) => {
   layout(Math.min(Math.max(0, start), n - 1));
   if (M.ink) M.ink.open(RD);                         // what's drawn on the pages with a pen (mink.js)
   // the Sketchbook beside it (sketchbook.js): a tab a volume, and its camera takes the page in view
-  if (C.Sketch) C.Sketch.attach({ item: 'manga:' + b.series.id, kind: 'manga', here: () => ({ tab: 'v:' + b.id, title: b.name.replace(/\s*[\(\[][^)\]]*[\)\]]/g, '').trim() || b.name }),
+  const vol = b.name.replace(/\s*[\(\[][^)\]]*[\)\]]/g, '').replace(b.series.name || '\u0000', '').trim(), nv = /^v(?:ol(?:ume)?)?\.?\s*0*(\d+)$/i.exec(vol);
+  if (C.Sketch) C.Sketch.attach({ item: 'manga:' + b.series.id, kind: 'manga', here: () => ({ tab: 'v:' + b.id, title: nv ? 'Vol. ' + nv[1] : vol || b.name }),
     shots: () => [...el.querySelectorAll('.mslot.cur .mpg, .mslot.cur .mhalf, .mstrip .mpg')] });
   el.focus();
   try { RD.wake = await navigator.wakeLock.request('screen'); } catch(e){}

@@ -125,6 +125,8 @@ On a tablet with a pen (the S Pen on a Galaxy Tab, or an Apple Pencil on an iPad
 
 English is read on the device by Grape, the reader FineNotes uses, in Daf itself, so it works in the browser too and offline once its 5.7 MB model has come. Hebrew is read by Google's handwriting reader in the Android app (0.5.2 and later), which it fetches from Google once, about 20 MB; pick **עברית** on the card. Lines drawn clean as shapes and the highlighter's strokes aren't read.
 
+For notes beside the page instead of on it, there's [the Sketchbook](sketchbook.md).
+
 While the pen is over the screen, a small ring shows where it'll write and how wide. A hand resting on the screen while you write doesn't scroll the page or turn it. What you write is kept on the server, so it's there on every device, and each stroke stays with the words it was written on: change the font size or the line width and it moves with them, and a note in the margin stays beside its paragraph. Written with no signal, it waits on the device and goes when you're back online, as highlights do. Writing on a Feed item saves it to the Library, as a highlight does.
 
 ## Focus mode

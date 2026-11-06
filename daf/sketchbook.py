@@ -160,7 +160,8 @@ def has(conn, item):
 
 def change(conn, item, tab, add=(), remove=(), title=None, pos=None, at=None):
     """Marks written or changed (add) and taken away (remove, by id) on one tab, in one go: the
-    removals first, so a mark sent as both (an edit undone) ends as added. Returns (added, removed)."""
+    removals first, so a mark sent as both (an edit undone) ends as added. Returns (added, removed,
+    {a picture's id: the name its file is kept under}, for one sent as a data: address)."""
     now = int(time.time())
     when = at if isinstance(at, int) and now - 30 * 86400 < at <= now + 60 else now
     ids = [str(i) for i in list(remove)[:2000] if MARK_ID.match(str(i))]
@@ -172,9 +173,11 @@ def change(conn, item, tab, add=(), remove=(), title=None, pos=None, at=None):
         # a block taken away takes its strokes (undo sends them again with it)
         conn.execute(f"DELETE FROM sketch_marks WHERE item = ? AND tab = ? AND kind = 'stroke' AND json_extract(data, '$.blk') IN ({','.join('?' * len(part))})",
                      (item, tab, *part))
-    added = 0
+    added, files = 0, {}
     for m in list(add)[:500]:
         mid, kind, d = _clean(m)
+        if kind == "image" and m.get("src"):
+            files[mid] = d["file"]
         old = conn.execute("SELECT created FROM sketch_marks WHERE id = ?", (mid,)).fetchone()
         conn.execute("INSERT OR REPLACE INTO sketch_marks (id, item, tab, kind, data, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?)",
                      (mid, item, tab, kind, json.dumps(d, separators=(",", ":"), ensure_ascii=False), old["created"] if old else when, when))
@@ -184,7 +187,7 @@ def change(conn, item, tab, add=(), remove=(), title=None, pos=None, at=None):
     conn.execute("INSERT INTO sketch_tabs (item, tab, title, pos, updated) VALUES (?, ?, ?, ?, ?) "
                  "ON CONFLICT(item, tab) DO UPDATE SET title = COALESCE(excluded.title, title), pos = COALESCE(excluded.pos, pos), updated = excluded.updated",
                  (item, tab, title, pos, now))
-    return added, removed
+    return added, removed, files
 
 
 # ---- text, as it reads ---------------------------------------------------------------------------
@@ -306,7 +309,7 @@ def _routes():
         if len(data) > 40 * 1024 * 1024:
             raise HTTPException(413, "That's too long to write down in one go")
         ctype = request.headers.get("content-type", "")
-        ext = ".mp4" if "mp4" in ctype or "aac" in ctype else ".ogg" if "ogg" in ctype else ".wav" if "wav" in ctype else ".webm"
+        ext = ".mp4" if "mp4" in ctype or "aac" in ctype else ".ogg" if "ogg" in ctype else ".wav" if "wav" in ctype else ".mp3" if "mpeg" in ctype else ".webm"
         return await run_in_threadpool(_dictate, data, ext)
 
     @r.post("/kindle/ack")
@@ -330,13 +333,13 @@ def _routes():
         if not item_ok(item) or not isinstance(b, dict) or not TAB.match(str(b.get("tab") or "")):
             raise HTTPException(400, "Bad item")
         try:
-            added, removed = change(c, item, str(b.get("tab") or ""), b.get("add") or [], b.get("remove") or [],
-                                    b.get("title"), b.get("pos"), b.get("at"))
+            added, removed, files = change(c, item, str(b.get("tab") or ""), b.get("add") or [], b.get("remove") or [],
+                                           b.get("title"), b.get("pos"), b.get("at"))
         except (ValueError, TypeError) as e:
             raise HTTPException(400, str(e) or "Bad mark")
         from . import sketchvault
         sketchvault.later(item)
-        return {"added": added, "removed": removed}
+        return {"added": added, "removed": removed, "files": files}
 
     return r
 

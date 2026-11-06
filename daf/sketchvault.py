@@ -334,7 +334,7 @@ def _body(conn, settings, item, rel):
     link = _stamp_link(conn, item)
     ts = SB.tabs(conn, item)
     one = len(ts) == 1 and ts[0]["tab"] == ""
-    out, base = ["", ""] if ts else [""], {}
+    out, base = [""], {}
     for t in ts:
         bl = SB.blocks(SB.marks(conn, item, t["tab"]))
         if not one:
