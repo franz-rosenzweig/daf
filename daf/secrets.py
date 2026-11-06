@@ -4,6 +4,8 @@
   Fever calls use) with user Franz_Rosenzweig. The vault's FRESHRSS_API_PASS was stale
   on 2026-10-09.
 - Karakeep: the vault's KARAKEEP_API_KEY, else the homepage's key.
+- Audiobookshelf: its own AUDIOBOOKSHELF_API_KEY, else the homepage's HOMEPAGE_VAR_ABS_KEY (absapi.py).
+  It stays on the server: the browser gets the audio and covers through Daf.
 - /srv/docker/daf/daf.env, if present, overrides any of these by the same names.
 """
 import re
@@ -44,6 +46,11 @@ def freshrss():
 def karakeep_key():
     e = env()
     return e.get("DAF_KARAKEEP_KEY") or e.get("KARAKEEP_API_KEY") or e.get("HOMEPAGE_VAR_KARAKEEP_KEY") or ""
+
+
+def abs_key():
+    e = env()
+    return e.get("DAF_ABS_KEY") or e.get("AUDIOBOOKSHELF_API_KEY") or e.get("HOMEPAGE_VAR_ABS_KEY") or ""
 
 
 def claude_model():

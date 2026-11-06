@@ -1,6 +1,7 @@
-"""A sandbox Daf whose outside writes go nowhere: Karakeep, FreshRSS, Hardcover, Komga progress, the
-morning email and GitHub get stand-ins that print what they were asked. Reads still go out (Komga
-pages, Hardcover search, Kokoro). No sync loop runs; "Sync now" still would, so leave it alone.
+"""A sandbox Daf whose outside writes go nowhere: Karakeep, FreshRSS, Hardcover, Komga progress,
+Audiobookshelf (its playback sessions and your place), the morning email and GitHub get stand-ins
+that print what they were asked. Reads still go out (Komga pages, Hardcover search, Kokoro, ABS's
+libraries, items, audio and covers). No sync loop runs; "Sync now" still would, so leave it alone.
 
     PYTHONPATH=<checkout> DAF_STATE=<a copy of the state> DAF_VAULT=<a scratch vault> \\
       DAF_KINDLE_DIR=<scratch> DAF_CWA_INGEST=<scratch> DAF_FRESHRSS_URL=http://127.0.0.1:9 \\
@@ -11,10 +12,11 @@ sandbox-issue.md."""
 import hashlib
 import os
 import sys
+import time
 
 import uvicorn
 
-from daf import config, digest, feedback, hardcover, manga
+from daf import absapi, config, digest, feedback, hardcover, manga
 from daf.sources import freshrss, karakeep
 
 OUT = config.STATE
@@ -60,6 +62,25 @@ def _hardcover(q, v=None):          # reads go to Hardcover; writes never leave 
 
 hardcover.gql = _hardcover
 manga.set_progress = lambda bid, page, completed=False, at=None: said("KOMGA PROGRESS", bid, page, completed)
+_abs_places = {}                    # what the stand-in was told, so the sandbox shows it back
+
+
+def _abs_write(method, path, body=None):
+    said("AUDIOBOOKSHELF " + method, path, {k: v for k, v in (body or {}).items() if k != "deviceInfo"})
+    parts = path.strip("/").split("/")
+    if parts[:2] == ["api", "items"] and len(parts) >= 4 and parts[3] == "play":
+        key = parts[2] + (":" + parts[4] if len(parts) > 4 else "")
+        _abs_places["open"] = key
+        return {"id": "sbx-session-" + key.replace(":", "-")}
+    if parts[:2] == ["api", "session"] and body and _abs_places.get("open"):
+        _abs_places[_abs_places["open"]] = {"currentTime": body.get("currentTime"), "duration": body.get("duration"),
+                                           "isFinished": False, "lastUpdate": int(time.time() * 1000)}
+    return {}
+
+
+_abs_progress = absapi.progress
+absapi.write = _abs_write
+absapi.progress = lambda: {**_abs_progress(), **{k: v for k, v in _abs_places.items() if k != "open"}}
 
 if __name__ == "__main__":
     if "/srv/docker/daf" in str(config.STATE):

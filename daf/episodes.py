@@ -82,8 +82,9 @@ def _get(url, timeout=30, limit=8 * 1024 * 1024):
 
 # ---- feeds -------------------------------------------------------------------------
 
-def parse_feed(data):
-    """An RSS feed → (show title, show picture, [episode dicts])."""
+def parse_feed(data, about=None):
+    """An RSS feed → (show title, show picture, [episode dicts]). `about`, a dict, gets what the feed
+    says of the show itself: its description, its website and its author (the show's page)."""
     root = ET.fromstring(data)
     ch = root.find("channel")
     if ch is None:
@@ -94,6 +95,9 @@ def parse_feed(data):
         if _local(el.tag) == "image":
             pic = el.get("href") or (el.findtext("url") or "").strip() or pic
     show_author = next(((el.text or "").strip() for el in ch if _local(el.tag) == "author" and el.text), None)
+    if about is not None:
+        desc = next((el.text for el in ch if _local(el.tag) in ("description", "summary") and (el.text or "").strip()), None)
+        about.update(description=(desc or "").strip()[:4000], link=(ch.findtext("link") or "").strip(), author=show_author or "")
     out = []
     for it in ch.findall("item")[:300]:
         enc = it.find("enclosure")
@@ -156,15 +160,17 @@ def read_feed(conn, feed_url, max_age=FEED_MAX_AGE):
     was = conn.execute("SELECT v FROM kv WHERE k = ?", (k,)).fetchone()
     if was and time.time() - int(json.loads(was[0]).get("at", 0)) < max_age:
         return json.loads(was[0]).get("title")
+    about = {}
     try:
         data, _ = _get(feed_url, timeout=30, limit=30 * 1024 * 1024)
-        show, pic, eps = parse_feed(data)
+        show, pic, eps = parse_feed(data, about)
     except Exception as e:  # noqa: BLE001 - a dead feed shouldn't stop anything
         log.info("feed %s: %s", feed_url, e)
-        conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", (k, json.dumps({"at": int(time.time()), "error": str(e)[:200]})))
+        old = json.loads(was[0]) if was else {}               # what an earlier read knew stays for the show's page
+        conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", (k, json.dumps({**old, "at": int(time.time()), "error": str(e)[:200]})))
         return None
     remember(conn, feed_url, show, eps)
-    conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", (k, json.dumps({"at": int(time.time()), "title": show, "image": pic})))
+    conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", (k, json.dumps({"at": int(time.time()), "title": show, "image": pic, **about})))
     return show
 
 
@@ -573,10 +579,13 @@ def _store(conn, audio, bl, chapters, source, lang):
 def state(conn, d, opening=True):
     """What the episode page needs besides the doc: the audio, where you were, chapters, and the
     transcript's state. Nothing here waits on the network; opening it asks for a transcript (want),
-    whose job reads the feed."""
+    whose job reads the feed. An episode of a show you don't follow, found in the directory and
+    only opened, waits for its first play (played) or the Transcribe button: an hour of whisper for
+    a look at its show notes is too much."""
     audio = d["enclosure"]
     m = meta(conn, audio) or {}
-    if opening:
+    if opening and (d.get("where_") != "podcast" or position(conn, audio) or
+                    conn.execute("SELECT 1 FROM gp_subs WHERE url = ? AND removed IS NULL", (m.get("podcast") or "",)).fetchone()):
         want(conn, audio, "auto")
     tr = transcript(conn, audio)
     pos = position(conn, audio)

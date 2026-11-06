@@ -732,7 +732,7 @@ async function renderBook(id, hl){
     (b.progress != null ? '<span>' + bar(b.progress) + ' ' + Math.round(b.progress) + '% on the Kindle · ' + esc(b.progress_note || '') + '</span>' : '') +
     (b.audio_note ? '<span class="mute">Audiobook: ' + esc(b.audio_note) + '</span>' : '') +
     '<span class="mute tiny">' + [b.minutes_kindle && !b.stats ? Math.round(b.minutes_kindle / 60 * 10) / 10 + ' h read on the Kindle' : '', b.last_read ? 'last opened ' + epochDate(b.last_read) : ''].filter(Boolean).join(' · ') + '</span>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' + (b.readable ? '<a class="btn primary" href="#ebook/' + encodeURIComponent(b.id) + '">' + (b.daf_position ? 'Continue in Daf · ' + Math.round((b.daf_position.fraction || 0) * 100) + '%' : 'Read in Daf') + '</a>' : '') + (b.kind === 'book' ? (b.on_nightstand ? '<button class="btn" data-act="standoff" data-id="' + esc(b.id) + '">Take off the nightstand</button>' : '<button class="btn primary" data-act="standon" data-id="' + esc(b.id) + '">Put on the nightstand</button>') : '') +
+    '<div id="bacts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' + (b.readable ? '<a class="btn primary" href="#ebook/' + encodeURIComponent(b.id) + '">' + (b.daf_position ? 'Continue in Daf · ' + Math.round((b.daf_position.fraction || 0) * 100) + '%' : 'Read in Daf') + '</a>' : '') + (b.kind === 'book' ? (b.on_nightstand ? '<button class="btn" data-act="standoff" data-id="' + esc(b.id) + '">Take off the nightstand</button>' : '<button class="btn primary" data-act="standon" data-id="' + esc(b.id) + '">Put on the nightstand</button>') : '') +
     (b.url ? '<a class="btn" href="' + esc(b.url) + '" target="_blank" rel="noopener">Open original</a>' : '') + '</div>' +
     (b.vault_path ? '<span class="tiny mute">Vault: <code>' + esc(b.vault_path) + '</code></span>' : '<span class="tiny mute">No vault note for this book yet; notes stay in Daf until there is one.</span>') + '</div></div>';
   if (b.stats) h += bookStats(b.stats);
@@ -752,6 +752,7 @@ async function renderBook(id, hl){
   $('#main .page').innerHTML = h;
   if ($('#hcsec') && window.DafCore.HC) window.DafCore.HC.section(b.id);
   if ($('#bshelves') && window.DafCore.Shelves) window.DafCore.Shelves.forBook(b).catch(() => {});
+  if (window.DafCore.Audiobooks) window.DafCore.Audiobooks.forBook(b).catch(() => {});     // Listen, when it has its audiobook
   if (hl) setTimeout(() => H.flash($('.hrow[data-h="' + CSS.escape(hl) + '"]')), 80);
 }
 

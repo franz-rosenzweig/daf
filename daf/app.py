@@ -2408,11 +2408,17 @@ def _episode_doc(c, doc_id):
 
 @app.post("/api/podcasts/open", dependencies=[Depends(user)])
 def post_podcast_open(b=Depends(json_body), c=Depends(conn)):
-    """{audio}: the episode's page, made if it has none yet → {id}."""
-    from . import episodes
+    """{audio, found?}: the episode's page, made if it has none yet → {id}."""
+    from . import episodes, podcasts
     audio = str(b.get("audio") or "").strip()
     if not re.match(r"^https?://", audio):
         raise HTTPException(400, "An episode's audio address")
+    if isinstance(b.get("found"), dict):          # one from the directory: what it said of it, until its feed is read
+        try:
+            podcasts.found(c, {**b["found"], "audio": audio})
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        c.commit()                                # doc_for reads its feed next: not with the write lock held
     return {"id": episodes.doc_for(c, audio)}
 
 
@@ -2452,11 +2458,73 @@ def post_podcast_clip(b=Depends(json_body), c=Depends(conn)):
 
 
 @app.get("/api/podcasts/show", dependencies=[Depends(user)])
-def get_podcast_show(feed: str, c=Depends(conn)):
-    from . import episodes
+def get_podcast_show(feed: str, known: int = 0, c=Depends(conn)):
+    """A show's page: what its feed says of it, Follow, and every episode, with where you are in each.
+    known: only what Daf already has, without reading the feed (the page draws that first)."""
+    from . import podcasts
     if not re.match(r"^https?://", feed or ""):
         raise HTTPException(400, "A feed's address")
-    return episodes.show(c, feed)
+    return podcasts.show(c, feed, read=not known)
+
+
+# ---- the Podcasts tab (podcasts.py): listening, shows, episodes, the search, Follow ----------
+
+@app.get("/api/podcasts/listening", dependencies=[Depends(user)])
+def get_podcasts_listening(c=Depends(conn)):
+    from . import podcasts
+    return podcasts.listening(c)
+
+
+@app.get("/api/podcasts/shows", dependencies=[Depends(user)])
+def get_podcasts_shows(c=Depends(conn)):
+    from . import podcasts
+    return {"shows": podcasts.shows(c)}
+
+
+@app.get("/api/podcasts/episodes", dependencies=[Depends(user)])
+def get_podcasts_episodes(feed: str = "", filter: str = "", sort: str = "newest", limit: int = 60, offset: int = 0, q: str = "", c=Depends(conn)):
+    from . import podcasts
+    return podcasts.episode_list(c, feed or None, filter, sort, max(1, min(limit, 500)), max(0, offset), q.strip())
+
+
+@app.get("/api/podcasts/search", dependencies=[Depends(user)])
+def get_podcasts_search(q: str = "", c=Depends(conn)):
+    """Your shows and episodes: titles, show notes, and what was said where Daf has the transcript."""
+    from . import podcasts
+    return podcasts.search_mine(c, q.strip())
+
+
+@app.get("/api/podcasts/directory", dependencies=[Depends(user)])
+def get_podcasts_directory(q: str = "", kind: str = "shows"):
+    """Apple's podcast directory: shows to follow, episodes to play."""
+    from . import podcasts
+    if len(q.strip()) < 2:
+        return {"results": []}
+    try:
+        return {"results": podcasts.directory(q, "episodes" if kind == "episodes" else "shows")}
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"The podcast directory didn't answer: {e}")
+
+
+@app.post("/api/podcasts/follow", dependencies=[Depends(user)])
+def post_podcasts_follow(b=Depends(json_body), c=Depends(conn)):
+    """{feed, follow}: into the subscriptions AntennaPod syncs (it picks a change up at its next sync)."""
+    from . import podcasts
+    feed = str(b.get("feed") or "").strip()
+    if not re.match(r"^https?://", feed):
+        raise HTTPException(400, "A feed's address")
+    return podcasts.follow(c, feed, b.get("follow", True) is not False)
+
+
+@app.get("/api/podcasts/play", dependencies=[Depends(user)])
+def get_podcasts_play(audio: str, c=Depends(conn)):
+    """An episode for the player straight from a list: its page's doc and what the page would know."""
+    from . import episodes
+    if not re.match(r"^https?://", audio or ""):
+        raise HTTPException(400, "An episode's audio address")
+    did = episodes.doc_for(c, audio)
+    d = dict(c.execute("SELECT * FROM docs WHERE id = ?", (did,)).fetchone())
+    return {"id": did, "title": d["title"], "source": d["source"], "episode": episodes.state(c, d, opening=False)}
 
 
 @app.get("/api/podcasts/audio", dependencies=[Depends(user)])
@@ -2577,6 +2645,163 @@ async def gp_episodes_post(username: str, request: Request, c=Depends(conn)):
     from . import episodes
     episodes.on_actions(c, actions)               # what you're listening to gets its transcript
     return out
+
+
+# ---- Audiobookshelf (absapi.py): its audiobooks and podcast libraries in Daf's player, and a book's
+# audiobook beside it (audiomap.py) ----------------------------------------------------------
+
+def _abs(f, *a):
+    from . import absapi
+    try:
+        return f(*a)
+    except absapi.Unavailable as e:
+        raise HTTPException(503, str(e))
+    except KeyError:
+        raise HTTPException(404, "Not in Audiobookshelf")
+
+
+@app.get("/api/abs", dependencies=[Depends(user)])
+def get_abs(c=Depends(conn)):
+    """The podcast libraries (each its own category), the audiobooks, and what you're in the middle of."""
+    from . import absapi
+    try:
+        return {"recordings": absapi.recordings(), "audiobooks": absapi.audiobooks(c), "going": absapi.going()}
+    except (absapi.Unavailable, OSError) as e:
+        return {"recordings": [], "audiobooks": [], "going": [], "error": str(e)}
+
+
+@app.get("/api/abs/show/{item_id}", dependencies=[Depends(user)])
+def get_abs_show(item_id: str):
+    from . import absapi
+    return _abs(absapi.show, item_id)
+
+
+@app.get("/api/abs/play/{item_id}", dependencies=[Depends(user)])
+def get_abs_play(item_id: str, episode: str = "", c=Depends(conn)):
+    """An audiobook (its files as one track) or a recording, for the player."""
+    from . import absapi
+    absapi.forget("progress")
+    p = _abs(absapi.playable, item_id, episode or None)
+    r = c.execute("SELECT book_id FROM book_keys WHERE key = ?", ("abs:" + item_id,)).fetchone()
+    p["book"] = r[0] if r and not episode else None
+    return p
+
+
+@app.post("/api/abs/progress", dependencies=[Depends(user)])
+def post_abs_progress(b=Depends(json_body)):
+    """{item, episode, at, listened, duration, end}: where you are, to ABS (its playback session)."""
+    from . import absapi
+    try:
+        at, listened = float(b["at"]), float(b.get("listened") or 0)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(400, "at, in seconds")
+    item = str(b.get("item") or "")
+    if not re.match(r"^[\w-]+$", item) or (b.get("episode") and not re.match(r"^[\w-]+$", str(b["episode"]))):
+        raise HTTPException(400, "An Audiobookshelf item")
+    try:
+        absapi.played(item, str(b.get("episode") or "") or None, at, listened, b.get("duration"), end=bool(b.get("end")))
+    except Exception as e:  # noqa: BLE001 - ABS away: the place is kept on the device and sent again
+        raise HTTPException(502, f"Audiobookshelf didn't take it: {e}")
+    return {"ok": True}
+
+
+@app.get("/api/abs/audio/{item_id}/{ino}", dependencies=[Depends(user_or_device)])
+def get_abs_audio(item_id: str, ino: str, request: Request):
+    """One of an item's audio files: from this disk when ABS's folder is here (FileResponse answers
+    Range requests), else from ABS with Daf's key, Range passed on."""
+    from fastapi.responses import StreamingResponse
+    from . import absapi
+    local, path, mime = _abs(absapi.audio_file, item_id, ino)
+    if local:
+        return FileResponse(local, media_type=mime, headers={"Cache-Control": "private, max-age=86400"})
+    h = {"Range": request.headers["range"]} if request.headers.get("range") else {}
+    try:
+        r = absapi.stream(path, h)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Audiobookshelf didn't answer: {e}")
+    out = {k: r.headers[k] for k in ("Content-Length", "Content-Range", "Accept-Ranges") if r.headers.get(k)}
+
+    def body():
+        try:
+            while chunk := r.read(256 * 1024):
+                yield chunk
+        finally:
+            r.close()
+    return StreamingResponse(body(), status_code=r.status, media_type=r.headers.get_content_type() or mime, headers=out)
+
+
+@app.get("/api/abs/cover/{item_id}", dependencies=[Depends(user_or_device)])
+def get_abs_cover(item_id: str):
+    from . import absapi
+    if not re.match(r"^[\w-]+$", item_id):
+        raise HTTPException(404, "No cover")
+    try:
+        with absapi.stream(f"/api/items/{item_id}/cover?width=480") as r:
+            data, kind = r.read(), r.headers.get_content_type()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(404, "No cover")
+    return Response(data, media_type=kind, headers={"Cache-Control": "private, max-age=604800"})
+
+
+@app.get("/api/abs/search", dependencies=[Depends(user)])
+def get_abs_search(q: str = ""):
+    """The audiobooks and recordings whose title, author or episode has the words (ABS's own search)."""
+    from . import absapi
+    try:
+        return absapi.search(q.strip())
+    except (absapi.Unavailable, OSError) as e:
+        return {"audiobooks": [], "recordings": [], "episodes": [], "error": str(e)}
+
+
+@app.get("/api/abs/book/{book_id}", dependencies=[Depends(user)])
+def get_abs_book(book_id: str, offer: int = 0, since: int = 0, fraction: float = -1, c=Depends(conn)):
+    """A book's audiobook: where you are in it, and with `offer`, the same place in the book when the
+    audiobook was played after `since` (the book's own place, which is at `fraction`)."""
+    from . import absapi, audiomap
+    item = absapi.for_book(c, book_id)
+    if not item:
+        return {"item": None}
+    p = _abs(absapi.playable, item)
+    pos = c.execute("SELECT fraction, chapter, updated FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
+    out = {"item": item, "title": p["title"], "duration": p["duration"], "at": p["at"], "done": p["done"], "last": p["last"],
+           "chapter": audiomap.audio_chapter([{"start": x["t"], "title": x["title"]} for x in p["chapters"]], p["at"] or 0),
+           "reading": dict(pos) if pos else None}
+    if offer and p["at"] and p["at"] > 30 and not p["done"] and (p["last"] or 0) > since:
+        try:
+            m = audiomap.to_book(c, book_id, p["at"], exact=True)
+        except Exception:  # noqa: BLE001
+            log.exception("audiobook place for %s", book_id)
+            m = None
+        if m and (fraction < 0 or abs(m["fraction"] - fraction) > 0.004):
+            out["offer"] = m
+    return out
+
+
+@app.get("/api/abs/book/{book_id}/place", dependencies=[Depends(user)])
+def get_abs_book_place(book_id: str, t: float, exact: int = 1, c=Depends(conn)):
+    """The place in the book for a second of its audiobook: {words, fraction, chapter, how}."""
+    from . import audiomap
+    r = audiomap.to_book(c, book_id, t, exact=bool(exact))
+    if not r:
+        raise HTTPException(404, "No audiobook and EPUB for this book")
+    return r
+
+
+@app.post("/api/abs/book/{book_id}/start", dependencies=[Depends(user)])
+def post_abs_book_start(book_id: str, b=Depends(json_body), c=Depends(conn)):
+    """{cfi, fraction, text, exact}: where in the audiobook a place in the book is (the reader's page;
+    without one, the book's kept place) → {t, chapter, how}."""
+    from . import audiomap
+    place = {k: b.get(k) for k in ("cfi", "fraction", "text") if b.get(k) is not None}
+    if not place:
+        pos = c.execute("SELECT cfi, fraction FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
+        if not pos:
+            raise HTTPException(404, "No place in this book yet")
+        place = dict(pos)
+    r = audiomap.from_book(c, book_id, place, exact=b.get("exact", True) is not False)
+    if not r:
+        raise HTTPException(404, "No audiobook and EPUB for this book")
+    return r
 
 
 # ---- paper pages (Phase 7) -------------------------------------------------------

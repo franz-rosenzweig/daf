@@ -64,13 +64,27 @@ Click any book, anywhere, and you get its page.
 ![A book's page](images/book.png)
 *A book's page: the time with it, its shelves and Hardcover; the highlights are further down.*
 
-At the top: the progress on the Kindle, in Daf and in the audiobook, when you last opened it, **Read in Daf** (or **Continue in Daf** with the percent), and **Put on the nightstand** or **Take off the nightstand**.
+At the top: the progress on the Kindle, in Daf and in the audiobook, when you last opened it, **Read in Daf** (or **Continue in Daf** with the percent), and **Put on the nightstand** or **Take off the nightstand**. A book with its audiobook in Audiobookshelf also has **Listen** and **Listen from here** (see below).
 
 The **Reading** card adds up the time across the Kindle, Daf and the audiobook, the number of sittings and on how many days, how many Kindle pages you read in an hour, and the time left, with a finish date at your recent pace. Under it is a bar for each of the last 30 days.
 
 **A note on this book** is for a thought while reading that isn't about one line. **Save** files it under the book in the vault, the same as a voice note from the Kindle.
 
 The **Highlights** card lists the book's highlights in reading order, under chapter headings, with **Review these**, **Export**, and how often they come up in the daily review: **More**, **As usual**, **Less** or **Never**.
+
+## The audiobook
+
+Some of my books are in Audiobookshelf too, and Daf knows which audiobook is which book. Then the two keep each other's place.
+
+- **Listen** on the book's page plays the audiobook in Daf's player from where I am in it, and it says how far that is.
+- **Listen from here** starts it where I'm reading instead. In the book itself, the **…** menu has **The audiobook from here**, for the page I'm on.
+- When I open the book after listening, Daf says "In the audiobook you're at" and the chapter, with **Go there** and **Stay here**, the same way it offers the Kindle's page.
+
+Where I stop listening goes back to Audiobookshelf as I go, so its app carries on from the same place.
+
+To find the place, Daf first goes by the book's chapters, taking the front matter, the notes and the index out of the count, and guesses how far into the chapter I am. That alone is usually within a few minutes. Then it listens to about twenty seconds of the audiobook there and finds those words in the book, which takes a few seconds, and that puts it within a sentence or so. Every place it finds that way it remembers for the book, so its guesses get closer the more I use it.
+
+When the two don't line up, like an audiobook of a different translation than my EPUB, the words aren't in the book and Daf goes with the chapter guess. That can be a few minutes out, so I listen for a moment and skip. The audiobook's own chapter numbers don't count for much, because they're often its own: the credits or a prologue as "Chapter 1", or a long chapter split in two.
 
 ## Hardcover
 
