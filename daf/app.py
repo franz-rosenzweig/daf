@@ -1861,7 +1861,9 @@ def get_feed_icon(h: str):
         data, kind = feedsrc.get().icon(h)
     except Exception:  # noqa: BLE001
         raise HTTPException(404, "No icon")
-    return Response(data, media_type=kind, headers={"Cache-Control": "private, max-age=604800"})
+    # A site's SVG icon is the site's own file: opened by itself from Daf's address, it may not run anything.
+    return Response(data, media_type=kind, headers={"Cache-Control": "private, max-age=604800",
+                                                    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox"})
 
 
 @app.post("/api/feed/seen", dependencies=[Depends(user)])
