@@ -57,4 +57,4 @@ The point of all three is the same: the hour in sight, where you'd otherwise loo
 
 Basically, the share menu, a text message and a glance at the widget cover most days, and Daf itself is for when I sit down to read.
 
-<sub>Next: [Your own server](server.md) →</sub>
+<sub>Next: [Reader apps](reader-apps.md) →</sub>

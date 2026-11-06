@@ -17,6 +17,8 @@ Each list has two tabs, **UNSEEN** and **SEEN**. Opening an item in Daf marks it
 
 The info panel shows the opening of the post and a **Summarize** button. **Save to Library** keeps an item for good, and so does highlighting it: the first highlight on a Feed item saves it to the Library on its own, the way Readwise does it.
 
+The Feed also reads well in other apps, like Read You on the phone or NetNewsWire on the Mac, with read and starred going both ways. [Reader apps](reader-apps.md) says how to connect one.
+
 ## The Library
 
 The Library is what I save: **Articles**, **Videos**, **Tweets** and **PDFs**, plus **Emails** once you pick newsletters. Each list has **INBOX**, **LATER** and **ARCHIVE**. **Shortlist** (★, or f) is the few things I mean to read soon, and they stay there until I archive them.

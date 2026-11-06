@@ -190,6 +190,11 @@ def icon(h):
 
 def subscribe(url, folder=None, conn=None):
     """Follow a site or a feed (the feed a site's page names), in a folder. Returns its title."""
+    return follow(url, folder, conn)[1]
+
+
+def follow(url, folder=None, conn=None):
+    """subscribe, returning (its id, its title, the feed's address): the reader apps' quickadd wants all three."""
     feed_url, d, icon_url = discover(url)
     conn, mine = _conn(conn)
     try:
@@ -197,7 +202,7 @@ def subscribe(url, folder=None, conn=None):
         if have:
             if folder is not None:
                 conn.execute("UPDATE feeds SET folder = ? WHERE id = ?", (folder or "", have["id"]))
-            return have["title"]
+            return have["id"], have["title"], feed_url
         n = 1 + max([int(r[0].split("/", 1)[1]) for r in conn.execute("SELECT id FROM feeds WHERE id LIKE 'feed/%'")
                      if r[0].split("/", 1)[1].isdigit()] or [0])
         fid = f"feed/{n}"
@@ -211,7 +216,7 @@ def subscribe(url, folder=None, conn=None):
                      (fid, feed_url, title, site, folder or "", key if got else None, int(time.time())))
         _take(conn, config.load_settings(), dict(conn.execute("SELECT * FROM feeds WHERE id = ?", (fid,)).fetchone()), d)
         conn.execute("UPDATE feeds SET fetched = ?, ok = ? WHERE id = ?", (int(time.time()), int(time.time()), fid))
-        return title
+        return fid, title, feed_url
     finally:
         _done(conn, mine)
 
@@ -453,10 +458,12 @@ def _drop_pictures(conn, names):
 
 
 def _forget(conn, settings):
-    """As freshrss.sync does: old seen posts that were never highlighted or sent to the Kindle go, once
-    they're older than the window; what each feed gave stays in feed_seen (a year), so they don't come back."""
+    """As freshrss.sync does: old seen posts that were never highlighted, sent to the Kindle or starred in
+    a reader app (greader.py) go, once they're older than the window; what each feed gave stays in
+    feed_seen (a year), so they don't come back."""
     expire = int(settings.get("feed_expire_days", 30))
-    keep = "id NOT IN (SELECT DISTINCT book_id FROM highlights WHERE book_id IS NOT NULL) AND id NOT IN (SELECT doc_id FROM kindle_sent)"
+    keep = ("id NOT IN (SELECT DISTINCT book_id FROM highlights WHERE book_id IS NOT NULL) AND id NOT IN (SELECT doc_id FROM kindle_sent) "
+            "AND COALESCE(starred, 0) = 0")
     forget = int(time.time()) - max(30, expire + 2) * 86400
     pictures = [r[0] for r in conn.execute("SELECT thumb FROM docs WHERE where_ = 'feed' AND status IN ('seen', 'deleted') AND added < ? "
                                            f"AND {keep} AND thumb LIKE '/api/thumb/%'", (forget,))]

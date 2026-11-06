@@ -3543,6 +3543,8 @@ from . import webapi  # noqa: E402 - the browser extension's routes (/api/web); 
 app.include_router(webapi.router)
 from . import sketchbook  # noqa: E402 - the Sketchbook beside the readers (/api/sketchbook)
 app.include_router(sketchbook.router())
+from . import greader  # noqa: E402 - the reader apps' Google Reader API (/api/greader.php) and its card (/api/greader)
+app.include_router(greader.router())
 
 
 @app.get("/api/extension/{name}", dependencies=[Depends(user)])

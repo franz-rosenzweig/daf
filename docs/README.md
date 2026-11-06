@@ -30,6 +30,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 - [The Android app](android.md) — phone and tablet, the widget, Listen and books on the phone
 - [The browser extension](browser-extension.md) — highlighting on any web page
 - [Sharing, messages and the widget](phone-shortcuts.md) — "Save to Daf", Signal messages, the morning highlight
+- [Reader apps](reader-apps.md) — Read You, NetNewsWire, Reeder and newsboat on Daf's Feed
 
 ### Tips and what's new
 The first time you reach something you haven't used yet, like the search, a book's Aa or the read-aloud voice, a small note points at it, one at a time. It goes for good once you press the thing or **Got it**. **What's new** in the sidebar (or in ⌘K) lists what changed lately and shows a count until you've looked; on the phone the More button gets a dot. **Preferences → Tips** turns the notes off or brings them all back. What you've seen is kept on the server, so the Mac and the phone agree.
