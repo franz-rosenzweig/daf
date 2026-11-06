@@ -11,6 +11,8 @@ Daf for KOReader.
   * From Daf to the Kindle: when a book opens, if Daf has you further along (read in
     Daf's book reader since you last read it here), offer to go there; and add the
     highlights you made in Daf as KOReader highlights, with their notes. Each is added once.
+    The book's Sketchbook pages come too, as bookmarks at their chapter's start with the
+    typed text as the bookmark's note (pushSketchbook); changed in Daf, changed here.
   * The Daf tab (dafscreen.lua): today, the day's review with Keep and Less often, the
     nightstand, and opening a book from it. From the bar, Tools → Daf → Open Daf, or a
     gesture. Works offline from the last answer; taps are queued.
@@ -507,8 +509,9 @@ function Daf:syncFromDaf(manual)
         return
     end
     local added = self:pushHighlights(res.highlights or {})
+    local pages = self:pushSketchbook(res.sketchbook or {})
     local offered = self:offerPosition(md5, res.daf)
-    if manual and added == 0 and not offered then
+    if manual and added == 0 and pages == 0 and not offered then
         UIManager:show(InfoMessage:new{ text = _("Nothing new from Daf for this book."), timeout = 3 })
     end
 end
@@ -575,6 +578,92 @@ function Daf:pushHighlights(list)
             .. (missed > 0 and "\n" .. string.format(_("%d couldn't be found in this edition."), missed) or ""), timeout = 4 })
     end
     return added
+end
+
+-- Where a Sketchbook page goes: its chapter's start, found by its title in the book's contents (the
+-- one nearest its place in the book when there are several), else its place in the book; General's
+-- at the start. In a PDF, a page number.
+local function squash(t) return (tostring(t or ""):lower():gsub("[%s%p]+", "")) end
+
+function Daf:sketchPlace(chapter, fraction)
+    local doc, toc = self.ui.document, self.ui.toc
+    local total = doc:getPageCount() or 1
+    local page = math.max(1, math.min(total, math.floor((fraction or 0) * total + 0.5)))
+    if chapter and toc then
+        pcall(function() toc:fillToc() end)
+        local best, bestd
+        for _i, t in ipairs(toc.toc or {}) do
+            if t.title and squash(t.title) == squash(chapter) then
+                local d = math.abs((t.page or 1) / total - (fraction or 0))
+                if not bestd or d < bestd then best, bestd = t, d end
+            end
+        end
+        if best then
+            if self.ui.rolling then return best.xpointer or doc:getPageXPointer(best.page), best.title end
+            return best.page, best.title
+        end
+    end
+    if not self.ui.rolling then return page, chapter end
+    if (fraction or 0) <= 0 then page = 1 end
+    local ok, xp = pcall(doc.getPageXPointer, doc, page)
+    if not ok or not xp then return nil end
+    return xp, chapter or (toc and toc:getTocTitleByPage(page))
+end
+
+-- The book's Sketchbook pages from Daf (sketchbook.for_kindle): each a bookmark with its typed text
+-- as the note. One Daf changed since is changed here, one emptied in Daf goes; Daf hears which.
+function Daf:pushSketchbook(list)
+    if #list == 0 or not self.ui.annotation then return 0 end
+    local have = self.settings:readSetting("pushed_sketch") or {}
+    local acks, changed = {}, 0
+    local anns = self.ui.annotation.annotations or {}
+    local function find(was)
+        if not was then return nil end
+        for i, a in ipairs(anns) do
+            if not a.drawer and a.page == was.page and a.text == was.label then return i, a end
+        end
+    end
+    for _i, p in ipairs(list) do
+        local was = have[p.id]
+        local i, a = find(was)
+        if p.remove then
+            if i then
+                local ok = pcall(function() self.ui.bookmark:removeItemByIndex(i) end)
+                if not ok then table.remove(anns, i) end
+                self.ui:handleEvent(Event:new("AnnotationsModified", { a }))
+                changed = changed + 1
+            end
+            have[p.id] = nil
+            table.insert(acks, { id = p.id, remove = true })
+        elseif a then
+            a.note = p.text
+            a.datetime_updated = os.date("%Y-%m-%d %H:%M:%S")
+            self.ui:handleEvent(Event:new("AnnotationsModified", { a, index_modified = i }))
+            table.insert(acks, { id = p.id, hash = p.hash })
+            changed = changed + 1
+        else
+            local pos, chapter = self:sketchPlace(p.chapter, p.fraction)
+            if pos then
+                local item = { page = pos, text = p.label, chapter = chapter, note = p.text, datetime = os.date("%Y-%m-%d %H:%M:%S") }
+                local index = self.ui.annotation:addItem(item)
+                self.ui:handleEvent(Event:new("AnnotationsModified", { item, index_modified = index }))
+                have[p.id] = { page = pos, label = p.label }
+                table.insert(acks, { id = p.id, hash = p.hash })
+                changed = changed + 1
+            end
+        end
+    end
+    self.settings:saveSetting("pushed_sketch", have)
+    self.settings:flush()
+    if #acks > 0 then
+        request("POST", self.settings:readSetting("url") .. "/api/sketchbook/kindle/ack", self.settings:readSetting("token"), { items = acks })
+    end
+    if changed > 0 then
+        UIManager:setDirty(self.view.dialog, "ui")
+        UIManager:show(InfoMessage:new{ text = changed == 1 and _("A Sketchbook page from Daf is in the bookmarks.")
+            or string.format(_("%d Sketchbook pages from Daf are in the bookmarks."), changed), timeout = 4 })
+    end
+    return changed
 end
 
 function Daf:offerPosition(md5, daf)
