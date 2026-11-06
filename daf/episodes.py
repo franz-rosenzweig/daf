@@ -579,10 +579,13 @@ def _store(conn, audio, bl, chapters, source, lang):
 def state(conn, d, opening=True):
     """What the episode page needs besides the doc: the audio, where you were, chapters, and the
     transcript's state. Nothing here waits on the network; opening it asks for a transcript (want),
-    whose job reads the feed."""
+    whose job reads the feed. An episode of a show you don't follow, found in the directory and
+    only opened, waits for its first play (played) or the Transcribe button: an hour of whisper for
+    a look at its show notes is too much."""
     audio = d["enclosure"]
     m = meta(conn, audio) or {}
-    if opening:
+    if opening and (d.get("where_") != "podcast" or position(conn, audio) or
+                    conn.execute("SELECT 1 FROM gp_subs WHERE url = ? AND removed IS NULL", (m.get("podcast") or "",)).fetchone()):
         want(conn, audio, "auto")
     tr = transcript(conn, audio)
     pos = position(conn, audio)
