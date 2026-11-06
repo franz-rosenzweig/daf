@@ -17,7 +17,8 @@
     daf jobs                   transcripts and clips waiting or done
     daf vault-backfill [--dry-run DIR]   rewrite Daf's article notes in the vault the current way
     daf feeds-list [--json]    the feeds the Feed follows
-    daf feeds-add URL [--folder F] [--title T]   follow a feed (the Substack sync, the security watch)
+    daf feeds-add URL [--folder F] [--title T] [--full]   follow a feed (the Substack sync, the security watch),
+                               or move one already followed to F, its posts with it
     daf feeds-remove URL ...   unfollow them
 """
 import argparse
@@ -341,7 +342,9 @@ def cmd_feeds_list(a):
 
 
 def cmd_feeds_add(a):
-    """Follow a feed in a folder (the Substack sync, the security watch); --title names it."""
+    """Follow a feed in a folder (the Substack sync, the security watch); --title names it, --full has
+    Daf load each post's whole article. A feed already followed moves to the folder, and so do its posts
+    (reader.edit_feed), so the Feed and the Torah page find them there."""
     from . import reader
     from .sources import feedsrc
     src = feedsrc.get()
@@ -352,9 +355,10 @@ def cmd_feeds_add(a):
             print(f"Couldn't follow {a.url}: {e}", file=sys.stderr)
             return 1
         f = next((x for x in src.subscriptions(conn=conn) if x["url"] == a.url or x["title"] == title), None)
-        if a.title and f and a.title != f["title"]:
-            reader.edit_feed(conn, f["id"], a.title)
-            title = a.title
+        rename = a.title if a.title and f and a.title != f["title"] else None
+        if f and (rename or a.folder or a.full):
+            reader.edit_feed(conn, f["id"], rename, a.folder or None, full=True if a.full else None)
+            title = rename or title
     print(f"Following {title}" + (f" in {a.folder}" if a.folder else ""))
     return 0
 
@@ -413,7 +417,8 @@ def main(argv=None):
     x = sub.add_parser("karakeep-import", help="Daf takes the Library over from Karakeep, once"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_karakeep_import)
     x = sub.add_parser("feeds-import", help="Daf reads the feeds itself from now on, FreshRSS's list brought over"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_feeds_import)
     x = sub.add_parser("feeds-list", help="the feeds the Feed follows"); x.add_argument("--json", action="store_true"); x.set_defaults(f=cmd_feeds_list)
-    x = sub.add_parser("feeds-add", help="follow a feed"); x.add_argument("url"); x.add_argument("--folder", default=""); x.add_argument("--title")
+    x = sub.add_parser("feeds-add", help="follow a feed, or move one to a folder"); x.add_argument("url"); x.add_argument("--folder", default=""); x.add_argument("--title")
+    x.add_argument("--full", action="store_true", help="always load the whole article")
     x.set_defaults(f=cmd_feeds_add)
     x = sub.add_parser("feeds-remove", help="unfollow feeds"); x.add_argument("urls", nargs="+"); x.set_defaults(f=cmd_feeds_remove)
     x = sub.add_parser("podcasts-import", help="subscriptions and listening from Nextcloud's GPodder Sync app"); x.add_argument("--user", default="admin"); x.set_defaults(f=cmd_podcasts_import)

@@ -130,7 +130,7 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
 - **Torah shelf** (`torah.py`, web `#torah`): Sefaria's calendar (diaspora, home time zone) gives the
   week's parasha with aliyot and the haftarah; each becomes a doc (`where_ = 'torah'`) of verse blocks,
   Hebrew (nikud, no cantillation) beside the JPS English. Both / עברית / English toggle in the reader.
-  The Ruach FreshRSS folder supplies the week's divrei Torah, those naming the parasha first.
+  The Feed's "Divrei Torah" folder supplies the week's divrei Torah and episodes, those naming the parasha first.
   Highlights go to `Reference/torah`, each with its verse.
 - **Lookup** (`lookup.py`): select one word → Define (Hebrew: Sefaria's BDB, Klein, Jastrow; English:
   Wiktionary; cached in kv). "In this sentence" and Translate (a Hebrew phrase) ask Claude, ~10 s.
@@ -620,7 +620,7 @@ Two read-only audit agents (server and web) went through Daf; these are the fixe
 - **Smaller:** `vault_search_exclude` is read from settings again; clipping file names stay under
   200 bytes; a bad date to `/api/paper` is a 400, not a 500 that would block the offline queue; bulk
   status checks the status once and lists per-document failures; the books goal and Hardcover use the
-  home time zone; deleted docs leave the home shelf, the Torah page's Ruach list and the caption jobs;
+  home time zone; deleted docs leave the home shelf, the Torah page's divrei Torah and the caption jobs;
   the model's errors reach the page in Daf's words (`ai.plain_error`).
 - **Web:** the offline queue reads the stored queue afresh for each send and removes only what it
   sent (new writes made during a flush were lost), and sets aside one Daf keeps refusing after five
@@ -838,3 +838,9 @@ A design round toward Apple Books' calm and fewer icons (the "Daf, focused" canv
 - **Books** (app.js `findBooks`): `GET /api/books/search?q=` (every folded word in the title, author, Calibre series (`ebooks.all_series`) or a shelf's name; non-private, no manga volumes; whole-title matches first, then last read; 150 at most, `count` is all). The page's sections are hidden under `#bfound` and come back as they were. "Your library" lost its own search box.
 - **Highlights**: the old `#hlq` field is the component; `S.hlq` follows it. **On the page** (the rest): Manga (series; a series' volumes), Torah, Recovery (every chapter of all three parts at once), a shelf, Stats (its book lists and On this day; the charts step aside), Paper pages (the 5 s poll redraws the list only), Sources.
 - **Offline**: sw.js passes any `?q=` through to the network, so a search is never kept or used as a list's `_any` copy; the pages use `api` rather than `swr` for them. Podcasts was left alone (its own rebuild).
+
+## The Divrei Torah folder (2026-11-05)
+
+- **torah.divrei** reads the Feed folder `torah.FOLDER` ("Divrei Torah"; it was Ruach, which is spirituality, not Torah) for the last 10 days by `COALESCE(published, added)`, so a feed just followed doesn't count its whole month as this week. `on_parasha` checks the title and the address's path (rabbisacks.org/covenant-conversation/chayei-sarah/…) with `mentions`. Order: on this parasha first, newest, longest (Chabad posts its week at one time). At most 3 per source on the parasha (2 per show for episodes) and each source's newest other post, 18 to read and 6 to listen to.
+- **/api/torah** has `divrei` (posts), `listen` (kind podcast; they open in the episode player), `folder`; `ruach` repeats `divrei` for the Mac app until it reads the new name.
+- **`daf feeds-add URL --folder F`** on a feed already followed moves it with its posts (reader.edit_feed; subscribe alone left the posts in the old folder), and `--full` turns on Always load the full article.

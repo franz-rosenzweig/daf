@@ -944,7 +944,7 @@ on('GET', '/api/feed/sources', () => {
 on('GET', '/api/torah', () => {
   if (!SEED.torah) throw err(404, NOT_HERE);
   const t = clone(SEED.torah), now = nowSec();
-  t.ruach.forEach(r => { r.added = now - (r.days || 0) * 86400 - 3600; r.status = 'unseen'; });
+  t.divrei.concat(t.listen || []).forEach(r => { r.when = r.added = now - (r.days || 0) * 86400 - 3600; r.status = 'unseen'; });
   return Object.assign({ essays: [] }, t);
 });
 on('GET', '/api/hardcover/book/:id', p => {

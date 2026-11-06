@@ -12,13 +12,23 @@ The Torah shelf is the week's Torah reading in Daf: the parasha and the haftarah
 **Torah** in the sidebar opens the shelf, with the parasha's name at the top right.
 
 - **Parasha** and **Haftarah:** this week's readings from Sefaria's calendar (the diaspora schedule, in your home time zone), with the verses and the Shabbat they're read on.
-- **Divrei Torah this week:** the posts from the "Ruach" folder of my Feed, the ones that name this parasha first.
+- **Divrei Torah this week:** the posts from the "Divrei Torah" folder of my Feed, the ones on this parasha first, then the newest from each of the others. Each site gets a few at most, so one that posts every day can't fill the week, and **In the Feed** opens the whole folder.
+- **Listen:** the podcast episodes from the same folder, this parasha's first. They play in Daf like any episode, with the transcript under them.
 - **From your vault:** essays filed in the vault under this parasha, like Rabbi Sacks' Covenant & Conversation kept as a folder of essays for each parasha. They open in Daf, so the time counts, and highlights go back into the same note.
 - **Earlier weeks:** the parashiot from the weeks before, still there if you fell behind.
 
 On Friday, Today reminds you that Shabbat is coming and that the parasha is waiting here.
 
 The magnifying glass at the top searches everything on the shelf by its title and what's under it. Hebrew works without the vowels, so חיי finds חַיֵּי שָׂרָה.
+
+## The Divrei Torah folder
+
+It's an ordinary folder in the Feed, so a feed goes in or out the usual way, from the Sources sheet or with `daf feeds-add URL --folder "Divrei Torah"`. Daf knows a post is on this parasha when its title or its address names it, in English or in Hebrew. This is what I follow there:
+
+- Rabbi Sacks' **Covenant & Conversation**, the essays and the recordings of them.
+- **Chabad.org's** weekly Parshah: the Nutshell, the Parshah in Depth and the Chassidic Masters. Chabad sends a few lines of each and doesn't let Daf fetch the rest, so those open on chabad.org.
+- **The Lehrhaus**, **Torah Musings**, **Rav Kook Torah**, Aish's **Shabbat Shalom**, **TheTorah.com**, **Ohr Torah Stone** and **Hadar**. TheTorah.com and Ohr Torah Stone only send a summary, so they have **Always load the full article** on.
+- To listen to: **Pardes from Jerusalem**, Hadar's **Ta Shma**, **A Thought for the Week** from Torah in Motion, **18Forty** and **Judaism Unbound**.
 
 ## Reading the parasha
 

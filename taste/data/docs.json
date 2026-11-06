@@ -77,11 +77,16 @@
       { "id": "torah:demo-noach", "author": "Parasha", "title": "Parashat Noach", "summary": "Genesis 6:9–11:32 · seven aliyot", "words": 6900, "progress": 34, "highlights": 2 },
       { "id": "torah:demo-noach-haftarah", "author": "Haftarah", "title": "Haftarah for Noach", "summary": "Isaiah 54:1–55:5", "words": 900, "progress": 0, "highlights": 0 }
     ],
-    "ruach": [
-      { "id": "fr:demo-t1", "title": "Building something that floats", "source": "A Weekly Thought (sample)", "this_parasha": true, "days": 1 },
-      { "id": "fr:demo-t2", "title": "The rainbow as a promise, not a reward", "source": "Parsha in Five Minutes (sample)", "this_parasha": true, "days": 2 },
-      { "id": "fr:demo-t3", "title": "Babel and the problem of one language", "source": "Notes on the Weekly Portion (sample)", "this_parasha": true, "days": 3 },
-      { "id": "fr:demo-t4", "title": "Starting over after the flood", "source": "A Weekly Thought (sample)", "this_parasha": true, "days": 5 }
+    "folder": "Divrei Torah",
+    "divrei": [
+      { "id": "fr:demo-t1", "title": "Building something that floats", "source": "A Weekly Thought (sample)", "this_parasha": true, "days": 1, "words": 1900 },
+      { "id": "fr:demo-t2", "title": "The rainbow as a promise, not a reward", "source": "Parsha in Five Minutes (sample)", "this_parasha": true, "days": 2, "words": 1100 },
+      { "id": "fr:demo-t3", "title": "Babel and the problem of one language", "source": "Notes on the Weekly Portion (sample)", "this_parasha": true, "days": 3, "words": 2400 },
+      { "id": "fr:demo-t4", "title": "Starting over after the flood", "source": "A Weekly Thought (sample)", "this_parasha": true, "days": 5, "words": 1300 }
+    ],
+    "listen": [
+      { "id": "fr:demo-l1", "kind": "podcast", "title": "Noach: the ark and the tower", "source": "Parsha on the Way (sample)", "this_parasha": true, "days": 2, "duration": 1260 },
+      { "id": "fr:demo-l2", "kind": "podcast", "title": "What a covenant asks of us", "source": "Jewish Ideas Hour (sample)", "this_parasha": false, "days": 4, "duration": 3420 }
     ],
     "earlier": [
       { "id": "torah:demo-bereshit", "title": "Parashat Bereshit", "summary": "Genesis 1:1–6:8", "highlights": 3 },

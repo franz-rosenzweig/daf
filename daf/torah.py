@@ -3,7 +3,8 @@
 Each reading is a doc (where_ 'torah', kind 'torah') whose blocks are verses: Hebrew
 (nikud kept, cantillation dropped) beside English, with aliyah headings. Highlights and
 notes work as on any doc and go to Reference/torah in the vault. Time spent reading here
-counts like an article. The Ruach feed folder in FreshRSS supplies the week's divrei Torah.
+counts like an article. The Feed's "Divrei Torah" folder supplies the week's divrei Torah, the
+posts on this parasha first, and its podcast episodes make a Listen group of their own.
 """
 import hashlib
 import html
@@ -21,6 +22,8 @@ log = logging.getLogger(__name__)
 API = "https://www.sefaria.org/api"
 ALIYOT = ["Rishon", "Sheni", "Shlishi", "Revi'i", "Chamishi", "Shishi", "Shvi'i", "Maftir"]
 CANTILLATION = re.compile("[֑-ֽ֯׀׃׆]")
+FOLDER = "Divrei Torah"                  # the Feed folder the Torah page reads
+PER_SOURCE = {"read": 3, "listen": 2}   # on this parasha; of the rest, each source's newest
 
 
 def _get(url, timeout=20):
@@ -187,6 +190,44 @@ def mentions(title, name, he):
     return False
 
 
+def on_parasha(post, par):
+    """Does a post name this week's parasha, in its title or its address (rabbisacks.org/…/chayei-sarah/…)?"""
+    if not par or not par.get("name"):
+        return False
+    if mentions(post.get("title"), par["name"], par.get("he")):
+        return True
+    path = urllib.parse.urlparse(post.get("url") or "").path
+    return mentions(re.sub(r"[/_.]+", " ", path), par["name"], None)
+
+
+def divrei(conn, par, days=10):
+    """The week's posts and episodes from the Divrei Torah folder: (to read, to listen to). Those on
+    this parasha come first, a few from each source, then each source's newest other one, so a site
+    that posts every day can't fill the week. The Feed has the rest."""
+    since = int(time.time()) - days * 86400
+    rows = [dict(r) for r in conn.execute(           # an episode's length, once Daf knows it (episodes.py)
+        "SELECT d.id, d.kind, d.title, d.author, d.source, d.url, d.published, d.added, d.status, d.words, "
+        "COALESCE(d.duration, g.duration) AS duration FROM docs d LEFT JOIN gp_episodes g ON g.url = d.enclosure "
+        "WHERE d.where_ = 'feed' AND d.category = ? AND d.status != 'deleted' AND COALESCE(d.published, d.added) > ? "
+        "ORDER BY COALESCE(d.published, d.added) DESC LIMIT 300", (FOLDER, since))]
+    for r in rows:
+        r["this_parasha"] = on_parasha(r, par)
+        r["when"] = r["published"] or r["added"]
+    # a batch posted at once (Chabad's week) goes longest first
+    rows.sort(key=lambda r: (not r["this_parasha"], -(r["when"] or 0), -(r["words"] or 0)))
+    out, per, other = {"read": [], "listen": []}, {}, set()
+    for r in rows:
+        group = "listen" if r["kind"] == "podcast" else "read"
+        key = (group, r["source"])
+        if per.get(key, 0) >= PER_SOURCE[group] or (not r["this_parasha"] and key in other):
+            continue
+        per[key] = per.get(key, 0) + 1
+        if not r["this_parasha"]:
+            other.add(key)
+        out[group].append(r)
+    return out["read"][:18], out["listen"][:6]
+
+
 def _front(text):
     m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
     out = {}
@@ -263,13 +304,7 @@ def shelf(conn):
                 "progress": r["progress"], "highlights": hl, "category": r["category"]}
     week = [card(r) for i in ids for r in conn.execute("SELECT * FROM docs WHERE id = ?", (i,))]
     par = cal.get("Parashat Hashavua") or {}
-    since = int(time.time()) - 10 * 86400
-    ruach = [dict(r) for r in conn.execute(
-        "SELECT id, title, author, source, added, status, words FROM docs WHERE where_ = 'feed' AND category = 'Ruach' AND status != 'deleted' AND added > ? "
-        "ORDER BY added DESC LIMIT 40", (since,))]
-    for r in ruach:
-        r["this_parasha"] = bool(par) and mentions(r["title"], par.get("name"), par.get("he"))
-    ruach.sort(key=lambda r: (not r["this_parasha"], -(r["added"] or 0)))
+    read, listen = divrei(conn, par)
     earlier = [card(r) for r in conn.execute(
         "SELECT * FROM docs WHERE where_ = 'torah' AND id LIKE 'sef:%%' AND id NOT IN (%s) ORDER BY published DESC LIMIT 30" % ",".join("?" * len(ids)), ids)] if ids else \
         [card(r) for r in conn.execute("SELECT * FROM docs WHERE where_ = 'torah' AND id LIKE 'sef:%' ORDER BY published DESC LIMIT 30")]
@@ -279,4 +314,5 @@ def shelf(conn):
         log.warning("torah essays: %s", e)
         mine = []
     return {"parasha": cal.get("Parashat Hashavua"), "haftarah": cal.get("Haftarah"), "week": week, "essays": mine,
-            "ruach": ruach[:12], "earlier": earlier}
+            "divrei": read, "listen": listen, "folder": FOLDER, "earlier": earlier,
+            "ruach": read}          # the old name, for a Mac app built before it read "divrei"

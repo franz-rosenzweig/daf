@@ -224,7 +224,7 @@ struct SourcesView: View {
     }
 }
 
-/// Torah: this week's parasha and haftarah, the readings to open, Ruach, and earlier weeks.
+/// Torah: this week's parasha and haftarah, the readings to open, the Divrei Torah folder's posts and episodes, and earlier weeks.
 struct TorahList: View {
     @Environment(AppModel.self) private var model
 
@@ -247,12 +247,12 @@ struct TorahList: View {
                         rows("This week", t.a("week"))
                     }
                     Heading("Divrei Torah this week")
-                    if t.a("ruach").isEmpty {
-                        Text("Nothing new in Ruach this week.").font(.callout).foregroundStyle(.secondary)
+                    if t.a("divrei").isEmpty {
+                        Text("Nothing new this week.").font(.callout).foregroundStyle(.secondary)
                     } else {
-                        Text("From the Ruach folder").font(.caption).foregroundStyle(.secondary)
-                        SelectableRows(items: t.a("ruach").map(Item.init))
+                        SelectableRows(items: t.a("divrei").map(Item.init))
                     }
+                    rows("Listen", t.a("listen"))
                     let essays = AppModel.essays(t)
                     if !essays.isEmpty {
                         Heading("From your vault")

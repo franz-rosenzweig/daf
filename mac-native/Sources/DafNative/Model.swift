@@ -366,7 +366,7 @@ final class AppModel {
             case .torah:
                 let t = try await API.shared.json("/api/torah")
                 torah = t
-                items = (t.a("week") + t.a("ruach") + Self.essays(t) + t.a("earlier")).map(Item.init)
+                items = (t.a("week") + t.a("divrei") + t.a("listen") + Self.essays(t) + t.a("earlier")).map(Item.init)
             case .feed(let cat):
                 if sources == nil { await loadSources() }
                 items = try await docs("feed", tab: feedTab, arg: cat, sort: sortFeed, filter: listFilter.dict)
