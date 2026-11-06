@@ -73,6 +73,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 - **Android.** A home-screen widget with the ring, "Save to Daf" in the share sheet, the volume keys turning pages if I want them to, listening with the screen off, and its own copy of Daf, with the books and articles I keep, for no signal.
 - **The browser extension.** Highlight on any web page in Firefox, Zen, Chrome, Arc or Safari, and the page goes into the Library with the highlight on it. The right-click menu saves a page or a link without highlighting (Alt+Shift+S saves the page), and a paywalled article I'm signed in to comes in whole.
 - **Send to Kindle.** Articles go to the Kindle as one EPUB, or a digest of several, and what I highlight there comes back to the article.
+- **Reader apps.** Read You, NetNewsWire, Reeder, newsboat and any other app that worked with FreshRSS read the Feed through the same Google Reader API, with its own password. Read and starred go both ways, and a star puts the article on the Shortlist.
 
 ## Screenshots
 

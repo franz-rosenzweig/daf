@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-06-reader-apps', date: 'Nov 6', title: 'The Feed in other apps', text: 'Read You, NetNewsWire, Reeder and other RSS apps read the Feed the way they read FreshRSS, read and starred both ways. Make their password in Preferences → Reader apps.', go: '#prefs/readerapps' },
   { id: '2026-11-05-podcasts', date: 'Nov 5', title: 'Podcasts, rebuilt', text: 'Listening, shows, episodes with filters and sorts, a search that finds new shows too, and Audiobookshelf’s recordings and audiobooks, which keep their place with the book.', go: '#podcasts' },
   { id: '2026-11-05-sketchbook', date: 'Nov 5', title: 'The Sketchbook', text: 'A page beside whatever you read or watch, a tab for each chapter: write with the pen, type, or capture a manga page. It goes to Obsidian as Ink notes.' },
   { id: '2026-11-05-rooms', date: 'Nov 5', title: 'Library rooms and page turns', text: 'Wood bookshelf, Rustic, Gothic and Cyberpunk libraries in Appearance; in a book, Aa → Page turn slides or curls the page.', go: '#prefs/appearance' },
