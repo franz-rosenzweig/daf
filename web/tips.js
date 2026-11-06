@@ -28,6 +28,10 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-05-player', date: 'Nov 5', title: 'It plays on', text: 'Podcasts and read-aloud play in a bar along the bottom, wherever you go in Daf and with the app closed. Tap it for the whole player.', go: '#podcasts' },
+  { id: '2026-11-05-search', date: 'Nov 5', title: 'Search in every tab', text: 'The magnifier in the top bar searches what that tab has: books by title, author, series or shelf; articles and posts by their words.', go: '#books' },
+  { id: '2026-11-05-feed-pics', date: 'Nov 5', title: 'Pictures in the Feed', text: 'Each post shows its site’s icon, and its own picture when it has one.', go: '#feed' },
+  { id: '2026-11-05-sidebar', date: 'Nov 5', title: 'The sidebar says what’s where', text: 'The narrow sidebar has each name under its icon, the three lines open the whole one, and Edit by Pinned picks what’s pinned.' },
   { id: '2026-10-30-focused', date: 'Oct 30', title: 'Daf, focused', text: 'Reading takes the whole screen, the bars get out of the way, books open as two pages, and the sidebar can be full, mini or hidden (⌘\\).', go: '#prefs/sidebar' },
   { id: '2026-10-28-episodes', date: 'Oct 28', title: 'Podcast episodes in Daf', text: 'Play an episode with its transcript under it, clip 30 seconds, and pick up where AntennaPod left off.', go: '#podcasts' },
   { id: '2026-10-26-anilist', date: 'Oct 26', title: 'AniList from Daf', text: 'Connect AniList in Preferences and your manga progress goes there every hour, volumes turned into chapters.', go: '#prefs/anilist' },
