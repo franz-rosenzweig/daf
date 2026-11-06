@@ -1729,3 +1729,134 @@ body.playerbig .pmini{visibility:hidden}
 .findh{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);padding:14px 12px 4px}
 .homefind .hov{display:none!important}
 .findnone{margin:40px auto}
+/* ---------- rooms (themes.js: Wood bookshelf, Rustic library, Gothic library, Cyberpunk library) ----------
+   A room's frame, the sidebar (a phone's bar and its sheet too), every top bar and a book's footer,
+   is made of its material, with the frame's own text and accent; the screen behind the cards is a wall
+   of it; books stand on shelves; headings take the room's face. The page you read stays plain.
+   The textures are SVG noise (feTurbulence made into a few shades of alpha), a few hundred bytes
+   each, laid over the theme's own colours, so light and dark share them. */
+:root{--t-grain-h:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0022 0.2' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.22 0 0 0 0 0.11 0 0 0 0 0.03 1.5 0 0 0 -0.6'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-grain-v:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='640'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.2 0.0022' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.22 0 0 0 0 0.11 0 0 0 0 0.03 1.6 0 0 0 -0.6'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-grain-h-lt:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0022 0.2' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.84 0 0 0 0 0.62 0.55 0 0 0 -0.22'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-grain-v-lt:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='640'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.2 0.0022' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.84 0 0 0 0 0.62 0.55 0 0 0 -0.22'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-fibre:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85 0.85' numOctaves='2' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.25 0 0 0 0 0.17 0 0 0 0 0.08 0.45 0 0 0 -0.17'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-mottle:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.007' numOctaves='3' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.26 0 0 0 0 0.08 1.0 0 0 0 -0.4'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-stone:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018 0.02' numOctaves='4' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.09 0 0 0 0 0.11 0.5 0 0 0 -0.19'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-stone-lt:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018 0.02' numOctaves='4' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.85 0 0 0 0 0.82 0 0 0 0 0.9 0.35 0 0 0 -0.12'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-grit:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7 0.7' numOctaves='3' seed='21' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0 0 0 -0.2'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-grit-lt:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7 0.7' numOctaves='3' seed='21' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.22 0 0 0 -0.08'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");--t-ashlar:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='176' height='112'%3E%3Cg stroke='rgba(60,50,40,.16)' stroke-width='1.2' fill='none'%3E%3Cpath d='M0 .6H176M0 56.6H176M.6 0V56.0M88.6 56.0V112'/%3E%3C/g%3E%3C/svg%3E");--t-ashlar-lt:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='176' height='112'%3E%3Cg stroke='rgba(255,245,230,.07)' stroke-width='1.2' fill='none'%3E%3Cpath d='M0 .6H176M0 56.6H176M.6 0V56.0M88.6 56.0V112'/%3E%3C/g%3E%3C/svg%3E");--t-arches:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='9'%3E%3Cpath d='M1 9V4.95Q1 2 8.0 1Q15 2 15 4.95V9' fill='none' stroke='rgba(230,195,108,.5)' stroke-width='1.2'/%3E%3C/svg%3E");--t-leather:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.32' numOctaves='2' seed='13' stitchTiles='stitch'/%3E%3CfeDiffuseLighting lighting-color='%23ffffff' surfaceScale='1.6' diffuseConstant='1'%3E%3CfeDistantLight azimuth='225' elevation='52'/%3E%3C/feDiffuseLighting%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.28 0 0 0 0.25760000000000005'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E");}
+:root[data-room]{--card-shadow:0 1px 2px rgba(40,25,10,.12),0 8px 22px rgba(40,25,10,.10)}
+:root[data-room] body{background:var(--tx-wall),var(--wall)}
+:root[data-room] :is(.side,.top,.bookfoot,.bctl){
+  --fg:var(--frame-fg);--fg-2:var(--frame-fg-2);--fg-3:var(--frame-fg-3);--hover:var(--frame-hover);--active:var(--frame-active);
+  --line:var(--frame-line);--line-2:var(--frame-line-2);--accent:var(--frame-accent);--accent-2:var(--frame-accent);
+  --accent-weak:var(--frame-accent-weak);--on-accent:var(--frame-on-accent);--bg:var(--frame);--side:var(--frame);--panel:var(--frame-hover);
+  color:var(--fg)}
+:root[data-room] .side{background:var(--tx-side),var(--frame);border-right-color:var(--frame-line)}
+:root[data-room] .side.open .navfull{background:var(--tx-side),var(--frame)}
+:root[data-room] .top,:root[data-room].focus .rv > .top,:root[data-room].focus .pdfv > .top{background:var(--tx-bar),var(--frame);backdrop-filter:none;border-bottom-color:var(--frame-line)}
+:root[data-room] .bookfoot,:root[data-room].focus .bookfoot,:root[data-room] .bctl{background:var(--tx-bar-b),var(--frame);border-top-color:var(--frame-line)}
+:root[data-room] .rv.ebook .bookfoot{border-top:1px solid var(--frame-line)}
+@media (max-width:780px){:root[data-room] .side{background:var(--tx-bar-b),var(--frame);border-top-color:var(--frame-line)}}
+/* what you read stays on a plain page: an article's view is the page colour, not the wall */
+:root[data-room] .rv{background:var(--bg)}
+:root[data-room] .card,:root[data-room] .hcard,:root[data-room] .rcard{box-shadow:var(--card-shadow)}
+:root[data-room] :is(.top h1,.hello h1,.card h2,.shelfh h2,.brand b,.btitle,.rv .vhead h1){font-family:var(--display);font-weight:var(--display-w,700);letter-spacing:var(--display-ls,normal)}
+/* shelves: the covers in Books → Your library stand on a plank that runs the width of the shelf */
+:root[data-room] .libgrid{isolation:isolate;overflow:hidden;padding:16px 16px 4px;row-gap:16px;background:var(--niche);border-radius:6px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12),inset 0 10px 18px -10px rgba(0,0,0,.35)}
+:root[data-room] .libgrid > .btn{margin-bottom:12px}
+:root[data-room] .libcard{container-type:inline-size;position:relative}
+:root[data-room] .libcard .cv.lib{position:relative;z-index:1;margin-bottom:20px;border-radius:2px 4px 4px 2px;box-shadow:var(--cover-shadow,0 2px 6px rgba(0,0,0,.35))}
+:root[data-room] .libcard::before{content:"";position:absolute;z-index:0;left:-100vw;right:-100vw;top:calc(150cqw - 2px);height:15px;background:var(--plank);box-shadow:0 7px 9px -5px rgba(0,0,0,.45)}
+/* and the books on the Library's rows and in each shelf's picture stand in a niche on one */
+:root[data-room] .hcard.book .himg,:root[data-room] .shstack{position:relative;background:var(--niche);padding-bottom:13px}
+:root[data-room] .hcard.book .himg::after,:root[data-room] .shstack::after{content:"";position:absolute;left:0;right:0;bottom:0;height:13px;background:var(--plank)}
+:root[data-room] .shstack .shc,:root[data-room] .hcard.book .himg img{position:relative;z-index:1}
+:root[data-room] .hcard.book .himg{padding-top:14px}
+@media (prefers-reduced-motion:reduce){:root[data-room] .libcard:hover .cv.lib{transform:none}}
+
+/* Wood bookshelf: oak walls and shelves, a walnut frame; walnut walls and ebony at night */
+:root[data-room="wood"]{--display:'Alegreya',var(--serif);
+  --tx-wall:linear-gradient(color-mix(in srgb,var(--wall) 68%,transparent) 0 0),var(--t-grain-h) 0 0/640px 220px;
+  --tx-side:var(--t-grain-v) 0 0/220px 640px,linear-gradient(90deg,rgba(0,0,0,0) 85%,rgba(0,0,0,.25));
+  --tx-bar:var(--t-grain-h) 0 0/640px 220px,linear-gradient(rgba(255,230,190,.10),rgba(0,0,0,.22));
+  --tx-bar-b:var(--t-grain-h) 0 0/640px 220px,linear-gradient(rgba(0,0,0,.18),rgba(255,230,190,.06));
+  --plank:linear-gradient(rgba(255,236,200,.4),rgba(255,236,200,0) 3px,rgba(0,0,0,0) 60%,rgba(0,0,0,.4)),var(--t-grain-h) 0 0/640px 220px,#7b5133;
+  --niche:linear-gradient(rgba(60,30,10,.2),rgba(60,30,10,.04) 40%),linear-gradient(color-mix(in srgb,#d9bd93 55%,transparent) 0 0),var(--t-grain-h) 0 0/640px 220px,#d9bd93;
+  --card-shadow:0 1px 2px rgba(60,30,10,.16),0 8px 20px rgba(60,30,10,.13)}
+:root[data-room="wood"][data-mode="dark"]{
+  --tx-wall:linear-gradient(color-mix(in srgb,var(--wall) 45%,transparent) 0 0),var(--t-grain-h-lt) 0 0/640px 220px;
+  --tx-side:var(--t-grain-v-lt) 0 0/220px 640px,linear-gradient(90deg,rgba(0,0,0,0) 80%,rgba(0,0,0,.4));
+  --tx-bar:var(--t-grain-h-lt) 0 0/640px 220px,linear-gradient(rgba(255,230,190,.05),rgba(0,0,0,.3));
+  --tx-bar-b:var(--t-grain-h-lt) 0 0/640px 220px;
+  --plank:linear-gradient(rgba(255,226,180,.28),rgba(255,226,180,0) 3px,rgba(0,0,0,0) 55%,rgba(0,0,0,.5)),var(--t-grain-h) 0 0/640px 220px,#5a3a22;
+  --niche:linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.12) 45%),var(--t-grain-h-lt) 0 0/640px 220px,#160f0a;
+  --card-shadow:0 1px 2px rgba(0,0,0,.4),0 10px 24px rgba(0,0,0,.35)}
+:root[data-room="wood"] .card,:root[data-room="wood"] .hcard{border-color:color-mix(in srgb,var(--line) 70%,#a0703f)}
+
+/* Rustic library: oxblood leather stitched at its edges, brass, parchment; dark leather at night */
+:root[data-room="rustic"]{--display:'EB Garamond',var(--serif);--display-w:600;--brass:#b08a3e;
+  --tx-wall:var(--t-mottle) 0 0/420px 420px,var(--t-fibre) 0 0/180px 180px;
+  --stitch:color-mix(in srgb,var(--frame-accent) 70%,transparent);
+  --tx-side:repeating-linear-gradient(180deg,var(--stitch) 0 7px,transparent 7px 12px) calc(100% - 6px) 0/1.5px 100% no-repeat,var(--t-leather) 0 0/220px 220px,var(--t-mottle) 0 0/420px 420px;
+  --tx-bar:repeating-linear-gradient(90deg,var(--stitch) 0 7px,transparent 7px 12px) 0 calc(100% - 5px)/100% 1.5px no-repeat,var(--t-leather) 0 0/220px 220px,linear-gradient(rgba(255,220,180,.06),rgba(0,0,0,.2));
+  --tx-bar-b:repeating-linear-gradient(90deg,var(--stitch) 0 7px,transparent 7px 12px) 0 5px/100% 1.5px no-repeat,var(--t-leather) 0 0/220px 220px;
+  --plank:linear-gradient(var(--brass),#8a6a2c 2px,rgba(0,0,0,0) 2px,rgba(0,0,0,0) 60%,rgba(0,0,0,.45)),var(--t-grain-h) 0 0/640px 220px,#4a2a1a;
+  --niche:linear-gradient(rgba(60,30,10,.2),rgba(60,30,10,.04) 45%),var(--t-mottle) 0 0/420px 420px,color-mix(in srgb,var(--wall) 86%,#6b3a1f);
+  --card-shadow:0 1px 2px rgba(60,30,10,.16),0 8px 20px rgba(60,30,10,.12)}
+:root[data-room="rustic"][data-mode="dark"]{--brass:#c9a24f;
+  --tx-wall:var(--t-leather) 0 0/220px 220px,linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.25));
+  --niche:linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.1) 45%),var(--t-leather) 0 0/220px 220px,#140f0c;
+  --card-shadow:0 1px 2px rgba(0,0,0,.4),0 10px 24px rgba(0,0,0,.35)}
+/* parchment cards inside a brass rule */
+:root[data-room="rustic"] .card,:root[data-room="rustic"] .hcard,:root[data-room="rustic"] .rcard{background:var(--t-fibre) 0 0/180px 180px,var(--bg);border-color:color-mix(in srgb,var(--brass) 55%,transparent);
+  box-shadow:inset 0 0 0 3px var(--bg),inset 0 0 0 4px color-mix(in srgb,var(--brass) 30%,transparent),var(--card-shadow)}
+:root[data-room="rustic"][data-mode="dark"] :is(.card,.hcard,.rcard){background:var(--bg)}
+
+/* Gothic library: stone walls in courses, crimson and gold; limestone by day, night stone after dark */
+:root[data-room="gothic"]{--display:'Vollkorn',var(--serif);--display-w:700;--display-ls:.01em;--gold:#c9a24a;
+  --tx-wall:var(--t-ashlar) 0 0/176px 112px,var(--t-stone) 0 0/400px 400px,var(--t-grit) 0 0/160px 160px;
+  --tx-side:linear-gradient(90deg,rgba(0,0,0,0) calc(100% - 3px),var(--gold) calc(100% - 3px),var(--gold) calc(100% - 2px),rgba(0,0,0,0) calc(100% - 2px)),linear-gradient(90deg,rgba(255,255,255,.05),rgba(0,0,0,.3)),var(--t-grit) 0 0/160px 160px;
+  --tx-bar:var(--t-arches) 0 100%/16px 9px repeat-x,linear-gradient(rgba(255,255,255,.04),rgba(0,0,0,.28)),var(--t-grit) 0 0/160px 160px;
+  --tx-bar-b:linear-gradient(var(--gold),var(--gold)) 0 0/100% 1px no-repeat,var(--t-grit) 0 0/160px 160px;
+  --plank:linear-gradient(var(--gold),#8c6a24 1.5px,rgba(0,0,0,0) 1.5px,rgba(0,0,0,0) 55%,rgba(0,0,0,.5)),var(--t-grain-h) 0 0/640px 220px,#3b2618;
+  --niche:linear-gradient(rgba(0,0,0,.22),rgba(0,0,0,.05) 45%),var(--t-stone) 0 0/400px 400px,color-mix(in srgb,var(--wall) 88%,#000);
+  --card-shadow:0 1px 2px rgba(20,10,10,.18),0 8px 22px rgba(20,10,10,.14)}
+:root[data-room="gothic"][data-mode="dark"]{
+  --tx-wall:var(--t-ashlar-lt) 0 0/176px 112px,var(--t-stone-lt) 0 0/400px 400px,var(--t-grit-lt) 0 0/160px 160px;
+  --niche:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.15) 45%),var(--t-stone-lt) 0 0/400px 400px,#0c0b0d;
+  --card-shadow:0 1px 2px rgba(0,0,0,.5),0 10px 26px rgba(0,0,0,.45)}
+:root[data-room="gothic"] .card,:root[data-room="gothic"] .rcard{border-top:2px solid color-mix(in srgb,var(--gold) 70%,transparent)}
+:root[data-room="gothic"] :is(.card h2,.shelfh h2){font-variant:small-caps;letter-spacing:.04em;font-size:17px}
+
+/* Cyberpunk library: a night grid lit magenta from above, neon edges, scanlines on the frame; by day
+   a bright terminal with the same neon */
+:root[data-room="cyber"]{--display:'Lexend',var(--ui);--display-w:600;--display-ls:.06em;--neon:var(--accent);--neon-2:#ff4f9a;
+  --tx-wall:radial-gradient(ellipse 90% 60% at 50% 0,color-mix(in srgb,var(--neon-2) 10%,transparent),transparent),linear-gradient(color-mix(in srgb,var(--neon) 9%,transparent) 1px,transparent 1px) 0 0/32px 32px,linear-gradient(90deg,color-mix(in srgb,var(--neon) 9%,transparent) 1px,transparent 1px) 0 0/32px 32px;
+  --scan:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px);
+  --tx-side:linear-gradient(90deg,rgba(0,0,0,0) calc(100% - 1px),var(--neon-2) calc(100% - 1px)),var(--scan);
+  --tx-bar:linear-gradient(90deg,transparent,var(--neon-2) 30%,var(--neon) 70%,transparent) 0 100%/100% 1px no-repeat,var(--scan);
+  --tx-bar-b:linear-gradient(90deg,transparent,var(--neon) 30%,var(--neon-2) 70%,transparent) 0 0/100% 1px no-repeat,var(--scan);
+  --plank:linear-gradient(var(--neon),color-mix(in srgb,var(--neon) 30%,#000) 2px,#090b18 2px);
+  --niche:linear-gradient(color-mix(in srgb,var(--neon) 10%,transparent),transparent 60%),var(--wall);
+  --cover-shadow:0 0 0 1px color-mix(in srgb,var(--neon) 35%,transparent),0 6px 16px rgba(0,0,0,.5);
+  --card-shadow:0 0 0 1px color-mix(in srgb,var(--neon) 22%,transparent),0 0 22px color-mix(in srgb,var(--neon) 8%,transparent)}
+:root[data-room="cyber"][data-mode="light"]{--neon-2:#e0287a;
+  --card-shadow:0 0 0 1px color-mix(in srgb,var(--neon) 25%,transparent),0 6px 18px rgba(20,22,60,.08)}
+:root[data-room="cyber"] :is(.card,.hcard,.rcard){border-color:color-mix(in srgb,var(--neon) 30%,transparent);border-radius:6px}
+:root[data-room="cyber"] :is(.card h2,.shelfh h2){text-transform:uppercase;font-size:13px}
+:root[data-room="cyber"][data-mode="dark"] :is(.top h1,.hello h1){text-shadow:0 0 14px color-mix(in srgb,var(--neon) 55%,transparent)}
+:root[data-room="cyber"] .libcard::before{box-shadow:0 0 14px color-mix(in srgb,var(--neon) 45%,transparent)}
+
+/* the cards in Preferences → Appearance: a little of each room's material */
+.thw.room.wood .ths{background-image:var(--t-grain-v)!important;background-size:220px 640px}
+.thw.room.rustic .ths{background-image:var(--t-leather)!important;background-size:220px 220px}
+.thw.room.gothic{background-image:var(--t-ashlar) ,var(--t-stone);background-size:88px 56px,400px 400px}
+.thw.room.cyber{background-image:linear-gradient(rgba(46,230,230,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(46,230,230,.12) 1px,transparent 1px);background-size:12px 12px}
+.thw.room.wood{background-image:var(--t-grain-h);background-size:640px 220px}
+.thw.room.rustic{background-image:var(--t-mottle);background-size:420px 420px}
+/* ---------- (end of rooms) ---------- */
+
+/* ---------- page turns (pageturn.js): while a page turns, the book's stage is a picture the browser
+   moves (a view transition), the next page already under it; the rest of the screen stays live ---------- */
+:root.ptturn{view-transition-name:none}
+:root.ptturn #bstage{view-transition-name:dafpage}
+::view-transition{pointer-events:none}
+::view-transition-group(dafpage){animation:none;overflow:clip;z-index:1}
+::view-transition-group(dafpagefx){animation:none;z-index:2}
+::view-transition-image-pair(dafpage),::view-transition-image-pair(dafpagefx){isolation:auto;animation:none}
+::view-transition-old(dafpage),::view-transition-new(dafpage),::view-transition-old(dafpagefx),::view-transition-new(dafpagefx){animation:none;mix-blend-mode:normal}
+#ptfx{position:fixed;z-index:30;pointer-events:none;view-transition-name:dafpagefx;
+  --pt-paper:color-mix(in srgb,var(--bg) 94%,var(--fg));--pt-bend:color-mix(in srgb,var(--bg) 80%,#fff);--pt-edge:color-mix(in srgb,var(--bg) 84%,var(--fg));--pt-rim:color-mix(in srgb,var(--bg) 62%,var(--fg))}
+#ptfx i{position:absolute;inset:0}

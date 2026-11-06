@@ -370,8 +370,10 @@ if (!mac) {
     said = now;
     shell().bars({ bg: now.split(' ')[0], dark: !!dark }).catch(() => { said = ''; });
   };
-  window.addEventListener('daf-theme', e => paint(e.detail && e.detail.bg, e.detail && e.detail.dark));
-  const first = () => paint(getComputedStyle(root).getPropertyValue('--bg').trim(), root.dataset.mode === 'dark');
+  // (a room's top bar is its frame, so the bars above and below are the frame's colour: themes.js)
+  window.addEventListener('daf-theme', e => { const d = e.detail || {}; paint(d.bars || d.bg, d.bars ? d.barsDark : d.dark); });
+  const first = () => { const cs = getComputedStyle(root), f = root.dataset.room && cs.getPropertyValue('--frame').trim();
+    paint(f || cs.getPropertyValue('--bg').trim(), f ? true : root.dataset.mode === 'dark'); };    // (every room's frame is dark)
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', first); else first();
 }
 

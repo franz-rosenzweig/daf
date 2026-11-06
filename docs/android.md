@@ -9,7 +9,7 @@ The Android app is Daf on the phone and the tablet, with the things a web page c
 
 ## The app
 
-Daf fills the screen between the status bar and the navigation bar, which both take the background of the theme you picked, and it has the bottom bar the phone layout has: **Today**, **Review**, **Feed**, **Library** and **More**. The phone's Back closes whatever is in front first (search, a dialog, the highlight bar, a sheet), then goes to the page before, and leaves the app only when there's nowhere left to go. Links to anything outside Daf open in the browser.
+Daf fills the screen between the status bar and the navigation bar, which both take the background of the theme you picked (in the rooms, the colour of the room's frame, so they run on from the top bar), and it has the bottom bar the phone layout has: **Today**, **Review**, **Feed**, **Library** and **More**. The phone's Back closes whatever is in front first (search, a dialog, the highlight bar, a sheet), then goes to the page before, and leaves the app only when there's nowhere left to go. Links to anything outside Daf open in the browser.
 
 Sign in once inside the app, and it connects itself: the widget, the share sheet and the nudge get a device token of their own, and **Preferences → Account** lists the phone as "Daf for Android" with its model name after it. A phone and a tablet each get their own, so connecting one never cuts off the other.
 

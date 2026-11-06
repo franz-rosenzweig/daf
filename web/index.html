@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
 <title>Daf</title>
 <script>/* the theme, before anything paints (web/themes.js keeps daf.themeVars) */
-try{var t=JSON.parse(localStorage.getItem('daf.themeVars')||'null');if(t){var a=t.a||{},d=a.mode==='dark'||(a.mode!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches),v=d?t.dark:t.light,r=document.documentElement;for(var k in v)r.style.setProperty(k,v[k]);r.dataset.mode=d?'dark':'light';}}catch(e){}</script>
+try{var t=JSON.parse(localStorage.getItem('daf.themeVars')||'null');if(t){var a=t.a||{},d=a.mode==='dark'||(a.mode!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches),v=d?t.dark:t.light,r=document.documentElement;for(var k in v)r.style.setProperty(k,v[k]);r.dataset.mode=d?'dark':'light';var m=(t.room||{})[d?'dark':'light'];if(m)r.dataset.room=m;}}catch(e){}</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -45,6 +45,7 @@ try{var t=JSON.parse(localStorage.getItem('daf.themeVars')||'null');if(t){var a=
 <script src="/underline.js"></script>
 <script src="/ink.js"></script>
 <script src="/focus.js"></script>
+<script src="/pageturn.js"></script>
 <script src="/paper.js"></script>
 <script src="/torah.js"></script>
 <script src="/recovery.js"></script>
