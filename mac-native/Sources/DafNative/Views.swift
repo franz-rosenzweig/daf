@@ -40,9 +40,10 @@ struct MainView: View {
     }
 
     /// Shown or hidden (Side), as the split view keeps it: hidden leaves the list and what's open (or
-    /// the page). A pane put away by focus mode doesn't count as hiding it.
+    /// the page). A pane put away by focus mode doesn't count as hiding it, and while it's on only what's
+    /// open shows, or SwiftUI brings the sidebar back the next time it draws the window.
     private func columns(page: Bool) -> Binding<NavigationSplitViewVisibility> {
-        Binding(get: { Side.shared.hidden ? (page ? .detailOnly : .doubleColumn) : .all },
+        Binding(get: { Focus.shared.main ? .detailOnly : Side.shared.hidden ? (page ? .detailOnly : .doubleColumn) : .all },
                 set: { v in
                     let hide = v != .all
                     if !Focus.shared.main, Side.shared.hidden != hide { Side.shared.hidden = hide }

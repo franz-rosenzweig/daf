@@ -590,7 +590,7 @@ enum SelfTest {
         capture("05-feed")
 
         // several chosen at once: marked seen together, then Undo
-        let some = Array(m.items.filter { $0.id.hasPrefix("fr:") }.prefix(3))
+        let some = Array(m.items.filter { $0.id.hasPrefix("rss:") || $0.id.hasPrefix("fr:") }.prefix(3))
         if some.count >= 2 {
             m.multi = Set(some.map(\.id))
             await pause(1)
@@ -686,7 +686,8 @@ enum SelfTest {
             await pause(0.5)
         }
         await m.refreshFeed()
-        check(m.error == nil && m.toast == "Nothing new", "Check for New Posts asks FreshRSS", m.toast ?? m.error ?? "")
+        check(m.error == nil && (m.toast ?? "").range(of: #"^(Nothing|\d+) new$"#, options: .regularExpression) != nil,
+              "Check for New Posts looks at the feeds", m.toast ?? m.error ?? "")
         m.sheet = .follow
         await pause(1.2)
         capture("24-follow")
