@@ -13,7 +13,7 @@ const P = { id: null, d: null, pdf: null, zoom: 1, base: 1, rendered: new Map(),
 // Where a PDF document's or a PDF book's things are.
 const SRC = {
   doc: id => ({ meta: '/api/docs/' + encodeURIComponent(id) + '?prefetch=1', file: '/api/docs/' + encodeURIComponent(id) + '/pdf',
-                back: '#read/' + encodeURIComponent(id), backLabel: 'Back to the text', hl: '/api/docs/' + encodeURIComponent(id) + '/highlights', beat: { doc_id: id } }),
+                back: '#read/' + encodeURIComponent(id), backLabel: 'Back', hl: '/api/docs/' + encodeURIComponent(id) + '/highlights', beat: { doc_id: id } }),
   book: id => ({ meta: '/api/ebooks/' + encodeURIComponent(id), file: '/api/ebooks/' + encodeURIComponent(id) + '/file', book: true,
                  back: '#book/' + encodeURIComponent(id), backLabel: 'Back to the book', hl: '/api/ebooks/' + encodeURIComponent(id) + '/highlights', beat: { book_id: id } }),
 };
@@ -27,10 +27,10 @@ C.views.pdf = async args => {
   if (P.id === id && P.pdf && $('#pdfpages')) { if (hl) goToHl(hl); return; }
   close();
   P.id = id; P.src = (book ? SRC.book : SRC.doc)(id);
-  $('#main').innerHTML = '<div class="pdfv"><div class="top" id="ptop"><a class="btn sm" href="' + P.src.back + '" title="' + P.src.backLabel + '" aria-label="' + P.src.backLabel + '">' + C.I.back + '</a>' +
+  $('#main').innerHTML = '<div class="pdfv"><div class="top" id="ptop"><button class="btn sm" data-pv="back" title="' + P.src.backLabel + '" aria-label="' + P.src.backLabel + '">' + C.I.back + '</button>' +
     '<h1 id="ptitle">PDF</h1><span class="spacer"></span><span class="mute tiny" id="ppg"></span>' +
     '<button class="btn sm" data-pv="out" aria-label="Smaller" title="Smaller (−)">−</button><button class="btn sm" data-pv="in" aria-label="Larger" title="Larger (+)">+</button>' +
-    (book ? '' : '<a class="btn sm" href="#read/' + encodeURIComponent(id) + '" title="The text, reflowed">Text</a>') +
+    (book ? '' : '<a class="btn sm" href="#read/' + encodeURIComponent(id) + '" data-swap title="The text, reflowed">Text</a>') +
     '<a class="btn sm" href="' + P.src.file + '" download title="The PDF file">Download</a>' + (C.Focus ? C.Focus.button('article') : '') + '</div>' +
     '<div class="pdfpages" id="pdfpages"><span class="mute" style="padding:24px">Opening the PDF…</span></div></div>';
   try { P.d = await api(P.src.meta); } catch(e){ $('#pdfpages').innerHTML = '<p class="mute" style="padding:24px">' + esc(e.message) + '</p>'; return; }
@@ -311,6 +311,7 @@ async function zoom(dir){
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-pv]'); if (!b || C.S.route[0] !== 'pdf') return;
+  if (b.dataset.pv === 'back') { if (P.src.book) { if ((C.S.navs || 0) > 1) history.back(); else location.hash = P.src.back; } else C.leaveDoc(P.d); return; }
   if (b.dataset.pv === 'in') zoom(1); else if (b.dataset.pv === 'out') zoom(-1);
 });
 document.addEventListener('keydown', e => {

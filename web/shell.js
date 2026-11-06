@@ -125,11 +125,15 @@ if (mac) {
 }
 
 /* ---------- back ---------- */
-// Daf's own history in this window, so Back knows when there's nowhere to go.
+// Daf's own history in this window, so Back knows when there's nowhere to go. A page that took the
+// last one's place (location.replace: an article's text and its PDF) leaves the history as long as it was.
 const hist = [location.hash];
+let histLen = history.length;
 window.addEventListener('hashchange', () => {
-  const h = location.hash;
+  const h = location.hash, grew = history.length > histLen;
+  histLen = history.length;
   if (hist.length > 1 && hist[hist.length - 2] === h) hist.pop();
+  else if (!grew && hist.length) hist[hist.length - 1] = h;
   else if (hist[hist.length - 1] !== h) hist.push(h);
   if (hist.length > 200) hist.shift();
 });

@@ -735,6 +735,7 @@ function leaveDoc(d){
   if ((C.S.navs || 0) > 1) history.back();
   else location.hash = d && d.where_ === 'feed' ? 'feed' : d && d.where_ === 'podcast' ? 'podcasts' : d && d.kind && KIND[d.kind] ? 'library/' + d.kind : 'library/article';
 }
+C.leaveDoc = leaveDoc;   // the PDF's pages leave the same way (pdfview.js)
 const fmtT = t => { t = Math.max(0, Math.floor(t || 0)); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), x = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
 // X saves a tweet's title as '(2) Name on X: "first tweet" / X'. Show "Name" and the tweet apart.
 function tweetParts(d){
@@ -871,7 +872,7 @@ function drawReaderTop(){
     (d.blocks.length && d.kind !== 'video' && !d.episode ? '<button class="ib' + (playing ? ' on' : '') + '" data-ract="listen" title="' + (playing ? 'Pause' : 'Listen') + K.tip('article', 'listen') + '" aria-label="' + (playing ? 'Pause' : 'Listen') + '">' + (playing ? ICON.pause : ICON.listen) + '</button>' : '') +
     (feed || pod ? '<button class="ib" data-dact="save" data-id="' + esc(d.id) + '" title="Save to Library' + K.tip('article', 'save') + '" aria-label="Save to Library">' + ICON.save + '</button>' : '') +
     (pod ? '' : '<button class="ib" data-dact="' + (feed ? 'seen' : 'archive') + '" data-id="' + esc(d.id) + '" title="Done' + K.tip('article', 'archive') + '" aria-label="Done">' + ICON.done + '</button>') +
-    (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
+    (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" data-swap title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
     '<button class="ib" data-ract="more" title="More actions (m)" aria-label="More actions"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg></button>' +
     '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" title="Notebook and info' + K.tip('article', 'panel') + '" aria-label="Notebook and info">' + ICON.panel + '</button>';
 }
@@ -915,7 +916,7 @@ function moreAct(a){
   else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; } R.panelOpen = !R.panelOpen; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); if (R.panelOpen) drawPanel(); }
   else if (a === 'full') loadFull(d.id);
   else if (a === 'device') deviceList().then(on => keepOnDevice(d.id, !(on && on.pinned.has(d.id))));
-  else if (a === 'pages') location.hash = 'pdf/' + encodeURIComponent(d.id);
+  else if (a === 'pages') C.swap('#pdf/' + encodeURIComponent(d.id));
   else if (a === 'note') { R.panel = 'notebook'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#docnote'); if (x) x.focus(); }, 40); }
   else if (a === 'listen') { if (R.tts.on && R.tts.doc === d.id) stopTTS(); else startTTS(); }
   else if (a === 'kindle') sendToKindle([d.id]).then(r => { if (r) d.kindle_sent = { file: r.file, at: Date.now() / 1000 }; });

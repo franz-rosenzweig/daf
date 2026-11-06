@@ -1243,7 +1243,14 @@ setTimeout(() => newer(false), 8000);
 setInterval(() => { if (!document.hidden) newer(false); }, 30 * 60000);
 window.addEventListener('hashchange', () => { show(); if (S.stale && settled()) fresh(); });
 
-window.DafCore = { api, swr, outbox, keepOffline, errs: ERRS, esc, toast, $, $$, epochDate, ago, shortTitle, shortDate, cover, bar, ring, bookRow, I, S, renderSide, load, closeModal, hlCard, colorDots, HL_COLORS, drawHighlights: () => drawHighlights(), views: {}, navExtra: null, Voices };
+// The same thing seen another way (an article's text and its PDF's pages): it takes this page's place
+// in the history, so Back leaves the document instead of going round between the two.
+function swap(h){ S.navs = Math.max(0, (S.navs || 0) - 1); location.replace(h); }
+document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[data-swap]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  e.preventDefault(); swap(a.getAttribute('href'));
+});
+window.DafCore = { api, swr, outbox, keepOffline, errs: ERRS, esc, toast, $, $$, epochDate, ago, shortTitle, shortDate, cover, bar, ring, bookRow, I, S, renderSide, load, closeModal, hlCard, colorDots, HL_COLORS, drawHighlights: () => drawHighlights(), views: {}, navExtra: null, Voices, swap };
 window.addEventListener('daf-hl-changed', () => { if (S.route[0] === 'review' && S.rev) drawReview(); });
 
 async function start(){
