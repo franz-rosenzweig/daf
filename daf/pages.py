@@ -213,25 +213,26 @@ def _robot(html, status=200):
     return status in (202, 403, 429, 503) or any(s in t for s in ROBOT)
 
 
-def keep_thumb(img_url):
-    """The page's picture, kept on the server (STATE/thumbs, at most 960 px): its address in Daf, or None."""
+def keep_thumb(img_url, smallest=40, largest=960):
+    """The page's picture, kept on the server (STATE/thumbs, at most `largest` px): its address in Daf,
+    or None. One under `smallest` px on a side isn't kept (the Feed's posts ask for more: rss.keep_pictures)."""
     try:
         raw, ctype, _, _ = _get(img_url, MAX_PICTURE, "image/avif,image/webp,image/*,*/*;q=0.5")
     except Exception:  # noqa: BLE001 - no picture is fine
         return None
-    return keep_thumb_bytes(raw)
+    return keep_thumb_bytes(raw, smallest, largest)
 
 
-def keep_thumb_bytes(raw):
+def keep_thumb_bytes(raw, smallest=40, largest=960):
     try:
         from PIL import Image
         im = Image.open(io.BytesIO(raw))
-        im.thumbnail((960, 960))
+        im.thumbnail((largest, largest))
         if im.mode not in ("RGB", "L"):
             bg = Image.new("RGB", im.size, (255, 255, 255))
             bg.paste(im.convert("RGBA"), mask=im.convert("RGBA").split()[-1])
             im = bg
-        if im.width < 40 or im.height < 40:
+        if im.width < smallest or im.height < smallest:
             return None                           # a tracking pixel or an icon
         out = io.BytesIO()
         im.convert("RGB").save(out, "JPEG", quality=82, optimize=True)

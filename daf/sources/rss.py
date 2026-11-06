@@ -4,7 +4,9 @@ The feeds Daf follows live in the table feeds, each with its folder. Every sync 
 are due (half an hour apart by default) with the conditional GET a polite reader sends (ETag,
 Last-Modified), parses them with feedparser, and keeps each new post as a doc with where='feed',
 just as FreshRSS's posts were kept (freshrss.sync). Which posts a feed has given is kept in
-feed_seen, so a post read and forgotten never comes back.
+feed_seen, so a post read and forgotten never comes back. Each feed's icon is kept in feed-icons/,
+and each post's own picture, where it has one, in thumbs/ like the Library's (keep_pictures, after
+the sync).
 
 This module has the same functions as sources/freshrss.py, and feedsrc.py picks the one in charge
 (settings.feed_reader = "daf"), so the rest of Daf doesn't care which it is. Read and starred are
@@ -32,6 +34,9 @@ from .. import config, content
 UA = "Mozilla/5.0 (compatible; Daf feed reader; +https://github.com/franz-rosenzweig/daf)"
 EVERY = 1800                     # seconds between two reads of one feed
 ICONS = config.STATE / "feed-icons"
+PICTURE_MIN = 100                # px on each side: a smaller picture in a post is an avatar, an emoji or a button
+PICTURE_MAX = 640                # a post's picture as kept: enough for its row, and for the Library's card once saved
+PICTURES_PER_SYNC = 120
 
 
 class FeedError(Exception):
@@ -294,8 +299,37 @@ def _kind(e, link):
     return "article", None
 
 
-def _take(conn, settings, f, d):
-    """A parsed feed's new posts into the Feed. Returns how many were new."""
+def _px(v):
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _picture(e):
+    """The address of the post's own picture, where the feed names one: its media:thumbnail (the
+    biggest), an image in media:content, an image enclosure or its itunes:image. One the feed says is
+    small (GitHub's 30 px avatars) doesn't count. None when it names none: keep_pictures looks in
+    the post's text."""
+    def ok(url, w=None, h=None):
+        url = str(url or "").strip()
+        return url.startswith(("http://", "https://")) and not (_px(w) and _px(h) and min(_px(w), _px(h)) < PICTURE_MIN)
+    for t in sorted(e.get("media_thumbnail") or [], key=lambda t: -_px(t.get("width"))):
+        if ok(t.get("url"), t.get("width"), t.get("height")):
+            return t["url"].strip()
+    for m in e.get("media_content") or []:
+        if (m.get("medium") == "image" or str(m.get("type", "")).startswith("image/")) and ok(m.get("url"), m.get("width"), m.get("height")):
+            return m["url"].strip()
+    for enc in e.get("enclosures") or []:
+        if str(enc.get("type", "")).startswith("image/") and ok(enc.get("href")):
+            return enc["href"].strip()
+    it = e.get("image") or {}
+    return it["href"].strip() if isinstance(it, dict) and ok(it.get("href")) else None
+
+
+def _take(conn, settings, f, d, pictures=False):
+    """A parsed feed's new posts into the Feed. Returns how many were new. With pictures, the posts
+    already in the Feed get the picture their feed names for them too (sync does it once)."""
     expire = int(settings.get("feed_expire_days", 30))
     horizon = int(time.time()) - (expire + 2) * 86400
     attrs = json.loads(f.get("attrs") or "{}")
@@ -308,6 +342,10 @@ def _take(conn, settings, f, d):
             continue
         keys = [("id:" + key)] + ([("link:" + link)] if link else [])
         if any(conn.execute("SELECT 1 FROM feed_seen WHERE feed = ? AND key = ?", (f["id"], k)).fetchone() for k in keys):
+            pic = _picture(e) if pictures and link else None
+            if pic:
+                conn.execute("UPDATE docs SET thumb = ? WHERE where_ = 'feed' AND feed = ? AND url = ? AND (thumb IS NULL OR thumb = '')",
+                             (pic, f["id"], link))
             continue
         conn.executemany("INSERT OR IGNORE INTO feed_seen (feed, key, at) VALUES (?, ?, ?)", [(f["id"], k, now) for k in keys])
         published = _when(e) or now
@@ -318,12 +356,13 @@ def _take(conn, settings, f, d):
         kind, enclosure = _kind(e, link)
         author = (e.get("author") or "").strip()
         did = "rss:" + hashlib.sha1(f"{f['id']}|{key}".encode()).hexdigest()[:16]
+        # thumb: the picture's address for now; keep_pictures keeps it on the server after the sync
         conn.execute(
             "INSERT OR IGNORE INTO docs (id, kind, where_, status, title, author, source, category, url, published, added, "
-            "words, summary, enclosure, ext_id, feed) VALUES (?, ?, 'feed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "words, summary, enclosure, ext_id, feed, thumb) VALUES (?, ?, 'feed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (did, kind, "seen" if seen_now else "unseen", html.unescape(e.get("title") or "Untitled").strip()[:500],
              "" if "@" in author else author[:120], f.get("title") or "", f.get("folder") or "", link, published, now,
-             content.words(bl), content.summary(bl), enclosure, key[:300], f["id"]))
+             content.words(bl), content.summary(bl), enclosure, key[:300], f["id"], _picture(e)))
         conn.execute("INSERT OR REPLACE INTO doc_content (id, blocks, fetched) VALUES (?, ?, ?)", (did, json.dumps(bl), now))
         new += 1
     return new
@@ -333,23 +372,84 @@ def sync(conn, settings, max_items=1500, every=None, force=False):
     """Read the feeds that are due (all of them with force), keep their new posts. Returns (new, unread)."""
     now = int(time.time())
     every = every or EVERY
-    due = [dict(r) for r in conn.execute("SELECT * FROM feeds") if force or not r["fetched"] or now - r["fetched"] >= (r["every"] or every)]
+    # Once, the first time Daf looks for the posts' pictures: every feed is read afresh (no ETag), so the
+    # posts the Feed already has get the picture their feed names, not only one from their text.
+    first = not conn.execute("SELECT 1 FROM kv WHERE k = 'feed_pictures'").fetchone()
+    due = [dict(r) for r in conn.execute("SELECT * FROM feeds")
+           if force or first or not r["fetched"] or now - r["fetched"] >= (r["every"] or every)]
+    if first:
+        for f in due:
+            f["etag"] = f["modified"] = None
     new = 0
     with ThreadPoolExecutor(8) as pool:
         for f, status, d, etag, modified, err in pool.map(_fetch, due):
             if d is not None:
                 try:
-                    new += _take(conn, settings, f, d)
+                    new += _take(conn, settings, f, d, pictures=first)
                 except Exception as e:  # noqa: BLE001
                     err = f"Couldn't read its posts: {e}"[:200]
             conn.execute("UPDATE feeds SET fetched = ?, etag = ?, modified = ?, error = ?, errors = ?, ok = COALESCE(?, ok) WHERE id = ?",
                          (now, etag, modified, err, (f.get("errors") or 0) + 1 if err else 0, None if err else now, f["id"]))
             if new >= max_items:
                 break
+    if first:
+        conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('feed_pictures', '1')")
     total, labels = unread_counts(conn)
     conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('feed_counts', ?)", (json.dumps({"total": total, "labels": labels}),))
     _forget(conn, settings)
     return new, total
+
+
+def keep_pictures(limit=PICTURES_PER_SYNC):
+    """The posts' own pictures, kept on the server the way the Library's are (pages.keep_thumb), so a
+    row shows its post's picture without asking the site each time. Newest first, a few each sync: the
+    picture the feed named (_take leaves its address in thumb), else the first big enough picture in
+    the post's text, which is how a post from before this gets one when its feed doesn't list it any
+    more. A post with none gets thumb '' and isn't looked at again. Run outside the sync's transaction
+    (sync.loop), as fulltext.backfill is: the pictures are fetched with no session open."""
+    from .. import db, pages
+    with db.session() as c:
+        rows = [tuple(r) for r in c.execute(
+            "SELECT d.id, d.thumb, t.blocks FROM docs d LEFT JOIN doc_content t ON t.id = d.id WHERE d.where_ = 'feed' "
+            "AND d.status != 'deleted' AND (d.thumb IS NULL OR d.thumb LIKE 'http%') ORDER BY d.added DESC LIMIT ?", (limit,))]
+
+    def one(r):
+        did, named, blocks = r
+        try:
+            inside = [b["src"] for b in json.loads(blocks or "[]") if b.get("t") == "img"]
+        except ValueError:
+            inside = []
+        for url in list(dict.fromkeys(([named] if named else []) + inside))[:3]:     # three tries at most
+            kept = pages.keep_thumb(url, PICTURE_MIN, PICTURE_MAX)
+            if kept:
+                return did, kept
+        return did, ""
+
+    with ThreadPoolExecutor(6) as pool:
+        got = list(pool.map(one, rows))
+    with db.session() as c:
+        logos = set(json.loads((c.execute("SELECT v FROM kv WHERE k = 'feed_logos'").fetchone() or ["[]"])[0]))
+        c.executemany("UPDATE docs SET thumb = ? WHERE id = ? AND (thumb IS NULL OR thumb LIKE 'http%')",
+                      [("" if t in logos else t, did) for did, t in got])
+        # A picture three posts of one feed share is the feed's own (its logo, a newsletter's header), not
+        # theirs: it goes from them, and from the posts that bring it later.
+        same = {r[0] for r in c.execute("SELECT thumb FROM docs WHERE where_ = 'feed' AND thumb LIKE '/api/thumb/%' "
+                                        "GROUP BY feed, thumb HAVING COUNT(*) >= 3")}
+        if same:
+            c.executemany("UPDATE docs SET thumb = '' WHERE where_ = 'feed' AND thumb = ?", [(t,) for t in same])
+            c.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('feed_logos', ?)", (json.dumps(sorted(logos | same)),))
+        _drop_pictures(c, {t for _, t in got if t in logos} | same)
+    return sum(1 for _, t in got if t and t not in logos | same)
+
+
+def _drop_pictures(conn, names):
+    """The kept pictures no doc shows any more (nor a book added from Hardcover, whose cover is kept the
+    same way): their files go, so the Feed's pictures don't pile up as its posts come and go."""
+    from .. import pages
+    for t in set(names):
+        if (t or "").startswith("/api/thumb/") and not conn.execute("SELECT 1 FROM docs WHERE thumb = ?", (t,)).fetchone() \
+                and not conn.execute("SELECT 1 FROM book_adds WHERE cover = ?", (t,)).fetchone():
+            (pages.THUMBS / t.rsplit("/", 1)[1]).unlink(missing_ok=True)
 
 
 def _forget(conn, settings):
@@ -358,9 +458,12 @@ def _forget(conn, settings):
     expire = int(settings.get("feed_expire_days", 30))
     keep = "id NOT IN (SELECT DISTINCT book_id FROM highlights WHERE book_id IS NOT NULL) AND id NOT IN (SELECT doc_id FROM kindle_sent)"
     forget = int(time.time()) - max(30, expire + 2) * 86400
+    pictures = [r[0] for r in conn.execute("SELECT thumb FROM docs WHERE where_ = 'feed' AND status IN ('seen', 'deleted') AND added < ? "
+                                           f"AND {keep} AND thumb LIKE '/api/thumb/%'", (forget,))]
     conn.execute("DELETE FROM doc_content WHERE id IN (SELECT id FROM docs WHERE where_ = 'feed' AND status IN ('seen', 'deleted') AND added < ? "
                  f"AND {keep})", (forget,))
     conn.execute(f"DELETE FROM docs WHERE where_ = 'feed' AND status IN ('seen', 'deleted') AND added < ? AND {keep}", (forget,))
+    _drop_pictures(conn, pictures)
     conn.execute("DELETE FROM feed_seen WHERE at < ?", (int(time.time()) - 400 * 86400,))
 
 

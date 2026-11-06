@@ -104,11 +104,27 @@ def list_docs(conn, settings, where, tab, kind=None, cat=None, limit=200, offset
     args += [limit, offset]
     hl = _hl_counts(conn)
     rows = [dict(r) for r in conn.execute(q, args)]
+    icons = feed_icons(conn) if where == "feed" else {}
     for r in rows:
         r["highlights"] = hl.get(r["id"], 0)
         r["mins"] = round(r["duration"] / 60) if r.get("duration") else max(1, round((r["words"] or 0) / 238)) if r["words"] else None
         r["expired"] = where == "feed" and r["status"] == "unseen" and (r["added"] or 0) < exp
+        if where == "feed":
+            r["feed_icon"] = icons.get(r["feed"], "")
+            if not (r["thumb"] or "").startswith("/api/thumb/"):
+                r["thumb"] = ""          # its picture isn't kept yet (rss.keep_pictures): the row doesn't fetch it from the site
     return rows
+
+
+def feed_icons(conn):
+    """{feed id: its icon's key, for /api/feed/icon/<key>} for the feeds whose icon Daf has, so a
+    Feed row shows its site's icon."""
+    if feedsrc.daf():
+        from .sources import rss
+        have = {p.stem for p in rss.ICONS.glob("*.*")} if rss.ICONS.is_dir() else set()
+        return {r[0]: r[1] for r in conn.execute("SELECT id, icon FROM feeds WHERE icon IS NOT NULL") if r[1] in have}
+    subs = json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])
+    return {x["id"]: x["icon"] for x in subs if x.get("icon")}
 
 
 def counts(conn, settings):

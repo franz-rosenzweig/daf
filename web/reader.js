@@ -173,20 +173,52 @@ document.addEventListener('paste', e => {
 });
 
 /* ---------- lists ---------- */
+// A row's square: the post's picture, else (a Feed row) its site's icon, else a coloured letter. A
+// picture or an icon that won't load gives way to the next one.
 function thumb(d){
-  if (d.thumb) return '<span class="thumb"><img src="' + esc(d.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\'' + esc((d.source || '?').charAt(0).toUpperCase()) + '\'"></span>';
   const letter = rtl(d.title) ? 'ע' : (d.source || d.title || '?').replace(/^(the |r\/)/i, '').charAt(0).toUpperCase();
-  return '<span class="thumb" style="background:hsl(' + hue(d.source || d.title) + ' 34% 42%)">' + esc(letter) + '</span>';
+  const tile = '<span class="thumb" style="background:hsl(' + hue(d.source || d.title) + ' 34% 42%)">' + esc(letter) + '</span>';
+  const img = (src, next, more) => '<img src="' + esc(src) + '" alt="" loading="lazy"' + (more || '') + ' data-next="' + esc(next) + '" onerror="this.parentNode.outerHTML=this.dataset.next">';
+  const icon = d.feed_icon ? '<span class="thumb ficon">' + img('/api/feed/icon/' + d.feed_icon, tile, ' class="fi"') + '</span>' : tile;
+  return d.thumb ? '<span class="thumb">' + img(d.thumb, icon, ' referrerpolicy="no-referrer"') + '</span>' : icon;
 }
+// The site's icon by its name, on a Feed row whose square shows the post's picture.
+const srcName = d => d.source ? (d.thumb && d.feed_icon ? '<img class="mico fi" src="/api/feed/icon/' + esc(d.feed_icon) + '" alt="" loading="lazy" onerror="this.remove()">' : '') + '<bdi>' + esc(d.source) + '</bdi>' : '';
+// A dark icon on a clear ground (GitHub's) all but vanishes on a dark theme: it gets a light plate
+// there, as NetNewsWire does. Each icon is looked at once, from its pixels.
+const darkIcons = new Map();
+document.addEventListener('load', e => {
+  const im = e.target;
+  if (!im.classList || !im.classList.contains('fi')) return;
+  const src = im.getAttribute('src');
+  if (!darkIcons.has(src)) {
+    let dark = false;
+    try {
+      const n = 24, cv = document.createElement('canvas'); cv.width = cv.height = n;
+      const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(im, 0, 0, n, n);
+      const p = cx.getImageData(0, 0, n, n).data; let clear = 0, a = 0, lum = 0;
+      for (let i = 0; i < p.length; i += 4) {
+        if (p[i + 3] < 40) { clear++; continue; }
+        a += p[i + 3]; lum += p[i + 3] * (0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2]);
+      }
+      dark = clear > n * n * 0.15 && a > 0 && lum / a < 60;
+    } catch(err){}
+    darkIcons.set(src, dark);
+  }
+  im.classList.toggle('dk', darkIcons.get(src));
+}, true);
 function rowHTML(d){
   const feed = d.where_ === 'feed';
   const tip = (label, a) => label + K.tip('list', a);
   const acts = (feed ? [['save', tip('Save to Library', 'save'), ICON.save], ['seen', d.status === 'seen' ? 'Mark unseen' : tip('Mark seen', 'archive'), ICON.done]]
     : [['star', tip(d.starred ? 'Off the Shortlist' : 'Shortlist', 'star'), ICON.star(!!d.starred)], ['later', tip('Later', 'later'), ICON.later], ['archive', d.status === 'archive' ? 'Back to Inbox' : tip('Archive', 'archive'), ICON.done]])
     .concat([['delete', tip('Delete', 'delete'), ICON.trash]]);
-  const meta = [feed && d.category ? '<span class="pill"' + dirAttr(d.category) + '>' + esc(d.category) + '</span>' : '', esc(d.source || ''), d.author && d.author !== d.source ? '· ' + esc(d.author) : '',
+  // the words after the folder in one run, so they wrap as a line of text (the site's icon with them); a
+  // Hebrew name is set apart, so "· 4 min" stays after it
+  const words = [srcName(d), d.author && d.author !== d.source ? '· <bdi>' + esc(d.author) + '</bdi>' : '',
     d.kind === 'podcast' ? '· episode' : d.mins ? '· ' + d.mins + ' min' : '', d.progress >= 1 ? '· ' + Math.round(d.progress) + '%' : '',
     d.highlights ? '· ' + d.highlights + ' highlight' + (d.highlights > 1 ? 's' : '') : '', d.expired ? '· <span class="mute">expired</span>' : ''].filter(Boolean).join(' ');
+  const meta = [feed && d.category ? '<span class="pill"' + dirAttr(d.category) + '>' + esc(d.category) + '</span>' : '', words ? '<span>' + words + '</span>' : ''].filter(Boolean).join(' ');
   const picked = R.multi.has(d.id);
   return '<div class="row' + (d.id === R.sel ? ' on' : '') + (d.starred ? ' starred' : '') + (picked ? ' picked' : '') + '" data-doc="' + esc(d.id) + '" role="option" aria-selected="' + (d.id === R.sel) + '">' +
     '<span class="pick" data-pick="' + esc(d.id) + '" role="checkbox" aria-checked="' + picked + '" aria-label="Select" title="Select (x)"></span>' +
@@ -401,7 +433,7 @@ function undoToast(msg, undo){
 function srcIcon(x){
   const letter = esc((x.title || '?').replace(/^(the |r\/|")/i, '').charAt(0).toUpperCase());
   const tile = '<span class="sico" style="background:hsl(' + hue(x.title) + ' 34% 42%)">' + letter + '</span>';
-  return x.icon ? '<img class="sico" src="/api/feed/icon/' + esc(x.icon) + '" alt="" loading="lazy" onerror="this.outerHTML=this.dataset.tile" data-tile="' + esc(tile) + '">' : tile;
+  return x.icon ? '<img class="sico fi" src="/api/feed/icon/' + esc(x.icon) + '" alt="" loading="lazy" onerror="this.outerHTML=this.dataset.tile" data-tile="' + esc(tile) + '">' : tile;
 }
 function sourcesHTML(s){
   const L = R.list, cur = L && L.where === 'feed' && !R.view ? (L.arg || '') : null;
