@@ -159,19 +159,19 @@ function shape(pen, pts, w){
 const GRAIN = '<filter id="dafgrain" x="0" y="0" width="1" height="1"><feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.4 2"/><feComposite in="SourceGraphic" operator="in"/></filter>';
 // A layer of strokes in an SVG element (or group): the highlighter's under everything else, one
 // group a colour and opacity so overlaps don't darken and the writing above isn't dimmed (Moshe's,
-// after Saber); the pencil with its grain.
-function layer(svg, dark){
+// after Saber); the pencil with its grain. inkColor: the colour 'ink' is there, when it isn't the text's.
+function layer(svg, dark, inkColor){
   const doc = svg.ownerDocument, defs = doc.createElementNS(NS, 'defs');
   defs.innerHTML = GRAIN;
   const hl = doc.createElementNS(NS, 'g'), ink = doc.createElementNS(NS, 'g');
   hl.setAttribute('class', 'dafhl'); hl.style.mixBlendMode = dark ? 'screen' : 'multiply';
   svg.append(defs, hl, ink);
-  const groups = new Map();
+  const groups = new Map(), tint = c => (!c || c === 'ink') && inkColor ? inkColor : colorOf(c, doc);
   // Handwriting made typed text (To text): its lines from where the handwriting began, in the
   // reading face, a Hebrew line from the right.
   function text(s, pts, k){
     const t = doc.createElementNS(NS, 'text'), fs = (s.fs || 16) * k, x = pts[0][0], w = (s.w || 120) * k;
-    t.setAttribute('fill', colorOf(s.color, doc)); t.setAttribute('font-size', r1(fs)); t.dataset.k = s.id;
+    t.setAttribute('fill', tint(s.color)); t.setAttribute('font-size', r1(fs)); t.dataset.k = s.id;
     let face = ''; try { face = getComputedStyle(doc.body).fontFamily; } catch(e){}
     t.setAttribute('font-family', face || 'serif');
     String(s.text || '').split('\n').forEach((line, i) => {
@@ -188,7 +188,7 @@ function layer(svg, dark){
     // s: the stroke; pts: its points where they go; k: how much bigger the type is than when written
     add(s, pts, k){
       if (kindOf(s) === 'text') return text(s, pts, k);
-      const pen = kindOf(s), op = opacityOf(s), el = doc.createElementNS(NS, 'path'), color = colorOf(s.color, doc);
+      const pen = kindOf(s), op = opacityOf(s), el = doc.createElementNS(NS, 'path'), color = tint(s.color);
       el.setAttribute('d', shape(pen, pts, (s.size || 2.5) * k));
       el.setAttribute('fill', color); el.dataset.k = s.id;
       if (pen === 'highlighter') {
@@ -292,7 +292,7 @@ function wet(L){
   }
   if (!L.brush || !L.pts.length) return;
   cv.hidden = false; cv.style.opacity = r1(L.brush.opacity);
-  x.fillStyle = L.wetColor || (L.wetColor = colorOf(L.brush.color, L.doc));
+  x.fillStyle = L.wetColor || (L.wetColor = (!L.brush.color || L.brush.color === 'ink') && L.surf.ink ? L.surf.ink() : colorOf(L.brush.color, L.doc));
   x.fill(new Path2D(shape(L.brush.pen, L.pts, L.brush.w)));
 }
 function dry(){ if (P.cv) { const x = P.cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, P.cv.width, P.cv.height); P.cv.hidden = true; } }
@@ -340,14 +340,24 @@ function feed(e, off){
 // Every document the pen writes in listens: the page's own, and a book's pages in their frames.
 // surf answers: live(), takes(el, doc), off(doc) → [x, y] of the document's corner in the window,
 // and keeps what's written: stroke(L), erase(x, y, mode, r, L), erased(L), highlight(L) → bool.
+// It may also have tap(x, y) (what a pen's tap does there), ink() (the colour of 'ink' on it) and
+// palm (a hand on the screen while the pen is near touches nothing there).
+// The page's own document has more than one surface (an article, and the manga reader over it):
+// the one in use takes the pen.
 function listen(doc, surf){
-  if (!doc || doc.__dafPens) return;
-  doc.__dafPens = true; P.docs.add(doc);
-  const off = () => surf.off ? surf.off(doc) : [0, 0];
+  if (!doc) return;
+  if (doc.__dafPens) { if (!doc.__dafSurfs.includes(surf)) doc.__dafSurfs.push(surf); return; }
+  doc.__dafPens = true; doc.__dafSurfs = [surf]; P.docs.add(doc);
+  const here = () => { const ss = doc.__dafSurfs; return ss.includes(P.surface) ? P.surface : ss.find(x => x.live()) || ss[0]; };
+  const off = () => { const s = here(); return s.off ? s.off(doc) : [0, 0]; };
   doc.addEventListener('pointerdown', e => {
+    const surf = here();
     if (C.Underline) C.Underline.down(e);
     if (doc !== document && e.pointerType !== 'pen') { closePop(); closeRound(); }   // a book's page: its own window, where the page's never hears a tap
-    if (e.pointerType !== 'pen') return;
+    if (e.pointerType !== 'pen') {
+      if (surf.palm && writing() && (P.live || Date.now() - P.near < 350) && e.target && e.target.closest && !e.target.closest(SKIP) && surf.takes(e.target, doc)) { e.preventDefault(); e.stopPropagation(); }
+      return;
+    }
     seenPen();
     const o = off(), x = e.clientX + o[0], y = e.clientY + o[1];
     // the button pressed with the pen over the glass: the round menu once it's let go (a click)
@@ -368,6 +378,7 @@ function listen(doc, surf){
   doc.addEventListener('pointermove', e => {
     if (e.pointerType !== 'pen') return;
     P.near = Date.now();
+    const surf = here();
     const o = off();
     if (P.live && e.pointerId === P.live.id) { e.preventDefault(); feed(e, o); return; }
     // over the glass: the ring, and the button pressed and let go there (when no pointerdown said so)
@@ -379,10 +390,11 @@ function listen(doc, surf){
   const up = e => {
     if (e.pointerType === 'pen' && !(e.buttons & 2) && P.button && !P.live) { clicked(); return; }
     const L = P.live; if (!L || e.pointerId !== L.id) return;
+    const surf = L.surf;
     P.live = null; P.penUp = Date.now(); P.near = Date.now(); clearTimeout(L.stillT);
     e.preventDefault(); dry();
     if (!surf.live()) return;
-    if (!L.moved && Date.now() - L.t0 < 450) { if (L.tool !== 'eraser') tap(doc, e.clientX, e.clientY); return; }
+    if (!L.moved && Date.now() - L.t0 < 450) { if (L.tool !== 'eraser') { if (surf.tap) surf.tap(e.clientX, e.clientY); else tap(doc, e.clientX, e.clientY); } return; }
     if (L.tool === 'eraser') { surf.erased(L); return; }
     if (L.tool === 'lasso') { hold(surf, surf.select(L.pts), L.pts); return; }
     if (e.type === 'pointercancel' && L.pts.length < 3) return;
@@ -394,7 +406,7 @@ function listen(doc, surf){
   doc.addEventListener('pointerup', up, true);
   doc.addEventListener('pointercancel', up, true);
   // a pen that's just written doesn't also click what it wrote on (a mouse-like pen sends one)
-  doc.addEventListener('click', e => { if (e.isTrusted && !P.tapping && Date.now() - P.penUp < 500 && writing() && e.target && e.target.closest && !e.target.closest(SKIP) && surf.takes(e.target, doc)) { e.preventDefault(); e.stopPropagation(); } }, true);
+  doc.addEventListener('click', e => { if (e.isTrusted && !P.tapping && Date.now() - P.penUp < 500 && writing() && e.target && e.target.closest && !e.target.closest(SKIP) && here().takes(e.target, doc)) { e.preventDefault(); e.stopPropagation(); } }, true);
   doc.addEventListener('contextmenu', e => { if (Date.now() - P.lastPen < 800 && writing()) e.preventDefault(); }, true);
   if (P.seen) arm(doc);
 }
@@ -473,7 +485,7 @@ function onPal(e){
   else if (k === 'panel') { if (P.popEl) closePop(); else openPop(t, T.tool); return; }
   else if (k === 'undo') s && s.undo();
   else if (k === 'redo') s && s.redo();
-  else if (k === 'away' || k === 'on') { P.on = k === 'on'; put('on', P.on); closePop(); }
+  else if (k === 'away' || k === 'on') turn(k === 'on');
   else if (s && s.extra) s.extra(k);
   redraw();
 }
@@ -697,8 +709,8 @@ function drawReadout(){
     (r.status === 'reading' ? '<div class="ronote mute">' + esc(r.note || 'Reading…') + '</div>' :
       (r.note ? '<div class="ronote mute">' + esc(r.note) + '</div>' : '') +
       '<textarea class="field" rows="' + Math.min(8, Math.max(2, r.text.split('\n').length + 1)) + '" aria-label="The text"' + (r.lang === 'he' ? ' dir="rtl"' : '') + '>' + esc(r.text) + '</textarea>' +
-      '<div class="roacts"><button class="btn primary" data-ro="note"' + dis + '>Note on the passage</button><button class="btn" data-ro="typed"' + dis + '>Typed, in its place</button><button class="btn" data-ro="copy"' + dis + '>Copy</button></div>' +
-      '<div class="mute tiny">A note on the passage goes with the words beside it, as a highlight’s note, in the Notebook and the vault, and the handwriting stays. Typed, in its place, the handwriting goes.</div>');
+      '<div class="roacts">' + (r.surf.noteOnPassage ? '<button class="btn primary" data-ro="note"' + dis + '>Note on the passage</button>' : '') + '<button class="btn' + (r.surf.noteOnPassage ? '' : ' primary') + '" data-ro="typed"' + dis + '>Typed, in its place</button><button class="btn" data-ro="copy"' + dis + '>Copy</button></div>' +
+      (r.surf.noteOnPassage ? '<div class="mute tiny">A note on the passage goes with the words beside it, as a highlight’s note, in the Notebook and the vault, and the handwriting stays. Typed, in its place, the handwriting goes.</div>' : ''));
 }
 async function onReadout(e){
   const b = e.target.closest('[data-ro], [data-lang]'), r = P.ro; if (!b || !r) return;
@@ -723,6 +735,8 @@ async function copy(text){
 }
 
 function redraw(){ drawPal(); }
+// The tools out (the pen writes) or put away (the pen is a finger), from the tools or a reader's bar.
+function turn(on){ P.on = !!on; put('on', P.on); if (P.on) seenPen(); closePop(); closeRound(); drawPal(); }
 // The app's own word that the button was clicked, since Android's WebView doesn't say (StylusButton.java).
 // A click opens the round menu, and the next one closes it.
 window.dafStylusButton = (x, y) => {
@@ -746,7 +760,7 @@ C.Pens = {
   // the surface the tools belong to now (an article, a book), or none
   use(s){ P.surface = s; closePop(); closeRound(); unhold(); closeReadout(); if (C.Underline) C.Underline.drop(); drawPal(); },
   surface: () => P.surface,
-  redraw, closeRound, openRound, writing, on: () => P.on, seen: () => P.seen, busy: () => !!P.live,
+  redraw, closeRound, openRound, writing, turn, on: () => P.on, seen: () => P.seen, busy: () => !!P.live,
   state: () => ({ tool: T.tool, pen: T.pen, under: T.under, on: P.on, seen: P.seen, round: !!P.roundEl, eraser: T.eraser.mode, held: P.held ? P.held.strokes.length : 0, readout: P.ro ? { status: P.ro.status, text: P.ro.text, note: P.ro.note, lang: P.ro.lang } : null }),
 };
 })();

@@ -3250,9 +3250,32 @@ def get_manga_series(sid: str):
 
 
 @app.get("/api/manga/books/{bid}", dependencies=[Depends(user)])
-def get_manga_book(bid: str):
+def get_manga_book(bid: str, c=Depends(conn)):
+    from . import ink, manga
+    d = _manga(manga.book, _kid(bid))
+    d["ink"] = ink.strokes(c, "manga:" + bid)          # what's drawn on its pages with a pen (web/mink.js)
+    return d
+
+
+@app.post("/api/manga/books/{bid}/ink", dependencies=[Depends(user)])
+def post_manga_ink(bid: str, b=Depends(json_body), c=Depends(conn)):
+    """Strokes drawn with a pen on a volume's pages (add) and erased (remove: their ids), in one go (web/mink.js)."""
+    from . import ink
+    if not isinstance(b, dict):
+        raise HTTPException(400, "Bad stroke")
+    try:
+        added, removed = ink.change(c, "manga:" + _kid(bid), b.get("add") or [], b.get("remove") or [], b.get("at"))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e) or "Bad stroke")
+    return {"added": added, "removed": removed}
+
+
+@app.get("/api/manga/books/{bid}/crop/{n}", dependencies=[Depends(user)])
+def get_manga_crop(bid: str, n: int):
+    """Where page n's cropped picture sits on the whole page (fractions: left, top, right, bottom),
+    so what's drawn on a page stays on its drawing with Crop borders on or off (web/mink.js)."""
     from . import manga
-    return _manga(manga.book, _kid(bid))
+    return {"box": _manga(manga.crop_box, _kid(bid), max(1, n))}
 
 
 @app.get("/api/manga/books/{bid}/pages/{n}", dependencies=[Depends(user)])

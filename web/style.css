@@ -1086,8 +1086,8 @@ mark.creveal{background:var(--hl-yellow);box-shadow:inset 0 -2px 0 var(--hl-yell
 .mpage.sc-screen.two .mpg{max-width:50%}
 .mpage.sc-screen.stretch .mpg{width:100%;height:100%}
 .mpage.sc-screen.stretch.two .mpg{width:50%}
-.mpage.sc-screen.stretch.two .mpg:first-child{object-position:right center} .mpage.sc-screen.stretch.two .mpg:last-child{object-position:left center}
-.mstage.rtl .mpage.sc-screen.stretch.two .mpg:first-child{object-position:left center} .mstage.rtl .mpage.sc-screen.stretch.two .mpg:last-child{object-position:right center}
+.mpage.sc-screen.stretch.two .mpg:first-of-type{object-position:right center} .mpage.sc-screen.stretch.two .mpg:last-of-type{object-position:left center}
+.mstage.rtl .mpage.sc-screen.stretch.two .mpg:first-of-type{object-position:left center} .mstage.rtl .mpage.sc-screen.stretch.two .mpg:last-of-type{object-position:right center}
 .mslot:has(.sc-width),.mslot:has(.sc-height),.mslot:has(.sc-original){overflow:auto;scrollbar-width:none}
 .mslot:has(.sc-width){align-items:flex-start} .mslot:has(.sc-height),.mslot:has(.sc-original){justify-content:flex-start;align-items:flex-start}
 .mpage.sc-width{height:auto;min-height:100%} .mpage.sc-width .mpg{width:100%;height:auto} .mpage.sc-width.two .mpg{width:50%}
@@ -1099,6 +1099,13 @@ mark.creveal{background:var(--hl-yellow);box-shadow:inset 0 -2px 0 var(--hl-yell
 .mstrip{width:var(--sw);margin:0 auto;display:flex;flex-direction:column;gap:var(--gap);padding-bottom:30px}
 .mstrip .mpg{width:100%;height:auto}
 .mstripend{padding:40px 16px 60px}
+/* what's drawn on a page with a pen (mink.js): a layer over each picture, in the page's units, with the page's filters */
+.mpage,.mstrip{position:relative}
+.minklayer{position:absolute;z-index:1;pointer-events:none;filter:var(--mfilter)}
+.mreader .mic[aria-pressed="true"]{color:var(--macc)}
+.mreader .msheet:not([hidden]) ~ .inkpal{display:none}
+@media (max-width:640px){ .mreader.bars .inkpal{display:none} }   /* on a phone it would sit on the bottom bar */
+body:has(> .mreader) :is(.inkwet,.penring,.penround,.penheld,.readout,.inkpop){z-index:67}
 .mcard2{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;max-width:340px;margin:0 auto;padding:24px;color:var(--mfg);
   background:rgba(20,20,22,.86);border:1px solid var(--mline);border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,.4)}
 .mcard2 b{font-size:19px;line-height:1.3} .mcard2 .mute{color:var(--mfg2)} .mcard2 .tiny{font-size:12.5px}

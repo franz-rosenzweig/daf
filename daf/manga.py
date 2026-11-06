@@ -225,24 +225,55 @@ def _bucket(want):
 
 
 def _crop_borders(im):
-    """The page without its blank margins: the border colour is taken from the corners, and a
-    margin goes only if what's left is still most of the page (a full-bleed page stays as it is)."""
+    """(The page without its blank margins, the box it was cut from, or None): the border colour is
+    taken from the corners, and a margin goes only if what's left is still most of the page (a
+    full-bleed page stays as it is)."""
     from PIL import ImageChops
     g = im.convert("L")
     w, h = g.size
     corners = sorted(g.getpixel(c) for c in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)))
     bg = corners[1] if corners[2] - corners[1] < 24 else None        # two or more corners agree
     if bg is None or 40 < bg < 215:                                  # only a white or a black margin
-        return im
+        return im, None
     mask = ImageChops.difference(g, g.point(lambda _: bg)).point(lambda v: 255 if v > 28 else 0)
     box = mask.getbbox()
     if not box:
-        return im
+        return im, None
     pad = max(4, round(min(w, h) * 0.01))
     box = (max(0, box[0] - pad), max(0, box[1] - pad), min(w, box[2] + pad), min(h, box[3] + pad))
     if (box[2] - box[0]) * (box[3] - box[1]) < 0.55 * w * h:
-        return im
-    return im.crop(box)
+        return im, None
+    return im.crop(box), box
+
+
+def _note_crop(bid, n, im):
+    """The page cropped, and where its picture is on the whole page noted for crop_box()."""
+    w, h = im.size
+    im, box = _crop_borders(im)
+    box = box or (0, 0, w, h)
+    p = CACHE / bid / f"{int(n)}-crop.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps([round(box[0] / w, 5), round(box[1] / h, 5), round(box[2] / w, 5), round(box[3] / h, 5)]))
+    return im
+
+
+def crop_box(bid, n):
+    """Where page n's cropped picture is on the whole page, as fractions [left, top, right, bottom]
+    ([0, 0, 1, 1] when nothing was trimmed), so a pen's strokes stay on the drawing either way."""
+    p = CACHE / bid / f"{int(n)}-crop.json"
+    if not p.exists():
+        data, _ = _req(f"/api/v1/books/{bid}/pages/{int(n)}", raw=True, timeout=60)
+        from PIL import Image
+        try:
+            im = Image.open(io.BytesIO(data))
+            im.load()
+        except Exception:  # noqa: BLE001 - something Pillow can't read isn't cropped either
+            return [0, 0, 1, 1]
+        _note_crop(bid, n, im)
+    try:
+        return json.loads(p.read_text())
+    except (OSError, ValueError):
+        return [0, 0, 1, 1]
 
 
 def page_image(bid, n, want=1800, crop=False):
@@ -261,7 +292,7 @@ def page_image(bid, n, want=1800, crop=False):
     except Exception:  # noqa: BLE001 - something Pillow can't read: hand it over as it is
         return data, ctype or "application/octet-stream"
     if crop:
-        im = _crop_borders(im)
+        im = _note_crop(bid, n, im)
     if max(im.size) > size:
         k = size / max(im.size)
         im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
