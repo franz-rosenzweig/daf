@@ -332,7 +332,7 @@ def cmd_feeds_list(a):
     """The feeds the Feed follows (Daf's own, or FreshRSS's): id, url, title, folder."""
     from .sources import feedsrc
     with db.session() as conn:
-        subs = [{k: f.get(k) or "" for k in ("id", "url", "title", "folder")} for f in feedsrc.get().subscriptions(conn=conn)]
+        subs = [{k: f.get(k) or "" for k in ("id", "url", "title", "folder")} for f in feedsrc.get().subscriptions(conn=conn, **({'pool': True} if feedsrc.daf() else {}))]
     if a.json:
         print(json.dumps(subs, ensure_ascii=False))
     else:
@@ -354,7 +354,7 @@ def cmd_feeds_add(a):
         except ValueError as e:
             print(f"Couldn't follow {a.url}: {e}", file=sys.stderr)
             return 1
-        f = next((x for x in src.subscriptions(conn=conn) if x["url"] == a.url or x["title"] == title), None)
+        f = next((x for x in src.subscriptions(conn=conn, **({'pool': True} if feedsrc.daf() else {})) if x["url"] == a.url or x["title"] == title), None)
         rename = a.title if a.title and f and a.title != f["title"] else None
         if f and (rename or a.folder or a.full):
             reader.edit_feed(conn, f["id"], rename, a.folder or None, full=True if a.full else None)
@@ -368,7 +368,7 @@ def cmd_feeds_remove(a):
     from . import reader
     from .sources import feedsrc
     with db.session() as conn:
-        subs = feedsrc.get().subscriptions(conn=conn)
+        subs = feedsrc.get().subscriptions(conn=conn, **({'pool': True} if feedsrc.daf() else {}))
         gone = 0
         for u in a.urls:
             f = next((x for x in subs if u in (x["url"], x["id"])), None)
@@ -430,6 +430,26 @@ def cmd_edition(a):
         print(f"      {it['why']}")
 
 
+def cmd_pool_add(a):
+    """Feeds into the Edition's pool, from a checked list ([{category, url | feed_url, ok}], verify_pool.py's output)."""
+    from .sources import rss
+    rows = json.load(open(a.file))
+    added = 0
+    for r in rows:
+        if not r.get("ok"):
+            continue
+        folder = rss.POOL + r["category"]
+        try:
+            with db.session() as conn:
+                fid, title, _ = rss.follow(r.get("feed_url") or r["url"], folder, conn)
+                conn.execute("UPDATE feeds SET every = ? WHERE id = ?", (rss.POOL_EVERY, fid))
+            added += 1
+            print(f"  {r['category']:<26} {title}")
+        except Exception as e:  # noqa: BLE001 - one feed that won't come costs only itself
+            print(f"  {r['category']:<26} FAILED {r['url']}: {str(e)[:80]}")
+    print(f"{added} feeds in the pool")
+
+
 def cmd_vault_backfill(a):
     """Daf's notes on articles, videos and podcasts, rewritten with the full text (vaultnotes.backfill).
     --dry-run DIR: copies of the notes as they'd be go there; the vault and Daf's data stay as they are."""
@@ -458,6 +478,7 @@ def main(argv=None):
     x = sub.add_parser("backup", help="a consistent copy of daf.db into STATE/backups (cron, 03:00)"); x.set_defaults(f=cmd_backup)
     x = sub.add_parser("karakeep-import", help="Daf takes the Library over from Karakeep, once"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_karakeep_import)
     x = sub.add_parser("feeds-import", help="Daf reads the feeds itself from now on, FreshRSS's list brought over"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_feeds_import)
+    x = sub.add_parser("pool-add", help="feeds for the Edition's pool, from a checked list (JSON)"); x.add_argument("file"); x.set_defaults(f=cmd_pool_add)
     x = sub.add_parser("edition", help="the day's Edition: show it, build it, or see the taste it's built from")
     x.add_argument("--date"); x.add_argument("--build", action="store_true", help="make (or remake) it now")
     x.add_argument("--dry-run", action="store_true", help="choose without saving, and show the shortlist with --json")
