@@ -385,7 +385,8 @@ function renderSide(){
   const mins = d ? (d.main && !(d.main.kind === 'minutes' && d.main.period === 'day') ? d.main.done + '/' + d.main.target : Math.floor(d.counted) + '/' + Math.round(d.goal || 60)) : '';
   const rv = d && d.review ? (d.review.total - d.review.done) + (d.cards_due || 0) : '';
   const mob = (key, label, icon, hash) => '<button class="mb' + (v === key || (key === 'library' && v === 'books') ? ' on' : '') + '" data-go="' + (hash || key) + '">' + icon + '<span>' + label + '</span></button>';
-  const mobbar = '<div class="mobbar">' + mob('today', 'Today', I.today) + mob('review', 'Review', I.review) + mob('feed', 'Feed', '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 15.5h.01M4.5 10a5.5 5.5 0 0 1 5.5 5.5M4.5 4.5a11 11 0 0 1 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>') +
+  const ed = d && d.edition && (d.edition.on || d.edition.total) ? d.edition : null;
+  const mobbar = '<div class="mobbar">' + mob('today', 'Today', I.today) + mob('review', 'Review', I.review) + (ed ? mob('edition', 'Edition', I.edition || I.sources) : '') + mob('feed', 'Feed', '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 15.5h.01M4.5 10a5.5 5.5 0 0 1 5.5 5.5M4.5 4.5a11 11 0 0 1 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>') +
     mob('library', 'Library', I.books, 'library') + '<button class="mb' + (window.DafCore && window.DafCore.Tips && window.DafCore.Tips.unseen() ? ' hasnew' : '') + '" data-act="more"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 10h13M3.5 14h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>More</span></button></div>';
   const D = window.DafCore || {}, on = pinsOn(), route = (S.route || []).join('/');
   const pins = PINS().filter(p => on.includes(p[0])).map(p => '<button class="nv' + (route === p[2] || v === p[2] || (p[0] === 'manga' && v === 'mread') ? ' on' : '') + '" data-go="' + p[2] + '">' + p[3] + '<span>' + p[1] + '</span></button>').join('');
@@ -393,6 +394,7 @@ function renderSide(){
       '<button class="ib sidebtn" data-act="add" aria-label="Add to Daf" title="Add a link, a book or a PDF"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>' +
     '<div class="nav">' +
     n('today', 'Today', I.today, '<span class="ct">' + mins + '</span>') +
+    (ed ? n('edition', 'Edition', I.edition || I.sources, ed.total ? '<span class="ct">' + ed.done + '/' + ed.total + '</span>' : '') : '') +
     n('review', 'Review', I.review, '<span class="ct">' + (rv || (rv === 0 ? '✓' : '')) + '</span>') +
     (D.navLibrary ? D.navLibrary() : n('library', 'Library', I.books)) + n('books', 'Books', I.books) + (D.navFeed ? D.navFeed() : n('feed', 'Feed', I.sources)) + n('highlights', 'Highlights', I.hl) + '</div>' +
     '<div class="navh"><span>Pinned</span><button class="linkbtn tiny" data-act="pins" aria-label="Edit what’s pinned">Edit</button></div>' + (pins ? '<div class="nav pins">' + pins + '</div>' : '') +

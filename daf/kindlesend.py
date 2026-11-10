@@ -201,6 +201,10 @@ p{margin:0 0 0.7em;text-indent:0} .meta{color:#555;font-size:0.9em;margin-bottom
 .cap{font-size:0.85em;color:#555;font-style:italic} .src{font-size:0.8em;color:#555;margin-top:2em;word-break:break-all}
 blockquote{margin:0.8em 1.2em;font-style:italic} ul{margin:0 0 0.8em 1.2em}
 .fig{margin:1em 0;text-align:center} .fig img{max-width:100%;height:auto}
+.front .mast{font-size:2.6em;text-align:center;margin:0.4em 0 0.1em} .front .date{text-align:center;color:#444;margin-bottom:1em}
+.front .toc{list-style:none;margin:0;padding:0;border-top:3px double #333} .front .toc li{border-bottom:1px solid #bbb;padding:0.35em 0}
+.front .k{font-size:0.7em;letter-spacing:0.08em;text-transform:uppercase;color:#555;margin:0} .front .t{font-weight:bold;margin:0}
+.front .m{font-size:0.8em;color:#555;margin:0}
 """
 
 
@@ -209,8 +213,9 @@ def _slug(s, n=60):
     return re.sub(r"\s+", " ", s)[:n].strip() or "Daf"
 
 
-def make_epub(conn, ids, when=None):
-    """Write the EPUB for these documents into KINDLE_DIR. Returns {file, title, count, skipped}."""
+def make_epub(conn, ids, when=None, title=None, fname=None, front=None):
+    """Write the EPUB for these documents into KINDLE_DIR. Returns {file, title, count, skipped}.
+    title/fname name it (the Edition does), and front is XHTML for a first page before the pieces."""
     docs, skipped = [], []
     for i in ids:
         d = reader.get_doc(conn, i, prefetch=True)
@@ -222,7 +227,9 @@ def make_epub(conn, ids, when=None):
     if not docs:
         raise ValueError("None of these has text Daf can send")
     when = when or datetime.now()
-    if len(docs) == 1:
+    if title and fname:
+        pass
+    elif len(docs) == 1:
         title = docs[0][0]["title"] or "Untitled"
         fname = f"{_slug(title)} (Daf).epub"
     else:
@@ -231,6 +238,10 @@ def make_epub(conn, ids, when=None):
     uid = "urn:uuid:" + str(uuid.uuid4())
     images = _Images(b.get("src") for _, bl in docs for b in bl if b.get("t") == "img")
     chapters = [_chapter(d, bl, images) for d, bl in docs]
+    if front:
+        chapters.insert(0, ("en", '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml">'
+                               f'<head><title>{html.escape(title or "Daf")}</title><link rel="stylesheet" href="style.css"/></head>'
+                               f'<body class="front">{front}</body></html>'))
     lang = "he" if all(c[0] == "he" for c in chapters) else "en"
     items = "".join(f'<item id="c{n}" href="c{n}.xhtml" media-type="application/xhtml+xml"/>' for n in range(1, len(chapters) + 1))
     items += "".join(f'<item id="i{n}" href="{name}" media-type="{mt}"/>' for n, (name, _, mt) in enumerate(images.files, 1))
@@ -243,7 +254,7 @@ def make_epub(conn, ids, when=None):
            f'<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>'
            f'<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="css" href="style.css" media-type="text/css"/>{items}</manifest>'
            f'<spine toc="ncx">{spine}</spine></package>')
-    names = [html.escape(d["title"] or "Untitled") for d, _ in docs]
+    names = ([html.escape("Contents")] if front else []) + [html.escape(d["title"] or "Untitled") for d, _ in docs]
     nav = ('<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">'
            f'<head><title>{html.escape(title)}</title></head><body><nav epub:type="toc"><h1>{html.escape(title)}</h1><ol>'
            + "".join(f'<li><a href="c{n}.xhtml">{t}</a></li>' for n, t in enumerate(names, 1)) + '</ol></nav></body></html>')
