@@ -12,6 +12,10 @@ struct BookPage: View {
     @State private var swapOut: [J]?
     /// Its audiobook in Audiobookshelf: where I am in it.
     @State private var audio: J?
+    /// Up by one when the cover changes (Edit Details), so it's fetched again.
+    @State private var coverKey = 0
+
+    static func calibreID(_ id: String) -> Int? { id.hasPrefix("cal:") ? Int(id.dropFirst(4)) : nil }
 
     var body: some View {
         ScrollView {
@@ -23,6 +27,7 @@ struct BookPage: View {
                         }
                         .frame(width: 120, height: 180)
                         .shadow(radius: 4, y: 2)
+                        .id(coverKey)
                         VStack(alignment: .leading, spacing: 8) {
                             Text(b.b("private") ? "Private reading" : (b.s("title") ?? "")).font(.system(.title, design: .serif).weight(.semibold))
                             if let a = b.s("author") { Text(a).font(.title3).foregroundStyle(.secondary) }
@@ -42,6 +47,7 @@ struct BookPage: View {
                                 if let x = audio, let item = x.s("item") { listen(b, x, item) }
                                 Button(b.b("on_nightstand") ? "Off the Nightstand" : "On the Nightstand") { Task { await nightstand(!b.b("on_nightstand")) } }
                                 ShelvesMenu(book: id)
+                                if let cid = Self.calibreID(id) { Button("Edit Details…") { model.sheet = .editBooks([cid]) } }
                             }
                             .padding(.top, 6)
                         }
@@ -99,6 +105,13 @@ struct BookPage: View {
                 .frame(maxWidth: .infinity)
             } else {
                 ProgressView().frame(maxWidth: .infinity).padding(60)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dafBookEdited)) { n in
+            guard n.object as? String == id else { return }
+            Task {
+                if let j = try? await API.shared.json("/api/books/" + API.enc(id)) { b = j }
+                coverKey += 1
             }
         }
         .task(id: id) {

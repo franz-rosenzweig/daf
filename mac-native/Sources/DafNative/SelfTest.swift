@@ -1333,6 +1333,7 @@ enum SelfTest {
         }
 
         await allBooks(m)
+        await calibreEdit(m)
 
         // Stats
         await go(m, .stats)
@@ -1475,6 +1476,174 @@ enum SelfTest {
             let row = table()?.selectedRow ?? -1
             check(row >= 0 && row < cat.books.count && cat.books[row].s("id") == id, "and coming back, the table is where it was", "row \(row)")
         }
+    }
+
+    /// Editing Calibre books (BookEdit.swift) against the sandbox, whose Calibre is a stand-in that only
+    /// keeps what it was asked (GET /api/sandbox/calibre): nothing reaches the library.
+    static func calibreEdit(_ m: AppModel) async {
+        let cat = Catalog.shared
+        func ops() async -> [J] {
+            guard let d = try? await API.shared.data("/api/sandbox/calibre"), let j = J(try? JSONSerialization.jsonObject(with: d)) else { return [] }
+            return j.a("ops")
+        }
+        guard (try? await API.shared.data("/api/sandbox/calibre")) != nil else {
+            log("SKIP  editing Calibre: this Daf isn't the sandbox with Calibre's stand-in, and nothing is changed in a real library")
+            return
+        }
+        func table() -> NSTableView? {
+            func find(_ v: NSView) -> NSTableView? { (v as? CatalogTableView) ?? v.subviews.lazy.compactMap(find).first }
+            return window?.contentView.flatMap(find)
+        }
+        func sheet(_ ids: [Int]) async -> BookEdit? {
+            m.sheet = .editBooks(ids)
+            _ = await until(15) { BookEdit.open?.ids == ids && BookEdit.open?.d != nil }
+            await pause(1.2)
+            return BookEdit.open?.ids == ids ? BookEdit.open : nil
+        }
+        func close() async { m.sheet = nil; BookEdit.open = nil; await pause(0.8) }
+        cat.resetAll()
+        await go(m, .catalog)
+        _ = await until(20) { cat.loaded && !cat.books.isEmpty }
+        guard let b = cat.books.first(where: { !$0.strings("formats").isEmpty && $0.b("cover") }), let cid = b.i("calibre_id") else {
+            check(false, "All Books has a book with a file and a cover to edit"); return
+        }
+
+        // one book: its details, and only what changed sent
+        guard let e = await sheet([cid]) else { check(false, "Edit Details opens", b.s("title") ?? ""); return }
+        capture("51f-edit-details")
+        check(e.v.title == b.s("title") && !e.files.isEmpty && !e.custom.isEmpty, "Edit Details opens with the book's details, its files and my own columns",
+              "\(e.v.title) · \(e.files.count) files · \(e.custom.map(\.label).joined(separator: ", "))")
+        var n = await ops().count
+        e.v.publisher = e.v.publisher == "Self-test Press" ? "Self-test Press 2" : "Self-test Press"
+        e.v.tags.append("Self-test tag")
+        e.v.rating = e.v.rating == 4 ? 3 : 4
+        let saved = await e.save()
+        var got = await ops()
+        let set = got.dropFirst(n).first
+        check(saved && set?.s("op") == "set" && set?.list("ids").compactMap({ ($0 as? NSNumber)?.intValue }) == [cid]
+              && Set(set?.o("fields")?.raw.keys.map { $0 } ?? []) == ["publisher", "tags", "rating"],
+              "Save sends only what changed", set?.o("fields")?.raw.keys.sorted().joined(separator: ", ") ?? "nothing")
+        await close()
+
+        // Find details: what came back, beside what the book has; Use These fills the form, the cover at once
+        if let f = await sheet([cid]) {
+            await f.find()
+            await pause(0.8)
+            capture("51g-find-details")
+            check(f.step == .found && !f.results.isEmpty, "Find details lists what Hardcover and Calibre's sources found (the sandbox's stand-in)", "\(f.results.count)")
+            if !f.results.isEmpty {
+                f.compare(0)
+                await pause(1)
+                capture("51h-find-compare")
+                let x = f.results[0]
+                let ticks = f.comparedFields.allSatisfy { k, _ in
+                    f.found(x, k).isEmpty || f.same(x, k) || k == "identifiers" || f.now(k).isEmpty == f.take.contains(k)
+                }
+                check(ticks, "and beside what the book has now, what it's missing ticked", f.take.sorted().joined(separator: ", "))
+                n = await ops().count
+                f.take.insert("publisher")
+                f.takeCover = true
+                await f.use(0)
+                got = await ops()
+                let new = got.dropFirst(n)
+                check(f.step == .form && f.v.publisher == x.s("publisher") && new.count == 1 && new.first?.s("op") == "cover",
+                      "Use These fills the form (nothing saved till Save), and a ticked cover is set at once", new.map { $0.s("op") ?? "" }.joined(separator: ", "))
+            }
+            await close()
+        }
+
+        // the files: convert, remove, add; a cover from a link
+        let g = BookEdit([cid])
+        await g.load()
+        if let fmt = g.files.first?.s("format"), let to = g.convertTo.first(where: { $0 != fmt }) {
+            n = await ops().count
+            await g.convert(fmt, to: to)
+            await g.remove(fmt)
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("Daf self-test.epub")
+            try? Data("not really a book".utf8).write(to: file)
+            await g.addFile(file)
+            await g.setCover(url: "https://example.com/self-test-cover.png")
+            got = await ops()
+            let kinds = got.dropFirst(n).map { "\($0.s("op") ?? "") \($0.s("to") ?? $0.s("fmt") ?? $0.strings("fmts").joined())" }
+            check(kinds == ["convert \(to)", "remove_formats \(fmt)", "add_format EPUB", "cover "] && g.problem == nil,
+                  "a file converted, removed and added, and a cover from a link, each through Calibre", kinds.joined(separator: " · ") + (g.problem.map { " · " + $0 } ?? ""))
+        }
+
+        // several books: chosen in the table, then the same change to all, numbered in the table's order
+        await go(m, .catalog)
+        _ = await until(10) { (table()?.numberOfRows ?? 0) > 2 }
+        table()?.selectRowIndexes([0, 1, 2], byExtendingSelection: false)
+        _ = await until(5) { cat.chosen.count == 3 }
+        await pause(0.8)
+        capture("51i-all-books-chosen")
+        let three = cat.chosenCals
+        if three.count == 3, let e3 = await sheet(three) {
+            capture("51j-edit-books")
+            e3.v.series = "Self-test Series"
+            e3.number = true
+            e3.numberFrom = "1"
+            e3.addTags = ["Self-test tag"]
+            n = await ops().count
+            let ok = await e3.save()
+            got = await ops()
+            let new = Array(got.dropFirst(n))
+            let ids = new.first?.list("ids").compactMap { ($0 as? NSNumber)?.intValue } ?? []
+            let f = new.first?.o("fields")
+            check(ok && new.count == 2 && ids == three && f?.s("series") == "Self-test Series" && f?.d("series_number") == 1
+                  && new.last?.s("op") == "tags" && new.last?.strings("add") == ["Self-test tag"],
+                  "three books changed at once, numbered in the table's order, a tag added to each", "\(ids) · \(new.map { $0.s("op") ?? "" })")
+            await close()
+        } else { check(false, "three rows chosen in the table", "\(cat.chosen.count)") }
+        cat.chosen = []
+        _ = await until(3) { table()?.selectedRowIndexes.isEmpty == true }
+        check(table()?.selectedRowIndexes.isEmpty == true, "Clear lets go of the chosen rows")
+
+        // tidying: the Tidy filter, Merge, Remove, Calibre's trash and Put Back, names turned around
+        cat.setQ("duplicate:true")
+        let tidied = await until(8) { cat.q == "duplicate:true" && cat.searchError == nil && cat.loaded && cat.books.count < cat.total }
+        check(tidied && cat.books.allSatisfy { $0.b("duplicate") }, "Tidy: Possible duplicates is a search of its own", "\(cat.books.count) of \(cat.total)")
+        cat.setQ("")
+        _ = await until(8) { cat.q.isEmpty && cat.books.count == cat.total }
+        table()?.selectRowIndexes([0, 1], byExtendingSelection: false)
+        _ = await until(5) { cat.chosen.count == 2 }
+        let two = cat.chosenBooks
+        if two.count == 2 {
+            m.sheet = .mergeBooks(cat.chosenCals)
+            await pause(1.5)
+            capture("51k-merge")
+            await close()
+            let keep = BookEdit.best(two)?.i("calibre_id") ?? -1
+            n = await ops().count
+            do { try await BookEdit.merge(keep: keep, ids: two.compactMap { $0.i("calibre_id") }) } catch { log("merge: \(error.localizedDescription)") }
+            got = await ops()
+            let mo = got.dropFirst(n).first
+            let withCover = two.filter { $0.b("cover") }
+            check(mo?.s("op") == "merge" && mo?.i("keep") == keep && mo?.list("ids").count == 2 && (withCover.isEmpty || withCover.contains { $0.i("calibre_id") == keep }),
+                  "Merge keeps the copy with a cover and the most files, and the other goes into it", "keep \(keep)")
+            n = await ops().count
+            do { try await BookEdit.remove([two[1]]) } catch { log("remove: \(error.localizedDescription)") }
+            got = await ops()
+            check(got.dropFirst(n).first?.s("op") == "remove_books", "Remove sends a book to Calibre's trash", two[1].s("title") ?? "")
+        } else { check(false, "two rows chosen for Merge", "\(cat.chosen.count)") }
+        cat.chosen = []
+        m.sheet = .calibreTrash
+        await pause(2)
+        capture("51l-calibre-trash")
+        await close()
+        let trashed = (try? await BookEdit.trash(private: false)) ?? []
+        if let tid = trashed.first?.i("id") {
+            n = await ops().count
+            do { try await BookEdit.putBack(tid) } catch { log("put back: \(error.localizedDescription)") }
+            got = await ops()
+            let back = got.dropFirst(n).first
+            check(back?.s("op") == "restore" && back?.list("trash_ids").compactMap({ ($0 as? NSNumber)?.intValue }) == [tid],
+                  "Calibre's trash lists what was removed, and Put Back brings it back", trashed.first?.s("title") ?? "")
+        } else { check(false, "Calibre's trash lists what was removed") }
+        let fl = BookEdit(cat.books.prefix(2).compactMap { $0.i("calibre_id") })
+        await fl.load()
+        fl.flip = true
+        let ff = fl.bulkFields()
+        check(ff["authors_flip"] as? Bool == true && ff["authors"] == nil, "several books' “Last, First” names turned around")
     }
 
     /// A book Calibre has only as a PDF: its pages in the PDF view, its place kept as the book's.

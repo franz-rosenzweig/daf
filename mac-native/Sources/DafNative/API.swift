@@ -167,13 +167,13 @@ final class API {
     }
 
     /// A file as the body, not JSON (a photo of a page).
-    func upload(_ path: String, _ data: Data, type: String) async throws -> Any {
+    func upload(_ path: String, _ data: Data, type: String, method: String = "POST", timeout: Double = 120) async throws -> Any {
         if Connection.shared.forced { throw URLError(.notConnectedToInternet) }
         var r = URLRequest(url: url(path))
-        r.httpMethod = "POST"
+        r.httpMethod = method
         r.setValue(type, forHTTPHeaderField: "Content-Type")
         r.httpBody = data
-        r.timeoutInterval = 120
+        r.timeoutInterval = timeout
         let (body, response) = try await session.data(for: r)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         let parsed = (try? JSONSerialization.jsonObject(with: body)) ?? [:]
