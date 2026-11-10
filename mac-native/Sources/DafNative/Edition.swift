@@ -332,6 +332,7 @@ struct TasteView: View {
                         HStack(alignment: .top, spacing: 20) { topics(t); mixCard.frame(width: 340) }.frame(minWidth: 780)
                         VStack(alignment: .leading, spacing: 20) { topics(t); mixCard }
                     }
+                    pool(t)
                     sources(t)
                 }
                 .padding(28)
@@ -443,7 +444,7 @@ struct TasteView: View {
         switch m.5 {
         case ":00": return String(format: "%02d:00", v)
         case " min", " days": return "\(v)" + m.5
-        default: return m.5 + "\(v)"
+        default: return v == 0 && !m.5.isEmpty ? "none" : m.5 + "\(v)"
         }
     }
 
@@ -462,6 +463,33 @@ struct TasteView: View {
         Task {
             do { try await API.shared.send("PUT", "/api/edition/settings", [k: v]) }
             catch { model.error = error.localizedDescription }
+        }
+    }
+
+    // MARK: the pool
+
+    /// The pool's categories (feeds read only for the Edition): how many feeds, what came in the last
+    /// two days, and Mute / Unmute, which mutes the category's folder.
+    @ViewBuilder private func pool(_ t: J) -> some View {
+        let cats = t.a("pool")
+        if !cats.isEmpty {
+            let feeds = cats.compactMap { $0.i("feeds") }.reduce(0, +), posts = cats.compactMap { $0.i("posts") }.reduce(0, +)
+            TodayCard("Pool", accessory: { Text("\(feeds) feeds · \(posts) posts in 2 days").font(.caption).foregroundStyle(.secondary) }) {
+                ForEach(Array(cats.enumerated()), id: \.offset) { _, c in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(c.s("name") ?? "").lineLimit(1)
+                            Text("\(c.i("feeds") ?? 0) feeds · \(c.i("posts") ?? 0) posts").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(c.b("muted") ? "Unmute" : "Mute") {
+                            Task { await adjust("source", "folder:" + (c.s("folder") ?? ""), c.b("muted") ? "" : "mute") }
+                        }
+                        .buttonStyle(.link).font(.caption)
+                    }
+                    .foregroundStyle(c.b("muted") ? .secondary : .primary)
+                }
+            }
         }
     }
 

@@ -18,7 +18,7 @@ The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the
 
 ## The Edition
 
-When the Edition is on (see [The Edition](edition.md)), it sits under Today in the sidebar with how many of its pieces I've read. It's the page's paper: the date with the Hebrew date and the issue number, a mark for each piece as I get to it and the time left, the lead with its opening lines and the day's list beside it, then the rest as cards, each with why it's there and 👍 and 👎. A piece opens in a window of its own. The toolbar has the past editions, **Taste**, **Kindle** to send it there, and the arrow to make it again. **Taste** shows what Daf thinks I like, and there I turn a topic or a source up, down or off, and set the mix.
+When the Edition is on (see [The Edition](edition.md)), it sits under Today in the sidebar with how many of its pieces I've read. It's the page's paper: the date with the Hebrew date and the issue number, a mark for each piece as I get to it and the time left, the lead with its opening lines and the day's list beside it, then the rest as cards, each with why it's there and 👍 and 👎. A piece opens in a window of its own. The toolbar has the past editions, **Taste**, **Kindle** to send it there, and the arrow to make it again. **Taste** shows what Daf thinks I like, and there I turn a topic or a source up, down or off, set the mix, and mute a part of the pool.
 
 ## Reading
 

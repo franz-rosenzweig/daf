@@ -120,7 +120,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 
 - here: Edition in the sidebar under Today (when edition.on or there's one), with done/total; a page across the window (edition.js): the date, the Hebrew date and the number, ten marks and the time left; the lead with its opening lines and the Today list beside it (under it when narrow); the other pieces as cards with their kind, why, 👍/👎 (POST /api/edition/vote) and Read; End of the edition; a piece opens in its own window (#read)
 - here: the toolbar: past editions, Taste, Kindle / On Kindle (POST /api/edition/kindle), Make It Again (asked first) and Make It Now (POST /api/edition/build), looked at every five seconds while it's being made
-- here: Taste (#edition/taste): the last two weeks, what it learned from, Picking up on; Topics with their bars, rising/fading and Less/More/Mute, Name Them Again; the Mix (Every morning, Days, the steppers, Kindle, Chosen by the model) through PUT /api/edition/settings; Sources with Less/More/Mute, Mute by name or folder:Name, Muted with Unmute
+- here: Taste (#edition/taste): the last two weeks, what it learned from, Picking up on; Topics with their bars, rising/fading and Less/More/Mute, Name Them Again; the Mix (Every morning, Days, the steppers, Kindle, Chosen by the model) through PUT /api/edition/settings; Sources with Less/More/Mute, Mute by name or folder:Name, Muted with Unmute; the Pool (#28): its categories with their feeds and the last two days' posts, Mute / Unmute a category (folder:Pool · …); "none" for an up-to or at-least at 0
 
 ## Sound (2026-11-09)
 
