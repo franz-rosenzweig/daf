@@ -169,32 +169,61 @@ def youtube_id(url):
     return m.group(1) if m else None
 
 
+_WORD_TIME = re.compile(r"<\d\d:\d\d:\d\d\.\d{3}>")
+_NOISE = re.compile(r"(>>\s*)?(\[.*\]|\(.*\))")     # [Music], (applause), ">> [clears throat]"
+
+
+def _vtt_cues(text):
+    """(start in whole seconds, [(line, timed)]) for each cue, tags gone. A timed line carries word timings:
+    YouTube's auto-captions time each word as it's typed out, so that line is being said right then."""
+    for h, m, s, body in re.findall(r"(\d\d):(\d\d):(\d\d)\.\d{3} --> [^\n]*\n(.*?)(?:\n\n|\Z)", text, re.S):
+        lines = [(html.unescape(re.sub(r"<[^>]+>", "", raw)).strip(), bool(_WORD_TIME.search(raw))) for raw in body.split("\n")]
+        yield int(h) * 3600 + int(m) * 60 + int(s), [l for l in lines if l[0]]
+
+
+def _fresh(lines, shown):
+    """The lines a cue adds to what's on screen. YouTube's auto-captions roll: each cue opens with the line
+    the last one ended on, and a 10 ms cue between them shows the line just finished, so every line came
+    three times. A cue's first lines go when they're the lines just shown (as many as match), but never a
+    timed line: that one is being said now, even when it's the same words again ("No. No.")."""
+    for n in range(min(len(lines), len(shown)), 0, -1):
+        if not any(timed for _, timed in lines[:n]) and [x for x, _ in lines[:n]] == shown[-n:]:
+            return lines[n:]
+    return lines
+
+
 def _parse_vtt(text):
-    cues = re.findall(r"(\d\d):(\d\d):(\d\d)\.\d{3} --> [^\n]*\n(.*?)(?:\n\n|\Z)", text, re.S)
-    lines, cur, last_text = [], None, None
-    for h, m, s, t in cues:
-        t = re.sub(r"<[^>]+>", "", t).replace("\n", " ").strip()
-        t = html.unescape(t)
-        if not t or re.fullmatch(r"\[.*\]|\(.*\)", t) or t == last_text:
-            continue
-        last_text = t
-        sec = int(h) * 3600 + int(m) * 60 + int(s)
-        spk = None
-        mm = re.match(r"^-\s*(\[(.*?)\])?\s*", t)
-        if mm:
-            spk, t = mm.group(2), t[mm.end():]
-            if cur:
+    lines, cur, shown = [], None, []
+    for sec, cue in _vtt_cues(text):
+        new = _fresh(cue, shown)
+        shown = (shown + [x for x, _ in new])[-4:]
+        said = " ".join(x for x, _ in new if not _NOISE.fullmatch(x))
+        for i, t in enumerate(re.split(r"\s*>>\s*", said)):      # ">>" is YouTube's mark for another voice
+            mm = re.match(r"^-\s*(\[(.*?)\])?\s*", t)
+            spk = mm.group(2) if mm else None
+            if mm:
+                t = t[mm.end():]
+            if (i or mm) and cur:
                 lines.append(cur)
                 cur = None
-        if cur is None:
-            cur = {"ts": sec, "spk": spk, "x": t}
-        else:
-            if t.startswith(cur["x"][-40:]) and len(cur["x"]) > 40:
-                t = t[len(cur["x"][-40:]):]
-            cur["x"] += " " + t
-        if re.search(r"[.?!][\"”’)]?$", t) and (sec - cur["ts"] >= 6 or len(cur["x"]) > 140):
-            lines.append(cur)
-            cur = None
+            if not t:
+                continue
+            if cur is None:
+                cur = {"ts": sec, "spk": spk, "x": t}
+            else:
+                cur["x"] += " " + t
+            if sec - cur["ts"] >= 6 or len(cur["x"]) > 140:
+                # A paragraph ends at the last sentence end in this line, even mid-line: a rolling caption's
+                # lines seldom end with the sentence, and the rest starts the next one.
+                ends = [m.end() for m in re.finditer(r"[.?!][\"”’)]?(?=\s|$)", t)]
+                if ends:
+                    rest = t[ends[-1]:].strip()
+                    cur["x"] = cur["x"][:len(cur["x"]) - len(t) + ends[-1]]
+                    lines.append(cur)
+                    cur = {"ts": sec, "spk": cur["spk"], "x": rest} if rest else None
+                elif len(cur["x"]) > 500:            # older auto-captions have no punctuation at all
+                    lines.append(cur)
+                    cur = None
     if cur:
         lines.append(cur)
     return lines
@@ -213,6 +242,18 @@ def _blocks_from_lines(lines, chapters):
     return out
 
 
+def caption_track(info):
+    """The caption track to read, from what yt-dlp says a video has: one a person made ("subtitles") before
+    YouTube's automatic ones, English before Hebrew ("iw" is YouTube's old code for it), and among the
+    automatic ones plain "en" before "en-orig" and the rest, as before. None when there's none of those."""
+    made, auto = info.get("subtitles") or {}, info.get("automatic_captions") or {}
+    tracks = [(lang, True) for lang in made] + [(lang, False) for lang in auto if lang not in made]
+    tracks = [(lang, m) for lang, m in tracks if lang.split("-")[0] in ("en", "he", "iw")]
+    if not tracks:
+        return None
+    return min(tracks, key=lambda t: (not t[1], not t[0].startswith("en"), t[0] != "en", "-orig" in t[0], t[0]))[0]
+
+
 def video_transcript(doc_id, use_whisper=False):
     with db.session() as conn:
         d = conn.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
@@ -228,15 +269,23 @@ def video_transcript(doc_id, use_whisper=False):
     with tempfile.TemporaryDirectory() as tmp:
         info = {}
         if not use_whisper:
-            subprocess.run(YTDLP + ["--skip-download", "--write-subs", "--write-auto-subs", "--sub-langs", "en.*,en,he.*,he",
-                            "--sub-format", "vtt", "--write-info-json", "-o", f"{tmp}/%(id)s.%(ext)s", url],
-                           capture_output=True, text=True, timeout=180)
+            # What the video has first, then only the one track chosen from it: asking for every English one at
+            # once got a 429 from YouTube on a spare track, and yt-dlp stopped before writing what the video has.
+            r = subprocess.run(YTDLP + ["--skip-download", "--write-info-json", "-o", f"{tmp}/%(id)s.%(ext)s", url],
+                               capture_output=True, text=True, timeout=180)
             infos = glob.glob(f"{tmp}/*.info.json")
-            if infos:
-                info = json.load(open(infos[0]))
-            vtts = sorted(glob.glob(f"{tmp}/*.vtt"), key=lambda p: (".en.vtt" not in p, "-orig" in p, p))
-            if not vtts:
+            if not infos:
+                raise RuntimeError("couldn't read the video on YouTube: " + r.stderr.strip()[-200:])
+            info = json.load(open(infos[0]))
+            lang = caption_track(info)
+            if not lang:
                 raise RuntimeError("no captions on YouTube for this video; try the whisper transcript")
+            r = subprocess.run(YTDLP + ["--load-info-json", infos[0], "--skip-download", "--write-subs", "--write-auto-subs",
+                                        "--sub-langs", lang, "--sub-format", "vtt", "-o", f"{tmp}/%(id)s.%(ext)s"],
+                               capture_output=True, text=True, timeout=180)
+            vtts = glob.glob(f"{tmp}/*.vtt")
+            if not vtts:
+                raise RuntimeError(f"couldn't download YouTube's captions ({lang}): " + r.stderr.strip()[-200:])
             lines = _parse_vtt(open(vtts[0], encoding="utf-8").read())
         else:
             r = subprocess.run(YTDLP + ["-f", "bestaudio", "-x", "--audio-format", "m4a", "--write-info-json", "-o",
@@ -257,6 +306,48 @@ def video_transcript(doc_id, use_whisper=False):
                      (sum(len(b["x"].split()) for b in blocks), info.get("duration"), (info.get("description") or "")[:280],
                       info.get("channel"), doc_id))
     return len(blocks)
+
+
+def doubled_runs(blocks, shortest=5, longest=15):
+    """How often a transcript says a run of words (5 to 15) and then the same run again: what YouTube's
+    rolling captions left on every line before Daf dropped their overlap. A person does it once or twice
+    in a talk."""
+    words = " ".join(b["x"] for b in blocks if b.get("t") == "cue").split()
+    count = i = 0
+    while i < len(words):
+        run = next((n for n in range(shortest, longest + 1) if words[i:i + n] == words[i + n:i + 2 * n]
+                    and i + 2 * n <= len(words)), 0)
+        count, i = count + bool(run), i + (run or 1)
+    return count
+
+
+def stale_captions(conn, ids=None):
+    """The YouTube transcripts to make again (`daf captions-rebuild`): the ones asked for, or else every one
+    with 3 or more doubled runs. Whisper's transcripts never have them, so they stay as they are.
+    `highlights`: how many it has; they're kept by paragraph number, which a new transcript changes."""
+    from . import social
+    sql = """SELECT d.id, d.title, d.url, c.blocks,
+                    (SELECT COUNT(*) FROM highlights h WHERE h.book_id = d.id AND h.deleted = 0) AS highlights
+             FROM docs d JOIN doc_content c ON c.id = d.id WHERE c.blocks LIKE '%"t": "cue"%'"""
+    if ids:
+        sql += f" AND d.id IN ({','.join('?' * len(ids))})"
+    out = []
+    for r in conn.execute(sql, list(ids or ())).fetchall():
+        if not youtube_id(r["url"]) or social.is_reel(r["url"]):
+            continue
+        n = doubled_runs(json.loads(r["blocks"]))
+        if ids or n >= 3:
+            out.append({"id": r["id"], "title": r["title"] or r["url"], "doubled": n, "highlights": r["highlights"]})
+    return out
+
+
+def remake_captions(doc_id):
+    """The captions job, run right here: YouTube's captions fetched and read again, and the vault note after."""
+    n = video_transcript(doc_id, use_whisper=False)
+    from . import vaultnotes
+    with db.session() as conn:
+        vaultnotes.refresh(conn, config.load_settings(), doc_id)
+    return n
 
 
 # ---- audiobookshelf bookmarks ----------------------------------------------------------

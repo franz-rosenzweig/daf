@@ -15,6 +15,7 @@
     daf paper-page PHOTO [--caption "page 112 middlemarch"]   read a marked page into highlights
     daf clip TEXT              a podcast link with a time (shared from AntennaPod): transcribe the minute before it
     daf jobs                   transcripts and clips waiting or done
+    daf captions-rebuild [ID ...] [--dry-run]   video transcripts with YouTube's rolling repeats, made again
     daf vault-backfill [--dry-run DIR]   rewrite Daf's article notes in the vault the current way
     daf feeds-list [--json]    the feeds the Feed follows
     daf feeds-add URL [--folder F] [--title T] [--full]   follow a feed (the Substack sync, the security watch),
@@ -454,6 +455,36 @@ def cmd_pool_add(a):
     print(f"{added} feeds in the pool")
 
 
+def cmd_captions_rebuild(a):
+    """Video transcripts made before Daf dropped the overlap of YouTube's rolling captions, made again from
+    YouTube's captions (media.stale_captions, media.remake_captions)."""
+    import time
+    from . import media
+    with db.session() as c:
+        todo = media.stale_captions(c, a.ids)
+    if not todo:
+        print("No transcript needs it." if not a.ids else "None of those is a YouTube transcript.")
+        return 0
+    failed = 0
+    for i, t in enumerate(todo):
+        print(f"{t['id']}  {t['doubled']} doubled  {t['title'][:70]}")
+        if t["highlights"]:          # kept by paragraph number, which a new transcript changes
+            print(f"    left as it is: its {t['highlights']} highlight(s) would lose their place")
+            continue
+        if a.dry_run:
+            continue
+        if i:
+            time.sleep(2)
+        try:
+            print(f"    made again: {media.remake_captions(t['id'])} blocks")
+        except Exception as e:  # noqa: BLE001
+            failed += 1
+            print(f"    failed: {e}")
+    if a.dry_run:
+        print(f"Dry run: {sum(not t['highlights'] for t in todo)} would be made again.")
+    return 1 if failed else 0
+
+
 def cmd_vault_backfill(a):
     """Daf's notes on articles, videos and podcasts, rewritten with the full text (vaultnotes.backfill).
     --dry-run DIR: copies of the notes as they'd be go there; the vault and Daf's data stay as they are."""
@@ -516,6 +547,9 @@ def main(argv=None):
     x.add_argument("photo"); x.add_argument("--caption", default=""); x.set_defaults(f=cmd_paper_page)
     x = sub.add_parser("clip", help="transcribe a podcast clip"); x.add_argument("text"); x.set_defaults(f=cmd_clip)
     x = sub.add_parser("jobs", help="transcripts and clips"); x.set_defaults(f=cmd_jobs)
+    x = sub.add_parser("captions-rebuild", help="make video transcripts with repeated runs again from YouTube's captions")
+    x.add_argument("ids", nargs="*", help="these docs only, repeats or not"); x.add_argument("--dry-run", action="store_true")
+    x.set_defaults(f=cmd_captions_rebuild)
     x = sub.add_parser("vault-backfill", help="rewrite Daf's article notes in the vault with the full text")
     x.add_argument("--dry-run", metavar="DIR", help="write copies there instead; the vault stays as it is"); x.set_defaults(f=cmd_vault_backfill)
     a = p.parse_args(argv)

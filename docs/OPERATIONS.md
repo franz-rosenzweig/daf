@@ -46,6 +46,7 @@ After changing code: `systemctl --user restart daf`. The web app has no build st
     daf paper-page PHOTO [--caption "page 112 middlemarch"]   a marked paper page -> highlights
     daf clip "TEXT"                     a podcast link with a time: transcribe the minute before it
     daf jobs                            transcripts and clips, waiting or done
+    daf captions-rebuild [ID ...] [--dry-run]   video transcripts with YouTube's rolling repeats, made again from the captions
     daf vault-backfill [--dry-run DIR]  rewrite Daf's article notes the current way (DIR: copies there, the vault untouched)
 
 Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call):
@@ -101,7 +102,24 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
   anything left running). `daf jobs` lists them.
 - **Videos** (Karakeep video bookmarks): captions with yt-dlp first, faster-whisper when there are none
   (`tools/whisper_segments.py`, run with Daf's own Python; yt-dlp and faster-whisper are in its .venv from requirements.txt since the October 2026 OS upgrade to Python 3.14 left the host's copies behind). The transcript is cue blocks
-  with timestamps, speakers and chapters. The player is YouTube's privacy-mode embed
+  with timestamps, speakers and chapters. The captions job asks yt-dlp what the video has first (info.json:
+  chapters, length, tracks), then downloads the one track `media.caption_track` picks: one a person made
+  (`subtitles`) before YouTube's automatic ones, English before Hebrew (`he`/`iw`), plain `en` before
+  `en-orig`. Asking for every English track at once got a 429 on a spare one, and yt-dlp stopped before
+  writing the info.json, so the chapters were lost too. YouTube's auto-captions roll: each cue opens with the line the
+  last one ended on, and a 10 ms cue between them shows the line just finished, so every line came three
+  times until November 2026. `_parse_vtt` now keeps the lines a cue adds (`_fresh`: its first lines go when
+  they're the lines just shown, but never a line with its own word timings, so a speaker saying the same
+  words twice keeps both), makes `>>` a new paragraph and drops `[Music]`-style lines. A paragraph ends at
+  the last sentence end in a line once it's 6 s or 140 chars long, even mid-line, or at 500 chars when the
+  captions have no punctuation. Hand-made captions read as before. Transcripts made earlier:
+  `daf captions-rebuild` finds the ones with 3+ doubled runs (`media.doubled_runs`; whisper's never have
+  them), fetches YouTube's captions again and rewrites the transcript and its vault note, right there in
+  the command (so run it from the code the service runs). A transcript with highlights is left as it is:
+  they're kept by paragraph number (`pos.b`), which a new transcript changes. An Edition already sent to
+  the Kindle keeps the old text.
+  Tests: `.venv/bin/python -m unittest discover tests` (real caption excerpts in tests/fixtures).
+  The player is YouTube's privacy-mode embed
   (`youtube-nocookie.com`); Invidious couldn't stream (its companion answers 500), so it's only a link.
   Click a line to seek, `c` or Clip 30s highlights the last 30 seconds, Follow along scrolls with it.
   Video time counts only if Preferences says so (off by default).
