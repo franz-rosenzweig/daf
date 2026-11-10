@@ -40,8 +40,8 @@ DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 DEFAULTS = {
     "on": False,            # build one each morning
     "pieces": 10,
-    "videos": 2,            # at most
-    "podcasts": 2,          # at most
+    "videos": 0,            # at most: a paper is something to read, so none unless you ask
+    "podcasts": 0,          # at most
     "torah": 1,             # at least, when there is one
     "wildcard": 1,          # from outside your usual
     "longest": 45,          # minutes; nothing longer
@@ -59,6 +59,8 @@ WATCHES_PER_DAY = 7         # Invidious keeps the order you watched in, not the 
 BOOST, FLOOR = 2.0, 0.7     # a source's multiplier: the one you return to most at BOOST, one you never touched at FLOOR
 RISING = {"recent": 14, "baseline": 90, "min_recent": 3, "min_lift": 3.0}   # days, and the floors a rising word must clear
 PER_SOURCE = 2              # in one edition
+MIN_WORDS = 150             # an article must have at least this much real text (a teaser, a paid post's lead-in, a link: out)
+WHOLE = 400                 # a feed body this long is the article itself; anything shorter is checked against its page
 STOP = set("""a about above after again against all also am an and any are aren't as at be because been before being
 below between both but by can can't cannot could couldn't did didn't do does doesn't doing don't down during each few for
 from further get gets got had hadn't has hasn't have haven't having he he'd he'll he's her here here's hers herself him
@@ -456,6 +458,10 @@ def candidates(conn, e, now, used, iv=None):
             "d.enclosure, f.folder FROM docs d LEFT JOIN feeds f ON f.id = d.feed WHERE d.where_ = 'feed' AND d.status != 'deleted' "
             "AND (d.deleted IS NULL OR d.deleted = 0) AND d.opened IS NULL AND COALESCE(d.published, d.added) >= ? "
             "AND d.kind IN ('article', 'video', 'podcast')", (since,)):
+        if (r["kind"] == "video" and not e["videos"]) or (r["kind"] == "podcast" and not e["podcasts"]):
+            continue
+        if re.match(r"\s*\[sponsor", r["title"] or "", re.I):
+            continue
         summary = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", r["summary"] or "")).strip()
         if r["kind"] == "article" and (r["words"] or 0) < 120 and len(summary) < 150:
             continue        # an index page, a release line, a comment
@@ -476,6 +482,9 @@ def candidates(conn, e, now, used, iv=None):
               "url": f"https://www.youtube.com/watch?v={vid}", "minutes": _minutes("video", 0, secs), "lane": lane,
               "thumb": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg", "published": int(added or pub or now), "origin": origin})
 
+    if not e["videos"]:
+        iv = dict(iv, lanes=[])
+        user = ""
     # iv-suggest's lanes first: it already found these for you beyond your subscriptions (no songs)
     for v in sorted(iv["lanes"], key=lambda v: -v["added"]):
         if "music" in v["lane"] or v["genre"] == "Music":
@@ -501,7 +510,8 @@ def candidates(conn, e, now, used, iv=None):
                 continue
 
     for r in conn.execute("SELECT e.url, e.link, e.title, e.podcast_title, e.published, e.duration, e.notes, e.image FROM gp_episodes e "
-                          "JOIN gp_subs s ON s.url = e.podcast WHERE s.removed IS NULL AND e.published >= ?", (since,)):
+                          "JOIN gp_subs s ON s.url = e.podcast WHERE s.removed IS NULL AND e.published >= ? AND ?",
+                          (since, 1 if e["podcasts"] else 0)):
         notes = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", r["notes"] or "")).strip()
         keep({"id": "ep:" + hashlib.sha1(r["url"].encode()).hexdigest()[:16], "kind": "podcast", "title": r["title"] or "",
               "source": r["podcast_title"] or "", "folder": "", "url": r["link"] or r["url"], "enclosure": r["url"],
@@ -557,6 +567,64 @@ def score(cands, prof, e, now, parasha=None):
     return kept
 
 
+# ---- the whole text -------------------------------------------------------------------------------
+
+def body_words(conn, doc_id):
+    from . import content
+    r = conn.execute("SELECT blocks FROM doc_content WHERE id = ?", (doc_id,)).fetchone()
+    try:
+        return content.words(json.loads(r[0])) if r and r[0] else 0
+    except (ValueError, KeyError, TypeError):
+        return 0
+
+
+def with_text(conn, short, keep=True):
+    """Only pieces Daf can show in full: an article whose feed sent the whole thing passes; any other is
+    fetched from its page (fulltext, trafilatura) and kept, so the reader and the Kindle have it too; one
+    whose page won't give MIN_WORDS of text (a robot check, a paywall, a link with nothing behind it) is
+    dropped. Videos and episodes pass as they are. Fetches run with nothing open in the database."""
+    from concurrent.futures import ThreadPoolExecutor
+    from . import content, fulltext
+    out, need = [], []
+    for c in short:
+        if c["kind"] != "article":
+            out.append(c)
+            continue
+        full = conn.execute("SELECT full FROM docs WHERE id = ?", (c["id"],)).fetchone()
+        w = body_words(conn, c["id"])
+        if w >= WHOLE or (full and full[0] and w >= MIN_WORDS):
+            c["words"] = w
+            out.append(c)
+        else:
+            need.append(c)
+    conn.commit()
+
+    def one(c):
+        try:
+            return c, fulltext.page_blocks(c["url"])
+        except Exception as ex:  # noqa: BLE001 - one page that won't open costs only its piece
+            log.info("edition: no text for %s (%s)", c["url"], str(ex)[:80])
+            return c, None
+    with ThreadPoolExecutor(6) as pool:
+        got = list(pool.map(one, need))
+    for c, bl in got:
+        w = content.words(bl) if bl else 0
+        if w < MIN_WORDS:
+            continue
+        if keep:
+            fulltext._keep(conn, c["id"], bl)
+        c["words"], c["minutes"] = w, _minutes("article", w, None)
+        if not c.get("summary"):
+            c["summary"] = content.summary(bl, 400)
+        out.append(c)
+    if keep:
+        conn.commit()
+    log.info("edition: %d of %d shortlisted have their whole text (%d fetched, %d kept)",
+             len([c for c in out if c["kind"] == "article"]), len([c for c in short if c["kind"] == "article"]), len(need),
+             len([1 for c, bl in got if bl and content.words(bl) >= MIN_WORDS]))
+    return [c for c in short if c in out]
+
+
 # ---- choosing -------------------------------------------------------------------------------------
 
 def shortlist(cands, e, day):
@@ -570,14 +638,15 @@ def shortlist(cands, e, day):
             continue
         per[k] += 1
         out.append(c)
-        if len(out) >= 40:
+        if len(out) >= 60:
             break
     out += [c for c in ranked if c["parasha"] and c not in out][:4]
     rng = random.Random(day.isoformat())
     strangers = [c for c in cands if not c["familiar"] and c not in out and c["score"] >= 0
-                 and ((c["kind"] == "article" and (c["minutes"] or 0) >= 4) or (c["kind"] != "article" and (c["minutes"] or 0) >= 8))]
+                 and ((c["kind"] == "article" and ((c["minutes"] or 0) >= 4 or len(c["summary"]) >= 150))   # with_text checks the rest
+                      or (c["kind"] != "article" and (c["minutes"] or 0) >= 8))]
     rng.shuffle(strangers)
-    for c in strangers[:8]:
+    for c in strangers[:12]:
         c["stranger"] = True
         out.append(c)
     return out
@@ -846,7 +915,7 @@ def build(day=None, use_ai=None, dry=False, conn=None):
         iv = invidious()
         prof = taste(conn, e, now, iv)
         cands = score(candidates(conn, e, now, used, iv), prof, e, now, parasha)
-        short = shortlist(cands, e, day)
+        short = with_text(conn, shortlist(cands, e, day), keep=not dry)
         how = "rules"
         chosen = None
         if (e["ai"] if use_ai is None else use_ai) and short:

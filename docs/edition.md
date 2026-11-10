@@ -9,7 +9,8 @@ The Feed never ends, and that's the trouble with it. A few hundred posts come in
 **Edition** in the sidebar (and on the phone's bottom bar) opens today's. At the top is the date, the Hebrew date and the issue's number, and a row of ten marks that fill in as I get through it, with how much reading is left.
 
 - **The lead** is the best read of the day, usually an article of five to twenty minutes, with its opening lines under the headline. Beside it, **Today** lists the whole edition, crossed off as I go.
-- **The rest** come in a grid like a front page: articles, a video or two from the YouTube channels I follow, a podcast episode or two, something on this week's parasha, and one **Wildcard** from a source I don't usually read, so the paper doesn't shrink to what I already know.
+- **The rest** come in a grid like a front page: articles, something on this week's parasha, and one **Wildcard** from a source I don't usually read, so the paper doesn't shrink to what I already know.
+- **Everything in it is real text.** A feed that sends only a summary or a link gets its whole article fetched from the page before the Edition is chosen, and a piece whose page won't give its text (a robot check, a paywall, a link with nothing behind it) is left out. The text is kept, so it opens in full in Daf and goes to the Kindle in full. Videos and podcast episodes stay out unless **Videos** or **Podcasts** in the mix says otherwise.
 - Every piece has a small line saying **why it's there**: "You've watched 24 Fireship videos", "This week's parasha", "You've opened 20 from The Conversation", or "Outside your usual" for the wildcard. These come only from what Daf actually knows, never made up.
 - **👍 and 👎** under each piece tell the Edition more or less like this. A piece it showed me that I never opened counts a little against it too.
 - **End of the edition** at the bottom is the end. The Feed is still there when I want it, but the Edition doesn't keep going.
@@ -18,7 +19,7 @@ Pieces open in Daf like anything else, so reading them counts toward the hour, a
 
 ## How it chooses
 
-Every morning, an hour before it's due, Daf gathers what's new: the last day or two of the Feed (Sunday's covers Shabbat too), new uploads from the channels I subscribe to on Invidious (no Shorts, nothing live), the videos [iv-suggest](https://github.com/NeskireDK/iv-suggest) has put in my lanes there (its suggestions from beyond my subscriptions, without the music lanes), and new episodes of the podcasts I follow in AntennaPod. Anything I've already opened or watched is left out, and so is anything muted.
+Every morning, an hour before it's due, Daf gathers what's new: the last day or two of the Feed (Sunday's covers Shabbat too) and, when the mix asks for them, new uploads from the channels I subscribe to on Invidious (no Shorts, nothing live), the videos [iv-suggest](https://github.com/NeskireDK/iv-suggest) has put in my lanes there, and new episodes of the podcasts I follow in AntennaPod. Anything I've already opened or watched is left out, and so is anything muted.
 
 Each candidate gets a score from my **taste**, which Daf builds from what I really do:
 
@@ -32,7 +33,7 @@ Older habits fade, so the taste follows me as I change: by default something I d
 
 A piece's score is how well its words match what I finish, times how much its source means to me. That second part borrows from iv-suggest: it's on a log curve, so one podcast I've played ninety times doesn't leave every other source at nothing, and a source I've never touched gets a floor rather than a zero, because no history isn't the same as dislike. Words I've **taken up lately** (in a few things I engaged with these two weeks and much rarer before) give a piece a lift, which is how a new interest shows up within days instead of a month. A video from one of my iv-suggest lanes gets a little more, since iv-suggest already found it for me, and the topic's More or Less turns the whole thing up or down.
 
-The best few dozen candidates, a few from sources I don't know yet and the parasha's posts then go to the model with the rules (how many videos, how many podcasts, at least one Torah piece, one wildcard, no more than two from one source). It picks the edition, orders it like a paper and writes the reasons from the facts it was given. If the model is off or doesn't answer, the same rules pick from the scores alone, and the reasons are made from the facts.
+The best sixty or so candidates, a few from sources I don't know yet and the parasha's posts are checked for their whole text (fetched from the page when the feed sent less), and the ones that have it go to the model with the rules (how many videos, how many podcasts, at least one Torah piece, one wildcard, no more than two from one source). It picks the edition, orders it like a paper and writes the reasons from the facts it was given. If the model is off or doesn't answer, the same rules pick from the scores alone, and the reasons are made from the facts.
 
 ## Taste
 
