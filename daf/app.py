@@ -1915,6 +1915,32 @@ def delete_shelf(shelf_id: str, c=Depends(conn)):
 
 @app.put("/api/shelves/{shelf_id}/books/{book_id}", dependencies=[Depends(user)])
 def put_shelf_book(shelf_id: str, book_id: str, c=Depends(conn)):
+    return _shelf_put(c, shelf_id, book_id)
+
+
+@app.post("/api/shelves/{shelf_id}/books", dependencies=[Depends(user)])
+def post_shelf_books(shelf_id: str, b=Depends(json_body), c=Depends(conn)):
+    """Several books on a shelf at once, or off it ({ids, remove}): what dragging books onto a shelf
+    and All books' Shelves list do. Each book as one would be put on alone (Hardcover lists and the
+    Kindle's shelves change too); one that can't be says why, the rest go on."""
+    b = b if isinstance(b, dict) else {}
+    ids = [str(i) for i in b.get("ids") or [] if isinstance(i, str)][:500]
+    if not ids:
+        raise HTTPException(400, "No books")
+    done, failed, kindle = 0, [], []
+    for bid in ids:
+        try:
+            r = _shelf_take(c, shelf_id, bid) if b.get("remove") else _shelf_put(c, shelf_id, bid)
+            done += 1
+            if r.get("kindle"):
+                kindle.append(r["kindle"])
+        except HTTPException as e:
+            failed.append({"id": bid, "error": e.detail})
+        c.commit()
+    return {"ok": True, "done": done, "failed": failed, "kindle": kindle}
+
+
+def _shelf_put(c, shelf_id, book_id):
     sh = c.execute("SELECT kindle FROM shelves WHERE id = ?", (shelf_id,)).fetchone()
     if not sh or not c.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone():
         raise HTTPException(404, "No such shelf or book")
@@ -1935,6 +1961,10 @@ def put_shelf_book(shelf_id: str, book_id: str, c=Depends(conn)):
 
 @app.delete("/api/shelves/{shelf_id}/books/{book_id}", dependencies=[Depends(user)])
 def delete_shelf_book(shelf_id: str, book_id: str, c=Depends(conn)):
+    return _shelf_take(c, shelf_id, book_id)
+
+
+def _shelf_take(c, shelf_id, book_id):
     if c.execute("SELECT 1 FROM shelves WHERE id = ? AND kindle IS NOT NULL", (shelf_id,)).fetchone():
         from . import kindleshelves
         kindleshelves.take_off(c, shelf_id, book_id)        # to the Kindle's home folder

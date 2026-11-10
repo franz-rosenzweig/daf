@@ -209,9 +209,10 @@ def rows(conn, settings=None, private=False):
     daf = {r["calibre_id"]: dict(r) for r in conn.execute(
         "SELECT id, calibre_id, status, progress, progress_note, last_read, audio_pct, private FROM books WHERE calibre_id IS NOT NULL")}
     hl = {r[0]: r[1] for r in conn.execute("SELECT book_id, COUNT(*) FROM highlights WHERE deleted = 0 GROUP BY book_id")}
-    shelves = {}
-    for bid, name in conn.execute("SELECT sb.book_id, s.name FROM shelf_books sb JOIN shelves s ON s.id = sb.shelf_id ORDER BY s.name"):
+    shelves, shelf_ids = {}, {}
+    for bid, sid, name in conn.execute("SELECT sb.book_id, s.id, s.name FROM shelf_books sb JOIN shelves s ON s.id = sb.shelf_id ORDER BY s.name"):
         shelves.setdefault(bid, []).append(name)
+        shelf_ids.setdefault(bid, []).append(sid)
     out = []
     for cid, b in cal.items():
         d = daf.get(cid) or {}
@@ -224,7 +225,7 @@ def rows(conn, settings=None, private=False):
             "status": STATUS.get(d.get("status"), (d.get("status") or "").capitalize() or None),
             "progress": d.get("progress"), "progress_note": d.get("progress_note"),
             "last_read": datetime.fromtimestamp(lr, tz).date().isoformat() if lr else None,
-            "audio": d.get("audio_pct"), "highlights": hl.get(bid, 0), "shelves": shelves.get(bid, []),
+            "audio": d.get("audio_pct"), "highlights": hl.get(bid, 0), "shelves": shelves.get(bid, []), "shelf_ids": shelf_ids.get(bid, []),
         })
     return out, columns(custom)
 

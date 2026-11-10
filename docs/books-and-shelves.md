@@ -41,6 +41,12 @@ On a book's page, **The Kindle** has **Put it on the Kindle** and a shelf to put
 
 Manga volumes leave this page and live on their own, under [Manga](manga.md).
 
+## Dragging books onto shelves
+
+Books can be dragged onto shelves, on Books, on a shelf's page and in All books. With a mouse I just drag a book. With a finger or the pen I hold it for a moment until the phone or tablet buzzes, then drag. As soon as a drag starts, **Put on** opens at the side with every shelf: my own, my Hardcover lists and the Kindle's. Under them are Calibre's **Collections**, for a book in Calibre. Dropping a book on a shelf puts it there the same way the book's page would: a Hardcover list changes on Hardcover too, and a Kindle shelf moves or sends the book to the Kindle at its next sync. **New shelf** and **New collection** at the bottom make one and put the book in it. On Books, the shelf tiles themselves take a drop as well. A book only has one collection in Calibre, so dropping it on another one moves it there.
+
+In All books, dragging a row that's one of the chosen ones carries every chosen book, and the label beside the pointer says how many. Holding a row and letting go without moving still opens its menu. For when dragging isn't handy, **Shelves** in the bar at the bottom (and **Shelves and collection** in a row's menu) lists the same shelves to tick. A ✓ means every chosen book is on that shelf and a – means some are, and ticking a ✓ takes them all off.
+
 ## Searching my books
 
 The magnifying glass at the top of **Books** opens a search right in the bar. It finds a book by its title, its author, its series in Calibre or the name of a shelf it's on, so "craft" brings up everything on my Craft shelf. Each result says its series and its shelves, with **Read** when Daf has the file. A shelf's own page has the same search for the books on it. × clears it, and Esc, the arrow or the phone's Back closes it.

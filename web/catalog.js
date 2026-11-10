@@ -115,7 +115,7 @@ function bulkBar(){
   const n = P.sel.size, all = P.data ? P.data.books.length : 0;
   bar.hidden = false;
   bar.innerHTML = '<b>' + n + ' chosen</b><span class="spacer"></span>' + (n < all ? '<button class="btn sm" data-catb="all">Choose all ' + all + '</button>' : '') +
-    '<button class="btn sm" data-catb="none">Clear</button><button class="btn sm" data-catb="fill">Find details</button>' + (n > 1 ? '<button class="btn sm" data-catb="merge">Merge</button>' : '') + '<button class="btn sm danger" data-catb="remove">Remove</button>' +
+    '<button class="btn sm" data-catb="none">Clear</button><button class="btn sm" data-catb="shelves">Shelves</button><button class="btn sm" data-catb="fill">Find details</button>' + (n > 1 ? '<button class="btn sm" data-catb="merge">Merge</button>' : '') + '<button class="btn sm danger" data-catb="remove">Remove</button>' +
     '<button class="btn sm primary" data-catb="edit">' + (n === 1 ? 'Edit details' : 'Edit ' + n + ' books') + '</button>';
 }
 function choose(id, on){
@@ -307,6 +307,7 @@ document.addEventListener('click', e => {
     if (k === 'edit' && C.BookEdit) C.BookEdit.bulk([...P.sel]);
     else if (k === 'merge' && C.BookEdit) C.BookEdit.merge(P.data.books.filter(x => P.sel.has(x.calibre_id)));
     else if (k === 'fill' && C.BookEdit) C.BookEdit.fill(P.data.books.filter(x => P.sel.has(x.calibre_id)));
+    else if (k === 'shelves' && C.DragBooks) C.DragBooks.sheet(P.data.books.filter(x => P.sel.has(x.calibre_id)), b);
     else if (k === 'remove' && C.BookEdit) C.BookEdit.remove(P.data.books.filter(x => P.sel.has(x.calibre_id))).then(done => { if (done) P.sel.clear(); });
     else if (k === 'none') { P.sel.clear(); draw(); }
     else if (k === 'all') { P.data.books.forEach(x => P.sel.add(x.calibre_id)); draw(); }
@@ -324,12 +325,12 @@ document.addEventListener('click', e => {
   if (!e.shiftKey) P.anchor = id;
   chosenSync();
 });
-// Right-click a row, or hold it: Edit details, the book's page.
-let held = 0, holdT = null;
+// Right-click a row, or hold it and let go (dragbooks.js): Edit details, shelves, the book's page.
+let held = 0;
 function rowMenu(tr, x, y){
   const p = $('#pop'), id = tr.dataset.cid, cal = +tr.dataset.cal;
   p.onclick = p.oninput = p.onkeydown = null;
-  p.innerHTML = '<div class="menu catmenu"><button data-catrow="edit" data-cal="' + cal + '"><i></i>Edit details</button><a href="#book/' + encodeURIComponent(id) + '"><i></i>Open the book’s page</a>' +
+  p.innerHTML = '<div class="menu catmenu"><button data-catrow="edit" data-cal="' + cal + '"><i></i>Edit details</button><button data-catrow="shelves" data-cal="' + cal + '"><i></i>Shelves and collection</button><a href="#book/' + encodeURIComponent(id) + '"><i></i>Open the book’s page</a>' +
     (P.sel.size > 1 && P.sel.has(cal) ? '<hr><button data-catrow="bulk"><i></i>Edit the ' + P.sel.size + ' chosen</button>' : '') + '</div>';
   p.hidden = false;
   if (matchMedia('(max-width:700px)').matches) { p.style.left = ''; p.style.top = ''; return; }
@@ -340,18 +341,11 @@ document.addEventListener('contextmenu', e => {
   const tr = e.target.closest && e.target.closest('#catscroll tbody tr'); if (!tr) return;
   e.preventDefault(); rowMenu(tr, e.clientX, e.clientY);
 });
-const HOLD_EVENTS = ['pointerup', 'pointercancel', 'pointermove'];
-document.addEventListener('pointerdown', e => {
-  const tr = e.target.closest && e.target.closest('#catscroll tbody tr'); if (!tr || e.pointerType === 'mouse') return;
-  const x = e.clientX, y = e.clientY; clearTimeout(holdT);
-  holdT = setTimeout(() => { held = Date.now(); if (navigator.vibrate) navigator.vibrate(10); rowMenu(tr, x, y); }, 520);
-  const stop = ev => { if (ev.type !== 'pointermove' || Math.hypot(ev.clientX - x, ev.clientY - y) > 10) { clearTimeout(holdT); HOLD_EVENTS.forEach(k => document.removeEventListener(k, stop, true)); } };
-  HOLD_EVENTS.forEach(k => document.addEventListener(k, stop, true));
-}, true);
 document.addEventListener('click', e => {
   const m = e.target.closest && e.target.closest('[data-catrow]'); if (!m) return;
   $('#pop').hidden = true;
   if (m.dataset.catrow === 'edit' && C.BookEdit) C.BookEdit.open(m.dataset.cal);
+  else if (m.dataset.catrow === 'shelves' && C.DragBooks) C.DragBooks.sheet(P.data.books.filter(b => b.calibre_id === +m.dataset.cal));
   else if (m.dataset.catrow === 'bulk' && C.BookEdit) C.BookEdit.bulk([...P.sel]);
 });
 
@@ -409,5 +403,9 @@ const endDrag = e => {
 document.addEventListener('pointerup', endDrag, true);
 document.addEventListener('pointercancel', endDrag, true);
 
-C.Catalog = { search: q => { if (C.S.route[0] !== 'catalog') { P.q = q; keep(); location.hash = 'catalog'; } else setQ(q); }, reload: () => { if (C.S.route[0] === 'catalog') load(true).then(() => { if (P.side) drawSide(); }); }, books: () => (P.data && P.data.books) || [] };
+C.Catalog = {
+  rowMenu: (tr, x, y) => { held = Date.now(); rowMenu(tr, x, y); },
+  // What a drag from this row carries: every chosen row when it's one of them, else just it.
+  dragBooks: tr => { const id = +tr.dataset.cal; return P.data ? P.data.books.filter(b => P.sel.has(id) && P.sel.size > 1 ? P.sel.has(b.calibre_id) : b.calibre_id === id) : []; },
+  search: q => { if (C.S.route[0] !== 'catalog') { P.q = q; keep(); location.hash = 'catalog'; } else setQ(q); }, reload: () => { if (C.S.route[0] === 'catalog') load(true).then(() => { if (P.side) drawSide(); }); }, books: () => (P.data && P.data.books) || [] };
 })();

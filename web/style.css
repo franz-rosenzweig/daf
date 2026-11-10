@@ -2324,3 +2324,21 @@ body.beopen{overflow:hidden}
 @media (max-width:700px){ .bemarow{grid-template-columns:minmax(0,1fr) auto} .bemarow select{grid-column:1} .bembar{bottom:calc(-30px - env(safe-area-inset-bottom,0px))} }
 .befx{cursor:pointer;border-radius:4px;padding:1px 3px;margin-left:-3px} .befx:hover{background:var(--hover)}
 .befx.off{text-decoration:line-through;color:var(--fg-3)} .befx.off i{color:var(--fg-3)}
+
+/* Dragging books onto shelves and collections (dragbooks.js) */
+body.dragging,body.dragging *{user-select:none;-webkit-user-select:none;cursor:grabbing}
+.dbghost{position:fixed;z-index:80;pointer-events:none;display:none;max-width:260px;padding:6px 12px;border-radius:9px;background:var(--fg);color:var(--bg);font-size:13.5px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dbghost.on{display:block}
+.dbdock{position:fixed;z-index:79;right:16px;top:70px;width:250px;max-height:calc(100vh - 100px);overflow:auto;padding:10px;background:var(--bg);border:1px solid var(--line-2);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.22);display:none}
+.dbdock.on{display:block;animation:sheetup .15s ease-out}
+.dbh{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);padding:6px 6px 4px}
+.dbsec{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+.dbt{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;border:1px dashed transparent;font-size:14px}
+.dbt span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dbt i,#pop .dbmenu em{font-style:normal;font-size:11.5px;color:var(--fg-3)}
+.dbt.dbnew{color:var(--fg-2);border-color:var(--line-2)}
+.dbt.over,[data-dropshelf].over{background:var(--accent-weak);border-color:var(--accent);color:var(--accent-2)}
+[data-dropshelf].over{outline:2px solid var(--accent);outline-offset:3px;border-radius:10px}
+#pop .dbmenu{min-width:240px;max-height:70vh;overflow:auto}
+#pop .dbmenu > button span{flex:1}
+@media (max-width:700px){ .dbdock{left:8px;right:8px;top:auto;bottom:calc(72px + env(safe-area-inset-bottom,0px));width:auto;max-height:46vh} }
