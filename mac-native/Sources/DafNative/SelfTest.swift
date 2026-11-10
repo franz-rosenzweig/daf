@@ -331,7 +331,12 @@ enum SelfTest {
             await pause(1.5)
             check(full && Focus.shared.main && Focus.shared.barTucked(w), "focus mode puts the article on the whole screen, the toolbar hidden till the top",
                   "full screen \(full), options \(NSApp.presentationOptions.rawValue), toolbar shown \(w.toolbar?.isVisible ?? false)")
-            check(panes() == 1 && m.reader?.textView === textView, "with only the article, the sidebar and the list gone, and the same reader still open", "panes \(panesBefore) → \(panes())")
+            // the pointer away from the screen's left edge, where full screen brings a hidden sidebar out
+            let pointer = NSEvent.mouseLocation, edge = pointer.x - (w.screen?.frame.minX ?? 0) < 40
+            if let s = w.screen { CGWarpMouseCursorPosition(CGPoint(x: s.frame.midX, y: s.frame.midY)) }
+            await pause(1.5)
+            check(panes() == 1 && m.reader?.textView === textView, "with only the article, the sidebar and the list gone, and the same reader still open",
+                  "panes \(panesBefore) → \(panes()); the pointer was \(edge ? "at the left edge" : "away from the edge") (\(Int(pointer.x)), \(Int(pointer.y)))")
             capture("70-focus")
             // nothing over the page at the top of the screen (an empty title bar once stayed, a dark strip)
             check(atTop(w, textView), "in focus mode the article goes to the top of the screen, no bar over it", topReport(w, textView))
@@ -700,10 +705,10 @@ enum SelfTest {
         }
         // what it says comes and goes while the Feed loads again, so it's looked for as it works
         let refreshing = Task { await m.refreshFeed() }
-        let said = await until(120) { m.error != nil || (m.toast ?? "").range(of: #"^(Nothing|\d+) new$"#, options: .regularExpression) != nil }
+        let said = await until(300) { m.error != nil || (m.toast ?? "").range(of: #"^(Nothing|\d+) new$"#, options: .regularExpression) != nil }
         let saidWhat = m.toast ?? m.error ?? ""
         await refreshing.value
-        check(said && m.error == nil, "Check for New Posts looks at the feeds", saidWhat)
+        check(said && saidWhat.range(of: #"^(Nothing|\d+) new$"#, options: .regularExpression) != nil, "Check for New Posts looks at the feeds", saidWhat)
         m.sheet = .follow
         await pause(1.2)
         capture("24-follow")

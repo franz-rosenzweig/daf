@@ -92,6 +92,14 @@ final class VideoPlayer {
         if kind == .episode, let it = item, !mine {
             if let t = startAt { time = t }
             if startPlaying { startPlaying = false; Player.shared.play(it, at: startAt ?? 0) }
+            else if duration == 0, let path = it.tracks.first?.url, !path.isEmpty {
+                // its length from the file, as the page's audio element finds it, when Daf doesn't say
+                Task { [weak self] in
+                    guard let d = try? await Player.playerItem(path).asset.load(.duration), d.isNumeric, d.seconds > 0,
+                          let self, self.duration == 0 else { return }
+                    self.duration = d.seconds
+                }
+            }
         }
     }
 

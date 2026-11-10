@@ -63,6 +63,16 @@ final class API {
         return URLSession(configuration: c)
     }()
 
+    /// For an answer that takes a while: Check for New Posts reads every feed before it answers.
+    let slowSession: URLSession = {
+        let c = URLSessionConfiguration.default
+        c.httpCookieStorage = .shared
+        c.httpShouldSetCookies = true
+        c.timeoutIntervalForRequest = 300
+        c.httpAdditionalHeaders = ["User-Agent": "Daf/\(Version.short) (macOS native)"]
+        return URLSession(configuration: c)
+    }()
+
     /// A path on Daf ("/api/today"), or an address that's already whole.
     func url(_ path: String) -> URL {
         if path.hasPrefix("http://") || path.hasPrefix("https://") { return URL(string: path)! }
@@ -100,9 +110,10 @@ final class API {
     /// A call to Daf. An answer is kept on this Mac (Cache); with no connection the kept one comes
     /// back instead, and a change waits in the Outbox (with its X-Daf-Op, so it's done once).
     @discardableResult
-    func send(_ method: String, _ path: String, _ body: [String: Any]?, op: String? = nil) async throws -> Any {
+    func send(_ method: String, _ path: String, _ body: [String: Any]?, op: String? = nil, slow: Bool = false) async throws -> Any {
         var r = URLRequest(url: url(path))
         r.httpMethod = method
+        if slow { r.timeoutInterval = 300 }
         r.cachePolicy = .reloadIgnoringLocalCacheData
         var bodyData: Data?
         if let body {
@@ -115,7 +126,7 @@ final class API {
         if let opID { r.setValue(opID, forHTTPHeaderField: "X-Daf-Op") }
         do {
             if Connection.shared.forced { throw URLError(.notConnectedToInternet) }
-            let (data, response) = try await session.data(for: r)
+            let (data, response) = try await (slow ? slowSession : session).data(for: r)
             Connection.shared.reached()
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let parsed = (try? JSONSerialization.jsonObject(with: data)) ?? [:]
