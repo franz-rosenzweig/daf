@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-10-calibre-tidy', date: 'Nov 10', title: 'Tidy the library', text: 'All books › Filter › Tidy finds possible duplicates, garbled titles and “Last, First” names. Choose books to merge copies into one or remove them; ⋯ › Calibre’s trash puts them back.', go: '#catalog' },
   { id: '2026-11-10-calibre-edit', date: 'Nov 10', title: 'Edit books like Calibre', text: 'Edit details on a book’s page or in All books: tags, series, cover, files and conversions, one book or many at once. Find details asks Hardcover and Calibre’s sources and lets you pick field by field.', go: '#catalog' },
   { id: '2026-11-10-all-books', date: 'Nov 10', title: 'All books', text: 'The whole Calibre library as a spreadsheet, under Books: choose the columns, sort by any of them, search the way Calibre does, filter by tag or date added, save views and export CSV.', go: '#catalog' },
   { id: '2026-11-06-reader-apps', date: 'Nov 6', title: 'The Feed in other apps', text: 'Read You, NetNewsWire, Reeder and other RSS apps read the Feed the way they read FreshRSS, read and starred both ways. Make their password in Preferences → Reader apps.', go: '#prefs/readerapps' },

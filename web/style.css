@@ -2280,3 +2280,15 @@ body.beopen{overflow:hidden}
   .befrow{grid-template-columns:24px minmax(0,1fr);row-gap:4px}
   .befnow,.befgot{grid-column:2} .befnow::before{content:"Now: ";color:var(--fg-3)} .befgot::before{content:"Found: ";color:var(--fg-3)}
 }
+
+/* Merge and remove (bookedit.js) */
+.beremove{margin-top:18px}
+.btn.danger{color:var(--bad)}
+.bemerge{display:flex;flex-direction:column}
+.bemrow{display:grid;grid-template-columns:20px 52px minmax(0,1fr);gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.bemrow input{accent-color:var(--accent);margin:0}
+.bemrow img,.bemrow .befnc{width:52px;height:76px;object-fit:cover;border-radius:4px}
+
+.betrash{display:flex;flex-direction:column}
+.betrow{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.betrow .befct{flex:1}

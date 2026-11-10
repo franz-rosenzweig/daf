@@ -69,6 +69,7 @@ function draw(){
         '<button class="ib" data-be="filemenu" data-fmt="' + esc(f.format) + '" aria-label="More for ' + esc(f.format) + '">' + ICON.dots + '</button></div>').join('') : '<span class="mute tiny">No file</span>') + '</div>' +
       '<div id="beconv"></div>' +
       '<label class="btn sm befile">Add a file<input type="file" accept="' + ACCEPT + '" data-be="addfile" hidden></label>' +
+      '<button class="btn sm danger beremove" data-be="remove">Remove from Calibre</button>' +
     '</div><div class="beform">' +
       row('Title', inp('title', d.title)) +
       row('Authors', inp('authors', (d.authors || []).join(' & '), ' list="dl-authors" autocomplete="off"') + dl('dl-authors', d.choices.authors)) +
@@ -156,6 +157,7 @@ async function bulk(ids){
   const s = sheet('<div class="behead"><h2>' + ids.length + ' books</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-be="save">Save</button></div>' +
     '<div class="bebody one"><div class="beform">' +
       row('Authors', inp('authors', '', ' list="dl-authors" autocomplete="off" placeholder="No change"') + dl('dl-authors', d.choices.authors)) +
+      '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="flip"> Turn “Last, First” names around</label></div>' +
       row('Series', inp('series', '', ' list="dl-series" autocomplete="off" placeholder="No change"') + dl('dl-series', d.choices.series)) +
       '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="number"> Number them from <input class="field benum" data-f2="start" type="number" value="1" step="any" inputmode="decimal"> in the table’s order</label></div>' +
       row('Add tags', chips('add_tags', [], d.choices.tags), 'betop') +
@@ -177,6 +179,7 @@ async function saveBulk(){
   const fields = toFields(ch, true);
   if ($('[data-f2="norating"]', s).checked) fields.rating = null;
   if ($('[data-f2="number"]', s).checked) { fields.series_number = +$('[data-f2="start"]', s).value || 1; }
+  if ($('[data-f2="flip"]', s).checked && fields.authors === undefined) fields.authors_flip = true;
   if (!Object.keys(fields).length && !add.length && !rem.length) { close(true); return; }
   if (fields.authors !== undefined) fields.authors = String(fields.authors).split('&').map(x => x.trim()).filter(Boolean);
   // In the table's order, for numbering a series.
@@ -369,6 +372,8 @@ document.addEventListener('click', e => {
   const k = b.dataset.be;
   if (k === 'cancel') close();
   else if (k === 'find') find();
+  else if (k === 'remove') { const d = E.d; remove([d]).then(ok => { if (ok) { close(true); if (C.S.route[0] === 'book') location.hash = 'catalog'; } }); }
+  else if (k === 'merge') doMerge();
   else if (k === 'findback') { F.seq++; backToForm(); F.snap = null; }
   else if (k === 'findlist') sheetList(F.results);
   else if (k === 'take') take();
@@ -417,5 +422,55 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
 }, true);
 
-C.BookEdit = { open, bulk, close };
+/* ---------- tidying: merge copies of one book, remove books ---------- */
+// Removed books go to Calibre's trash, which keeps them for 14 days.
+async function remove(books){
+  const n = books.length, hl = books.reduce((s, b) => s + (b.highlights || 0), 0);
+  const what = n === 1 ? '“' + books[0].title + '”' : n + ' books';
+  if (!confirm('Remove ' + what + ' from Calibre?' + (hl ? ' ' + (n === 1 ? 'It has' : 'They have') + ' ' + hl + ' highlight' + (hl === 1 ? '' : 's') + ' in Daf.' : ''))) return false;
+  try {
+    await api('/api/catalog/remove', { method: 'POST', body: JSON.stringify({ ids: books.map(b => b.calibre_id) }) });
+    toast(n === 1 ? 'Removed' : n + ' books removed'); after(); return true;
+  } catch(e){ toast(e.message); return false; }
+}
+// Which copy stays: the one with a cover and the most files, then the first added.
+function merge(books){
+  const best = books.slice().sort((a, b) => (b.cover - a.cover) || ((b.formats || []).length - (a.formats || []).length) || String(a.added).localeCompare(String(b.added)))[0];
+  E.merging = books; E.d = null; E.ids = null; E.orig = null;
+  sheet('<div class="behead"><h2>Merge ' + books.length + ' books</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-be="merge">Merge</button></div>' +
+    '<div class="bebody one"><div class="bemerge" role="radiogroup" aria-label="Keep">' + books.map(b => '<label class="bemrow"><input type="radio" name="bekeep" value="' + b.calibre_id + '"' + (b === best ? ' checked' : '') + '>' +
+      (b.cover ? '<img src="/api/cover/' + encodeURIComponent(b.id) + '?v=' + (b.cover_v || 0) + '" alt="">' : '<span class="befnc"></span>') +
+      '<span class="befct"><b>' + esc(b.title) + '</b><span>' + esc((b.authors || []).join(' & ')) + '</span><span class="mute tiny">' + [(b.formats || []).join(', ') || 'No file', b.added, b.highlights ? b.highlights + ' highlights' : ''].filter(Boolean).map(esc).join(' · ') + '</span></span></label>').join('') +
+    '</div></div>');
+}
+async function doMerge(){
+  const books = E.merging || [], keep = +(($('#bedit input[name=bekeep]:checked') || {}).value || 0);
+  if (!keep) return;
+  const btn = $('#bedit [data-be="merge"]'); btn.disabled = true; btn.textContent = 'Merging…';
+  try {
+    await api('/api/catalog/merge', { method: 'POST', body: JSON.stringify({ keep, ids: books.map(b => b.calibre_id) }) });
+    toast('Merged into one'); E.merging = null; close(true); after();
+  } catch(e){ toast(e.message); btn.disabled = false; btn.textContent = 'Merge'; }
+}
+
+// Calibre's trash: the books removed lately, each with Put back.
+async function trash(priv){
+  E.d = E.ids = E.orig = null;
+  sheet('<div class="behead"><h2>Calibre’s trash</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Close</button></div><div class="bebody one"><p class="mute">Loading…</p></div>');
+  let r;
+  try { r = await api('/api/catalog/trash' + (priv ? '?private=1' : '')); } catch(e){ toast(e.message); close(true); return; }
+  const when = t => new Date(t * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const body = $('#bedit .bebody'); if (!body) return;
+  body.innerHTML = r.books.length ? '<div class="betrash">' + r.books.map(b => '<div class="betrow"><span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc(b.author || '') + ' · ' + when(b.removed) + '</span></span>' +
+    '<button class="btn sm" data-betrash="' + b.id + '">Put back</button></div>').join('') + '</div>' : '<p class="mute">Nothing in the trash.</p>';
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-betrash]'); if (!b) return;
+  b.disabled = true;
+  api('/api/catalog/trash/restore', { method: 'POST', body: JSON.stringify({ ids: [+b.dataset.betrash] }) })
+    .then(() => { b.closest('.betrow').remove(); toast('Back in Calibre'); after(); })
+    .catch(err => { toast(err.message); b.disabled = false; });
+});
+
+C.BookEdit = { open, bulk, close, merge, remove, trash };
 })();
