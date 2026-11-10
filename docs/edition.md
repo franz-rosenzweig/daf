@@ -41,7 +41,7 @@ My own Feed is what I chose to follow, and it's small: a day of it gives only a 
 
 The pool stays out of the Feed. Its posts aren't in any Feed list or count, the reader apps don't see them, and they go after five days unless an Edition took them. A piece the Edition does take becomes an ordinary Feed post, so it opens, saves and highlights like any other. The pool's feeds are read every four hours instead of every half hour.
 
-A pool feed's folder starts with "Pool · ", so `daf feeds-add URL --folder "Pool · Science"` puts one in, and `daf pool-add list.json` adds a checked list. On the Taste page, **Pool** shows each category with its feeds and what came in the last two days, and **Mute** keeps a whole category out.
+The pool is simply every folder set to **Hidden** on the [Feeds page](feed-and-library.md#what-shows-where), so a feed goes into it by putting it in one of those folders, or by setting the feed itself to Hidden. `daf pool-add list.json` adds a checked list, each feed into its category's folder, and makes a new folder Hidden. On the Taste page, **Pool** shows each hidden folder with its feeds and what came in the last two days, and **Mute** keeps a whole folder out. (Until November 10 a pool folder's name started with "Pool · "; Daf took that off and set those folders to Hidden.)
 
 ## Taste
 

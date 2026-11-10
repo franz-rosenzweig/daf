@@ -438,10 +438,14 @@ def cmd_pool_add(a):
     for r in rows:
         if not r.get("ok"):
             continue
-        folder = rss.POOL + r["category"]
+        folder = r["category"]
         try:
             with db.session() as conn:
+                if not conn.execute("SELECT 1 FROM feeds WHERE folder = ?", (folder,)).fetchone():
+                    rss.set_show(conn, ["folder:" + folder], "hidden")     # a new folder for the pool: hidden
                 fid, title, _ = rss.follow(r.get("feed_url") or r["url"], folder, conn)
+                if not rss.is_hidden(conn, conn.execute("SELECT * FROM feeds WHERE id = ?", (fid,)).fetchone()):
+                    rss.set_show(conn, [fid], "hidden")                       # in a folder you see: hidden on its own
                 conn.execute("UPDATE feeds SET every = ? WHERE id = ?", (rss.POOL_EVERY, fid))
             added += 1
             print(f"  {r['category']:<26} {title}")

@@ -248,6 +248,9 @@ CREATE TABLE IF NOT EXISTS soundscapes (       -- the scenes the model heard in 
   scenes TEXT NOT NULL,                       -- [{start, scene, sounds: {id: level}}]
   made INTEGER NOT NULL, model TEXT, error TEXT,
   PRIMARY KEY (book_id, file, start));
+CREATE TABLE IF NOT EXISTS feed_folders (       -- a Feed folder's settings (rss.py): where its posts show
+  name TEXT PRIMARY KEY,
+  show TEXT NOT NULL DEFAULT 'all');          -- all (in All feeds) | folder (only in its folder) | hidden (only for the Edition: where_ 'pool')
 CREATE TABLE IF NOT EXISTS greader_ids (       -- each Feed item's id in the reader apps' Google Reader API (greader.py)
   gid INTEGER PRIMARY KEY,                    -- a microsecond, as FreshRSS's ids are: an fr: item's own, else when Daf got it
   doc TEXT NOT NULL UNIQUE);
@@ -356,7 +359,7 @@ def connect():
     return conn
 
 
-MIGRATIONS = [("books", "hc_id", "INTEGER"), ("docs", "duration", "INTEGER"), ("audio_bookmarks", "transcribed", "INTEGER"), ("highlights", "color", "TEXT"), ("review_state", "tags", "TEXT"), ("review_state", "fav", "INTEGER"),
+MIGRATIONS = [("feeds", "show", "TEXT"), ("books", "hc_id", "INTEGER"), ("docs", "duration", "INTEGER"), ("audio_bookmarks", "transcribed", "INTEGER"), ("highlights", "color", "TEXT"), ("review_state", "tags", "TEXT"), ("review_state", "fav", "INTEGER"),
               ("docs", "tags", "TEXT"), ("docs", "ai_summary", "TEXT"),
               ("docs", "starred", "INTEGER"), ("sessions", "pages", "INTEGER"),
               ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("shelves", "kindle", "TEXT"), ("docs", "full", "INTEGER"),

@@ -905,3 +905,13 @@ A bed of recorded sound under a book that follows its scenes. `soundscape.parts(
 - Settings live on the device: `daf.soundOn` (on for books here) and `daf.soundVol`.
 - Headless docker-chrome can't decode MP3 in Web Audio; check playback in the Playwright image (Chromium and WebKit both decode it).
 - Not yet: the native Mac app's own player, and playing on with the Android app's screen off.
+
+## What shows where in the Feed (`rss.py` Show, `web/feeds.js`, 2026-11-10)
+
+- **Show** per folder (table `feed_folders`, name → all | folder | hidden) and per feed (`feeds.show`, NULL = its folder's); `rss.shows()` resolves them (`COALESCE(f.show, ff.show, 'all')`).
+- **Hidden** = the Edition's pool: `_take` stores a hidden feed's posts with `where_ = 'pool'`, so no list, count, reader app or digest needs to know. `rss.set_show` / `rss.resettle` move a feed's posts between `feed` and `pool` when it changes, keeping highlighted, starred and Kindle-sent ones in the Feed, and set `every` to POOL_EVERY. Moving a feed in or out of a hidden folder (reader.edit_feed) resettles too; a folder renamed from a reader app takes its Show along (`rss.rename_folder`, before the feeds move).
+- **Its folder** is a filter, `rss.IN_ALL`, on All feeds (reader._all_feeds, not with a search), the Feed's count, the morning email's Feed part, the Kindle Home's Feed row and /api/tools/feed without a folder.
+- **migrate_pool** (once, kv `feed_show_v1`, at the start of rss.sync): "Pool · X" folders became X set to hidden, docs' category and the Edition's `folder:` mutes renamed. `daf pool-add` now names the folder by its category and makes a new one hidden (a feed added into a visible folder is hidden on its own).
+- **Pins**: settings `feed_pins` (["folder:Name", "feed/12"], ordered; missing = every visible folder, as before) and `feed_pins_hide_empty`; /api/docs/counts gives `feed_pins` with counts.
+- **Edition dial** on the Feeds page writes `edition.sources` (a folder as "folder:Name", a feed by its title). A folder's More/Less now counts in the score too, on top of the feed's or its publication's.
+- **Routes**: GET /api/feed/manage (everything, with posts a week from the posts' dates: the Feed's last four weeks, the pool's last five days × 7/5), PUT /api/feed/show {keys, show}, GET /api/feed/folders?hidden=1 (Follow a site; the reader apps never get the hidden ones).

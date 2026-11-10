@@ -52,8 +52,9 @@ def build(conn, settings, since=None):
                     "mins": mins, "summary": _short(summary)})
     feed = {"count": 0, "folders": []}
     if clean(settings.get("digest"))["feed"]:
+        from .sources import rss
         rows = conn.execute("SELECT COALESCE(NULLIF(category, ''), 'Other') AS f, COUNT(*) AS n FROM docs WHERE where_ = 'feed' "
-                            "AND status = 'unseen' AND added >= ? GROUP BY f ORDER BY n DESC", (since,)).fetchall()
+                            f"AND status = 'unseen' AND added >= ? AND {rss.IN_ALL} GROUP BY f ORDER BY n DESC", (since,)).fetchall()
         feed = {"count": sum(r["n"] for r in rows), "folders": [{"name": r["f"], "count": r["n"]} for r in rows[:6]]}
     y = T.today(settings) - timedelta(days=1)
     s = T.day_summary(conn, y, settings)

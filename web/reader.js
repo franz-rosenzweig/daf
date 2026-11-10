@@ -75,13 +75,19 @@ C.navLibrary = () => {
     (open ? kinds.map(x => '<button class="nv sub' + navOn('library', x) + '" data-go="library/' + x + '"><span>' + KIND[x] + '</span><span class="ct">' + ((k.library || {})[x] || '') + '</span></button>').join('') +
       (R.views || []).map(v => '<button class="nv sub' + navOn('view', v.id) + '" data-go="view/' + encodeURIComponent(v.id) + '" title="A saved view"><span>' + esc(v.name) + '</span></button>').join('') : '');
 };
+// Under Feed: what's pinned there (the Feeds page, feeds.js), folders and single feeds, in their order;
+// with FreshRSS still reading the feeds, every folder.
 C.navFeed = () => {
   const rt = C.S.route || [], k = R.counts || { feed: {}, library: {}, feed_total: '' };
-  const cats = Object.keys(k.feed || {}).filter(Boolean).sort();
+  const pins = Array.isArray(k.feed_pins) ? k.feed_pins.filter(p => !k.feed_pins_hide_empty || p.count || navOn('feed', p.key.startsWith('folder:') ? p.key.slice(7) : p.key))
+    : Object.keys(k.feed || {}).filter(Boolean).sort().map(c => ({ key: 'folder:' + c, name: c, count: k.feed[c] }));
   const open = store.get('catsOpen', true);
+  const row = p => { const arg = p.key.startsWith('folder:') ? p.key.slice(7) : p.key;
+    return '<button class="nv sub' + (p.key.startsWith('feed/') ? ' subfeed' : '') + navOn('feed', arg) + '" data-go="feed/' + encodeURIComponent(arg) + '" data-fkey="' + esc(p.key) + '">' +
+      (p.key.startsWith('feed/') ? srcIcon({ title: p.name, icon: p.icon }) : '') + '<span' + dirAttr(p.name) + '>' + esc(p.name) + '</span><span class="ct">' + (p.count || '') + '</span></button>'; };
   return '<div class="nvrow"><button class="nv' + (rt[0] === 'feed' && !rt[1] ? ' on' : '') + '" data-go="feed">' + ICON.feed + '<span>Feed</span><span class="ct">' + (k.feed_total || '') + '</span></button>' +
-      (cats.length ? '<button class="nvx" data-act="cats" aria-expanded="' + open + '" aria-label="' + (open ? 'Hide' : 'Show') + ' the folders" title="Folders">' + CHEV(open) + '</button>' : '') + '</div>' +
-    (open ? cats.map(c => '<button class="nv sub' + navOn('feed', c) + '" data-go="feed/' + encodeURIComponent(c) + '"><span' + dirAttr(c) + '>' + esc(c) + '</span><span class="ct">' + k.feed[c] + '</span></button>').join('') : '');
+      (pins.length ? '<button class="nvx" data-act="cats" aria-expanded="' + open + '" aria-label="' + (open ? 'Hide' : 'Show') + ' the folders" title="Folders">' + CHEV(open) + '</button>' : '') + '</div>' +
+    (open ? pins.map(row).join('') : '');
 };
 
 /* ---------- Add: a link, a book or a PDF, as in Readwise's Add menu ---------- */
@@ -94,7 +100,7 @@ function openAdd(file, url){
     '<label class="adddrop" id="adddrop"><input type="file" id="addfile" accept=".epub,.kepub,.mobi,.azw3,.azw,.fb2,.cbz,.pdf" multiple hidden><b>Drop books or PDFs here</b><span class="mute tiny">or click to choose. EPUB, MOBI, AZW3 and FB2 go into Calibre, then Books, where Daf opens them. PDFs go straight into the Library.</span></label>' +
     '<div id="addstatus" class="tiny" role="status"></div><div style="display:flex;justify-content:flex-end"><button class="btn" data-act="close">Close</button></div>';
   if (file) uploadFiles(Array.isArray(file) ? file : [file]); else $('#addurl').focus();
-  api('/api/feed/folders').then(r => { const s = $('#addfolder'); if (s) s.innerHTML = '<option value="">no folder</option>' + r.folders.filter(f => f !== 'Uncategorized').map(f => '<option>' + esc(f) + '</option>').join(''); }).catch(() => {});
+  api('/api/feed/folders?hidden=1').then(r => { const s = $('#addfolder'); if (s) s.innerHTML = '<option value="">no folder</option>' + r.folders.filter(f => f !== 'Uncategorized').map(f => '<option>' + esc(f) + '</option>').join(''); }).catch(() => {});
 }
 document.addEventListener('click', async e => {
   if (e.target.id !== 'addfollow') return;
@@ -485,6 +491,8 @@ function undoToast(msg, undo){
   t.querySelector('.tundo').onclick = () => { t.hidden = true; undoLast(); };
   clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 6000);
 }
+const PINI = on => '<svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3h6l-1 5 3 3H5l3-3zM10 11v6" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+const CHEVR = '<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function srcIcon(x){
   const letter = esc((x.title || '?').replace(/^(the |r\/|")/i, '').charAt(0).toUpperCase());
   const tile = '<span class="sico" style="background:hsl(' + hue(x.title) + ' 34% 42%)">' + letter + '</span>';
@@ -498,22 +506,24 @@ function sourcesHTML(s){
     s.folders.map(f => {
       const isOpen = open[f.name] != null ? open[f.name] : f.feeds.some(x => x.id === cur);
       const feeds = f.feeds.filter(x => !hide || x.count || x.id === cur);
-      return '<div class="sfold' + (isOpen ? ' open' : '') + '"><div class="srow' + (cur === f.name && f.name ? ' on' : '') + '">' +
+      const pin = k => s.hidden ? '<button class="ib spin' + ((k.startsWith('folder:') ? f.pinned : (f.feeds.find(x => x.id === k) || {}).pinned) ? ' on' : '') + '" data-fpin="' + esc(k) + '" aria-label="Pin">' + PINI((k.startsWith('folder:') ? f.pinned : (f.feeds.find(x => x.id === k) || {}).pinned)) + '</button>' : '';
+      return '<div class="sfold' + (isOpen ? ' open' : '') + '"><div class="srow' + (cur === f.name && f.name ? ' on' : '') + '"' + (f.name && s.hidden ? ' data-fkey="folder:' + esc(f.name) + '"' : '') + '>' +
         '<button class="ib sfx" data-srcfold="' + esc(f.name) + '" aria-expanded="' + isOpen + '" aria-label="Show the feeds in ' + esc(f.name || 'no folder') + '">' + ICON.chev + '</button>' +
-        (f.name ? '<button class="sgo" data-src="' + esc(f.name) + '"><span class="sn"' + dirAttr(f.name) + '>' + esc(f.name) + '</span>' + ct(f.count) + '</button>'
+        (f.name ? '<button class="sgo" data-src="' + esc(f.name) + '"><span class="sn"' + dirAttr(f.name) + '>' + esc(f.name) + '</span>' + (f.show === 'folder' ? '<span class="stag">Its folder</span>' : '') + ct(f.count) + '</button>' + pin('folder:' + f.name)
           : '<span class="sgo mute"><span class="sn">No folder</span>' + ct(f.count) + '</span>') + '</div>' +
-        '<div class="sfeeds">' + (feeds.length ? feeds.map(x => '<div class="srow feed' + (x.id === cur ? ' on' : '') + (x.count ? '' : ' zero') + '">' +
+        '<div class="sfeeds">' + (feeds.length ? feeds.map(x => '<div class="srow feed' + (x.id === cur ? ' on' : '') + (x.count ? '' : ' zero') + '"' + (s.hidden ? ' data-fkey="' + esc(x.id) + '"' : '') + '>' +
           '<button class="sgo" data-src="' + esc(x.id) + '">' + srcIcon(x) + '<span class="sn"' + dirAttr(x.title) + '>' + esc(x.title) + '</span>' + ct(x.count) + '</button>' +
           '<button class="ib" data-srcedit="' + esc(x.id) + '" aria-label="Edit ' + esc(x.title) + '" title="Rename, move or unfollow">' + ICON.dots + '</button></div>').join('')
           : '<span class="mute tiny" style="padding:6px 52px">Nothing new in these feeds</span>') + '</div></div>';
     }).join('') +
+    (s.hidden && s.hidden.length ? '<div class="srow"><a class="sgo mute" href="#feeds/hidden" data-act="close">' + CHEVR + '<span class="sn">Hidden</span><span class="ct">' + s.hidden.length + (s.hidden.length === 1 ? ' folder' : ' folders') + '</span></a></div>' : '') +
     '<div class="sfoot"><label class="shide"><input type="checkbox" data-srchide' + (hide ? ' checked' : '') + '> Hide feeds with nothing new</label>' +
     '<button class="btn sm" data-act="add">Follow a site</button></div>' +
     (s.stale && !byDaf() ? '<p class="mute tiny">FreshRSS didn’t answer; this is the list from before.</p>' : '');
 }
 async function openSources(){
   const m = $('#modal'); $('#scrim').hidden = false; m.hidden = false; m.classList.add('sheet');
-  m.innerHTML = '<div class="srchead"><h2>Sources</h2><button class="ib" data-act="close" aria-label="Close">' + ICON.close + '</button></div><div class="srcs" id="srcs">' +
+  m.innerHTML = '<div class="srchead"><h2>Sources</h2><span class="spacer"></span>' + (byDaf() ? '<a class="btn sm" href="#feeds" data-act="close">Manage</a>' : '') + '<button class="ib" data-act="close" aria-label="Close">' + ICON.close + '</button></div><div class="srcs" id="srcs">' +
     (R.sources ? sourcesHTML(R.sources) : '<span class="mute" style="padding:12px">Loading…</span>') + '</div>';
   try {
     R.sources = await api('/api/feed/sources');
@@ -822,7 +832,9 @@ function leaveDoc(d){
   if ((C.S.navs || 0) > 1) history.back();
   else location.hash = d && d.where_ === 'feed' ? 'feed' : d && d.where_ === 'podcast' ? 'podcasts' : d && d.kind && KIND[d.kind] ? 'library/' + d.kind : 'library/article';
 }
-C.leaveDoc = leaveDoc;   // the PDF's pages leave the same way (pdfview.js)
+C.leaveDoc = leaveDoc;
+// For the Feeds page and its menu (feeds.js): edit a feed, the counts again, the Sources list again.
+C.FeedSrc = { edit: id => openFeedEdit(id), refresh: () => refreshCounts(), invalidate: () => { R.sources = null; } };   // the PDF's pages leave the same way (pdfview.js)
 const fmtT = t => { t = Math.max(0, Math.floor(t || 0)); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), x = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
 // X saves a tweet's title as '(2) Name on X: "first tweet" / X'. Show "Name" and the tweet apart.
 function tweetParts(d){
