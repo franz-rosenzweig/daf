@@ -3629,6 +3629,8 @@ from . import sketchbook  # noqa: E402 - the Sketchbook beside the readers (/api
 app.include_router(sketchbook.router())
 from . import greader  # noqa: E402 - the reader apps' Google Reader API (/api/greader.php) and its card (/api/greader)
 app.include_router(greader.router())
+from . import soundscape  # noqa: E402 - Sound: the scene's sounds under the book, in Daf and from the Kindle's page
+app.include_router(soundscape.router())
 
 
 @app.get("/api/extension/{name}", dependencies=[Depends(user)])

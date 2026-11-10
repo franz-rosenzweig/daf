@@ -242,6 +242,12 @@ CREATE TABLE IF NOT EXISTS feeds (           -- the feeds Daf reads itself (sour
   every INTEGER, attrs TEXT, added INTEGER);
 CREATE TABLE IF NOT EXISTS feed_seen (        -- every post a feed has given ("id:<guid>", "link:<url>"), so a forgotten one never comes back
   feed TEXT NOT NULL, key TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (feed, key));
+CREATE TABLE IF NOT EXISTS soundscapes (       -- the scenes the model heard in a part of a book, and their sounds (soundscape.py)
+  book_id TEXT NOT NULL, file TEXT NOT NULL,  -- the book's file as "size:mtime": a new edition is read again
+  start INTEGER NOT NULL, end INTEGER NOT NULL,   -- the part, in characters of audiomap's text
+  scenes TEXT NOT NULL,                       -- [{start, scene, sounds: {id: level}}]
+  made INTEGER NOT NULL, model TEXT, error TEXT,
+  PRIMARY KEY (book_id, file, start));
 CREATE TABLE IF NOT EXISTS greader_ids (       -- each Feed item's id in the reader apps' Google Reader API (greader.py)
   gid INTEGER PRIMARY KEY,                    -- a microsecond, as FreshRSS's ids are: an fr: item's own, else when Daf got it
   doc TEXT NOT NULL UNIQUE);

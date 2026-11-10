@@ -2042,3 +2042,12 @@ select.edpast{appearance:auto;padding-right:6px}
   .edsrcs{grid-template-columns:minmax(0,1fr)}
   .edtrow{grid-template-columns:minmax(0,1fr) 16px 150px;row-gap:6px}.edtrow .edbar{grid-column:1/-1;grid-row:2}
 }
+
+/* Sound (sound.js): the scene's name and the volume in its menu; Today's row beside the Kindle */
+.sndpop{min-width:240px}
+.sndpop .sndscene{padding:8px 12px 4px;font-weight:600;font-size:14px;line-height:1.35}
+.sndpop .sndvl{display:flex;align-items:center;gap:10px;padding:6px 12px 8px;font-size:13px;color:var(--fg-2)}
+.sndvol{flex:1;min-width:80px;max-width:160px;accent-color:var(--accent)}
+.sndrow{align-items:center;gap:10px}
+.sndrow .sndvol{max-width:120px}
+@media (max-width:700px){ .sndrow{flex-wrap:wrap} .sndrow .sndvol{order:3;max-width:none;flex-basis:100%} }

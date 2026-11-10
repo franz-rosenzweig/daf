@@ -493,6 +493,7 @@ end
 function Daf:onReaderReady()
     if not self.ui.document or not self:configured() then return end
     UIManager:scheduleIn(2, function() pcall(function() self:syncFromDaf(false) end) end)
+    self:sendWhere()
 end
 
 function Daf:syncFromDaf(manual)
@@ -872,6 +873,32 @@ end
 
 function Daf:onPageUpdate()
     self:refreshSleepMessage()
+    self:sendWhere()
+end
+
+-- Sound in Daf: a few seconds after a page turns, the page (its words and how far in) goes to Daf,
+-- which plays that scene's sound on a phone or a computer (Today's Sound row). Off unless chosen.
+function Daf:sendWhere()
+    if not self.settings:isTrue("sound") or not self.ui.document or not self:configured() then return end
+    if self.where_task then UIManager:unschedule(self.where_task) end
+    self.where_task = function()
+        self.where_task = nil
+        if not self.ui.document or not online() then return end
+        pcall(function()
+            local md5 = self:docMd5()
+            if not md5 or not md5:match("^%x+$") then return end
+            local doc, text = self.ui.document, nil
+            local page, total = doc:getCurrentPage(), doc:getPageCount() or 1
+            if self.ui.rolling and page < total then
+                local a, b = doc:getPageXPointer(page), doc:getPageXPointer(page + 1)
+                if a and b then text = doc:getTextFromXPointers(a, b) end
+            end
+            if text then text = text:sub(1, 600):gsub("[\192-\255][\128-\191]*$", "") end
+            request("POST", self.settings:readSetting("url") .. "/api/kindle/where", self.settings:readSetting("token"),
+                { md5 = md5, text = text, fraction = page / math.max(1, total) })
+        end)
+    end
+    UIManager:scheduleIn(3, self.where_task)
 end
 
 function Daf:onSuspend()
@@ -960,6 +987,15 @@ function Daf:addToMainMenu(menu_items)
                 text = _("Show today's minutes on the sleep screen"),
                 checked_func = function() return self.settings:readSetting("sleep_screen") ~= false end,
                 callback = function() self:setSleepScreen(self.settings:readSetting("sleep_screen") == false) end,
+            },
+            {
+                text = _("Sound in Daf"),
+                checked_func = function() return self.settings:isTrue("sound") end,
+                callback = function()
+                    self.settings:saveSetting("sound", not self.settings:isTrue("sound"))
+                    self.settings:flush()
+                    self:sendWhere()
+                end,
             },
             {
                 text = _("Open Daf on the first wake of the morning"),
