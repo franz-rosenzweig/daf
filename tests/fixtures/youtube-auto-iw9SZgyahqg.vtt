@@ -1,0 +1,135 @@
+WEBVTT
+Kind: captions
+Language: en
+
+00:01:28.000 --> 00:01:29.390 align:start position:0%
+understand 3SAT, which you may vaguely
+remember<00:01:28.500><c> from</c><00:01:28.700><c> when</c><00:01:28.800><c> you</c><00:01:28.900><c> were</c><00:01:29.000><c> high</c><00:01:29.300><c> in</c>
+
+00:01:29.390 --> 00:01:29.400 align:start position:0%
+remember from when you were high in
+ 
+
+00:01:29.400 --> 00:01:30.890 align:start position:0%
+remember from when you were high in
+computer<00:01:29.800><c> science</c><00:01:30.100><c> class</c><00:01:30.400><c> in</c><00:01:30.500><c> your</c><00:01:30.600><c> junior</c>
+
+00:01:30.890 --> 00:01:30.900 align:start position:0%
+computer science class in your junior
+ 
+
+00:01:30.900 --> 00:01:32.790 align:start position:0%
+computer science class in your junior
+year<00:01:31.100><c> of</c><00:01:31.200><c> college.</c><00:01:31.800><c> The</c><00:01:32.000><c> idea</c><00:01:32.400><c> is</c><00:01:32.600><c> that</c><00:01:32.800><c> you</c>
+
+00:01:32.790 --> 00:01:32.800 align:start position:0%
+year of college. The idea is that you
+ 
+
+00:01:32.800 --> 00:01:34.990 align:start position:0%
+year of college. The idea is that you
+have<00:01:33.000><c> a</c><00:01:33.100><c> bunch</c><00:01:33.400><c> of</c><00:01:33.500><c> true</c><00:01:33.700><c> false</c><00:01:34.000><c> variables</c><00:01:34.700><c> and</c>
+
+00:01:34.990 --> 00:01:35.000 align:start position:0%
+have a bunch of true false variables and
+ 
+
+00:01:35.000 --> 00:01:37.090 align:start position:0%
+have a bunch of true false variables and
+a list<00:01:35.300><c> of</c><00:01:35.400><c> rules</c><00:01:36.000><c> where</c><00:01:36.200><c> each</c><00:01:36.400><c> rule</c><00:01:36.800><c> says</c><00:01:37.000><c> at</c>
+
+00:01:37.090 --> 00:01:37.100 align:start position:0%
+a list of rules where each rule says at
+ 
+
+00:01:37.100 --> 00:01:38.890 align:start position:0%
+a list of rules where each rule says at
+least<00:01:37.300><c> one</c><00:01:37.500><c> of</c><00:01:37.600><c> these</c><00:01:37.800><c> three</c><00:01:38.000><c> variables</c><00:01:38.700><c> has</c>
+
+00:01:38.890 --> 00:01:38.900 align:start position:0%
+least one of these three variables has
+ 
+
+00:01:38.900 --> 00:01:40.890 align:start position:0%
+least one of these three variables has
+to<00:01:39.000><c> be</c><00:01:39.200><c> true.</c><00:01:39.700><c> And</c><00:01:39.900><c> your</c><00:01:40.000><c> job</c><00:01:40.200><c> is</c><00:01:40.400><c> to</c><00:01:40.500><c> find</c><00:01:40.800><c> a</c>
+
+00:01:40.890 --> 00:01:40.900 align:start position:0%
+to be true. And your job is to find a
+ 
+
+00:01:40.900 --> 00:01:42.990 align:start position:0%
+to be true. And your job is to find a
+setting<00:01:41.300><c> of</c><00:01:41.400><c> variables</c><00:01:42.200><c> that</c><00:01:42.500><c> satisfies</c>
+
+00:01:42.990 --> 00:01:43.000 align:start position:0%
+setting of variables that satisfies
+ 
+
+00:01:43.000 --> 00:01:44.890 align:start position:0%
+setting of variables that satisfies
+every<00:01:43.300><c> rule</c><00:01:43.600><c> at</c><00:01:43.700><c> once.</c><00:01:44.200><c> It's</c><00:01:44.400><c> the</c><00:01:44.500><c> original</c>
+
+00:01:44.890 --> 00:01:44.900 align:start position:0%
+every rule at once. It's the original
+ 
+
+00:01:44.900 --> 00:01:46.990 align:start position:0%
+every rule at once. It's the original
+NP-complete<00:01:45.700><c> problem,</c><00:01:46.400><c> which</c><00:01:46.600><c> means</c><00:01:46.800><c> if</c><00:01:46.900><c> you</c>
+
+00:01:46.990 --> 00:01:47.000 align:start position:0%
+NP-complete problem, which means if you
+ 
+
+00:01:47.000 --> 00:01:48.490 align:start position:0%
+NP-complete problem, which means if you
+could<00:01:47.100><c> solve</c><00:01:47.300><c> it</c><00:01:47.400><c> fast,</c><00:01:48.000><c> you</c><00:01:48.100><c> could</c><00:01:48.200><c> solve</c>
+
+00:01:48.490 --> 00:01:48.500 align:start position:0%
+could solve it fast, you could solve
+ 
+
+00:01:48.500 --> 00:01:50.790 align:start position:0%
+could solve it fast, you could solve
+every<00:01:48.800><c> other</c><00:01:49.100><c> NP</c><00:01:49.400><c> problem</c><00:01:49.800><c> fast.</c><00:01:50.400><c> If</c><00:01:50.500><c> P</c><00:01:50.700><c> would</c>
+
+00:01:50.790 --> 00:01:50.800 align:start position:0%
+every other NP problem fast. If P would
+ 
+
+00:01:50.800 --> 00:01:52.890 align:start position:0%
+every other NP problem fast. If P would
+equal<00:01:51.100><c> NP</c><00:01:51.600><c> and</c><00:01:51.800><c> you'd</c><00:01:52.000><c> become</c><00:01:52.300><c> the</c><00:01:52.400><c> most</c><00:01:52.700><c> hated</c>
+
+00:01:52.890 --> 00:01:52.900 align:start position:0%
+equal NP and you'd become the most hated
+ 
+
+00:01:52.900 --> 00:01:54.790 align:start position:0%
+equal NP and you'd become the most hated
+man<00:01:53.100><c> in</c><00:01:53.200><c> cryptography.</c><00:01:54.200><c> The</c><00:01:54.500><c> obvious</c>
+
+00:01:54.790 --> 00:01:54.800 align:start position:0%
+man in cryptography. The obvious
+ 
+
+00:01:54.800 --> 00:01:56.790 align:start position:0%
+man in cryptography. The obvious
+approach<00:01:55.200><c> is</c><00:01:55.300><c> to</c><00:01:55.400><c> try</c><00:01:55.600><c> every</c><00:01:55.900><c> combination,</c>
+
+00:01:56.790 --> 00:01:56.800 align:start position:0%
+approach is to try every combination,
+ 
+
+00:01:56.800 --> 00:01:58.690 align:start position:0%
+approach is to try every combination,
+which<00:01:57.000><c> is</c><00:01:57.100><c> 2</c><00:01:57.400><c> to</c><00:01:57.500><c> the</c><00:01:57.600><c> N</c><00:01:57.800><c> of</c><00:01:57.900><c> them.</c><00:01:58.400><c> And</c><00:01:58.500><c> over</c>
+
+00:01:58.690 --> 00:01:58.700 align:start position:0%
+which is 2 to the N of them. And over
+ 
+
+00:01:58.700 --> 00:02:01.182 align:start position:0%
+which is 2 to the N of them. And over
+the<00:01:58.800><c> decades,</c><00:01:59.200><c> we've</c><00:01:59.400><c> got</c><00:01:59.792><c> down</c><00:02:00.092><c> to</c><00:02:00.192><c> about</c><00:02:00.392><c> 1.3</c>

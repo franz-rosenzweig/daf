@@ -10,6 +10,8 @@ Videos I save show up under **Videos** in the Library. Open one and the player s
 
 The transcript comes from YouTube's own captions when there are any. When there aren't, Daf transcribes the audio itself with faster-whisper on the server, which is slow, so it only happens when you ask: **Get YouTube's captions** or **Transcribe on the server (slow)**. Long videos get their chapters as headings.
 
+YouTube's automatic captions scroll up a line at a time, and each new caption starts with the line before it, so Daf used to print every line two or three times. Since November 2026 it keeps each line once, and a phrase the speaker really did say twice stays twice. A transcript made before that is cleaned with `daf captions-rebuild` on the server, which fetches YouTube's captions again. It leaves alone any video I've highlighted, because the highlights would lose their place.
+
 **Clip 30s** (or c) highlights the last thirty seconds of what you just heard, which is the BEST way I've found to keep something from a talk. The highlight keeps its time and the words that were said, and it goes into the review like any other.
 
 Keys: Space plays and pauses, c clips, and ← → move ten seconds. The player is YouTube's privacy-mode embed, and **Watch on Invidious** opens it there instead.
