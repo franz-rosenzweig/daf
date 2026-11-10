@@ -46,13 +46,18 @@ final class Catalog {
     var side = UserDefaults.standard.bool(forKey: "catalogSide") {
         didSet { UserDefaults.standard.set(side, forKey: "catalogSide") }
     }
-    var open = Set(UserDefaults.standard.stringArray(forKey: "catalogOpen") ?? ["added", "missing", "status", "tags"]) {
+    var open = Set(UserDefaults.standard.stringArray(forKey: "catalogOpen") ?? ["added", "missing", "tidy", "status", "tags"]) {
         didSet { UserDefaults.standard.set(Array(open), forKey: "catalogOpen") }
     }
     var all: Set<String> = []
     var fq = ""
     /// The row chosen, and where the table was scrolled, for coming back to it.
     var picked: String?
+    /// The rows chosen (Daf ids), in the table's order: several are edited at once.
+    var chosen: [String] = []
+    /// Their Calibre ids.
+    var chosenCals: [Int] { chosenBooks.compactMap { $0.i("calibre_id") } }
+    var chosenBooks: [J] { books.filter { chosen.contains($0.s("id") ?? "") } }
     @ObservationIgnored var scroll: NSPoint?
     @ObservationIgnored private var seq = 0
 
@@ -189,6 +194,7 @@ final class Catalog {
                         ("added:thisyear", "This year"), ("added:lastyear", "Last year")]
     static let missing = [("formats:false", "No file"), ("cover:false", "No cover"), ("tags:false", "No tags"),
                           ("rating:false", "No rating"), ("series:false", "No series")]
+    static let tidy = [("duplicate:true", "Possible duplicates"), ("title:~[âÃ�]", "Odd characters"), ("authors:\"~^[^&]+, \"", "Last name first")]
 
     static func term(_ key: String, _ v: Any) -> String {
         if key == "rating" { return "rating:" + num(v) }
@@ -354,6 +360,8 @@ struct CatalogPage: View {
     @State private var newName = ""
     @State private var replacing: String?
     @State private var deleting: String?
+    /// Books to remove from Calibre, asked first.
+    @State private var removing: [J]?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -373,7 +381,9 @@ struct CatalogPage: View {
                     .background(.red.opacity(0.08))
                     Divider()
                 }
-                CatalogTable(cat: cat, version: cat.version, layout: cat.layout, sort: cat.sort + (cat.desc ? "↓" : "↑")) { model.open(book: $0) }
+                CatalogTable(cat: cat, version: cat.version, layout: cat.layout, sort: cat.sort + (cat.desc ? "↓" : "↑"), chosen: cat.chosen,
+                             open: { model.open(book: $0) }, edit: { model.sheet = .editBooks($0) },
+                             merge: { model.sheet = .mergeBooks($0) }, remove: { removing = $0 })
                     .overlay {
                         if !cat.loaded {
                             if let f = cat.failed { ContentUnavailableView("It didn't load", systemImage: "exclamationmark.triangle", description: Text(f)) }
@@ -382,6 +392,22 @@ struct CatalogPage: View {
                             Text("Nothing matches.").foregroundStyle(.secondary)
                         }
                     }
+                if cat.chosen.count > 1 {
+                    Divider()
+                    HStack(spacing: 10) {
+                        Text("\(cat.chosen.count) chosen").bold()
+                        Spacer()
+                        if cat.chosen.count < cat.books.count {
+                            Button("Choose All \(cat.books.count)") { cat.chosen = cat.books.compactMap { $0.s("id") } }
+                        }
+                        Button("Clear") { cat.chosen = [] }
+                        Button("Merge…") { model.sheet = .mergeBooks(cat.chosenCals) }
+                        Button("Remove…", role: .destructive) { removing = cat.chosenBooks }
+                        Button("Edit \(cat.chosen.count) Books…") { model.sheet = .editBooks(cat.chosenCals) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                }
             }
         }
         .navigationTitle("All Books")
@@ -411,6 +437,8 @@ struct CatalogPage: View {
                 Menu {
                     Button("Export as CSV…") { cat.export() }
                     Toggle("Show Private Books", isOn: Binding(get: { cat.priv }, set: { cat.showPrivate($0) }))
+                    Divider()
+                    Button("Calibre's Trash…") { model.sheet = .calibreTrash }
                 } label: { Label("More", systemImage: "ellipsis.circle") }
                 .help("More")
             }
@@ -428,6 +456,15 @@ struct CatalogPage: View {
         .confirmationDialog("Replace the view “\(replacing ?? "")”?", isPresented: Binding(get: { replacing != nil }, set: { if !$0 { replacing = nil } })) {
             Button("Replace") { if let n = replacing { save(n) }; replacing = nil }
         }
+        .confirmationDialog(BookEdit.removeQuestion(removing ?? []), isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
+            Button("Remove", role: .destructive) {
+                let books = removing ?? []
+                removing = nil
+                Task {
+                    do { try await BookEdit.remove(books); cat.chosen = [] } catch { model.error = error.localizedDescription }
+                }
+            }
+        } message: { Text(BookEdit.removeNote(removing ?? [])) }
         .confirmationDialog("Delete the view “\(deleting ?? "")”?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
             Button("Delete", role: .destructive) {
                 if let n = deleting { Task { do { try await cat.delete(view: n) } catch { model.error = error.localizedDescription } } }
@@ -528,6 +565,7 @@ struct CatalogFilter: View {
             List {
                 group("added", "Added", Catalog.added.map { Val(t: $0.0, label: $0.1) })
                 group("missing", "Missing", Catalog.missing.map { Val(t: $0.0, label: $0.1) })
+                group("tidy", "Tidy", Catalog.tidy.map { Val(t: $0.0, label: $0.1) })
                 ForEach(Array((cat.facets ?? []).enumerated()), id: \.offset) { _, f in
                     let key = f.s("key") ?? ""
                     group(key, f.s("label") ?? key, f.list("values").compactMap { x -> Val? in
@@ -597,9 +635,13 @@ struct CatalogTable: NSViewRepresentable {
     let version: Int
     let layout: String
     let sort: String
+    let chosen: [String]
     let open: (J) -> Void
+    let edit: ([Int]) -> Void
+    let merge: ([Int]) -> Void
+    let remove: ([J]) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(cat, open) }
+    func makeCoordinator() -> Coordinator { Coordinator(cat, open, edit, merge, remove) }
 
     func makeNSView(context: Context) -> NSScrollView {
         let c = context.coordinator
@@ -610,7 +652,7 @@ struct CatalogTable: NSViewRepresentable {
         t.allowsColumnReordering = true
         t.allowsColumnResizing = true
         t.allowsColumnSelection = false
-        t.allowsMultipleSelection = false
+        t.allowsMultipleSelection = true
         t.rowHeight = 30
         t.intercellSpacing = NSSize(width: 10, height: 2)
         t.delegate = c
@@ -618,6 +660,8 @@ struct CatalogTable: NSViewRepresentable {
         t.target = c
         t.doubleAction = #selector(Coordinator.doubleClicked)
         t.onReturn = { [weak c] in c?.openPicked() }
+        t.onEdit = { [weak c] in c?.editChosen() }
+        t.onRemove = { [weak c] in c?.removeChosen() }
         let header = NSMenu()
         header.delegate = c
         t.headerView?.menu = header
@@ -639,6 +683,9 @@ struct CatalogTable: NSViewRepresentable {
 
     func updateNSView(_ s: NSScrollView, context: Context) {
         context.coordinator.open = open
+        context.coordinator.edit = edit
+        context.coordinator.merge = merge
+        context.coordinator.remove = remove
         context.coordinator.sync()
     }
 
@@ -651,14 +698,27 @@ struct CatalogTable: NSViewRepresentable {
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
         let cat: Catalog
         var open: (J) -> Void
+        var edit: ([Int]) -> Void
+        var merge: ([Int]) -> Void
+        var remove: ([J]) -> Void
         weak var table: NSTableView?
         weak var headerMenu: NSMenu?
         private var drawn = -1
         private var syncing = false
 
-        init(_ cat: Catalog, _ open: @escaping (J) -> Void) {
+        init(_ cat: Catalog, _ open: @escaping (J) -> Void, _ edit: @escaping ([Int]) -> Void, _ merge: @escaping ([Int]) -> Void, _ remove: @escaping ([J]) -> Void) {
             self.cat = cat
             self.open = open
+            self.edit = edit
+            self.merge = merge
+            self.remove = remove
+        }
+
+        /// The rows the catalog has chosen, chosen in the table.
+        private func choose(_ t: NSTableView, orPicked: Bool) {
+            var rows = IndexSet(cat.books.indices.filter { cat.chosen.contains(cat.books[$0].s("id") ?? "") })
+            if rows.isEmpty, orPicked, let p = cat.picked, let i = cat.books.firstIndex(where: { $0.s("id") == p }) { rows = [i] }
+            if rows != t.selectedRowIndexes { t.selectRowIndexes(rows, byExtendingSelection: false) }
         }
 
         /// The table as the catalog has it: its columns, their widths, the order, the rows.
@@ -683,12 +743,18 @@ struct CatalogTable: NSViewRepresentable {
                 t.setIndicatorImage(on ? NSImage(named: cat.desc ? "NSDescendingSortIndicator" : "NSAscendingSortIndicator") : nil, in: tc)
             }
             t.highlightedTableColumn = nil
-            guard reload else { return }
+            guard reload else {
+                // Choose All and Clear
+                if Set(t.selectedRowIndexes.compactMap { cat.books.indices.contains($0) ? cat.books[$0].s("id") : nil }) != Set(cat.chosen) {
+                    choose(t, orPicked: false)
+                }
+                return
+            }
             drawn = cat.version
             t.reloadData()
-            if let p = cat.picked, let i = cat.books.firstIndex(where: { $0.s("id") == p }) {
-                t.selectRowIndexes([i], byExtendingSelection: false)
-            } else { t.deselectAll(nil) }
+            let kept = cat.chosen.filter { id in cat.books.contains { $0.s("id") == id } }      // only what the table shows stays chosen
+            if kept != cat.chosen { cat.chosen = kept }
+            choose(t, orPicked: true)
             // back where it was, once there are rows and the table has its size
             if let o = cat.scroll, !cat.books.isEmpty {
                 cat.scroll = nil
@@ -728,9 +794,38 @@ struct CatalogTable: NSViewRepresentable {
         }
 
         func tableViewSelectionDidChange(_ n: Notification) {
-            guard !syncing, let t = table, t.selectedRow >= 0, t.selectedRow < cat.books.count else { return }
-            cat.picked = cat.books[t.selectedRow].s("id")
+            guard !syncing, let t = table else { return }
+            let ids = t.selectedRowIndexes.compactMap { cat.books.indices.contains($0) ? cat.books[$0].s("id") : nil }
+            if ids != cat.chosen { cat.chosen = ids }
+            if t.selectedRow >= 0, t.selectedRow < cat.books.count { cat.picked = cat.books[t.selectedRow].s("id") }
         }
+
+        /// ⌘I: the chosen book's details, or the chosen books' together.
+        func editChosen() {
+            let ids = cat.chosenCals
+            if !ids.isEmpty { edit(ids) }
+        }
+
+        @objc private func editClicked() {
+            guard let t = table, t.clickedRow >= 0, t.clickedRow < cat.books.count, let cid = cat.books[t.clickedRow].i("calibre_id") else { return }
+            edit([cid])
+        }
+
+        @objc private func editAll() { editChosen() }
+
+        /// ⌘⌫: the chosen books out of Calibre, asked first.
+        func removeChosen() {
+            let books = cat.chosenBooks
+            if !books.isEmpty { remove(books) }
+        }
+
+        @objc private func removeClicked() {
+            guard let t = table, t.clickedRow >= 0, t.clickedRow < cat.books.count else { return }
+            let many = t.selectedRowIndexes.count > 1 && t.selectedRowIndexes.contains(t.clickedRow)
+            remove(many ? cat.chosenBooks : [cat.books[t.clickedRow]])
+        }
+
+        @objc private func mergeAll() { merge(cat.chosenCals) }
 
         @objc func moved(_ n: Notification) {
             guard !syncing, let t = table else { return }
@@ -780,6 +875,26 @@ struct CatalogTable: NSViewRepresentable {
                 let o = NSMenuItem(title: "Open", action: #selector(openClicked), keyEquivalent: "")
                 o.target = self
                 m.addItem(o)
+                let e = NSMenuItem(title: "Edit Details…", action: #selector(editClicked), keyEquivalent: "i")
+                e.keyEquivalentModifierMask = .command
+                e.target = self
+                m.addItem(e)
+                let n = t.selectedRowIndexes.count
+                let many = n > 1 && t.selectedRowIndexes.contains(t.clickedRow)
+                if many {
+                    m.addItem(.separator())
+                    let a = NSMenuItem(title: "Edit the \(n) Chosen…", action: #selector(editAll), keyEquivalent: "")
+                    a.target = self
+                    m.addItem(a)
+                    let g = NSMenuItem(title: "Merge the \(n) Chosen…", action: #selector(mergeAll), keyEquivalent: "")
+                    g.target = self
+                    m.addItem(g)
+                }
+                m.addItem(.separator())
+                let r = NSMenuItem(title: many ? "Remove the \(n) Chosen from Calibre…" : "Remove from Calibre…", action: #selector(removeClicked), keyEquivalent: "\u{8}")
+                r.keyEquivalentModifierMask = .command
+                r.target = self
+                m.addItem(r)
             }
         }
     }
@@ -787,8 +902,21 @@ struct CatalogTable: NSViewRepresentable {
 
 final class CatalogTableView: NSTableView {
     var onReturn: (() -> Void)?
+    var onEdit: (() -> Void)?
+    var onRemove: (() -> Void)?
     override func keyDown(with e: NSEvent) {
         if e.keyCode == 36 || e.keyCode == 76 { onReturn?() } else { super.keyDown(with: e) }
+    }
+    override func performKeyEquivalent(with e: NSEvent) -> Bool {
+        if window?.firstResponder === self, e.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, e.charactersIgnoringModifiers == "i" {
+            onEdit?()
+            return true
+        }
+        if window?.firstResponder === self, e.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, e.keyCode == 51 {
+            onRemove?()
+            return true
+        }
+        return super.performKeyEquivalent(with: e)
     }
 }
 
@@ -884,13 +1012,15 @@ final class CatalogCell: NSTableCellView {
 
     private func showCover(_ b: J) {
         guard let iv = cover, let id = b.s("id") else { return }
-        coverID = id
         iv.layer?.backgroundColor = NSColor.quaternaryLabelColor.cgColor
+        coverID = nil
         guard b.b("cover") else { iv.image = nil; return }
-        if let img = CatalogCovers.cache.object(forKey: id as NSString) { iv.image = img; return }
+        let key = id + "?v=" + (b.s("cover_v") ?? "0")
+        coverID = key
+        if let img = CatalogCovers.cache.object(forKey: key as NSString) { iv.image = img; return }
         iv.image = nil
         Task { @MainActor [weak self] in
-            guard let img = await CatalogCovers.get(id), self?.coverID == id else { return }
+            guard let img = await CatalogCovers.get(key), self?.coverID == key else { return }
             self?.cover?.image = img
         }
     }
@@ -916,11 +1046,15 @@ enum CatalogCovers {
     static let cache = NSCache<NSString, NSImage>()
     private static var loading: [String: Task<NSImage?, Never>] = [:]
 
-    static func get(_ id: String) async -> NSImage? {
+    /// `key`: the book's id and its cover's time ("cal:12?v=1731…"), as All Books asks for it.
+    static func get(_ key: String) async -> NSImage? {
+        let id = key
         if let i = cache.object(forKey: id as NSString) { return i }
         if let t = loading[id] { return await t.value }
+        let parts = key.split(separator: "?", maxSplits: 1).map(String.init)
+        let path = "/api/cover/" + API.enc(parts[0]) + (parts.count > 1 ? "?" + parts[1] : "")
         let t = Task { () -> NSImage? in
-            guard let d = try? await API.shared.data("/api/cover/" + API.enc(id)) else { return nil }
+            guard let d = try? await API.shared.data(path) else { return nil }
             return small(d)
         }
         loading[id] = t

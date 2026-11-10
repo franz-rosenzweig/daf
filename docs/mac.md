@@ -32,6 +32,14 @@ As on the page (see [What shows where](feed-and-library.md#what-shows-where)), o
 
 Double-clicking a book, or pressing Return, opens its page in Books. When I come back to All Books, the table is where I left it, with the same book picked.
 
+To change a book's details in Calibre, I pick it and press ⌘I, or right-click it and choose **Edit Details…**, and the book's own page has an **Edit Details…** button too. The sheet has the cover (**Change Cover…** from a file, **Cover from a Link…**), the files with their sizes (each one downloads, and its **…** menu converts it to EPUB, AZW3, KEPUB, MOBI or PDF, or removes it), **Add a File…**, and every field: the title, authors, series and its number, tags, rating, publisher, the date it was published, languages, identifiers, the description and my own Calibre columns. The fields suggest what Calibre already has as I type. Only what I changed is sent, with **Save** or ⌘↩, and Esc asks before it throws changes away.
+
+**Find Details…** at the top asks Hardcover and Calibre's own sources about the book. I pick one of the answers to see it next to what the book has now, a field a row, with a box to tick for each. What the book is missing comes ticked already. **Use These** puts the ticked ones into the form, and nothing is saved until I press Save, except a ticked cover, which goes on right away.
+
+Choosing several books (⌘-click, ⇧-click, or ⌘A) brings up a bar under the table with **Edit N Books…**. That sheet changes them all at once: authors, a series (numbered in the table's order if I like), tags to add and tags to take away, rating, publisher, date, languages and my own columns. Whatever I leave empty stays as each book has it. There's also **Turn “Last, First” names around**, for authors Calibre has backwards.
+
+For tidying, **Filter** has a **Tidy** group: **Possible duplicates**, **Odd characters** in a title, and **Last name first**. With two or more copies of a book chosen, **Merge…** (in the bar, or the right-click menu) asks which one to keep, starting with the one that has a cover and the most files. The kept book takes the others' files, tags, identifiers and anything it's missing, the others go to Calibre's trash, and their highlights, shelves and places in Daf move to the kept one. **Remove…** (also ⌘⌫, or **Remove from Calibre…** at the bottom of Edit Details) sends books to Calibre's trash after asking, and says how many highlights they have in Daf. **… → Calibre's Trash…** lists what was removed lately, each with **Put Back**.
+
 ## Reading
 
 An article's toolbar has **Themes & Settings** (Aa), **Listen**, **Save to Library** for something from the Feed, **Done**, the **…** menu and the **Notebook**. The **…** menu has the rest: the Shortlist, Read Later, the original, Focus Mode, the next or previous one in the list, and so on. The time left sits quietly under the text.

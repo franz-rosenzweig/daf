@@ -310,6 +310,8 @@ final class AppModel {
 
     enum Sheet: Identifiable, Hashable {
         case addLink, paper, follow, renameFeed(String), saveView, newShelf(String?), renameShelf(String), feedback, palette, shortcuts
+        case editBooks([Int])                // Calibre ids: one book's details, or several at once (BookEdit.swift)
+        case mergeBooks([Int]), calibreTrash
         var id: String {
             switch self {
             case .addLink: return "addLink"
@@ -322,6 +324,9 @@ final class AppModel {
             case .saveView: return "saveView"
             case .newShelf(let b): return "newShelf " + (b ?? "")
             case .renameShelf(let s): return "renameShelf " + s
+            case .editBooks(let ids): return "edit " + ids.map(String.init).joined(separator: ",")
+            case .mergeBooks(let ids): return "merge " + ids.map(String.init).joined(separator: ",")
+            case .calibreTrash: return "calibreTrash"
             }
         }
     }
