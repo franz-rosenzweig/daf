@@ -17,7 +17,7 @@ from starlette.concurrency import run_in_threadpool
 
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from . import ai, auth, config, db, digest, ebooks, feedback, goals, gpodder, imports, jump, library, lookup, media, notes, paper_pages, phone, reader, review, sync, today as T, torah, vaultnotes
+from . import ai, auth, catalog, config, db, digest, ebooks, feedback, goals, gpodder, imports, jump, library, lookup, media, notes, paper_pages, phone, reader, review, sync, today as T, torah, vaultnotes
 from .sources import checks, kindle, paper
 
 log = logging.getLogger(__name__)
@@ -1167,6 +1167,37 @@ def get_books(private: int = 0, c=Depends(conn)):
     return {"nightstand": stand_cards, "suggested": [] if stand else [_book_card(b) | {"readable": b["id"] in readable} for b in library.suggest_nightstand(c)],
             "others": out, "marked_reading": sum(1 for b in reading if b["status"] == "reading"),
             "manga": c.execute("SELECT COUNT(DISTINCT series) FROM manga_books").fetchone()[0]}
+
+
+# ---- All books (#catalog): the Calibre library as a spreadsheet (catalog.py) ----------------
+@app.get("/api/catalog", dependencies=[Depends(user)])
+def get_catalog(q: str = "", sort: str = "added", desc: int = 1, private: int = 0, facets: int = 0, c=Depends(conn)):
+    """Every Calibre book with Daf's side (status, progress, highlights, shelves), searched the way
+    Calibre searches (q), sorted by any column. facets=1 adds the values to filter by, with counts."""
+    return catalog.view(c, q, sort, bool(desc), bool(private), bool(facets))
+
+
+@app.get("/api/catalog/export", dependencies=[Depends(user)])
+def export_catalog(q: str = "", sort: str = "added", desc: int = 1, private: int = 0, cols: str = "", c=Depends(conn)):
+    """What the page shows, as CSV: its search, its order and its columns (cols=title,authors,…)."""
+    r = catalog.view(c, q, sort, bool(desc), bool(private))
+    if r["error"]:
+        raise HTTPException(400, r["error"])
+    import datetime as _dt
+    name = f"daf-books-{_dt.date.today().isoformat()}.csv"
+    return Response(catalog.to_csv(r, [k for k in cols.split(",") if k]), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.put("/api/catalog/views", dependencies=[Depends(user)])
+def put_catalog_views(b=Depends(json_body)):
+    """The saved views, all of them at once: [{name, q, sort, desc, cols, widths}]."""
+    if not isinstance(b, dict) or not isinstance(b.get("views"), list):
+        raise HTTPException(400, "views: a list")
+    s = config.load_settings()
+    s["catalog_views"] = catalog.clean_views(b["views"])
+    config.save_settings(s)
+    return {"views": s["catalog_views"]}
 
 
 @app.put("/api/nightstand", dependencies=[Depends(user)])

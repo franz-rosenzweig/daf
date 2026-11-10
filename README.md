@@ -46,6 +46,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 
 ### Reading in Daf
 
+- **All books.** The whole Calibre library as a spreadsheet: any columns, sorted any way, searched with Calibre's own search language, filtered from a tag browser, saved as views and exported as CSV.
 - **Books.** Every book in my Calibre library (EPUB, MOBI, AZW3, FB2 or CBZ) opens in Daf's own reader, built on foliate-js, in Scroll or Pages, with footnotes in a popover and minutes left in the chapter. If the Kindle is further along, Daf offers to go there.
 - **Themes and typefaces.** 17 themes, each in a light and a dark version, 24 reading faces that Daf serves itself, Hebrew ones too, and any font I add, like Bookerly. The choice follows me to every device.
 - **The Feed and the Library.** The Feed is Daf's own feed reader (it was FreshRSS until November), and it replaced Read You for me. The Library is Daf's own now (it was Karakeep until October): articles, tweets, PDFs, YouTube videos with their transcripts, links to Instagram reels, plus the newsletters I pick. Daf reads every page I save from my server, keeps its text and picture, and gives it a short summary and a few tags.
@@ -177,7 +178,7 @@ Daf is one Python process with a SQLite file, run as a systemd user service. I b
 The docs are a set of short pages, written the way I'd explain Daf to a friend.
 
 - **Getting started:** [What is Daf?](docs/what-is-daf.md), [A day with Daf](docs/how-i-use-it.md), [Install](docs/install.md)
-- **Using Daf:** [Today and goals](docs/today-and-goals.md), [Where the minutes come from](docs/reading-time.md), [Paper books](docs/paper-books.md), [The reader](docs/reader.md), [The Feed and the Library](docs/feed-and-library.md), [Videos and podcasts](docs/videos-and-podcasts.md), [Highlights and review](docs/highlights-and-review.md), [Books and shelves](docs/books-and-shelves.md), [The Torah shelf](docs/torah.md), [Stats](docs/stats.md), [Manga](docs/manga.md)
+- **Using Daf:** [Today and goals](docs/today-and-goals.md), [Where the minutes come from](docs/reading-time.md), [Paper books](docs/paper-books.md), [The reader](docs/reader.md), [The Feed and the Library](docs/feed-and-library.md), [Videos and podcasts](docs/videos-and-podcasts.md), [Highlights and review](docs/highlights-and-review.md), [Books and shelves](docs/books-and-shelves.md), [Calibre in Daf](docs/calibre.md), [The Torah shelf](docs/torah.md), [Stats](docs/stats.md), [Manga](docs/manga.md)
 - **Devices:** [The Kindle](docs/kindle.md), [The Mac app](docs/mac.md), [The Android app](docs/android.md), [The browser extension](docs/browser-extension.md), [Sharing, messages and the widget](docs/phone-shortcuts.md)
 - **Running your own server:** [Your own server](docs/server.md)
 - **Under the hood:** [How Daf runs](docs/OPERATIONS.md), [The plan](PLAN.md), [The native apps brief](docs/NATIVE.md), [The shell contract](docs/SHELL.md)

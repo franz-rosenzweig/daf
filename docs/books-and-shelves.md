@@ -37,6 +37,8 @@ On a book's page, **The Kindle** has **Put it on the Kindle** and a shelf to put
 - **Opened lately:** the books you've had open recently, on the Kindle or in Daf, each with **Put on the nightstand**.
 - **Your library:** every book in Calibre, with **Show all** for the full list.
 
+**All books**, at the top of the page, is the whole library as a spreadsheet, with Calibre's search. It has its own page: [Calibre in Daf](calibre.md).
+
 Manga volumes leave this page and live on their own, under [Manga](manga.md).
 
 ## Searching my books

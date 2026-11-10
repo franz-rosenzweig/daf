@@ -184,6 +184,8 @@ def load_settings():
         s["feed_pins_hide_empty"] = bool(saved["feed_pins_hide_empty"])
     if isinstance(saved.get("views"), list):          # saved Library and Feed views (Readwise's filtered views)
         s["views"] = [v for v in saved["views"] if isinstance(v, dict) and isinstance(v.get("id"), str)][:30]
+    if isinstance(saved.get("catalog_views"), list):  # All books (#catalog): saved searches, sorts and columns (catalog.py)
+        s["catalog_views"] = [v for v in saved["catalog_views"] if isinstance(v, dict) and isinstance(v.get("name"), str)][:40]
     if isinstance(saved.get("goals"), list):
         s["goals"] = [g for g in saved["goals"] if isinstance(g, dict)]      # checked in goals.all_goals
     for k in ("feed_full", "feed_notify"):          # the Feed's per-feed switches: full article, notify

@@ -381,7 +381,7 @@ document.addEventListener('change', async e => {
 });
 function renderSide(){
   const v = S.route[0];
-  const n = (key, label, icon, extra) => '<button class="nv' + (v === key || (key === 'books' && v === 'book') ? ' on' : '') + '" data-go="' + key + '">' + icon + '<span>' + label + '</span>' + (extra || '') + '</button>';
+  const n = (key, label, icon, extra) => '<button class="nv' + (v === key || (key === 'books' && (v === 'book' || v === 'catalog')) ? ' on' : '') + '" data-go="' + key + '">' + icon + '<span>' + label + '</span>' + (extra || '') + '</button>';
   const d = S.data;
   const mins = d ? (d.main && !(d.main.kind === 'minutes' && d.main.period === 'day') ? d.main.done + '/' + d.main.target : Math.floor(d.counted) + '/' + Math.round(d.goal || 60)) : '';
   const rv = d && d.review ? (d.review.total - d.review.done) + (d.cards_due || 0) : '';
@@ -661,7 +661,7 @@ function hlCard(x){ return window.DafCore.HL.row(x); }
 /* ---------- books ---------- */
 async function renderBooks(){
   $('#main').innerHTML = '<div class="top"><h1>Books</h1><span class="spacer"></span>' + window.DafCore.Find.html('books', 'Search books', findBooks, 250) +
-    '<button class="btn sm primary" data-act="addbook">Add a book</button></div><div class="page"><span class="mute">Loading…</span></div>';
+    '<a class="btn sm" href="#catalog">All books</a><button class="btn sm primary" data-act="addbook">Add a book</button></div><div class="page"><span class="mute">Loading…</span></div>';
   const r = await swr('/api/books');
   S.books = r;
   const stand = r.nightstand.length ? r.nightstand : [];
@@ -1251,7 +1251,7 @@ document.addEventListener('keydown', e => {
   }
   // Pages without shortcuts of their own still answer ?: the ones that work everywhere.
   if (!typing && e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey && window.DafCore.Keys &&
-      ['today', 'highlights', 'books', 'book', 'stats', 'prefs', 'sources', 'torah', 'recovery', 'podcasts', 'paper', 'manga', 'shelves', 'shelf'].includes(S.route[0])) {
+      ['today', 'highlights', 'books', 'book', 'stats', 'prefs', 'sources', 'torah', 'recovery', 'podcasts', 'paper', 'manga', 'shelves', 'shelf', 'catalog'].includes(S.route[0])) {
     e.preventDefault(); window.DafCore.Keys.sheet('general'); return;
   }
   if (S.route[0] === 'review'){
