@@ -115,7 +115,7 @@ function bulkBar(){
   const n = P.sel.size, all = P.data ? P.data.books.length : 0;
   bar.hidden = false;
   bar.innerHTML = '<b>' + n + ' chosen</b><span class="spacer"></span>' + (n < all ? '<button class="btn sm" data-catb="all">Choose all ' + all + '</button>' : '') +
-    '<button class="btn sm" data-catb="none">Clear</button>' + (n > 1 ? '<button class="btn sm" data-catb="merge">Merge</button>' : '') + '<button class="btn sm danger" data-catb="remove">Remove</button>' +
+    '<button class="btn sm" data-catb="none">Clear</button><button class="btn sm" data-catb="fill">Find details</button>' + (n > 1 ? '<button class="btn sm" data-catb="merge">Merge</button>' : '') + '<button class="btn sm danger" data-catb="remove">Remove</button>' +
     '<button class="btn sm primary" data-catb="edit">' + (n === 1 ? 'Edit details' : 'Edit ' + n + ' books') + '</button>';
 }
 function choose(id, on){
@@ -219,10 +219,14 @@ function viewsMenu(anchor){
     (!P.view && P.lastView && vs.some(v => v.name === P.lastView) ? '<button data-catm="update"><i></i>Save into “' + esc(P.lastView) + '”</button>' : '') +
     '<button data-catm="save"><i></i>Save as a view…</button><button data-catm="reset"><i></i>All books, newest first</button>');
 }
-function moreMenu(anchor){
+async function moreMenu(anchor){
   const qs = new URLSearchParams({ q: P.q, sort: P.sort, desc: P.desc ? '1' : '0', cols: colsNow().map(c => c.key).join(',') });
   if (P.priv) qs.set('private', '1');
-  openPop(anchor, '<a href="/api/catalog/export?' + qs.toString() + '" download><i></i>Export as CSV</a>' +
+  let emb = { pending: 0 };
+  try { emb = await api('/api/catalog/embed'); } catch(e){}
+  openPop(anchor, '<button data-catm="items"><i></i>Tags, authors and series</button>' +
+    (emb.pending ? '<button disabled><i></i>Writing details into files · ' + emb.pending + ' left</button>' : '<button data-catm="embedall"><i></i>Write details into every file</button>') + '<hr>' +
+    '<a href="/api/catalog/export?' + qs.toString() + '" download><i></i>Export as CSV</a>' +
     '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>' +
     '<hr><button data-catm="trash"><i></i>Calibre’s trash</button>');
 }
@@ -270,6 +274,10 @@ document.addEventListener('click', async e => {
     else if (k === 'clear') setQ('');
     else if (k === 'colsreset') { P.cols = null; P.widths = {}; P.view = dirtyView(); keep(); draw(); $('#pop').hidden = true; }
     else if (k === 'trash') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.trash(P.priv); }
+    else if (k === 'items') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.items('tags'); }
+    else if (k === 'embedall') { $('#pop').hidden = true;
+      if (confirm('Write the details into the files of all ' + (P.data ? P.data.total : '') + ' books? Calibre rewrites each file; it takes a few minutes.'))
+        api('/api/catalog/embed', { method: 'POST', body: JSON.stringify({ all: true }) }).then(r => toast('Writing details into ' + r.pending + ' books’ files')).catch(err => toast(err.message)); }
     else if (k === 'priv') { P.priv = !P.priv; keep(); $('#pop').hidden = true; P.facets = null; load(true).then(() => { if (P.side) drawSide(); }); }
     else if (k === 'reset') { $('#pop').hidden = true; Object.assign(P, { q: '', sort: 'added', desc: true, cols: null, widths: {}, view: null }); keep(); const box = $('#catq'); if (box) box.value = ''; load(); if (P.side) drawSide(); }
     else if (k === 'save' || k === 'update') {
@@ -298,6 +306,7 @@ document.addEventListener('click', e => {
   if (b) { const k = b.dataset.catb;
     if (k === 'edit' && C.BookEdit) C.BookEdit.bulk([...P.sel]);
     else if (k === 'merge' && C.BookEdit) C.BookEdit.merge(P.data.books.filter(x => P.sel.has(x.calibre_id)));
+    else if (k === 'fill' && C.BookEdit) C.BookEdit.fill(P.data.books.filter(x => P.sel.has(x.calibre_id)));
     else if (k === 'remove' && C.BookEdit) C.BookEdit.remove(P.data.books.filter(x => P.sel.has(x.calibre_id))).then(done => { if (done) P.sel.clear(); });
     else if (k === 'none') { P.sel.clear(); draw(); }
     else if (k === 'all') { P.data.books.forEach(x => P.sel.add(x.calibre_id)); draw(); }
@@ -400,5 +409,5 @@ const endDrag = e => {
 document.addEventListener('pointerup', endDrag, true);
 document.addEventListener('pointercancel', endDrag, true);
 
-C.Catalog = { reload: () => { if (C.S.route[0] === 'catalog') load(true).then(() => { if (P.side) drawSide(); }); }, books: () => (P.data && P.data.books) || [] };
+C.Catalog = { search: q => { if (C.S.route[0] !== 'catalog') { P.q = q; keep(); location.hash = 'catalog'; } else setQ(q); }, reload: () => { if (C.S.route[0] === 'catalog') load(true).then(() => { if (P.side) drawSide(); }); }, books: () => (P.data && P.data.books) || [] };
 })();

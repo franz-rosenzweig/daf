@@ -72,7 +72,7 @@ def main():
             ids = [int(i) for i in op.get("ids") or ([op["id"]] if "id" in op else [])]
             have = set(d.all_book_ids())
             missing = [i for i in ids if i not in have]
-            if missing:
+            if missing and k != "embed":
                 raise ValueError("Calibre has no book %s" % missing[0])
             if k == "set":
                 for field, v in op["fields"].items():
@@ -186,6 +186,32 @@ def main():
                     touched.add(i)
                 out["done"].append(k)
                 continue
+            elif k in ("rename_items", "remove_items"):    # a tag, author, series… across the library
+                field = op["field"]
+                names = op["renames"] if k == "rename_items" else {n: None for n in op["names"]}
+                ids_map, hit = {}, set()
+                exact = {n: i for i, n in d.get_id_map(field).items()}
+                for name, to in names.items():
+                    iid = exact.get(name)       # get_item_id(case_sensitive=True) misses names with a comma
+                    if iid is None:
+                        continue
+                    hit |= set(d.books_for_field(field, iid))
+                    if to is None or to != name:
+                        ids_map[iid] = to
+                if not ids_map:
+                    raise ValueError("Calibre has none of those names")
+                if ids_map:
+                    if k == "rename_items":
+                        d.rename_items(field, ids_map)
+                    else:
+                        d.remove_items(field, list(ids_map))
+                touched.update(hit)
+                out["done"].append(k)
+                continue
+            elif k == "embed":                          # the details into the book files themselves
+                d.embed_metadata([i for i in ids if i in have])
+                out["done"].append(k)
+                continue
             elif k == "remove_books":
                 d.remove_books(ids)
                 for i in ids:
@@ -236,6 +262,8 @@ def run(ops, timeout=120):
         raise CalibreError(out.get("error") or "Calibre said no")
     books = {int(k): v for k, v in out["books"].items()}
     _follow(books)
+    if any(op.get("op") in EMBED_AFTER for op in ops):
+        embed_later([i for i, b in books.items() if b])
     if "trash" in out:
         books["trash"] = out["trash"]
     return books
@@ -260,6 +288,63 @@ def _follow(books):
 
 def b64(data):
     return base64.b64encode(data).decode()
+
+
+# ---------- the details go into the book files too, a little later ----------
+# Calibre keeps a book's details in its database; the EPUB (or AZW3, PDF…) keeps its own copy inside,
+# which is what the Kindle and other readers show. After a change, Calibre writes them into the
+# files (embed_metadata), as Calibre-Web Automated does after an edit there. In the background, a
+# batch at a time, so an edit of many books doesn't wait for it.
+EMBED_AFTER = {"set", "tags", "cover", "merge", "rename_items", "remove_items", "restore"}
+_embed = {"pending": set(), "running": 0, "done": 0, "error": None}
+_embed_cv = threading.Condition()
+
+
+def embed_later(ids):
+    with _embed_cv:
+        _embed["pending"].update(int(i) for i in ids)
+        _embed_cv.notify()
+    _embed_worker()
+
+
+def embed_status():
+    return {"pending": len(_embed["pending"]) + _embed["running"], "done": _embed["done"], "error": _embed["error"]}
+
+
+_worker = []
+
+
+def _embed_worker():
+    if _worker and _worker[0].is_alive():
+        return
+
+    def loop():
+        while True:
+            with _embed_cv:
+                while not _embed["pending"]:
+                    _embed_cv.wait(60)
+                batch = sorted(_embed["pending"])[:25]
+                _embed["pending"].difference_update(batch)
+                _embed["running"] = len(batch)
+            time.sleep(3)                       # an edit right after usually touches the same books
+            r = None
+            if _lock.acquire(timeout=900):
+                try:
+                    r = subprocess.run(RUN + [DEBUG, "-c", SCRIPT], input=json.dumps({"lib": LIB, "ops": [{"op": "embed", "ids": batch}]}),
+                                       capture_output=True, text=True, timeout=900)
+                except (subprocess.TimeoutExpired, OSError) as e:
+                    log.warning("embed: %s", e)
+                finally:
+                    _lock.release()
+            ok = r is not None and any(x.startswith("DAFRESULT ") and '"ok": true' in x for x in r.stdout.splitlines())
+            _embed["error"] = None if ok else "Calibre couldn't write the details into some files"
+            if not ok:
+                log.warning("embed failed: %s", (r.stdout[-400:] + r.stderr[-400:]) if r else "lock")
+            _embed["done"] += len(batch) if ok else 0
+            _embed["running"] = 0
+    t = threading.Thread(target=loop, daemon=True, name="calibre-embed")
+    _worker[:] = [t]
+    t.start()
 
 
 # ---------- conversions take a while: a job the page asks about ----------

@@ -95,3 +95,40 @@ class Search(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Tidy(unittest.TestCase):
+    def test_alike(self):
+        tags = ["Self Help", "Self-Help", "selfhelp", "Thriller", "Thrillers", "Essays", "Glass", "History"]
+        self.assertEqual(sorted(map(sorted, catalog.alike(tags, "tags"))), [["Self Help", "Self-Help", "selfhelp"], ["Thriller", "Thrillers"]])
+        authors = ["J. R. R. Tolkien", "J.R.R. Tolkien", "J R R Tolkien", "Tolkien, J. R. R.", "Raphael Patai", "Patai, Raphael", "Ann Patchett"]
+        groups = sorted(map(sorted, catalog.alike(authors, "authors")))
+        self.assertEqual(groups, [["J R R Tolkien", "J. R. R. Tolkien", "J.R.R. Tolkien", "Tolkien, J. R. R."], ["Patai, Raphael", "Raphael Patai"]])
+
+
+class Fill(unittest.TestCase):
+    def setUp(self):
+        from daf import calibrefind
+        self.F = calibrefind
+        self.book = {"title": "Gilead", "authors": ["Marilynne Robinson"], "publisher": None, "published": "2004-01-01", "comments": "",
+                     "tags": [], "series": None, "languages": ["eng"], "cover": True, "#pages": None, "identifiers_map": {"isbn": "9781700137210"}}
+
+    def test_same_book(self):
+        F = self.F
+        self.assertTrue(F.same_book(self.book, {"title": "Gilead: A Novel", "authors": ["Marilynne Robinson"]}))
+        self.assertFalse(F.same_book(self.book, {"title": "Study Guide: Gilead by Marilynne Robinson", "authors": ["Supersummary"]}))
+        self.assertFalse(F.same_book(self.book, {"title": "Gilead", "authors": ["Someone Else"]}))
+        self.assertTrue(F.same_book({"title": "Café", "authors": ["Jean Kovačić"]}, {"title": "Cafe", "authors": ["J. Kovacic"]}))
+
+    def test_proposals_fill_only_whats_missing(self):
+        a = {"source": "Hardcover", "title": "Gilead", "authors": ["Marilynne Robinson"], "publisher": "Picador", "published": "2006-01-10",
+             "comments": "A letter.", "tags": ["Fiction"], "series": "Gilead", "series_index": 1, "languages": ["eng"],
+             "identifiers": {"hardcover-book": "247430", "isbn": "9780312424404"}, "pages": 289, "cover": "https://x/c.jpg"}
+        props, src = self.F.proposals(self.book, [a], self.F.FILL_FIELDS, {"#pages"})
+        self.assertEqual(props["publisher"], "Picador")
+        self.assertNotIn("published", props)                 # it has a date already
+        self.assertNotIn("cover", props)                     # and a cover
+        self.assertNotIn("languages", props)
+        self.assertEqual(props["identifiers"], {"hardcover-book": "247430"})   # its own ISBN stays
+        self.assertEqual((props["series"], props["series_index"], props["#pages"]), ("Gilead", 1, 289))
+        self.assertEqual(src["publisher"], "Hardcover")
