@@ -311,6 +311,10 @@ CREATE TABLE IF NOT EXISTS inbox (           -- links shared to Daf from the pho
   created INTEGER NOT NULL,
   status TEXT NOT NULL                      -- new | saved | failed
 );
+CREATE TABLE IF NOT EXISTS editions (        -- the Edition, one a day (edition.py): the pieces chosen, in order, with why
+  day TEXT PRIMARY KEY, made INTEGER NOT NULL, items TEXT NOT NULL, how TEXT, kindle TEXT);
+CREATE TABLE IF NOT EXISTS edition_votes (   -- thumbs on an Edition's pieces: +1 / -1, with what the piece was, for the taste
+  id TEXT PRIMARY KEY, vote INTEGER NOT NULL, at INTEGER NOT NULL, source TEXT, title TEXT);
 CREATE TABLE IF NOT EXISTS devices (
   token_hash TEXT PRIMARY KEY,
   name TEXT NOT NULL,

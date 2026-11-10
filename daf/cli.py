@@ -388,6 +388,48 @@ def cmd_podcasts_import(a):
     print(f"From Nextcloud: {r['subs']} subscriptions, {r['removed']} unsubscribed, {r['actions']} episodes' listening.")
 
 
+def cmd_edition(a):
+    from datetime import date
+    from . import edition
+    day = date.fromisoformat(a.date) if a.date else None
+    if a.taste:
+        with db.session() as conn:
+            p = edition.taste(conn)
+        if a.json:
+            print(json.dumps(p, ensure_ascii=False, indent=1))
+            return
+        for t in p["topics"]:
+            print(f"  {t['name']:<32} {t['weight']:.2f} {t['trend']}{'  ' + t['adj'] if t['adj'] else ''}")
+        for k, v in sorted(p["sources"].items(), key=lambda kv: -kv[1])[:30]:
+            print(f"  {v:+.2f}  {k}  {p['facts'].get(k) or ''}")
+        print("  words:", ", ".join(w for w, v in sorted(p["words"].items(), key=lambda kv: -kv[1])[:40]))
+        print("  rising:", ", ".join(f"{r['word']} ({r['recent']}, ×{r['lift']})" for r in p["rising"]) or "-")
+        print("  named in iv-suggest:", ", ".join(p["named"]) or "-")
+        return
+    if a.kindle:
+        print(edition.send_kindle(day))
+        return
+    if a.topics:
+        for t in edition.seed_topics():
+            print(f"  {t['name']}: {', '.join(t['words'])}")
+        return
+    if a.build or a.dry_run:
+        ed = edition.build(day, use_ai=False if a.no_ai else None, dry=a.dry_run)
+    else:
+        with db.session() as conn:
+            ed = edition.get(conn, day or T.today(config.load_settings()))
+        if not ed:
+            print("No edition for that day yet (daf edition --build makes one).")
+            return
+    if a.json:
+        print(json.dumps(ed, ensure_ascii=False, indent=1))
+        return
+    print(f"{ed['day']}  ({ed['how']}, from {ed.get('candidates', '?')} candidates)")
+    for n, it in enumerate(ed["items"], 1):
+        print(f"{n:>2}. [{it['section']}] {it['title']}  ({it['source']}, {it['minutes'] or '?'} min)  {it['score'] if 'score' in it else ''}")
+        print(f"      {it['why']}")
+
+
 def cmd_vault_backfill(a):
     """Daf's notes on articles, videos and podcasts, rewritten with the full text (vaultnotes.backfill).
     --dry-run DIR: copies of the notes as they'd be go there; the vault and Daf's data stay as they are."""
@@ -416,6 +458,11 @@ def main(argv=None):
     x = sub.add_parser("backup", help="a consistent copy of daf.db into STATE/backups (cron, 03:00)"); x.set_defaults(f=cmd_backup)
     x = sub.add_parser("karakeep-import", help="Daf takes the Library over from Karakeep, once"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_karakeep_import)
     x = sub.add_parser("feeds-import", help="Daf reads the feeds itself from now on, FreshRSS's list brought over"); x.add_argument("--again", action="store_true"); x.set_defaults(f=cmd_feeds_import)
+    x = sub.add_parser("edition", help="the day's Edition: show it, build it, or see the taste it's built from")
+    x.add_argument("--date"); x.add_argument("--build", action="store_true", help="make (or remake) it now")
+    x.add_argument("--dry-run", action="store_true", help="choose without saving, and show the shortlist with --json")
+    x.add_argument("--no-ai", action="store_true", help="the rules alone, no model"); x.add_argument("--kindle", action="store_true", help="send it to the Kindle")
+    x.add_argument("--taste", action="store_true", help="what Daf thinks you like"); x.add_argument("--topics", action="store_true", help="have the model name your topics (again)"); x.add_argument("--json", action="store_true"); x.set_defaults(f=cmd_edition)
     x = sub.add_parser("feeds-list", help="the feeds the Feed follows"); x.add_argument("--json", action="store_true"); x.set_defaults(f=cmd_feeds_list)
     x = sub.add_parser("feeds-add", help="follow a feed, or move one to a folder"); x.add_argument("url"); x.add_argument("--folder", default=""); x.add_argument("--title")
     x.add_argument("--full", action="store_true", help="always load the whole article")

@@ -441,6 +441,11 @@ def get_today(d: str | None = None, c=Depends(conn)):
     out = T.day_summary(c, day, s)
     out["today"] = T.today(s).isoformat()
     out["week"] = T.week(c, s)
+    try:
+        from . import edition
+        out["edition"] = edition.summary(c, T.today(s))
+    except Exception:  # noqa: BLE001 - the Edition must never cost Today its page
+        out["edition"] = None
     out["year30"] = T.grid(c, config.YEAR30_START, s)
     out["shabbat"] = T.is_shabbat_window(s)
     out["settings"] = s
@@ -685,6 +690,85 @@ def post_digest_send(c=Depends(conn)):
         return digest.send(c, config.load_settings(), force=True)
     except Exception as e:  # noqa: BLE001 - the Bridge said no
         raise HTTPException(502, f"The email didn't go: {e}")
+
+
+@app.get("/api/edition", dependencies=[Depends(user)])
+def get_edition(day: str | None = None, c=Depends(conn)):
+    """The Edition (edition.py): a day's pieces with what you've done with them, and the days that have one."""
+    from . import edition
+    s = config.load_settings()
+    return edition.public(c, date.fromisoformat(day) if day else T.today(s))
+
+
+@app.post("/api/edition/build", dependencies=[Depends(user)])
+async def post_edition_build(request: Request):
+    from . import edition
+    body = await _body(request)
+    day = date.fromisoformat(body["day"]) if body.get("day") else None
+    return {"building": edition.build_now(day) or edition.is_building()}
+
+
+@app.post("/api/edition/kindle", dependencies=[Depends(user)])
+async def post_edition_kindle(request: Request):
+    from . import edition
+    body = await _body(request)
+    try:
+        return edition.send_kindle(date.fromisoformat(body["day"]) if body.get("day") else None)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/edition/vote", dependencies=[Depends(user)])
+async def post_edition_vote(request: Request, c=Depends(conn)):
+    from . import edition
+    body = await _body(request)
+    doc_id, v = str(body.get("id") or ""), body.get("vote")
+    if not doc_id or v not in (-1, 0, 1):
+        raise HTTPException(400, "id and vote (-1, 0 or 1)")
+    edition.vote(c, doc_id, v)
+    c.commit()
+    return {"id": doc_id, "vote": v}
+
+
+@app.get("/api/edition/taste", dependencies=[Depends(user)])
+def get_edition_taste(c=Depends(conn)):
+    from . import edition
+    return edition.taste_page(c)
+
+
+@app.put("/api/edition/settings", dependencies=[Depends(user)])
+async def put_edition_settings(request: Request):
+    """The Taste page's controls: the mix, a topic's or a source's more / less / mute."""
+    from . import edition
+    body = await _body(request)
+    e = edition.settings()
+    changes = {k: v for k, v in body.items() if k in edition.DEFAULTS and k not in ("topics", "sources")}
+    if isinstance(body.get("topic"), dict):           # {"name", "adj"}
+        name, adj = str(body["topic"].get("name") or ""), body["topic"].get("adj") or ""
+        if adj not in edition.ADJ:
+            raise HTTPException(400, "adj")
+        changes["topics"] = [dict(t, adj=adj) if t["name"] == name else t for t in e["topics"]]
+    if isinstance(body.get("source"), dict):          # {"name", "adj"}; "" takes it back
+        name, adj = str(body["source"].get("name") or "")[:200], body["source"].get("adj") or ""
+        if not name or adj not in edition.ADJ:
+            raise HTTPException(400, "source")
+        src = dict(e["sources"])
+        if adj:
+            src[name] = adj
+        else:
+            src.pop(name, None)
+        changes["sources"] = src
+    return {"settings": {k: v for k, v in edition.save(changes).items() if k not in ("topics", "sources")}}
+
+
+@app.post("/api/edition/topics", dependencies=[Depends(user)])
+def post_edition_topics():
+    """Name the topics again from the taste as it is now (the model)."""
+    from . import edition
+    try:
+        return {"topics": edition.seed_topics()}
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, str(e)[:300])
 
 
 KEY_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,29}$")

@@ -15,6 +15,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 - [Paper books](paper-books.md) — logging minutes, Shabbat, and photos of marked pages
 - [The reader](reader.md) — books, articles and PDFs, themes and typefaces, writing with a pen, focus mode, Listen, lookup, Ask, and the keys
 - [The Sketchbook](sketchbook.md) — a notebook beside whatever I'm reading or watching, kept in Obsidian and on the Kindle
+- [The Edition](edition.md) — a short paper each morning, chosen by what I read, watch and listen to, and the Taste behind it
 - [The Feed and the Library](feed-and-library.md) — FreshRSS, the Library and its tags, imports, the morning email, newsletters, Home, search and Send to Kindle
 - [Videos and podcasts](videos-and-podcasts.md) — transcripts, clips, episode pages, and AntennaPod
 - [Highlights and review](highlights-and-review.md) — colors, tags, the daily review, flashcards and export

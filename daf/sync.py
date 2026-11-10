@@ -223,10 +223,21 @@ def feed_pictures():
         log.exception("feed pictures")
 
 
+def _quiet(f):
+    def run():
+        try:
+            f()
+        except Exception:  # noqa: BLE001
+            log.exception(f.__module__)
+    return run
+
+
 def extras():
     """After each sync, outside its transaction: the morning email when it's time, feedback that
     couldn't reach GitHub, and an import a restart interrupted."""
-    from . import digest, feedback, imports
+    from . import digest, edition, feedback, imports
+    # the Edition asks the model, which can take a few minutes: never on the sync's own thread
+    threading.Thread(target=_quiet(edition.maybe_build), name="edition", daemon=True).start()
     for f in (digest.maybe_send, feedback.retry, imports.resume):
         try:
             f()
