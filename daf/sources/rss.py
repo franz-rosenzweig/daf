@@ -503,8 +503,10 @@ def sync(conn, settings, max_items=1500, every=None, force=False):
     # Once, the first time Daf looks for the posts' pictures: every feed is read afresh (no ETag), so the
     # posts the Feed already has get the picture their feed names, not only one from their text.
     first = not conn.execute("SELECT 1 FROM kv WHERE k = 'feed_pictures'").fetchone()
+    # force (pull to refresh) reads every feed you see now; the hidden ones (the Edition's pool) keep their four hours
+    hidden = {fid for fid, s in shows(conn).items() if s == "hidden"}
     due = [dict(r) for r in conn.execute("SELECT * FROM feeds")
-           if force or first or not r["fetched"] or now - r["fetched"] >= (r["every"] or every)]
+           if (force and r["id"] not in hidden) or first or not r["fetched"] or now - r["fetched"] >= (r["every"] or every)]
     if first:
         for f in due:
             f["etag"] = f["modified"] = None
@@ -518,6 +520,8 @@ def sync(conn, settings, max_items=1500, every=None, force=False):
                     err = f"Couldn't read its posts: {e}"[:200]
             conn.execute("UPDATE feeds SET fetched = ?, etag = ?, modified = ?, error = ?, errors = ?, ok = COALESCE(?, ok) WHERE id = ?",
                          (now, etag, modified, err, (f.get("errors") or 0) + 1 if err else 0, None if err else now, f["id"]))
+            # a feed at a time: the database isn't held for writing while the rest are still being fetched
+            conn.commit()
             if new >= max_items:
                 break
     if first:
