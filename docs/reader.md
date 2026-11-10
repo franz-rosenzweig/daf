@@ -2,7 +2,7 @@
 
 # The reader
 
-Daf's reading view is where books, articles and PDFs open. Whatever I'm reading takes the whole window: the sidebar goes away (a swipe from the left edge or ⌘\\ brings it back for a moment), and the bar on top is short and gets out of the way once I start reading. The contents and a side panel with **Info**, **Notebook** and **Ask** are there when I want them. This page covers books first, then what's different for articles and PDFs, then Listen, looking words up and the keys.
+Daf's reading view is where books, articles and PDFs open. Whatever I'm reading takes the whole window: the sidebar goes away (⌘\\ brings it back for a moment; on a tablet the left edge belongs to the page, so a swipe there turns back a page and doesn't bring the sidebar), and the bar on top is short and gets out of the way once I start reading. The contents and a side panel with **Info**, **Notebook** and **Ask** are there when I want them. This page covers books first, then what's different for articles and PDFs, then Listen, looking words up and the keys.
 
 ![A book in Daf with highlights and the Notebook](images/reader.png)
 *A book in Daf, with the Notebook open on the right.*
@@ -13,7 +13,7 @@ Every book in my Calibre library with an EPUB, KEPUB, AZW3, MOBI, FB2 or CBZ fil
 
 Your place is kept per book on the server, so the phone and the desk agree, and the newest place wins when you open it ("Picked up at 45%"). If the Kindle is further along, Daf says "On the Kindle you're at page 212 of 480", with **Go there** and **Stay here**.
 
-A book reads the way it does in Apple Books. On a wide screen it opens as two pages side by side, like a real book, and on a phone as one. The bar has back and the title, then **Contents** (t), **Aa**, **Search** (/), the bookmark ribbon (b) and the **…** menu, and it fades as soon as I turn a page. Moving the pointer to the top or the bottom brings it back. The contents and the side panel slide in over the pages and go again with a tap outside them. Under the pages is the [status bar](#the-status-bar), with the page number, and that one stays.
+A book reads the way it does in Apple Books. On a wide screen it opens as two pages side by side, like a real book, and on a phone as one. The bar has back and **Contents** (t) on the left, the title in the middle, then **Aa**, **Search** (/), the bookmark ribbon (b) and the **…** menu, and it fades as soon as I turn a page. Moving the pointer to the top or the bottom brings it back. The contents and the side panel slide in over the pages and go again with a tap outside them. Under the pages is the [status bar](#the-status-bar), with the page number, and that one stays.
 
 On a phone the page is all there is: no bar, just the status bar at the bottom. One tap in the middle brings ✕ with the title and the author at the top, and at the bottom a slider to go anywhere in the book and a round button. That button opens one menu with **Contents**, **Notebook**, **Search Book**, **Themes & Settings**, **Listen** and **Ask about this book**, and under them the bookmark, focus mode and the full **…** menu. Tap the middle again and it's just the page.
 
@@ -40,7 +40,7 @@ The **…** menu has **Listen from here** (l), **The audiobook from here** when 
   - **For books:** the book's own.
 
   They all come from Daf itself, so they work offline too.
-- **Page turn**, for a book in Pages: **None**, and the next page is just there; **Slide**, and the page slides away as the next one comes in beside it; **Curl**, and the page lifts at its corner and turns over like paper, with the next one underneath. With two pages open the right one turns over onto the left, and a Hebrew book turns the other way. Taps, swipes, the arrow keys and the volume buttons all turn it, a page for each, even in quick succession. A swipe holds the page under my finger: let go past about a third of the way, or with a flick, and it turns; short of that it falls back. It's this device's choice, the same for every book, and if the system asks for reduced motion the pages just turn.
+- **Page turn**, for a book in Pages: **None**, and the next page is just there; **Slide**, and the page slides away as the next one comes in beside it; **Curl**, and the page lifts at its corner and turns over like paper, with the next one underneath. With two pages open the right one turns over onto the left, and a Hebrew book turns the other way. Taps, swipes, the arrow keys and the volume buttons all turn it, a page for each, even in quick succession. A swipe holds the page under my finger: let go past about a third of the way, or with a flick, and it turns; short of that it falls back. If I hold the page still before letting go, it goes whichever way it's nearer, and if Android takes the swipe away halfway (its Back gesture from the edge does that), the page settles on a whole page instead of staying stuck between two. It's this device's choice, the same for every book, and if the system asks for reduced motion the pages just turn.
 - **Spacing, margins, justify:** **Font size**, **Line spacing**, **Line width** (Narrow, Medium, Wide), and for books **Justify the text**.
 
 **Just for this book** keeps a book's own typeface, size and layout, while the theme and the page turn stay the same everywhere.
@@ -141,7 +141,13 @@ Focus mode stays on for the next thing you open until you leave it from the **�
 
 ## PDFs
 
-A PDF opens as text first, which reads like an article and reflows on a phone. **Pages** opens it as printed, with pdf.js, drawn page by page with a text layer you can select and highlight. Zoom with + and −. Highlights made on the page show in the text view too when their words are there, and the other way around.
+A PDF opens as text first, which reads like an article and reflows on a phone. **Pages** opens it as printed, with pdf.js, drawn page by page with a text layer you can select and highlight. Highlights made on the page show in the text view too when their words are there, and the other way around. A book Calibre only has as a PDF opens straight onto its pages.
+
+On the pages it works the way Preview and Acrobat do. The button beside Back (t) opens the side panel. **Pages** has every page as a small picture, with a dot under the ones I've highlighted, and the grid button next to the tabs (Shift G) spreads them over the whole screen, as many across as fit. **Contents** is the PDF's own table of contents, with the chapter I'm in marked. **Highlights** lists mine in page order, and **Search** (/, or ⌘F) finds a word or a phrase on every page, a few words around each, and marks them on the page. On a wide screen the panel stays beside the pages; on a tablet upright or a phone it comes in over them and goes once I've picked a page. In focus mode it's the drawer from the left edge, and the bar from the top edge has the same button, so all the pages and the contents are one tap away there too.
+
+The page number in the bar (g) goes to a page: type a number, or the page number printed on the page when the PDF has them (a scanned book's page 315 might be the PDF's 319, and Daf knows), or drag the slider. ← and → turn a page, and so do the volume buttons when **Volume buttons turn pages** is on, and a sideways swipe when the pages aren't wider than the screen.
+
+The view menu next to Search has the zoom (+ and −, or pinch with two fingers, or ⌘ and the wheel on a Mac), **Fit the width** or **The whole page** (0 switches between them), **Scroll** or **Page by page**, where each page fills the screen and settles in the middle, **One page** or **Two pages** side by side (a book's cover alone first, as a printed book opens), **Dark pages** for night reading, and **Download the PDF**. How it's set is this device's, for every PDF.
 
 ## Listen
 
@@ -168,6 +174,8 @@ Select a single word and the bar shows **Define**: Hebrew words come from Sefari
 | Esc | close | Shift J / K | next / previous in the list |
 | | | d / z | delete / undo |
 | | | t | tags |
+
+In a PDF: ← → turn a page, t the side panel, Shift G all the pages, g go to a page, / search, + and − zoom, 0 fit the width or the whole page, h highlight the selection.
 
 Everywhere: ⌘K searches everything, ? shows the keys for where you are, and holding Alt (⌥ on a Mac) while you select selects without highlighting.
 

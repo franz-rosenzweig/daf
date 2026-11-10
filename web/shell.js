@@ -167,7 +167,7 @@ window.dafBack = () => {
 
 /* ---------- commands, for the shell's menus ---------- */
 const GO = ['today', 'review', 'library', 'feed', 'highlights', 'books', 'stats', 'torah', 'paper', 'prefs'];
-const art = () => view() === 'read', book = () => view() === 'ebook', manga = () => view() === 'mread';
+const art = () => view() === 'read', book = () => view() === 'ebook', manga = () => view() === 'mread', pdf = () => view() === 'pdf';
 const list = () => ['library', 'feed', 'view'].includes(view());
 // A key as it's bound now (Preferences → Keyboard, keys.js), so the menus follow a changed shortcut.
 const bound = (scope, a, k) => { const K = C() && C().Keys; return (K && K.keys(scope, a)[0]) || k; };
@@ -183,8 +183,8 @@ const CMD = {
   bookmark: () => book() && press('[data-bk="bookmark"]'),
   // In the manga reader, Android's next/prev are its volume keys: the reader's own event, so its
   // "Volume keys: turn pages / inverted / off" setting holds; the Mac's menu items turn the page.
-  next: () => manga() ? (mac ? key(bound('manga', 'next', 'PageDown')) : volume(1)) : book() ? key(bound('book', 'next', 'ArrowRight')) : art() && key(bound('article', 'next', 'j')),
-  prev: () => manga() ? (mac ? key(bound('manga', 'prev', 'PageUp')) : volume(-1)) : book() ? key(bound('book', 'prev', 'ArrowLeft')) : art() && key(bound('article', 'prev', 'k')),
+  next: () => manga() ? (mac ? key(bound('manga', 'next', 'PageDown')) : volume(1)) : book() ? key(bound('book', 'next', 'ArrowRight')) : pdf() ? key(bound('pdf', 'next', 'ArrowRight')) : art() && key(bound('article', 'next', 'j')),
+  prev: () => manga() ? (mac ? key(bound('manga', 'prev', 'PageUp')) : volume(-1)) : book() ? key(bound('book', 'prev', 'ArrowLeft')) : pdf() ? key(bound('pdf', 'prev', 'ArrowLeft')) : art() && key(bound('article', 'prev', 'k')),
   keys: () => (art() || book()) && key('?'),
   paper: () => { closeAll(); return act('paper'); },
   add: () => { closeAll(); return act('add'); },
@@ -386,7 +386,7 @@ if (!mac) {
     const v = view(), ae = document.activeElement, c = C();
     const editing = !!ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName));
     const book = (() => { try { return localStorage.getItem('daf.volumeKeys') === 'true'; } catch (e) { return false; } })();
-    const now = { volumeKeys: v === 'mread' ? !!(c && c.Manga && c.Manga.volumeKeys && c.Manga.volumeKeys()) : v === 'ebook' && book,
+    const now = { volumeKeys: v === 'mread' ? !!(c && c.Manga && c.Manga.volumeKeys && c.Manga.volumeKeys()) : (v === 'ebook' || v === 'pdf') && book,
       ownMenu: (v === 'read' || v === 'ebook') && !editing };
     const k = JSON.stringify(now);
     if (k === said) return;

@@ -7,13 +7,13 @@
 html.skopen .app{margin:var(--skt,0px) var(--skr,0px) var(--skb,0px) 0;height:calc(100% - var(--skt,0px) - var(--skb,0px))}
 html.skopen .mreader{top:var(--skt,0px);right:var(--skr,0px);bottom:var(--skb,0px)}
 html.skopen.focus .rv > .top,html.skopen.focus .pdfv > .top{top:var(--skt,0px);right:var(--skr,0px)}
-html.skopen.focus .bookfoot{right:var(--skr,0px);bottom:var(--skb,0px)}
 html.skopen .fedge.t{top:var(--skt,0px);right:var(--skr,0px)}
 html.skopen .fedge.b{bottom:var(--skb,0px);right:var(--skr,0px)}
 html.skopen .fedge.l{top:calc(30px + var(--skt,0px));bottom:calc(30px + var(--skb,0px))}
 html.skopen .fedge.r{right:var(--skr,0px);top:calc(30px + var(--skt,0px));bottom:calc(30px + var(--skb,0px))}
 html.skopen .fscrim{top:var(--skt,0px);right:var(--skr,0px);bottom:var(--skb,0px)}
-html.skopen.focus.ftoc .rvgrid > .toc{top:var(--skt,0px);bottom:var(--skb,0px)}
+html.skopen.focus.ftoc .rvgrid > .toc,html.skopen.focus.ftoc .pdfv .pdfside{top:var(--skt,0px);bottom:var(--skb,0px)}
+html.skopen.focus.ftoc .pdfv.pgrid .pdfside{right:var(--skr,0px)}
 html.skopen.focus.fpanel .rvgrid > .rpanel{top:var(--skt,0px);right:var(--skr,0px);bottom:var(--skb,0px)}
 @media (max-width:1180px){ html.skopen .rvgrid.withpanel .rpanel{top:var(--skt,0px);right:var(--skr,0px);bottom:var(--skb,0px)} }
 html.skopen body.bpanelsheet .rv.ebook .rpanel{right:var(--skr,0px);bottom:var(--skb,0px)}
@@ -29,9 +29,9 @@ html.skopen .rv:has(.rvgrid.withpanel) .inkpal{right:calc(var(--skr,0px) + 342px
 @media (max-width:1180px){ html.skopen .rv:has(.rvgrid.withpanel) .inkpal{right:calc(var(--skr,0px) + min(360px,92vw) + 12px)} }
 @media (max-width:640px){ html.skopen .inkpal{bottom:calc(76px + var(--skb,0px) + env(safe-area-inset-bottom,0px))} }
 /* the book's pages and the reader's panels, which go by the window's height */
-html.skopen .rv.ebook .rvgrid,html.skopen .bookwrap{height:calc(100dvh - var(--skt,0px) - var(--skb,0px) - 56px)}
+html.skopen .rv.ebook .rvgrid,html.skopen .bookwrap{height:calc(100dvh - var(--skt,0px) - var(--skb,0px) - var(--btop,56px))}
 html.skopen.focus .rv.ebook .rvgrid,html.skopen.focus .bookwrap{height:calc(100dvh - var(--skt,0px) - var(--skb,0px))}
-html.skopen .rv.ebook .toc,html.skopen .rv.ebook .rpanel{max-height:calc(100dvh - var(--skt,0px) - var(--skb,0px) - 56px)}
+html.skopen .rv.ebook .toc,html.skopen .rv.ebook .rpanel{max-height:calc(100dvh - var(--skt,0px) - var(--skb,0px) - var(--btop,56px))}
 /* the pens' things over everything, the manga reader too, while it's open */
 html.skopen .inkwet{z-index:66} html.skopen .penring{z-index:67}
 html.skopen .inkpop,html.skopen .penround,html.skopen .penheld{z-index:68} html.skopen .readout{z-index:69}

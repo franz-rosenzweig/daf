@@ -30,6 +30,11 @@ const DEFS = {
   review: ['Daily review', [
     ['keep', 'Keep', ['k', 'ArrowRight']], ['less', 'Less often', ['l']], ['note', 'Note', ['n']], ['open', 'Open at its spot', ['o']],
     ['never', 'Not in review', ['x']], ['fav', 'Favorite', ['f']]]],
+  pdf: ['PDFs', [
+    ['next', 'Next page', ['ArrowRight']], ['prev', 'Previous page', ['ArrowLeft']], ['side', 'Pages and contents', ['t']],
+    ['goto', 'Go to a page', ['g']], ['search', 'Search in the PDF', ['/']], ['grid', 'All the pages', ['G']],
+    ['larger', 'Larger', ['+', '=']], ['smaller', 'Smaller', ['-']], ['fit', 'Fit the width, or the whole page', ['0']],
+    ['highlight', 'Highlight the selection', ['h']]]],
   manga: ['Manga', [
     ['left', 'Page to the left', ['ArrowLeft']], ['right', 'Page to the right', ['ArrowRight']], ['next', 'Next page', [' ', 'PageDown', 'ArrowDown']],
     ['prev', 'Previous page', ['PageUp', 'ArrowUp']], ['first', 'First page', ['Home']], ['last', 'Last page', ['End']],
@@ -40,6 +45,7 @@ const DEFS = {
 const FIXED = { list: [['?', 'These shortcuts'], ['Esc', 'Clear the selection']], article: [['?', 'These shortcuts'], ['Esc', 'Close, then back'], ['Alt-select', 'Select without highlighting']],
   book: [['Space', 'Next page (pages layout)'], ['Shift Space', 'Previous page'], ['?', 'These shortcuts'], ['Alt-select', 'Select without highlighting'], ['Esc', 'Close, then back to the book page']],
   review: [['Space', 'Show a flashcard’s answer'], ['1 2 3 4', 'Again, hard, good, easy'], ['⌘ Enter', 'Save the note']],
+  pdf: [['Pinch', 'Larger or smaller (⌘ and the wheel, on a Mac)'], ['?', 'These shortcuts'], ['Esc', 'Close what’s open']],
   manga: [['Shift Space', 'Previous page'], ['?', 'These shortcuts'], ['Esc', 'Close, then back']],
   general: [['⌘K', 'Search everything, or go somewhere'], ['⌘\\', 'The sidebar: full, mini, hidden'], ['?', 'These shortcuts'], ['Esc', 'Close what’s open']] };
 

@@ -942,7 +942,7 @@ function detach(){
 // The bar's button, in each reader's own kind of button.
 function button(kind){
   const label = 'Sketchbook', on = S.shown;
-  const cls = kind === 'manga' ? 'mic' : kind === 'pdf' ? 'btn sm' : 'ib';
+  const cls = kind === 'manga' ? 'mic' : 'ib';
   return '<button class="' + cls + (on ? ' on' : '') + '" data-sketch aria-pressed="' + on + '" title="' + label + '" aria-label="' + label + '">' + IC.book + '</button>';
 }
 document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-sketch]'); if (!b) return; e.preventDefault(); toggle(); });

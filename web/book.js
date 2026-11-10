@@ -94,6 +94,9 @@ async function openBook(id, at){
     '<div class="bctl" id="bctl"><input type="range" id="bslide" min="0" max="1000" value="0" aria-label="Where you are in the book"><div class="bctlrow"><span id="bslidet" class="mute"></span>' +
     '<button class="round bmenu" data-bk="pmenu" aria-label="Reading menu">' + ICON.menu + '</button></div></div></div>' +
     '<aside class="rpanel" id="bpanel"></aside></div><div class="bscrim" data-bk="closesheets"></div></div>';
+  // the bar's own height (a theme's frame makes it a little more than 56 px): the page and its status
+  // bar fit under it, with or without the Sketchbook below
+  if (window.ResizeObserver) { if (B.topObs) B.topObs.disconnect(); B.topObs = new ResizeObserver(() => { const t = $('#btop'); if (t && t.offsetHeight) document.documentElement.style.setProperty('--btop', t.offsetHeight + 'px'); }); B.topObs.observe($('#btop')); }
   // The file starts coming at once, beside the book's details: from the device when it's been
   // opened before (sw.js), else from Daf.
   const fileUrl = '/api/ebooks/' + encodeURIComponent(id) + '/file', fileStop = new AbortController();
@@ -885,7 +888,7 @@ function drawMarks(){
 }
 
 /* ---------- top bar, contents, panel ---------- */
-// The bar, as Apple Books has it: back, the title, and Contents, Aa, Search and the bookmark; Listen, the
+// The bar, as Apple Books has it: back and Contents, the title, then Aa, Search and the bookmark; Listen, the
 // notebook, Ask and focus mode are in the … menu. It fades once you turn a page (chrome below).
 function drawTop(){
   const d = B.d, tip = a => C.Keys.tip('book', a);
@@ -895,8 +898,8 @@ function drawTop(){
     return;
   }
   $('#btop').innerHTML = '<a class="ib" href="#book/' + encodeURIComponent(d.id) + '" aria-label="Back to the book">' + I.back + '</a>' +
-    '<span class="btitle-top mute"' + (isRtlText(d.title) ? ' dir="rtl"' : '') + '>' + esc(String(d.title || '').split(/:\s/)[0]) + '</span>' +
     '<button class="ib" data-bk="toc" title="Contents' + tip('toc') + '" aria-label="Contents">' + ICON.toc + '</button>' +
+    '<span class="btitle-top mute"' + (isRtlText(d.title) ? ' dir="rtl"' : '') + '>' + esc(String(d.title || '').split(/:\s/)[0]) + '</span>' +
     '<button class="ib aa" data-bk="aa" title="Themes and settings" aria-label="Themes and settings">Aa</button>' +
     '<button class="ib" data-bk="search" title="Search the book' + tip('search') + '" aria-label="Search the book">' + ICON.search + '</button>' +
     '<button class="ib" data-bk="bookmark" title="Bookmark this page' + tip('bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' + (C.Sketch ? C.Sketch.button() : '') + (C.Sound ? C.Sound.button() : '') +
