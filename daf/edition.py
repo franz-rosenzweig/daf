@@ -788,8 +788,8 @@ def _facts_text(c, parasha):
     f = [f"{k} {v}" for k, v in (c.get("facts") or {}).items()]
     if c.get("topic"):
         f.append("topic " + c["topic"])
-    if (c.get("folder") or "").startswith("Pool · "):
-        f.append("from the wider pool: " + c["folder"][7:])
+    if c.get("origin") == "pool" and c.get("folder"):
+        f.append("from the wider pool: " + c["folder"])
     if c.get("parasha") and parasha:
         f.append(f"PARASHA {parasha.get('name')}")
     elif c.get("torah"):
