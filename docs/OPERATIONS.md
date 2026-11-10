@@ -102,7 +102,11 @@ Ezer (`.claude/scripts/signal-bot.py`, rules ahead of the router, no model call)
   anything left running). `daf jobs` lists them.
 - **Videos** (Karakeep video bookmarks): captions with yt-dlp first, faster-whisper when there are none
   (`tools/whisper_segments.py`, run with Daf's own Python; yt-dlp and faster-whisper are in its .venv from requirements.txt since the October 2026 OS upgrade to Python 3.14 left the host's copies behind). The transcript is cue blocks
-  with timestamps, speakers and chapters. YouTube's auto-captions roll: each cue opens with the line the
+  with timestamps, speakers and chapters. The captions job asks yt-dlp what the video has first (info.json:
+  chapters, length, tracks), then downloads the one track `media.caption_track` picks: one a person made
+  (`subtitles`) before YouTube's automatic ones, English before Hebrew (`he`/`iw`), plain `en` before
+  `en-orig`. Asking for every English track at once got a 429 on a spare one, and yt-dlp stopped before
+  writing the info.json, so the chapters were lost too. YouTube's auto-captions roll: each cue opens with the line the
   last one ended on, and a 10 ms cue between them shows the line just finished, so every line came three
   times until November 2026. `_parse_vtt` now keeps the lines a cue adds (`_fresh`: its first lines go when
   they're the lines just shown, but never a line with its own word timings, so a speaker saying the same

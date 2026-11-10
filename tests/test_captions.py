@@ -108,6 +108,35 @@ class PlainCaptions(unittest.TestCase):
                          [(1, None, "She walked in. Nobody looked up."), (11, "Ana", "Then the lights went out.")])
 
 
+def tracks(*langs):
+    return {lang: [{"ext": "vtt", "url": "https://example.invalid/" + lang}] for lang in langs}
+
+
+class TrackChoice(unittest.TestCase):
+    """media.caption_track, on the track lists yt-dlp's info.json gives (subtitles = made by a person)."""
+
+    def test_made_by_a_person_under_another_code(self):            # tpI0XWjIsqI: a punctuated en-US track
+        info = {"subtitles": tracks("en-US"), "automatic_captions": tracks("en", "en-orig", "en-US", "fr", "he")}
+        self.assertEqual(media.caption_track(info), "en-US")
+
+    def test_automatic_only_reads_plain_en_as_before(self):       # iw9SZgyahqg
+        info = {"subtitles": {}, "automatic_captions": tracks("en-orig", "en", "he", "de")}
+        self.assertEqual(media.caption_track(info), "en")
+
+    def test_english_before_hebrew_and_plain_before_regional(self):
+        self.assertEqual(media.caption_track({"subtitles": tracks("he", "en-GB", "en")}), "en")
+        self.assertEqual(media.caption_track({"subtitles": tracks("he", "en-GB")}), "en-GB")
+
+    def test_hebrew_by_a_person_before_automatic_english(self):
+        info = {"subtitles": tracks("iw"), "automatic_captions": tracks("en", "iw-orig")}
+        self.assertEqual(media.caption_track(info), "iw")
+
+    def test_other_languages_and_live_chat_dont_count(self):
+        self.assertEqual(media.caption_track({"subtitles": tracks("fr", "live_chat"), "automatic_captions": tracks("en")}), "en")
+        self.assertIsNone(media.caption_track({"subtitles": tracks("fr"), "automatic_captions": tracks("de")}))
+        self.assertIsNone(media.caption_track({}))
+
+
 class Rebuild(unittest.TestCase):
     def test_old_transcripts_are_found_and_new_ones_are_not(self):
         vtt = fixture("youtube-auto-iw9SZgyahqg.vtt")

@@ -242,6 +242,18 @@ def _blocks_from_lines(lines, chapters):
     return out
 
 
+def caption_track(info):
+    """The caption track to read, from what yt-dlp says a video has: one a person made ("subtitles") before
+    YouTube's automatic ones, English before Hebrew ("iw" is YouTube's old code for it), and among the
+    automatic ones plain "en" before "en-orig" and the rest, as before. None when there's none of those."""
+    made, auto = info.get("subtitles") or {}, info.get("automatic_captions") or {}
+    tracks = [(lang, True) for lang in made] + [(lang, False) for lang in auto if lang not in made]
+    tracks = [(lang, m) for lang, m in tracks if lang.split("-")[0] in ("en", "he", "iw")]
+    if not tracks:
+        return None
+    return min(tracks, key=lambda t: (not t[1], not t[0].startswith("en"), t[0] != "en", "-orig" in t[0], t[0]))[0]
+
+
 def video_transcript(doc_id, use_whisper=False):
     with db.session() as conn:
         d = conn.execute("SELECT * FROM docs WHERE id = ?", (doc_id,)).fetchone()
@@ -257,15 +269,23 @@ def video_transcript(doc_id, use_whisper=False):
     with tempfile.TemporaryDirectory() as tmp:
         info = {}
         if not use_whisper:
-            subprocess.run(YTDLP + ["--skip-download", "--write-subs", "--write-auto-subs", "--sub-langs", "en.*,en,he.*,he",
-                            "--sub-format", "vtt", "--write-info-json", "-o", f"{tmp}/%(id)s.%(ext)s", url],
-                           capture_output=True, text=True, timeout=180)
+            # What the video has first, then only the one track chosen from it: asking for every English one at
+            # once got a 429 from YouTube on a spare track, and yt-dlp stopped before writing what the video has.
+            r = subprocess.run(YTDLP + ["--skip-download", "--write-info-json", "-o", f"{tmp}/%(id)s.%(ext)s", url],
+                               capture_output=True, text=True, timeout=180)
             infos = glob.glob(f"{tmp}/*.info.json")
-            if infos:
-                info = json.load(open(infos[0]))
-            vtts = sorted(glob.glob(f"{tmp}/*.vtt"), key=lambda p: (".en.vtt" not in p, "-orig" in p, p))
-            if not vtts:
+            if not infos:
+                raise RuntimeError("couldn't read the video on YouTube: " + r.stderr.strip()[-200:])
+            info = json.load(open(infos[0]))
+            lang = caption_track(info)
+            if not lang:
                 raise RuntimeError("no captions on YouTube for this video; try the whisper transcript")
+            r = subprocess.run(YTDLP + ["--load-info-json", infos[0], "--skip-download", "--write-subs", "--write-auto-subs",
+                                        "--sub-langs", lang, "--sub-format", "vtt", "-o", f"{tmp}/%(id)s.%(ext)s"],
+                               capture_output=True, text=True, timeout=180)
+            vtts = glob.glob(f"{tmp}/*.vtt")
+            if not vtts:
+                raise RuntimeError(f"couldn't download YouTube's captions ({lang}): " + r.stderr.strip()[-200:])
             lines = _parse_vtt(open(vtts[0], encoding="utf-8").read())
         else:
             r = subprocess.run(YTDLP + ["-f", "bestaudio", "-x", "--audio-format", "m4a", "--write-info-json", "-o",

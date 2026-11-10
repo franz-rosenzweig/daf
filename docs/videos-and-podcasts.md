@@ -8,7 +8,7 @@ This page covers the things you watch and listen to: YouTube videos and Instagra
 
 Videos I save show up under **Videos** in the Library. Open one and the player sits above its transcript, a line per caption with the time beside it. Click a line and the video jumps there, and **Follow along** keeps the transcript scrolling with the video.
 
-The transcript comes from YouTube's own captions when there are any. When there aren't, Daf transcribes the audio itself with faster-whisper on the server, which is slow, so it only happens when you ask: **Get YouTube's captions** or **Transcribe on the server (slow)**. Long videos get their chapters as headings.
+The transcript comes from YouTube's own captions when there are any, the ones a person made for the video if it has them, and YouTube's automatic ones if not. When there aren't, Daf transcribes the audio itself with faster-whisper on the server, which is slow, so it only happens when you ask: **Get YouTube's captions** or **Transcribe on the server (slow)**. Long videos get their chapters as headings.
 
 YouTube's automatic captions scroll up a line at a time, and each new caption starts with the line before it, so Daf used to print every line two or three times. Since November 2026 it keeps each line once, and a phrase the speaker really did say twice stays twice. A transcript made before that is cleaned with `daf captions-rebuild` on the server, which fetches YouTube's captions again. It leaves alone any video I've highlighted, because the highlights would lose their place.
 
