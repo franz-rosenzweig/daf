@@ -21,6 +21,7 @@ Everything is under **Tools → Daf**:
 - **Today: 38 of 60 minutes:** the count, at a glance.
 - **Send reading time and highlights now:** sends the page turns and any changed highlights right away. It says "Sent N page turns to Daf" or "Daf is up to date", and how many books' highlights went.
 - **Show today's minutes on the sleep screen:** on or off. Turning it off puts back the screensaver message you had before.
+- **Sound in Daf:** sends the page to Daf a few seconds after each page turn, so a phone or a computer beside me can play the scene's sound. See [Sound](sound.md#beside-the-kindle). Off unless I turn it on.
 - **Open Daf on the first wake of the morning:** the first time you wake the Kindle each morning, it opens on the Daf tab.
 
 Three actions are also in KOReader's gestures, under **Gestures → pick a gesture → General**: "Daf: open Home", "Daf: open the Daf screen" and "Daf: send reading time".

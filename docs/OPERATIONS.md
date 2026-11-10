@@ -893,3 +893,13 @@ A design round toward Apple Books' calm and fewer icons (the "Daf, focused" canv
 - **Invidious:** `DAF_INVIDIOUS_PSQL` (a psql command line, read with shlex; `-At -F '\t' -c SQL` is added) and `DAF_INVIDIOUS_USER` in daf.env. Read-only queries on `users`, `channel_videos` and `videos`; nothing is fetched from YouTube, so the VPN exit isn't touched.
 - **CLI:** `daf edition [--date D] [--build | --dry-run [--json]] [--no-ai] [--kindle] [--taste] [--topics]`.
 
+## Sound (`daf/soundscape.py`, `web/sound.js`, 2026-11-09)
+
+A bed of recorded sound under a book that follows its scenes. `soundscape.parts()` cuts the book's text (audiomap's stream, so places line up with the audiobook map) into the contents' chapters, joining ones under 3,000 characters to the next and cutting ones over 45,000 at a paragraph. The model (ai.run, the AI settings' model) reads one part with its paragraphs numbered and answers scenes as `[{from, scene, sounds: {id: level}}]` from the 30 ids in `SOUNDS`; they're kept in table `soundscapes` keyed by book, the file's `size:mtime` and the part's start, so a new edition is read again. A part is read in a background thread the first time a place in it is asked for, then the next part is read too, and again once you're past half of a part. A failed read is kept with its error and tried again after 10 minutes. About 20 seconds a part on Opus.
+
+- `POST /api/ebooks/{id}/sound` {cfi, fraction, text} → {state: ready|reading|failed|none, scene, sounds, part}. The reader sends `C.BookPlace.here()` 1.2 s after the page settles.
+- `POST /api/kindle/where` (device token) {md5, text, fraction}: the plugin's page, sent 3 s after a turn when its "sound" setting is on; kept in kv `kindle_where`. `GET /api/sound/kindle?after=&wait=` answers the scene there, and with `after` waits up to 25 s for a newer page (asyncio, no thread held), so Today's row listens without a timer.
+- `GET /api/sounds/{id}.mp3`: the recordings, fetched once from `DAF_SOUNDS_URL` (default Chataltul's public `audio/` folder on stuffs) into `STATE/sounds`. They're Chataltul's CC0 loops: PAD 0.5 s of their own end before and of their start after, so `web/sound.js` loops `PAD … PAD + round(duration − 2·PAD)` with Web Audio and fades layers over 4 s.
+- Settings live on the device: `daf.soundOn` (on for books here) and `daf.soundVol`.
+- Headless docker-chrome can't decode MP3 in Web Audio; check playback in the Playwright image (Chromium and WebKit both decode it).
+- Not yet: the native Mac app's own player, and playing on with the Android app's screen off.

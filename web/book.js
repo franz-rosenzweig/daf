@@ -106,6 +106,7 @@ async function openBook(id, at){
   // A book Calibre has only as a PDF: its pages as printed, in the PDF view (pdfview.js)
   if (d.format === 'PDF') { fileStop.abort(); location.replace('#pdf/book/' + encodeURIComponent(id) + (at && at.startsWith('hl:') ? '/' + at : '')); return; }
   B.d = d;
+  if (C.Sound) C.Sound.open(id);
   inkLoad(d);
   d.highlights.forEach(h => { h.source = 'epub'; B.byCfi.set(h.pos.cfi, h); });
   d.other_highlights.forEach(h => { h.sec = xpIndex(h.xp); });
@@ -459,6 +460,7 @@ function cleanup(){
   inkFlush();
   if (B.tts && B.tts.on && B.tts.unfollow) { B.tts.unfollow(); B.tts.unfollow = null; }   // it reads on, off the page
   closeNote(); wake(false); H.hide(); pagesStop();
+  if (C.Sound) C.Sound.closed();
   if (B.view) { try { savePosition(true); } catch(e){} try { B.view.close(); } catch(e){} B.view.remove(); }
   if (B.scans) B.scans.close();
   B.view = null; B.id = null; B.d = null; B.scans = null;
@@ -483,7 +485,7 @@ function onSectionLoad(e){
     if (el) { el.classList.add('daf-speaking'); if (T.audio) { if (T.unfollow) T.unfollow(); T.unfollow = H.follow(T.audio, el); } }
     if (T.goThere) { T.goThere = false; setTimeout(goToSpeaking, 50); }
   } else if (T.on && T.goThere === true && T.bookId === B.id) { T.goThere = 'chapter'; B.view.goTo(T.index).catch(() => {}); }   // then the paragraph, above
-  const active = () => { B.lastActive = Date.now(); };
+  const active = () => { B.lastActive = Date.now(); if (C.Sound) C.Sound.wake(); };
   ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(ev => doc.addEventListener(ev, active, { passive: true }));
   doc.addEventListener('keydown', onKey);
   doc.addEventListener('click', ev => { const a = ev.target.closest('a[href]'); if (a) B.lastLink = a; else closeNote(); }, true);
@@ -589,6 +591,7 @@ function onRelocate(e){
   const on = $('#btoc .on'); if (on && !B.searching) { const r = on.getBoundingClientRect(), t = $('#btoc').getBoundingClientRect(); if (r.top < t.top + 40 || r.bottom > t.bottom - 20) on.scrollIntoView({ block: 'center' }); }
   const mk = $('[data-bk="bookmark"]'); if (mk) { const m = markHere(); mk.classList.toggle('on', !!m); mk.innerHTML = ICON.mark(!!m); mk.title = m ? 'Remove the bookmark (b)' : 'Bookmark this page (b)'; }
   clearTimeout(B.saveT); B.saveT = setTimeout(() => savePosition(), 1500);
+  if (C.Sound) C.Sound.moved(C.BookPlace.here());     // Sound: the scene on this page (sound.js)
   if (B.panel === 'info' && panelShown()) drawPanelInfoProgress();
 }
 function savePosition(now){
@@ -896,7 +899,7 @@ function drawTop(){
     '<button class="ib" data-bk="toc" title="Contents' + tip('toc') + '" aria-label="Contents">' + ICON.toc + '</button>' +
     '<button class="ib aa" data-bk="aa" title="Themes and settings" aria-label="Themes and settings">Aa</button>' +
     '<button class="ib" data-bk="search" title="Search the book' + tip('search') + '" aria-label="Search the book">' + ICON.search + '</button>' +
-    '<button class="ib" data-bk="bookmark" title="Bookmark this page' + tip('bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' + (C.Sketch ? C.Sketch.button() : '') +
+    '<button class="ib" data-bk="bookmark" title="Bookmark this page' + tip('bookmark') + '" aria-label="Bookmark">' + ICON.mark(!!markHere()) + '</button>' + (C.Sketch ? C.Sketch.button() : '') + (C.Sound ? C.Sound.button() : '') +
     '<button class="ib" data-bk="more" title="More" aria-label="More">' + ICON.more + '</button>';
 }
 const PHONE = () => matchMedia('(max-width:700px)').matches;
@@ -906,7 +909,7 @@ function openPhoneMenu(anchor){
   const row = (a, label, icon, extra) => '<button data-pm="' + a + '"><span>' + label + '</span>' + (extra || '') + icon + '</button>';
   p.innerHTML = '<div class="menu pmenu">' +
     row('toc', 'Contents', ICON.toc) + row('notebook', 'Notebook', ICON.pen, n ? '<span class="pmc">' + n + '</span>' : '') + row('search', 'Search Book', ICON.search) +
-    row('aa', 'Themes &amp; Settings', '<b class="pmaa">Aa</b>') + row('listen', B.tts.on ? 'Stop listening' : 'Listen', ICON.listen) + row('ask', 'Ask about this book', ICON.ask) +
+    row('aa', 'Themes &amp; Settings', '<b class="pmaa">Aa</b>') + row('listen', B.tts.on ? 'Stop listening' : 'Listen', ICON.listen) + (C.Sound ? row('sound', 'Sound', C.Sound.icon, C.Sound.mode === 'book' ? '<span class="pmc">✓</span>' : '') : '') + row('ask', 'Ask about this book', ICON.ask) +
     '<div class="pmrow"><button data-pm="mark" aria-label="' + (markHere() ? 'Remove the bookmark' : 'Bookmark this page') + '">' + ICON.mark(!!markHere()) + '</button>' +
     (C.Focus ? '<button data-pm="focus" aria-label="Focus mode">' + ICON.focus + '</button>' : '') + '<button data-pm="more" aria-label="More">' + ICON.more + '</button></div></div>';
   p.hidden = false; p.style.left = Math.max(8, window.innerWidth - 272) + 'px'; p.style.top = Math.max(8, r.top - p.offsetHeight - 12) + 'px';
@@ -1541,6 +1544,7 @@ document.addEventListener('click', async e => {
     else if (a === 'aa') { showChrome(); B.aaFromBar = false; C.openAa && C.openAa(bk, { book: true }); }
     else if (a === 'status') tapStatus();
     else if (a === 'more') openMore(bk);
+    else if (a === 'sound' && C.Sound) C.Sound.menu(bk);
     else if (a === 'bookmark') toggleMark();
     else if (a === 'kindle' && B.d.kindle) { $('#bnotice').innerHTML = ''; await B.view.goToFraction(B.d.kindle.fraction); toast('At the Kindle’s page, about ' + Math.round(B.d.kindle.fraction * 100) + '% in'); }
     else if (a === 'nokindle') $('#bnotice').innerHTML = '';
@@ -1567,6 +1571,7 @@ document.addEventListener('click', async e => {
     else if (a === 'listen') { if (B.tts.on) stopListen(); else startListen(); }
     else if (a === 'mark') toggleMark();
     else if (a === 'focus' && C.Focus) C.Focus.toggle();
+    else if (a === 'sound' && C.Sound) C.Sound.menu(anchor || pm);
     else if (a === 'more') openMore(anchor || pm);
     return;
   }
