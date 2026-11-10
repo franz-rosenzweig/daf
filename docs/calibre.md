@@ -2,7 +2,7 @@
 
 # Calibre in Daf
 
-My books live in Calibre. Calibre-Web Automated runs it on the server, takes in new files and converts them, and for a long time I opened Calibre on the Mac whenever I wanted to look through the library properly or fix a book's details. I'd rather do all of that in Daf, next to the reading, so Daf has taken over Calibre's jobs: the library as a spreadsheet with Calibre's search, editing one book or many, covers, files and conversions, and finding a book's details online.
+My books live in Calibre. Calibre-Web Automated runs it on the server, takes in new files and converts them, and for a long time I opened Calibre on the Mac whenever I wanted to look through the library properly or fix a book's details. I'd rather do all of that in Daf, next to the reading, so Daf has taken over Calibre's jobs: the library as a spreadsheet with Calibre's search, editing one book or many, covers, files and conversions, finding a book's details online, and tidying: duplicates, merging, removing and Calibre's trash.
 
 ## All books
 
@@ -57,6 +57,14 @@ When anything is chosen, a bar comes up at the bottom with **Edit N books**. Tha
 **Find details**, at the top of the edit sheet, asks two places at once: Hardcover, which Daf is already connected to, and Calibre's own download sources (Google, Amazon, Edelweiss and Open Library). It takes up to half a minute. The answers come back as a list with their covers, and the title and author at the top can be changed and searched again when the book's own are wrong.
 
 Picking an answer puts it side by side with what the book has now, one row a field. The ones the book is missing are ticked already, and the rest I tick myself. Rows where both say the same thing are greyed out. Tags are added to the ones the book has rather than replacing them, and identifiers only add the kinds the book doesn't have yet. The found cover can be ticked too. **Use these** puts it all into the edit sheet so I can look it over before I **Save**. The covers in the list come through Daf's server, so the tablet never talks to Amazon or Google itself.
+
+## Tidying the library
+
+The **Filter** panel has a **Tidy** group next to **Missing**. **Possible duplicates** finds books with the same title (subtitles and punctuation aside) by the same author. **Odd characters** finds titles with garbled letters, like "â€™" where an apostrophe should be. **Last name first** finds authors written as "Patai, Raphael", which Calibre then files under a folder of that name. To fix those in one go, I choose them all and tick **Turn "Last, First" names around** in the multi-book editor. Names like "…, Inc." or "…, Ph.D." are left alone.
+
+With two or more books chosen, the bar at the bottom also has **Merge** and **Remove**. **Merge** is for copies of one book. I pick the copy to keep (Daf suggests the one with a cover and the most files), and it takes the others' files it doesn't have yet, their tags and identifiers, and anything else it was missing. Then the others go. In Daf, their highlights, shelves, notes and my place in them move over to the kept copy. **Remove** takes books out of Calibre, and so does **Remove from Calibre** at the bottom of the edit sheet. Daf says first if a book has highlights, which stay in Daf.
+
+Nothing is lost straight away. Removed and merged books go to Calibre's own trash, and **⋯ › Calibre's trash** lists what's there, newest first, with **Put back**, which returns a book exactly as it was, files and all. Calibre empties its trash after a couple of weeks.
 
 ## How Daf changes Calibre
 

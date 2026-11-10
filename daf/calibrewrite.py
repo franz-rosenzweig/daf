@@ -80,6 +80,22 @@ def main():
                         v = day(v) if v else UNDEFINED_DATE
                         d.set_field("pubdate", {i: v for i in ids})
                         continue
+                    if field == "authors_flip":             # "Last, First" → "First Last", each book its own
+                        import re as _re
+                        def flip(a):
+                            m = _re.fullmatch(r"\s*([^,]+),\s*([^,]+?)\s*", a)
+                            if not m or _re.search(r"(?i)\b(inc|ltd|llc|co|corp|press|services|ph\.?\s?d|m\.?d|jr|sr|ii|iii|iv)\.?$", m.group(2)):
+                                return a
+                            return m.group(2) + " " + m.group(1)
+                        new = {}
+                        for i in ids:
+                            cur = d.field_for("authors", i)
+                            nxt = tuple(flip(a) for a in cur)
+                            if nxt != cur:
+                                new[i] = nxt
+                        if new:
+                            d.set_field("authors", new)
+                        continue
                     if field == "series_number":            # 1, 2, 3… in the order given
                         start = float(v or 1)
                         d.set_field("series_index", {i: start + n for n, i in enumerate(ids)})
@@ -125,6 +141,51 @@ def main():
                     raise ValueError("Calibre couldn't convert it: " + (r.stderr or r.stdout or "")[-400:])
                 d.add_format(ids[0], op["to"].upper(), dst, replace=True)
                 os.unlink(dst); os.rmdir(tmp)
+            elif k == "merge":                          # the others' files, tags, identifiers and empty fields into one; then the others go
+                keep = int(op["keep"])
+                others = [i for i in ids if i != keep]
+                for o in others:
+                    have = {f.upper() for f in d.formats(keep)}
+                    for fmt in d.formats(o):
+                        if fmt.upper() not in have:
+                            d.add_format(keep, fmt, d.format_abspath(o, fmt), replace=False)
+                    tags = list(d.field_for("tags", keep))
+                    for t in d.field_for("tags", o):
+                        if t.lower() not in {x.lower() for x in tags}:
+                            tags.append(t)
+                    d.set_field("tags", {keep: tuple(tags)})
+                    idk = dict(d.field_for("identifiers", keep))
+                    for a, b in d.field_for("identifiers", o).items():
+                        idk.setdefault(a, b)
+                    d.set_field("identifiers", {keep: idk})
+                    for f in ["series", "publisher", "rating", "comments", "languages"] + sorted(d.field_metadata.custom_field_keys()):
+                        if d.field_metadata[f].get("datatype") == "composite":
+                            continue
+                        if not d.field_for(f, keep) and d.field_for(f, o):
+                            d.set_field(f, {keep: d.field_for(f, o)})
+                            if f == "series":
+                                d.set_field("series_index", {keep: d.field_for("series_index", o)})
+                    if d.field_for("pubdate", keep) == UNDEFINED_DATE and d.field_for("pubdate", o) != UNDEFINED_DATE:
+                        d.set_field("pubdate", {keep: d.field_for("pubdate", o)})
+                    if not d.field_for("cover", keep) and d.field_for("cover", o):
+                        d.set_cover({keep: d.cover(o)})
+                d.remove_books(others)
+                for o in others:
+                    out["books"][str(o)] = None
+                touched.add(keep)
+                out["done"].append(k)
+                continue
+            elif k == "trash":                          # what Calibre's trash holds
+                books, _fmts = d.list_trash_entries()
+                out["trash"] = [{"id": e.book_id, "title": e.title, "author": e.author, "removed": int(e.mtime)} for e in books]
+                out["done"].append(k)
+                continue
+            elif k == "restore":
+                for i in [int(x) for x in op["trash_ids"]]:
+                    d.move_book_from_trash(i)
+                    touched.add(i)
+                out["done"].append(k)
+                continue
             elif k == "remove_books":
                 d.remove_books(ids)
                 for i in ids:
@@ -175,6 +236,8 @@ def run(ops, timeout=120):
         raise CalibreError(out.get("error") or "Calibre said no")
     books = {int(k): v for k, v in out["books"].items()}
     _follow(books)
+    if "trash" in out:
+        books["trash"] = out["trash"]
     return books
 
 

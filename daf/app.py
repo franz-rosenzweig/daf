@@ -1231,6 +1231,9 @@ def _edit_fields(f, custom_keys):
             out[k] = list(dict.fromkeys(str(x).strip()[:200] for x in vals if str(x).strip()))[:200]
         elif k in ("series", "publisher"):
             out[k] = str(v or "").strip()[:300] or None
+        elif k == "authors_flip":
+            if v:
+                out["authors_flip"] = True
         elif k in ("series_index", "series_number"):
             try:
                 out[k] = float(v if v not in (None, "") else 1)
@@ -1411,6 +1414,78 @@ def find_catalog_book(cid: int, b=Depends(json_body), c=Depends(conn)):
     authors = [str(a)[:200] for a in authors][:5]
     q = f"{title} {authors[0] if authors else ''}".strip() if b.get("title") else None
     return {"job": calibrefind.start(db.connect, cid, d["id"], title, authors, ids, q)}
+
+
+def _after_removal(moves):
+    """Books Calibre no longer has: what pointed at a merged-away book (highlights, shelves, place,
+    notes) points at the one kept, then Daf's book list is built again, away from the request."""
+    s = config.load_settings()
+    c = db.connect()
+    try:
+        for old, new in moves.items():
+            library.rekey(c, s, old, new)
+        c.commit()
+    finally:
+        c.close()
+
+    def rebuild():
+        from . import sync
+        with sync._lock:
+            c2 = db.connect()
+            try:
+                library.rebuild(c2, config.load_settings())
+                c2.commit()
+            except Exception:  # noqa: BLE001
+                logging.getLogger("daf").exception("rebuild after a Calibre removal")
+            finally:
+                c2.close()
+    threading.Thread(target=rebuild, daemon=True).start()
+
+
+@app.post("/api/catalog/remove", dependencies=[Depends(user)])
+def remove_catalog_books(b=Depends(json_body)):
+    """Books out of Calibre, into Calibre's own trash (it keeps them for 14 days)."""
+    ids = [int(i) for i in (b or {}).get("ids") or [] if str(i).isdigit()][:500]
+    if not ids:
+        raise HTTPException(400, "No books")
+    _calibre([{"op": "remove_books", "ids": ids}], timeout=300)
+    _after_removal({})
+    return {"ok": True, "removed": len(ids)}
+
+
+@app.post("/api/catalog/merge", dependencies=[Depends(user)])
+def merge_catalog_books(b=Depends(json_body)):
+    """Several copies of one book into one, the way Calibre merges: {keep, ids}. The kept book takes
+    the others' files it doesn't have, their tags and identifiers, and anything it's missing; the
+    others go to Calibre's trash, and in Daf their highlights, shelves and places move to the kept one."""
+    b = b if isinstance(b, dict) else {}
+    ids = [int(i) for i in b.get("ids") or [] if str(i).isdigit()][:50]
+    keep = int(b["keep"]) if str(b.get("keep", "")).isdigit() else None
+    if keep is None or keep not in ids or len(ids) < 2:
+        raise HTTPException(400, "Two books or more, and which one to keep")
+    _calibre([{"op": "merge", "ids": ids, "keep": keep}], timeout=600)
+    _after_removal({f"cal:{i}": f"cal:{keep}" for i in ids if i != keep})
+    return {"ok": True, "kept": keep}
+
+
+@app.get("/api/catalog/trash", dependencies=[Depends(user)])
+def get_catalog_trash(private: int = 0):
+    """What's in Calibre's trash, newest first (private titles only with private=1)."""
+    s = config.load_settings()
+    items = (_calibre([{"op": "trash"}]) or {}).get("trash") or []
+    items = [x for x in items if private or not library.is_private(x["title"], s)]
+    return {"books": sorted(items, key=lambda x: -x["removed"])}
+
+
+@app.post("/api/catalog/trash/restore", dependencies=[Depends(user)])
+def restore_catalog_books(b=Depends(json_body)):
+    """Books back from Calibre's trash, as they were."""
+    ids = [int(i) for i in (b or {}).get("ids") or [] if str(i).isdigit()][:200]
+    if not ids:
+        raise HTTPException(400, "No books")
+    _calibre([{"op": "restore", "trash_ids": ids}], timeout=300)
+    _after_removal({})
+    return {"ok": True, "restored": len(ids)}
 
 
 @app.get("/api/catalog/jobs/{jid}", dependencies=[Depends(user)])

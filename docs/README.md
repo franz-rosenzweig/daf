@@ -21,7 +21,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 - [Videos and podcasts](videos-and-podcasts.md) — transcripts, clips, episode pages, and AntennaPod
 - [Highlights and review](highlights-and-review.md) — colors, tags, the daily review, flashcards and export
 - [Books and shelves](books-and-shelves.md) — the nightstand, shelves, Hardcover and a book's page
-- [Calibre in Daf](calibre.md) — All books as a spreadsheet, Calibre's search, editing one book or many, covers, files, conversions and Find details
+- [Calibre in Daf](calibre.md) — All books as a spreadsheet, Calibre's search, editing one book or many, covers, files, conversions, Find details, merging, removing and the trash
 - [The Torah shelf](torah.md) — the parasha, the haftarah, divrei Torah and the dictionaries
 - [Recovery](recovery.md) — the Big Book by its chapters, the Step 10 and 11 readings, prayers
 - [Stats](stats.md) — streaks, totals and the books that are waiting

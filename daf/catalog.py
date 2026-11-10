@@ -46,6 +46,7 @@ BUILTIN = [
     ("highlights", "Highlights", "number", ()),
     ("shelves", "Shelves", "list", ("shelf",)),
     ("calibre_id", "Calibre ID", "number", ("id",)),
+    ("duplicate", "Duplicate", "bool", ("duplicates", "dupe", "dupes")),
 ]
 DEFAULT_COLS = ["title", "authors", "series", "tags", "rating", "added", "formats", "#pages", "status", "progress"]
 STATUS = {"to-read": "To read", "reading": "Reading", "read": "Read", "paused": "Paused", "dropped": "Dropped"}
@@ -182,6 +183,14 @@ def calibre_rows(settings=None):
                     books[b][k] = v
     finally:
         c.close()
+    # Possible duplicates: the same title (its subtitle, articles and punctuation aside) by the same author.
+    from .library import norm, surname
+    groups = {}
+    for b in books.values():
+        groups.setdefault((norm(b["title"]), surname(b["authors"][0] if b["authors"] else "")), []).append(b["calibre_id"])
+    for g in groups.values():
+        for i in g:
+            books[i]["duplicate"] = len(g) > 1
     _cache.update(key=key, books=books, custom=custom)
     return books, custom
 

@@ -20,7 +20,7 @@ const IC = {
 const DEF = { q: '', sort: 'added', desc: true, cols: null, widths: {}, priv: false, view: null };
 const saved = store.get('catalog', {});
 const P = Object.assign({}, DEF, saved, { data: null, facets: null, side: store.get('catalogSide', false),
-  open: new Set(store.get('catalogOpen', ['added', 'missing', 'status', 'tags'])), all: new Set(), fq: '', scroll: 0, seq: 0, sel: new Set(), anchor: null });
+  open: new Set(store.get('catalogOpen', ['added', 'missing', 'tidy', 'status', 'tags'])), all: new Set(), fq: '', scroll: 0, seq: 0, sel: new Set(), anchor: null });
 const keep = () => store.set('catalog', { q: P.q, sort: P.sort, desc: P.desc, cols: P.cols, widths: P.widths, priv: P.priv, view: P.view, lastView: P.lastView });
 const WIDTH = { title: 300, authors: 180, series: 170, tags: 200, rating: 112, added: 112, published: 100, modified: 112, publisher: 160, languages: 90,
   formats: 110, size: 80, isbn: 130, identifiers: 240, cover: 70, status: 96, progress: 120, last_read: 112, audio: 110, highlights: 92, shelves: 160, calibre_id: 90 };
@@ -115,7 +115,8 @@ function bulkBar(){
   const n = P.sel.size, all = P.data ? P.data.books.length : 0;
   bar.hidden = false;
   bar.innerHTML = '<b>' + n + ' chosen</b><span class="spacer"></span>' + (n < all ? '<button class="btn sm" data-catb="all">Choose all ' + all + '</button>' : '') +
-    '<button class="btn sm" data-catb="none">Clear</button><button class="btn sm primary" data-catb="edit">' + (n === 1 ? 'Edit details' : 'Edit ' + n + ' books') + '</button>';
+    '<button class="btn sm" data-catb="none">Clear</button>' + (n > 1 ? '<button class="btn sm" data-catb="merge">Merge</button>' : '') + '<button class="btn sm danger" data-catb="remove">Remove</button>' +
+    '<button class="btn sm primary" data-catb="edit">' + (n === 1 ? 'Edit details' : 'Edit ' + n + ' books') + '</button>';
 }
 function choose(id, on){
   if (on) P.sel.add(id); else P.sel.delete(id);
@@ -153,6 +154,7 @@ function dirtyView(){
 const term = (key, val) => key === 'rating' ? 'rating:' + val : key + ':"=' + String(val).replace(/"/g, '') + '"';
 const ADDED = [['added:thisweek', 'This week'], ['added:thismonth', 'This month'], ['added:>=30daysago', 'Last 30 days'], ['added:thisyear', 'This year'], ['added:lastyear', 'Last year']];
 const MISSING = [['formats:false', 'No file'], ['cover:false', 'No cover'], ['tags:false', 'No tags'], ['rating:false', 'No rating'], ['series:false', 'No series']];
+const TIDY = [['duplicate:true', 'Possible duplicates'], ['title:~[âÃ�]', 'Odd characters'], ['authors:"~^[^&]+, "', 'Last name first']];
 const esc_re = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const has = (t, neg) => new RegExp('(^|[\\s(])' + (neg ? 'not ' : '') + esc_re(t) + '(?=$|[\\s)])', 'i').test(P.q);
 const stateOf = t => has(t, true) ? 'out' : has(t) ? 'in' : '';
@@ -180,6 +182,7 @@ function drawSide(keepFocus){
     (P.q ? '<button class="btn sm" data-catm="clear">Clear</button>' : '') + '<button class="btn sm catdone" data-catm="side">Done</button></div>';
   h += group('added', 'Added', ADDED.map(([t, l]) => [t, esc(l)]));
   h += group('missing', 'Missing', MISSING.map(([t, l]) => [t, esc(l)]));
+  h += group('tidy', 'Tidy', TIDY.map(([t, l]) => [t, esc(l)]));
   for (const f of P.facets || []) h += group(f.key, f.label, f.values.map(([v, n]) => [term(f.key, v), f.key === 'rating' ? stars(v) : esc(v), n]));
   side.innerHTML = h;
   if (keepFocus) { const i = $('#catfq'); if (i && document.activeElement !== i && P.fq) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -220,7 +223,8 @@ function moreMenu(anchor){
   const qs = new URLSearchParams({ q: P.q, sort: P.sort, desc: P.desc ? '1' : '0', cols: colsNow().map(c => c.key).join(',') });
   if (P.priv) qs.set('private', '1');
   openPop(anchor, '<a href="/api/catalog/export?' + qs.toString() + '" download><i></i>Export as CSV</a>' +
-    '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>');
+    '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>' +
+    '<hr><button data-catm="trash"><i></i>Calibre’s trash</button>');
 }
 async function saveViews(views){
   const r = await api('/api/catalog/views', { method: 'PUT', body: JSON.stringify({ views }) });
@@ -265,6 +269,7 @@ document.addEventListener('click', async e => {
     if (k === 'side') toggleSide(false);
     else if (k === 'clear') setQ('');
     else if (k === 'colsreset') { P.cols = null; P.widths = {}; P.view = dirtyView(); keep(); draw(); $('#pop').hidden = true; }
+    else if (k === 'trash') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.trash(P.priv); }
     else if (k === 'priv') { P.priv = !P.priv; keep(); $('#pop').hidden = true; P.facets = null; load(true).then(() => { if (P.side) drawSide(); }); }
     else if (k === 'reset') { $('#pop').hidden = true; Object.assign(P, { q: '', sort: 'added', desc: true, cols: null, widths: {}, view: null }); keep(); const box = $('#catq'); if (box) box.value = ''; load(); if (P.side) drawSide(); }
     else if (k === 'save' || k === 'update') {
@@ -292,6 +297,8 @@ document.addEventListener('click', e => {
   const b = t.closest('[data-catb]');
   if (b) { const k = b.dataset.catb;
     if (k === 'edit' && C.BookEdit) C.BookEdit.bulk([...P.sel]);
+    else if (k === 'merge' && C.BookEdit) C.BookEdit.merge(P.data.books.filter(x => P.sel.has(x.calibre_id)));
+    else if (k === 'remove' && C.BookEdit) C.BookEdit.remove(P.data.books.filter(x => P.sel.has(x.calibre_id))).then(done => { if (done) P.sel.clear(); });
     else if (k === 'none') { P.sel.clear(); draw(); }
     else if (k === 'all') { P.data.books.forEach(x => P.sel.add(x.calibre_id)); draw(); }
     return; }
