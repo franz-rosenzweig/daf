@@ -1251,18 +1251,19 @@ html.rail:not(.shell-mac) .side:not(.open) .navfull{overflow-y:auto;overflow-x:h
 html.rail:not(.shell-mac) .side:not(.open) .brand{justify-content:center;padding:12px 0 6px}
 html.rail:not(.shell-mac) .side:not(.open) .brand b,
 html.rail:not(.shell-mac) .side:not(.open) .nv>.ct,
-html.rail:not(.shell-mac) .side:not(.open) .navh,
 html.rail:not(.shell-mac) .side:not(.open) .nv.sub,
 html.rail:not(.shell-mac) .side:not(.open) .sidefoot,
 html.rail:not(.shell-mac) .side:not(.open) .soon{display:none}
 html.rail:not(.shell-mac) .side:not(.open) .nav{padding:2px 6px}
-/* each icon with its name under it, as Material's navigation rail */
-html.rail:not(.shell-mac) .side:not(.open) .nv{flex-direction:column;justify-content:center;gap:2px;padding:6px 0 5px;min-height:52px}
-html.rail:not(.shell-mac) .side:not(.open) .nv>span:not(.ct){display:block;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:10.5px;line-height:1.2;color:var(--fg-2);text-align:center}
-html.rail:not(.shell-mac) .side:not(.open) .nv.on>span:not(.ct){color:var(--fg);font-weight:600}
+/* icons only (each names itself on hover), in the full sidebar's groups with a line between them */
+html.rail:not(.shell-mac) .side:not(.open) .nv{justify-content:center;gap:0;padding:0;min-height:44px;width:44px;margin:1px auto}
+html.rail:not(.shell-mac) .side:not(.open) .nv>span:not(.ct){display:none}
+html.rail:not(.shell-mac) .side:not(.open) .nv svg{width:20px;height:20px;flex:none}
 html.rail:not(.shell-mac) .side:not(.open) .nvrow{justify-content:center}
-html.rail:not(.shell-mac) .side:not(.open) .nav+.nav{border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
+html.rail:not(.shell-mac) .side:not(.open) .brand .spacer{display:none}
+html.rail:not(.shell-mac) .side:not(.open) .navh{display:block;height:0;min-height:0;padding:0;margin:8px 14px;border-top:1px solid var(--line);overflow:hidden;font-size:0}
+html.rail:not(.shell-mac) .side:not(.open) .navh *{display:none}
+html.rail:not(.shell-mac) .side:not(.open) .nav+.nav{border-top:1px solid var(--line);margin:8px 14px 0;padding:8px 0 0}
 html.rail:not(.shell-mac) .railbtn{display:inline-grid}
 html.rail:not(.shell-mac) .side.open .navfull{position:fixed;left:0;top:0;bottom:0;width:280px;overflow:auto;background:var(--side);border-right:1px solid var(--line);
   box-shadow:var(--shadow);z-index:46;padding-top:env(safe-area-inset-top,0px)}
@@ -1283,8 +1284,8 @@ html.rail:not(.shell-mac) .side:not(.open) .sidebtn{display:none}
 /* the one sidebar button, in the same corner whether the sidebar is full, mini or hidden (#sideshow) */
 .brand .sidetog{width:34px;height:34px;color:var(--fg-2);margin-left:-5px}
 .side:not(.open) .brand:has(.sidetog){padding:12px 12px 8px 13px;gap:8px}
-html.rail:not(.shell-mac) .side:not(.open) .brand{padding:12px 0 6px}
-html.rail:not(.shell-mac) .side:not(.open) .brand .sidetog{margin:0}
+html.rail:not(.shell-mac) .side:not(.open) .brand{padding:12px 0 6px;justify-content:center;gap:0}
+html.rail:not(.shell-mac) .side:not(.open) .brand .sidetog{margin:0 auto}
 /* its edge, dragged for mini, full or hidden (app.js); a small handle shows on a touch screen */
 .side{position:relative}
 /* its edge handle lies over the page's edge, so the sidebar doesn't clip it: its list scrolls instead */
