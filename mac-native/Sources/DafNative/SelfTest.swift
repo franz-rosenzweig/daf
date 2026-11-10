@@ -336,7 +336,7 @@ enum SelfTest {
             if let s = w.screen { CGWarpMouseCursorPosition(CGPoint(x: s.frame.midX, y: s.frame.midY)) }
             await pause(1.5)
             check(panes() == 1 && m.reader?.textView === textView, "with only the article, the sidebar and the list gone, and the same reader still open",
-                  "panes \(panesBefore) → \(panes()); the pointer was \(edge ? "at the left edge" : "away from the edge") (\(Int(pointer.x)), \(Int(pointer.y)))")
+                  "panes \(panesBefore) → \(panes()) (\(Focus.split(w)?.splitViewItems.map { $0.isCollapsed ? "shut" : "open" }.joined(separator: " ") ?? "-")); the pointer was \(edge ? "at the left edge" : "away from the edge") (\(Int(pointer.x)), \(Int(pointer.y)))")
             capture("70-focus")
             // nothing over the page at the top of the screen (an empty title bar once stayed, a dark strip)
             check(atTop(w, textView), "in focus mode the article goes to the top of the screen, no bar over it", topReport(w, textView))
@@ -1001,10 +1001,15 @@ enum SelfTest {
         // in the Feed, or in the Library once a clip on it saved it there
         let feedItems = ((try? await API.shared.json("/api/docs?where=library&tab=inbox&limit=200"))?.a("items") ?? [])
             + ((try? await API.shared.json("/api/docs?where=feed&tab=unseen&limit=400"))?.a("items") ?? [])
-        for x in feedItems.filter({ $0.s("kind") == "podcast" }).prefix(12) {
-            if let id = x.s("id"), let d = try? await API.shared.json("/api/docs/" + API.enc(id) + "?prefetch=1"),
-               d.o("episode")?.o("transcript")?.s("status") == "done" { epID = id; break }
+        // the one the sandbox gave chapters (sandbox_more.py), else any with a transcript
+        var withChapters: String?
+        for x in feedItems.filter({ $0.s("kind") == "podcast" }).prefix(20) {
+            guard let id = x.s("id"), let d = try? await API.shared.json("/api/docs/" + API.enc(id) + "?prefetch=1"),
+                  d.o("episode")?.o("transcript")?.s("status") == "done" else { continue }
+            if epID == nil { epID = id }
+            if (d.o("episode")?.a("chapters").count ?? 0) >= 2 { withChapters = id; break }
         }
+        epID = withChapters ?? epID
         if let eid = epID, let ed = try? await API.shared.json("/api/docs/" + API.enc(eid) + "?prefetch=1") {
             _ = try? await API.shared.send("POST", "/api/podcasts/position", ["doc": eid, "started": 30, "position": 75])
             await go(m, .library("inbox"))
