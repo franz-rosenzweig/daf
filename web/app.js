@@ -737,7 +737,8 @@ async function renderBook(id, hl){
     (b.audio_note ? '<span class="mute">Audiobook: ' + esc(b.audio_note) + '</span>' : '') +
     '<span class="mute tiny">' + [b.minutes_kindle && !b.stats ? Math.round(b.minutes_kindle / 60 * 10) / 10 + ' h read on the Kindle' : '', b.last_read ? 'last opened ' + epochDate(b.last_read) : ''].filter(Boolean).join(' · ') + '</span>' +
     '<div id="bacts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' + (b.readable ? '<a class="btn primary" href="#ebook/' + encodeURIComponent(b.id) + '">' + (b.daf_position ? 'Continue in Daf · ' + Math.round((b.daf_position.fraction || 0) * 100) + '%' : 'Read in Daf') + '</a>' : '') + (b.kind === 'book' ? (b.on_nightstand ? '<button class="btn" data-act="standoff" data-id="' + esc(b.id) + '">Take off the nightstand</button>' : '<button class="btn primary" data-act="standon" data-id="' + esc(b.id) + '">Put on the nightstand</button>') : '') +
-    (b.url ? '<a class="btn" href="' + esc(b.url) + '" target="_blank" rel="noopener">Open original</a>' : '') + '</div>' +
+    (b.url ? '<a class="btn" href="' + esc(b.url) + '" target="_blank" rel="noopener">Open original</a>' : '') +
+    (/^cal:\d+$/.test(b.id) && window.DafCore.BookEdit ? '<button class="btn" data-act="bookedit" data-id="' + esc(b.id) + '">Edit details</button>' : '') + '</div>' +
     (b.vault_path ? '<span class="tiny mute">Vault: <code>' + esc(b.vault_path) + '</code></span>' : '<span class="tiny mute">No vault note for this book yet; notes stay in Daf until there is one.</span>') + '</div></div>';
   if (b.stats) h += bookStats(b.stats);
   if (window.DafCore.AddBook) h += window.DafCore.AddBook.sections(b);

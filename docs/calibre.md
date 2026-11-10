@@ -2,7 +2,7 @@
 
 # Calibre in Daf
 
-My books live in Calibre. Calibre-Web Automated runs it on the server, takes in new files and converts them, and for a long time I opened Calibre on the Mac whenever I wanted to look through the library properly. I'd rather do all of that in Daf, next to the reading, so Daf is slowly taking over Calibre's jobs. This page covers what's there so far.
+My books live in Calibre. Calibre-Web Automated runs it on the server, takes in new files and converts them, and for a long time I opened Calibre on the Mac whenever I wanted to look through the library properly or fix a book's details. I'd rather do all of that in Daf, next to the reading, so Daf has taken over Calibre's jobs: the library as a spreadsheet with Calibre's search, editing one book or many, covers, files and conversions, and finding a book's details online.
 
 ## All books
 
@@ -40,6 +40,28 @@ When I have a search, an order and a set of columns I'll want again, **Views ›
 
 **⋯ › Export as CSV** downloads exactly what's on the screen, in its order and with its columns, as a spreadsheet file that Numbers, Excel or Google Sheets opens.
 
-## How it reads Calibre
+## Editing a book
 
-Daf reads Calibre's database directly and never writes to it here. It reads it again only when the file changes, so the table is quick even with the whole library in it.
+**Edit details** is on every Calibre book's page in Daf, and in All books when I right-click a row (or hold it on the tablet). It has everything Calibre's own edit window has: the title, the authors (separated by "&", the way Calibre does it), the series and the book's number in it, the tags, my rating, the publisher, the date it was published, the languages, the identifiers (one per line, like `isbn: 978…`), the description, and my own Calibre columns (Read, Pages, Collections and the rest). The tags are little chips: I type one and press Enter or a comma, pick one from the list Calibre already has, or press the × to take one off. Nothing changes until I press **Save** (or ⌘↩), and only the fields I actually touched are sent.
+
+The left side has the cover and the files. **Change cover** takes an image from the device, and **Cover from a link** takes the address of one on the web. Under **Files**, each format has a download button and a **⋯** menu with **Convert to** EPUB, AZW3, KEPUB, MOBI or PDF, and **Remove**. **Add a file** puts another format on the same book, or replaces the one it has. A conversion takes from a few seconds to a minute, and the file shows up in the list when Calibre is done.
+
+## Several books at once
+
+In All books, each row has a box at its left. A click on a row chooses it the way a spreadsheet does: on its own, with ⌘ (or Ctrl) one more, and with Shift every row from the last one I clicked. On the tablet and the phone a tap adds the row or takes it out. The box in the header chooses everything the table shows.
+
+When anything is chosen, a bar comes up at the bottom with **Edit N books**. That sheet changes them all at once: the authors, the series (with **Number them from 1 in the table's order**, which is how I put a series in order: sort the table the way I want and then number), **Add tags** and **Remove tags** (the ones already on the chosen books are offered), the rating or **No rating**, the publisher, the date, the languages, and my own columns. Anything I leave empty stays as it is on each book.
+
+## Find details
+
+**Find details**, at the top of the edit sheet, asks two places at once: Hardcover, which Daf is already connected to, and Calibre's own download sources (Google, Amazon, Edelweiss and Open Library). It takes up to half a minute. The answers come back as a list with their covers, and the title and author at the top can be changed and searched again when the book's own are wrong.
+
+Picking an answer puts it side by side with what the book has now, one row a field. The ones the book is missing are ticked already, and the rest I tick myself. Rows where both say the same thing are greyed out. Tags are added to the ones the book has rather than replacing them, and identifiers only add the kinds the book doesn't have yet. The found cover can be ticked too. **Use these** puts it all into the edit sheet so I can look it over before I **Save**. The covers in the list come through Daf's server, so the tablet never talks to Amazon or Google itself.
+
+## How Daf changes Calibre
+
+Daf reads Calibre's database directly for the table, and reads it again only when the file changes, so the table is quick even with the whole library in it.
+
+Daf never writes to that database itself. Every change goes to Calibre: Daf runs a short script with Calibre's own tools inside the Calibre-Web Automated container, and Calibre does the work the same way it would in its own window. That means the book's folder moves when the title or the author changes, the sort fields follow, covers are stored the way Calibre stores them, and the `metadata.opf` file beside each book is written again. One change runs at a time. Calibre-Web Automated's own imports go through Calibre too, so the two never write over each other.
+
+Calibre-Web Automated fills in details from the web only for books it's importing, so it doesn't undo what I've edited. Its weekly Hardcover refresh of the whole library is off, and it should stay off for the same reason.

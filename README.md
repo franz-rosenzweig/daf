@@ -47,6 +47,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 ### Reading in Daf
 
 - **All books.** The whole Calibre library as a spreadsheet: any columns, sorted any way, searched with Calibre's own search language, filtered from a tag browser, saved as views and exported as CSV.
+- **Calibre, in Daf.** Edit a book's details, or many books at once, change covers, add, convert and remove files, and find details and covers on Hardcover and Calibre's own sources. Every change goes through Calibre itself.
 - **Books.** Every book in my Calibre library (EPUB, MOBI, AZW3, FB2 or CBZ) opens in Daf's own reader, built on foliate-js, in Scroll or Pages, with footnotes in a popover and minutes left in the chapter. If the Kindle is further along, Daf offers to go there.
 - **Themes and typefaces.** 17 themes, each in a light and a dark version, 24 reading faces that Daf serves itself, Hebrew ones too, and any font I add, like Bookerly. The choice follows me to every device.
 - **The Feed and the Library.** The Feed is Daf's own feed reader (it was FreshRSS until November), and it replaced Read You for me. The Library is Daf's own now (it was Karakeep until October): articles, tweets, PDFs, YouTube videos with their transcripts, links to Instagram reels, plus the newsletters I pick. Daf reads every page I save from my server, keeps its text and picture, and gives it a short summary and a few tags.
