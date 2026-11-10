@@ -115,3 +115,16 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 ## The Sketchbook (2026-11-05)
 
 - not yet: the Sketchbook beside a book, an article, a video, a PDF and a manga volume (web/sketchbook.js): a panel on the right whose width is dragged, a tab a chapter (following where you are) or a volume and General, typed text blocks (add, edit, move up and down, delete, type below), handwriting and pictures shown (the pen itself is tablet-only), time stamps that seek a video, the camera on a manga or PDF page, dictation (/api/sketchbook/dictate), all through /api/sketchbook
+
+## The Edition (2026-11-09)
+
+- here: Edition in the sidebar under Today (when edition.on or there's one), with done/total; a page across the window (edition.js): the date, the Hebrew date and the number, ten marks and the time left; the lead with its opening lines and the Today list beside it (under it when narrow); the other pieces as cards with their kind, why, 👍/👎 (POST /api/edition/vote) and Read; End of the edition; a piece opens in its own window (#read)
+- here: the toolbar: past editions, Taste, Kindle / On Kindle (POST /api/edition/kindle), Make It Again (asked first) and Make It Now (POST /api/edition/build), looked at every five seconds while it's being made
+- here: Taste (#edition/taste): the last two weeks, what it learned from, Picking up on; Topics with their bars, rising/fading and Less/More/Mute, Name Them Again; the Mix (Every morning, Days, the steppers, Kindle, Chosen by the model) through PUT /api/edition/settings; Sources with Less/More/Mute, Mute by name or folder:Name, Muted with Unmute
+
+## Sound (2026-11-09)
+
+- here: Sound in the book reader (sound.js): the wave button with the scene, Volume and Turn On / Turn Off Sound; on for books on this Mac until turned off; the place sent 1.2 s after the pages settle (POST /api/ebooks/{id}/sound), asked again every 5 s while it's reading; stops when the book closes
+- here: the mixer in AVAudioEngine: an AVAudioPlayerNode a sound, its loop PAD to PAD + whole seconds, started somewhere in it, faded in and out over 4 s, the volume on top; the files kept on the Mac
+- here: Today's Sound row beside the Kindle (GET /api/sound/kindle, seen in the last half hour): the book, the scene and the volume while it plays, Sound / Stop; it waits for the Kindle's next page and plays on with the window in the background
+

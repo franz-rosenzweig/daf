@@ -13,6 +13,7 @@ enum PodNav: Hashable {
 
 enum Place: Hashable {
     case today
+    case edition                      // the day's paper (Edition.swift)
     case home                         // the Library's home: its shelves
     case review
     case library(String)              // inbox, later, archive
@@ -34,7 +35,7 @@ enum Place: Hashable {
     case search
 
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
-    var isPage: Bool { self == .today || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
+    var isPage: Bool { self == .today || self == .edition || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
 
     /// A list of the Library's (Inbox, Later, Archive, or a kind).
     var isLibrary: Bool {
@@ -51,6 +52,7 @@ enum Place: Hashable {
     var title: String {
         switch self {
         case .today: return "Today"
+        case .edition: return "Edition"
         case .home: return "Home"
         case .review: return "Review"
         case .shortlist: return "Shortlist"
@@ -421,7 +423,7 @@ final class AppModel {
                 items = []
             case .recovery:
                 items = []
-            case .review, .highlights, .stats, .podcasts, .sources:
+            case .review, .highlights, .stats, .podcasts, .sources, .edition:
                 items = []
             case .manga:
                 let j = try await API.shared.json("/api/manga")
@@ -816,6 +818,9 @@ final class AppModel {
         case "podcasts":
             podNav = parts.count > 2 && parts[1] == "abs" ? .abs(parts[2]) : .cat(parts.count > 1 ? parts[1] : "")
             place = .podcasts
+            NSApp.activate()
+        case "edition":
+            place = .edition
             NSApp.activate()
         case "book" where parts.count > 1:
             place = .books

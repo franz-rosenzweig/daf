@@ -139,6 +139,14 @@ enum SelfTest {
         await pause(1)
         capture("01-today")
         check(m.place?.isPage == true, "Today is a page across the window")
+        // the Edition (Edition.swift): a page of its own, with the day's paper or the way to make it
+        let edJ = try? await API.shared.json("/api/edition")
+        await go(m, .edition)
+        await pause(2.5)
+        capture("02d-edition")
+        check(m.place == .edition && m.place?.isPage == true && edJ?.s("day") != nil, "the Edition is a page of its own",
+              edJ?.o("edition").map { "\($0.a("items").count) pieces" } ?? (edJ?.b("building") == true ? "being made" : "none yet"))
+        await go(m, .today)
         let y29 = try? await API.shared.json("/api/year/29")
         check(y29?.list("days").count == 365, "and Year 29 is there to show", "\(y29?.i("days_read") ?? -1) days read")
         // the whole page, in a tall window
@@ -1494,6 +1502,23 @@ enum SelfTest {
         let onward = await until(60) { sp.started > before + 1 }
         check(onward, "and goes on to the next paragraph", "\(sp.index + 1)")
         sp.stop()
+
+        // Sound (Sound.swift): turned on, Daf is asked for the scene on this page; off, it stops
+        let bed = SoundBed.shared
+        bed.toggleBook()
+        let answered = await until(40) { (bed.answer?.s("state") ?? "reading") != "reading" }
+        capture("36b-book-sound", win)
+        check(bed.mode == .book && answered, "Sound asks Daf for the scene on the page", "\(bed.answer?.s("state") ?? "-"): \(bed.answer?.s("scene") ?? bed.answer?.s("why") ?? "")")
+        bed.toggleBook()
+        check(bed.mode == nil && !UserDefaults.standard.bool(forKey: "soundOn"), "and Turn Off Sound stops it")
+        if onScreen, let first = (try? await API.shared.json("/api/sound/sounds"))?.a("sounds").first?.s("id") {
+            bed.testMix([first: 0.3])
+            let sounding = await until(60) { bed.sounding == 1 }
+            await pause(1)
+            bed.testMix([:])
+            let quiet = await until(8) { bed.sounding == 0 && bed.fading == 0 }
+            check(sounding && quiet, "a sound loops in, fading, and fades out", first)
+        } else if !onScreen { log("SKIP  a sound playing: this Mac account isn't the one on the screen") }
 
         // bigger type: the same place
         let at0 = pages.visible.location

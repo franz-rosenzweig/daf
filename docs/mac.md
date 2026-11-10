@@ -12,19 +12,25 @@ Only Daf loads in the window. Any other link opens in your browser, `obsidian://
 
 ## The sidebar
 
-The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Review**, **Library** with its kinds, **Books**, **Feed** with its folders and **Highlights**, then what I've pinned (**Edit** beside Pinned picks them), then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
+The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Edition** (once it's on), **Review**, **Library** with its kinds, **Books**, **Feed** with its folders and **Highlights**, then what I've pinned (**Edit** beside Pinned picks them), then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
 
 ⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (the icons, each with its name under it, and ☰ at the top for the full one): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
+
+## The Edition
+
+When the Edition is on (see [The Edition](edition.md)), it sits under Today in the sidebar with how many of its pieces I've read. It's the page's paper: the date with the Hebrew date and the issue number, a mark for each piece as I get to it and the time left, the lead with its opening lines and the day's list beside it, then the rest as cards, each with why it's there and 👍 and 👎. A piece opens in a window of its own. The toolbar has the past editions, **Taste**, **Kindle** to send it there, and the arrow to make it again. **Taste** shows what Daf thinks I like, and there I turn a topic or a source up, down or off, and set the mix.
 
 ## Reading
 
 An article's toolbar has **Themes & Settings** (Aa), **Listen**, **Save to Library** for something from the Feed, **Done**, the **…** menu and the **Notebook**. The **…** menu has the rest: the Shortlist, Read Later, the original, Focus Mode, the next or previous one in the list, and so on. The time left sits quietly under the text.
 
-A book opens the way Apple Books does it: two pages side by side when the window is wide, the title in the middle of the toolbar, and **Contents**, **Aa**, **Search**, **Bookmark** and **…** beside it. Contents and search slide over the pages from the left, and the notebook, the book's details and Ask from the right; a click beside them puts them away. Under the pages is the status bar, set up like KOReader's: **Themes & Settings → Status Bar** (or a right-click on it) picks what's on it, one at a time or all at once, and the line beside it, of the book with its chapters marked or of the chapter. A click on it goes on to the next thing.
+A book opens the way Apple Books does it: two pages side by side when the window is wide, the title in the middle of the toolbar, and **Contents**, **Aa**, **Search**, **Bookmark**, **Sound** and **…** beside it. Contents and search slide over the pages from the left, and the notebook, the book's details and Ask from the right; a click beside them puts them away. Under the pages is the status bar, set up like KOReader's: **Themes & Settings → Status Bar** (or a right-click on it) picks what's on it, one at a time or all at once, and the line beside it, of the book with its chapters marked or of the chapter. A click on it goes on to the next thing.
 
 **Themes & Settings** is the same for both: two A buttons for smaller and bigger, Pages or Scroll for a book, six looks (Daf, Paper and E-ink for the day; Dusk, Night and Black for the night), Auto, Light or Dark, and under them the typeface and the spacing, the line width and justifying. A day look while it's dark switches to light, and a night look while it's light to dark. **All Themes…** opens Settings → Appearance.
 
 In a window the toolbars stay where they are, the way a Mac window keeps its toolbar. In full screen the toolbar hides until the pointer goes to the top of the screen, so the page goes right to the top. For nothing but the page, there's Focus Mode.
+
+**Sound** (the wave in a book's toolbar) plays a quiet bed of recorded sound that follows the scene I'm in, as on the page (see [Sound](sound.md)), with its volume above **Turn Off Sound**. It stays on for books on this Mac until I turn it off, and stops when the book closes. When I read on the Kindle with the Mac beside me, Today has a **Sound** row for the Kindle's book, and the Mac goes on playing the Kindle's scene with its window in the background.
 
 ## Focus mode
 

@@ -23,7 +23,7 @@ struct PaletteSheet: View {
     }
 
     private static let places: [(String, Place)] = [
-        ("Today", .today), ("Daily Review", .review), ("Home", .home), ("Inbox", .library("inbox")), ("Later", .library("later")),
+        ("Today", .today), ("Edition", .edition), ("Daily Review", .review), ("Home", .home), ("Inbox", .library("inbox")), ("Later", .library("later")),
         ("Shortlist", .shortlist), ("Archive", .library("archive")), ("All Feeds", .feed(nil)), ("Books", .books), ("Manga", .manga),
         ("Highlights", .highlights), ("Stats", .stats), ("Torah", .torah), ("Recovery", .recovery), ("Podcasts", .podcasts),
         ("Paper Pages", .paper), ("Sources", .sources),
