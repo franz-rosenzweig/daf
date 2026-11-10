@@ -2292,3 +2292,35 @@ body.beopen{overflow:hidden}
 .betrash{display:flex;flex-direction:column}
 .betrow{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)}
 .betrow .befct{flex:1}
+
+/* Tags, authors and series; Find details for many (bookedit.js) */
+.bemgr,.befill{display:flex;flex-direction:column;gap:10px}
+.bemgr h3,.befill h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);margin:10px 0 0}
+.bemtabs{display:flex;flex-wrap:wrap;gap:6px}
+.bemtabs button{font:inherit;font-size:13.5px;padding:5px 12px;border-radius:999px;border:1px solid var(--line-2);background:var(--bg);color:var(--fg-2);cursor:pointer}
+.bemtabs button.on{background:var(--active);color:var(--fg);border-color:var(--line-2);font-weight:600}
+.bemq{min-height:36px;padding:7px 10px}
+.bemalike{display:flex;flex-direction:column}
+.bemarow{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,220px) auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.bemarow b{font-weight:400;color:var(--fg-3);font-size:12px}
+.bemlist{display:flex;flex-direction:column}
+.bemrow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;border-bottom:1px solid var(--line);min-height:38px}
+.bemrow input[type=checkbox]{margin:0;accent-color:var(--accent)}
+.bemrow.sel{background:var(--active)}
+.bemname{all:unset;cursor:text;padding:6px 2px;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bemname:hover{text-decoration:underline dotted}
+.bemedit{min-height:30px;padding:4px 8px}
+.bemcount{all:unset;cursor:pointer;color:var(--fg-2);font-size:12.5px;font-variant-numeric:tabular-nums;padding:4px 8px;border-radius:6px}
+.bemcount:hover{background:var(--hover);color:var(--accent)}
+.bembar{position:sticky;bottom:-26px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;background:var(--bg);border-top:1px solid var(--line)}
+.befields{display:flex;flex-wrap:wrap;gap:8px 18px} .befields label{display:flex;gap:6px;align-items:center;font-size:14px}
+.befields input{accent-color:var(--accent)}
+.bebooks{display:flex;flex-direction:column;gap:2px;max-height:40vh;overflow:auto}
+.befrow2{display:grid;grid-template-columns:22px 44px minmax(0,1fr);gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.befrow2 input{margin:4px 0 0;accent-color:var(--accent)}
+.befrow2 img,.befrow2 .befnc{width:44px;height:64px;object-fit:cover;border-radius:4px}
+.befills{display:flex;flex-direction:column;gap:2px;font-size:13.5px} .befills i{font-style:normal;color:var(--fg-2);margin-right:4px}
+.befnone{padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}
+@media (max-width:700px){ .bemarow{grid-template-columns:minmax(0,1fr) auto} .bemarow select{grid-column:1} .bembar{bottom:calc(-30px - env(safe-area-inset-bottom,0px))} }
+.befx{cursor:pointer;border-radius:4px;padding:1px 3px;margin-left:-3px} .befx:hover{background:var(--hover)}
+.befx.off{text-decoration:line-through;color:var(--fg-3)} .befx.off i{color:var(--fg-3)}

@@ -2,7 +2,7 @@
 
 # Calibre in Daf
 
-My books live in Calibre. Calibre-Web Automated runs it on the server, takes in new files and converts them, and for a long time I opened Calibre on the Mac whenever I wanted to look through the library properly or fix a book's details. I'd rather do all of that in Daf, next to the reading, so Daf has taken over Calibre's jobs: the library as a spreadsheet with Calibre's search, editing one book or many, covers, files and conversions, finding a book's details online, and tidying: duplicates, merging, removing and Calibre's trash.
+My books live in Calibre. Calibre-Web Automated runs it on the server, takes in new files and converts them, and for a long time I opened Calibre on the Mac whenever I wanted to look through the library properly or fix a book's details. I'd rather do all of that in Daf, next to the reading, so Daf has taken over Calibre's jobs: the library as a spreadsheet with Calibre's search, editing one book or many, covers, files and conversions, finding details online for one book or many, renaming and combining tags, authors and series across the library, writing the details into the book files, and tidying: duplicates, merging, removing and Calibre's trash.
 
 ## All books
 
@@ -57,6 +57,24 @@ When anything is chosen, a bar comes up at the bottom with **Edit N books**. Tha
 **Find details**, at the top of the edit sheet, asks two places at once: Hardcover, which Daf is already connected to, and Calibre's own download sources (Google, Amazon, Edelweiss and Open Library). It takes up to half a minute. The answers come back as a list with their covers, and the title and author at the top can be changed and searched again when the book's own are wrong.
 
 Picking an answer puts it side by side with what the book has now, one row a field. The ones the book is missing are ticked already, and the rest I tick myself. Rows where both say the same thing are greyed out. Tags are added to the ones the book has rather than replacing them, and identifiers only add the kinds the book doesn't have yet. The found cover can be ticked too. **Use these** puts it all into the edit sheet so I can look it over before I **Save**. The covers in the list come through Daf's server, so the tablet never talks to Amazon or Google itself.
+
+## Find details for many books
+
+With books chosen in All books, **Find details** in the bar at the bottom looks all of them up at once and fills in only what each one is missing. I tick what to fill in (publisher, date, description, tags, series, languages, identifiers, pages and cover), and **Look up** goes through the books four at a time, asking Hardcover and Calibre's quicker sources (Google, Open Library and Edelweiss). It takes a few seconds a book.
+
+It only takes an answer when it's surely the same book: the same title (subtitles aside) by the same author, so a study guide or a different book with a similar name never gets in. A field the book already has is never changed, tags are only added to a book that has none, and identifiers only add kinds the book doesn't have, so a wrong ISBN stays until I fix it myself. The results list each book with what would go in and where it came from. I untick any I don't want, and nothing changes until **Save**. Books with nothing to fill in are listed at the bottom, with why.
+
+## Tags, authors and series
+
+**⋯ › Tags, authors and series** lists every tag, author, series, publisher and my own name columns (Collections, Reading) across the whole library, each with how many books have it. Clicking the number shows those books in the table.
+
+At the top, **Look alike** groups names that are probably the same thing written differently: "Self Help", "Self-Help" and "selfhelp"; "Thriller" and "Thrillers"; "J. R. R. Tolkien", "J.R.R. Tolkien" and "J R R Tolkien"; "Patai, Raphael" and "Raphael Patai". Each group has the name to keep (the most used one first) and **Combine**. Clicking any name lets me rename it right there, and renaming it to a name that already exists combines the two. With several ticked, the bar at the bottom has **Combine** and **Delete** (a tag, series or publisher comes off every book that has it; an author can only be renamed). When an author's name changes, Calibre moves the books' folders to match.
+
+## The details inside the book files
+
+Calibre keeps a book's details in its database, but each EPUB, AZW3 or PDF also carries its own copy inside it, and that copy is what the Kindle and other reading apps show. Whenever Daf changes a book (an edit, a cover, a combined tag, filled-in details, a merge), Calibre writes the new details into that book's files too, a minute or so later and in the background, so a big edit doesn't wait for it. **⋯ › Write details into every file** does it for the whole library at once, which is worth doing once so the files match what Calibre has. While it's working, the ⋯ menu says how many are left.
+
+A book that's already on the Kindle keeps its old copy until it's sent again.
 
 ## Tidying the library
 

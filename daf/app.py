@@ -6,6 +6,7 @@ import logging
 import re
 import threading
 import time
+import uuid
 import unicodedata
 from urllib.parse import quote as _urlq
 from datetime import date, datetime, timedelta
@@ -1486,6 +1487,127 @@ def restore_catalog_books(b=Depends(json_body)):
     _calibre([{"op": "restore", "trash_ids": ids}], timeout=300)
     _after_removal({})
     return {"ok": True, "restored": len(ids)}
+
+
+# ---- Tags, authors and series across the library; Find details for many books; details into files ----
+def _item_field(field):
+    if field not in {f["key"] for f in catalog.item_fields()}:
+        raise HTTPException(400, f"Daf doesn't manage {field}")
+    return field
+
+
+@app.get("/api/catalog/items", dependencies=[Depends(user)])
+def get_catalog_items(field: str = "tags"):
+    """Every name a field has (tags, authors, series, publishers, my own name columns), with how many
+    books have it, and the ones that are probably the same name written differently (alike)."""
+    return catalog.items(_item_field(field)) | {"fields": catalog.item_fields()}
+
+
+@app.post("/api/catalog/items/rename", dependencies=[Depends(user)])
+def rename_catalog_items(b=Depends(json_body)):
+    """{field, from: [names], to}: each name becomes `to` on every book; names that become one are
+    combined (Calibre's rename). Authors' books move to the new name's folder."""
+    b = b if isinstance(b, dict) else {}
+    field, to = _item_field(str(b.get("field") or "")), str(b.get("to") or "").strip()[:300]
+    names = [str(n) for n in b.get("from") or [] if str(n).strip()][:200]
+    if not to or not names:
+        raise HTTPException(400, "Which names, and what to call them")
+    _calibre([{"op": "rename_items", "field": field, "renames": {n: to for n in names}}], timeout=600)
+    return {"ok": True}
+
+
+@app.post("/api/catalog/items/delete", dependencies=[Depends(user)])
+def delete_catalog_items(b=Depends(json_body)):
+    """{field, names}: the names off every book that has them (not authors: every book needs one)."""
+    b = b if isinstance(b, dict) else {}
+    field = _item_field(str(b.get("field") or ""))
+    if field == "authors":
+        raise HTTPException(400, "An author can be renamed, not deleted")
+    names = [str(n) for n in b.get("names") or [] if str(n).strip()][:500]
+    if not names:
+        raise HTTPException(400, "No names")
+    _calibre([{"op": "remove_items", "field": field, "names": names}], timeout=600)
+    return {"ok": True}
+
+
+@app.post("/api/catalog/fill", dependencies=[Depends(user)])
+def fill_catalog_books(b=Depends(json_body)):
+    """Find details for many books: {ids, fields}. A job (GET /api/catalog/jobs/{job}: done, total,
+    books [{id, title, fill {field: value}, from {field: source}, found}]) that only proposes; nothing
+    changes until /api/catalog/fill/apply."""
+    from . import calibrefind
+    b = b if isinstance(b, dict) else {}
+    ids = [int(i) for i in b.get("ids") or [] if str(i).isdigit()][:300]
+    fields = [f for f in b.get("fields") or calibrefind.FILL_FIELDS if f in calibrefind.FILL_FIELDS]
+    if not ids or not fields:
+        raise HTTPException(400, "Which books, and what to fill in")
+    return {"job": calibrefind.fill_start(ids, fields)}
+
+
+@app.post("/api/catalog/fill/apply", dependencies=[Depends(user)])
+def apply_catalog_fill(b=Depends(json_body)):
+    """The proposals chosen: {books: [{id, fill: {field: value}}]}, written by Calibre ten books at a time
+    (a job), covers fetched by the server first."""
+    from . import calibrewrite
+    books = [x for x in (b or {}).get("books") or [] if isinstance(x, dict) and str(x.get("id", "")).isdigit() and isinstance(x.get("fill"), dict)][:300]
+    if not books:
+        raise HTTPException(400, "Nothing to fill in")
+    have, custom_keys = catalog.brief([int(x["id"]) for x in books])
+    jid = uuid.uuid4().hex[:12]
+    job = calibrewrite._jobs[jid] = {"state": "running", "started": time.time(), "kind": "apply", "done": 0, "total": len(books), "failed": []}
+
+    def fields_for(cid, fill):
+        f = {}
+        for k, v in fill.items():
+            if k in ("publisher", "series", "series_index", "published", "tags", "languages") or (k in custom_keys and k == "#pages"):
+                f[k] = v
+            elif k == "comments":
+                f["comments"] = str(v or "")
+            elif k == "identifiers" and isinstance(v, dict):
+                f["identifiers"] = {**(have.get(cid, {}).get("identifiers_map") or {}), **v}
+        return _edit_fields(f, custom_keys)
+
+    def work():
+        for i in range(0, len(books), 10):
+            ops, batch = [], books[i:i + 10]
+            for x in batch:
+                cid = int(x["id"])
+                try:
+                    f = fields_for(cid, {k: v for k, v in x["fill"].items() if k != "cover"})
+                    if f:
+                        ops.append({"op": "set", "ids": [cid], "fields": f})
+                    if x["fill"].get("cover"):
+                        ops.append({"op": "cover", "id": cid, "data": calibrewrite.b64(_remote_image(str(x["fill"]["cover"])))})
+                except Exception as e:  # noqa: BLE001 - one book's cover or field mustn't stop the rest
+                    job["failed"].append({"id": cid, "error": getattr(e, "detail", None) or str(e)})
+            try:
+                if ops:
+                    calibrewrite.run(ops, timeout=600)
+            except Exception as e:  # noqa: BLE001
+                job["failed"] += [{"id": int(x["id"]), "error": str(e)} for x in batch]
+            job["done"] += len(batch)
+        job["state"] = "done"
+    threading.Thread(target=work, daemon=True).start()
+    return {"job": jid}
+
+
+@app.get("/api/catalog/embed", dependencies=[Depends(user)])
+def get_catalog_embed():
+    """How many books' files are still waiting for their details."""
+    from . import calibrewrite
+    return calibrewrite.embed_status()
+
+
+@app.post("/api/catalog/embed", dependencies=[Depends(user)])
+def post_catalog_embed(b=Depends(json_body)):
+    """Write the details into the files of {ids}, or {all: true} of every book."""
+    from . import calibrewrite
+    b = b if isinstance(b, dict) else {}
+    ids = list(catalog.calibre_rows()[0]) if b.get("all") else [int(i) for i in b.get("ids") or [] if str(i).isdigit()]
+    if not ids:
+        raise HTTPException(400, "No books")
+    calibrewrite.embed_later(ids)
+    return calibrewrite.embed_status()
 
 
 @app.get("/api/catalog/jobs/{jid}", dependencies=[Depends(user)])

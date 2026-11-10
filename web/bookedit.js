@@ -472,5 +472,143 @@ document.addEventListener('click', e => {
     .catch(err => { toast(err.message); b.disabled = false; });
 });
 
-C.BookEdit = { open, bulk, close, merge, remove, trash };
+/* ---------- Tags, authors and series: rename, combine, delete, across the library ---------- */
+const M = { field: 'tags', data: null, q: '', sel: new Set(), editing: null };
+async function items(field){
+  E.d = E.ids = E.orig = null;
+  M.field = field || M.field; M.sel.clear(); M.editing = null;
+  if (!$('#bedit') || $('#bedit').hidden || !$('#bedit .bemgr')) sheet('<div class="behead"><h2>Tags, authors and series</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Close</button></div><div class="bebody one bemgr"><p class="mute">Loading…</p></div>');
+  try { M.data = await api('/api/catalog/items?field=' + encodeURIComponent(M.field)); } catch(e){ toast(e.message); return; }
+  drawItems();
+}
+function drawItems(){
+  const box = $('#bedit .bemgr'); if (!box || !M.data) return;
+  const d = M.data, q = M.q.trim().toLowerCase(), count = Object.fromEntries(d.items.map(x => [x.name, x.count]));
+  const shown = d.items.filter(x => !q || x.name.toLowerCase().includes(q));
+  const tabs = '<div class="bemtabs" role="tablist">' + d.fields.map(f => '<button role="tab" class="' + (f.key === M.field ? 'on' : '') + '" data-bemtab="' + esc(f.key) + '">' + esc(f.label) + '</button>').join('') + '</div>';
+  const alike = d.alike.filter(g => !q || g.some(n => n.toLowerCase().includes(q)));
+  const by = g => g.slice().sort((a, b) => (count[b] || 0) - (count[a] || 0));
+  let h = tabs + '<input class="field bemq" type="search" placeholder="Find a name" value="' + esc(M.q) + '" data-bemq autocomplete="off">';
+  if (alike.length) h += '<h3>Look alike</h3><div class="bemalike">' + alike.map(g => { const s = by(g);
+    return '<div class="bemarow"><span>' + s.map(n => esc(n) + ' <b>' + (count[n] || 0) + '</b>').join(' · ') + '</span><select class="field sm" data-bemto aria-label="Into">' + s.map(n => '<option>' + esc(n) + '</option>').join('') + '</select>' +
+      '<button class="btn sm" data-bemcombine="' + esc(JSON.stringify(g)) + '">Combine</button></div>'; }).join('') + '</div>';
+  h += '<h3>' + shown.length + ' ' + esc((d.fields.find(f => f.key === M.field) || {}).label || '').toLowerCase() + '</h3><div class="bemlist">' + shown.map(x =>
+    '<div class="bemrow' + (M.sel.has(x.name) ? ' sel' : '') + '"><input type="checkbox" data-bemsel="' + esc(x.name) + '"' + (M.sel.has(x.name) ? ' checked' : '') + ' aria-label="Choose">' +
+    (M.editing === x.name ? '<input class="field sm bemedit" data-bemedit="' + esc(x.name) + '" value="' + esc(x.name) + '">' : '<button class="bemname" data-bemren="' + esc(x.name) + '">' + esc(x.name) + '</button>') +
+    '<button class="bemcount" data-bemshow="' + esc(x.name) + '">' + x.count + '</button></div>').join('') + '</div>';
+  if (M.sel.size) h += '<div class="bembar"><b>' + M.sel.size + ' chosen</b><span class="spacer"></span><button class="btn sm" data-bem="none">Clear</button>' +
+    (M.sel.size > 1 ? '<button class="btn sm" data-bem="combine">Combine</button>' : '') + (M.field !== 'authors' ? '<button class="btn sm danger" data-bem="delete">Delete</button>' : '') + '</div>';
+  const keepFocus = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-bemq]');
+  box.innerHTML = h;
+  if (keepFocus) { const i = $('[data-bemq]', box); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  const ed = $('[data-bemedit]', box); if (ed) { ed.focus(); ed.select(); }
+}
+async function renameItems(names, to){
+  to = (to || '').trim(); names = names.filter(n => n !== to);
+  if (!to || !names.length) { M.editing = null; drawItems(); return; }
+  const into = M.data.items.some(x => x.name === to);
+  if (into && !confirm('Combine ' + names.map(n => '“' + n + '”').join(', ') + ' into “' + to + '”?')) return;
+  try {
+    await api('/api/catalog/items/rename', { method: 'POST', body: JSON.stringify({ field: M.field, from: names, to }) });
+    toast(into ? 'Combined' : 'Renamed'); M.sel.clear(); M.editing = null; items(M.field); after();
+  } catch(e){ toast(e.message); }
+}
+document.addEventListener('click', e => {
+  const t = e.target; if (!t.closest || !t.closest('#bedit .bemgr')) return;
+  const tab = t.closest('[data-bemtab]'); if (tab) { M.q = ''; items(tab.dataset.bemtab); return; }
+  const cb = t.closest('[data-bemcombine]'); if (cb) { const g = JSON.parse(cb.dataset.bemcombine), to = cb.parentNode.querySelector('[data-bemto]').value; renameItems(g, to); return; }
+  const rn = t.closest('[data-bemren]'); if (rn) { M.editing = rn.dataset.bemren; drawItems(); return; }
+  const sh = t.closest('[data-bemshow]'); if (sh) { const f = M.field, n = sh.dataset.bemshow; close(true); if (C.Catalog) C.Catalog.search(f + ':"=' + n.replace(/"/g, '') + '"'); return; }
+  const k = t.closest('[data-bem]'); if (!k) return;
+  const names = [...M.sel];
+  if (k.dataset.bem === 'none') { M.sel.clear(); drawItems(); }
+  else if (k.dataset.bem === 'combine') {
+    const most = names.slice().sort((a, b) => (M.data.items.find(x => x.name === b) || {}).count - (M.data.items.find(x => x.name === a) || {}).count)[0];
+    const to = prompt('Combine into', most); if (to) renameItems(names, to);
+  }
+  else if (k.dataset.bem === 'delete') {
+    if (!confirm('Delete ' + (names.length === 1 ? '“' + names[0] + '”' : names.length + ' names') + ' from every book that has ' + (names.length === 1 ? 'it' : 'them') + '?')) return;
+    api('/api/catalog/items/delete', { method: 'POST', body: JSON.stringify({ field: M.field, names }) })
+      .then(() => { toast('Deleted'); M.sel.clear(); items(M.field); after(); }).catch(err => toast(err.message));
+  }
+});
+document.addEventListener('change', e => {
+  const c = e.target.closest && e.target.closest('[data-bemsel]'); if (!c) return;
+  if (c.checked) M.sel.add(c.dataset.bemsel); else M.sel.delete(c.dataset.bemsel);
+  drawItems();
+});
+document.addEventListener('input', e => { if (e.target.matches && e.target.matches('[data-bemq]')) { M.q = e.target.value; drawItems(); } });
+document.addEventListener('keydown', e => {
+  const t = e.target; if (!t.matches || !t.matches('[data-bemedit]')) return;
+  if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); renameItems([t.dataset.bemedit], t.value); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); M.editing = null; drawItems(); }
+}, true);
+document.addEventListener('focusout', e => { const t = e.target; if (t.matches && t.matches('[data-bemedit]') && M.editing) setTimeout(() => { if (M.editing === t.dataset.bemedit && !document.activeElement.matches('[data-bemedit]')) { M.editing = null; drawItems(); } }, 150); });
+
+/* ---------- Find details for many books: only what each is missing, from answers surely the same book ---------- */
+const FILL = [['publisher', 'Publisher'], ['published', 'Published'], ['comments', 'Description'], ['tags', 'Tags'], ['series', 'Series'], ['languages', 'Languages'], ['identifiers', 'Identifiers'], ['#pages', 'Pages'], ['cover', 'Cover']];
+const L = { books: null, res: null, seq: 0 };
+function fill(books){
+  E.d = E.ids = E.orig = null; L.books = books; L.res = null; L.seq++;
+  sheet('<div class="behead"><h2>Find details for ' + books.length + ' book' + (books.length === 1 ? '' : 's') + '</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-befill="start">Look up</button></div>' +
+    '<div class="bebody one befill"><h3>Fill in</h3><div class="befields">' + FILL.map(([k, l]) => '<label><input type="checkbox" data-fillf="' + esc(k) + '" checked> ' + esc(l) + '</label>').join('') + '</div>' +
+    '<div class="bebooks">' + books.map(b => '<div class="mute tiny">' + esc(b.title) + '</div>').join('') + '</div></div>');
+}
+async function fillStart(){
+  const fields = $$('#bedit [data-fillf]').filter(c => c.checked).map(c => c.dataset.fillf);
+  if (!fields.length) return;
+  const n = ++L.seq, body = $('#bedit .befill'), head = $('#bedit .behead');
+  head.innerHTML = '<h2>Find details for ' + L.books.length + ' book' + (L.books.length === 1 ? '' : 's') + '</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button>';
+  body.innerHTML = '<p class="mute" id="befprog">Looking up…</p>';
+  try {
+    const { job } = await api('/api/catalog/fill', { method: 'POST', body: JSON.stringify({ ids: L.books.map(b => b.calibre_id), fields }) });
+    for (;;) {
+      await new Promise(r => setTimeout(r, 1500));
+      if (n !== L.seq || !$('#bedit .befill')) return;
+      const j = await api('/api/catalog/jobs/' + job);
+      const pr = $('#befprog'); if (pr) pr.innerHTML = 'Looking up ' + Math.min(j.done + 1, j.total) + ' of ' + j.total + '… ' + C.bar(100 * j.done / Math.max(1, j.total));
+      if (j.state === 'running') continue;
+      if (j.state === 'failed') throw new Error(j.error || 'Nothing came back');
+      L.res = j.books; drawFill(); return;
+    }
+  } catch(e){ const b = $('#bedit .befill'); if (b) b.innerHTML = '<p class="placeholder">' + esc(e.message) + '</p>'; }
+}
+const showVal = (k, v) => k === 'comments' ? String(v).slice(0, 140) + (String(v).length > 140 ? '…' : '') : Array.isArray(v) ? v.join(', ') : k === 'identifiers' ? Object.entries(v).map(([a, b]) => a + ': ' + b).join(', ') : String(v);
+function drawFill(){
+  const body = $('#bedit .befill'), head = $('#bedit .behead'); if (!body) return;
+  const some = L.res.filter(b => Object.keys(b.fill).length), none = L.res.filter(b => !Object.keys(b.fill).length);
+  head.innerHTML = '<h2>' + some.length + ' of ' + L.res.length + ' with something to fill in</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button>' +
+    (some.length ? '<button class="btn sm primary" data-befill="save">Save</button>' : '');
+  body.innerHTML = some.map(b => '<label class="befrow2"><input type="checkbox" data-fillbook="' + b.id + '" checked>' +
+      (b.fill.cover ? '<img src="/api/catalog/coverproxy?u=' + encodeURIComponent(b.fill.cover) + '" alt="" loading="lazy">' : '<span class="befnc"></span>') +
+      '<span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc((b.authors || []).join(' & ')) + '</span>' +
+      '<span class="befills">' + Object.entries(b.fill).filter(([k]) => k !== 'cover' && k !== 'series_index').map(([k, v]) => '<span class="befx" data-fillx="' + b.id + '|' + esc(k) + '" role="checkbox" aria-checked="true" tabindex="0"><i>' + esc((FILL.find(f => f[0] === k) || [k, k])[1]) + '</i> ' + esc(showVal(k, v)) + (k === 'series' && b.fill.series_index != null ? ' #' + esc(b.fill.series_index) : '') + '</span>').join('') +
+      (b.fill.cover ? '<span class="befx" data-fillx="' + b.id + '|cover" role="checkbox" aria-checked="true" tabindex="0"><i>Cover</i></span>' : '') + '</span><span class="mute tiny">' + esc([...new Set(Object.values(b.from))].join(', ')) + '</span></span></label>').join('') +
+    (none.length ? '<h3>Nothing to fill in</h3>' + none.map(b => '<div class="befnone"><b>' + esc(b.title) + '</b> <span class="mute tiny">' + (b.found ? 'Nothing missing that was found' : 'No answer surely the same book') + '</span></div>').join('') : '');
+}
+async function fillSave(){
+  // A line taken out (tapped, so it's crossed out) stays as the book has it.
+  $$('#bedit .befx.off').forEach(x => { const [id, k] = x.dataset.fillx.split('|'), b = L.res.find(r => String(r.id) === id); if (b) { delete b.fill[k]; if (k === 'series') delete b.fill.series_index; } });
+  const chosen = L.res.filter(b => { const c = $('#bedit [data-fillbook="' + b.id + '"]'); return c && c.checked && Object.keys(b.fill).length; });
+  if (!chosen.length) return;
+  const head = $('#bedit .behead'); head.innerHTML = '<h2>Saving ' + chosen.length + ' books…</h2>';
+  try {
+    const { job } = await api('/api/catalog/fill/apply', { method: 'POST', body: JSON.stringify({ books: chosen.map(b => ({ id: b.id, fill: b.fill })) }) });
+    for (;;) {
+      await new Promise(r => setTimeout(r, 1500));
+      const j = await api('/api/catalog/jobs/' + job);
+      const h = $('#bedit .behead h2'); if (h) h.textContent = 'Saving ' + j.done + ' of ' + j.total + ' books…';
+      if (j.state !== 'running') { toast((j.total - j.failed.length) + ' books filled in' + (j.failed.length ? '; ' + j.failed.length + ' couldn’t be' : '')); break; }
+    }
+  } catch(e){ toast(e.message); }
+  close(true); after();
+}
+document.addEventListener('click', e => {
+  const x = e.target.closest && e.target.closest('[data-fillx]');
+  if (x) { e.preventDefault(); x.classList.toggle('off'); x.setAttribute('aria-checked', !x.classList.contains('off')); return; }
+  const b = e.target.closest && e.target.closest('[data-befill]'); if (!b) return;
+  if (b.dataset.befill === 'start') fillStart(); else if (b.dataset.befill === 'save') fillSave();
+});
+
+C.BookEdit = { open, bulk, close, merge, remove, trash, items, fill };
 })();

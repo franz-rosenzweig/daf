@@ -683,3 +683,76 @@ def book_file(cid, fmt):
         return None
     p = db.parent / r[0] / f"{r[1]}.{fmt.lower()}"
     return p if p.exists() else None
+
+
+# ---------- Tags, authors and series: every name a field has, across the library ----------
+ITEM_FIELDS = [("tags", "Tags", "tags", "books_tags_link", "tag"), ("authors", "Authors", "authors", "books_authors_link", "author"),
+               ("series", "Series", "series", "books_series_link", "series"), ("publisher", "Publishers", "publishers", "books_publishers_link", "publisher")]
+
+
+def item_fields():
+    """The fields whose names can be renamed and combined: Calibre's, and my own columns that keep
+    their values as a list of names (not choices: those are Calibre's column settings)."""
+    _books, custom = calibre_rows()
+    out = [{"key": k, "label": l} for k, l, *_ in ITEM_FIELDS]
+    out += [{"key": c["key"], "label": c["label"]} for c in custom if c["normalized"] and c["dtype"] in ("text", "series")]
+    return out
+
+
+def items(field):
+    """Every name in a field, with how many books have it (private ones too)."""
+    _books, custom = calibre_rows()
+    spec = next((x for x in ITEM_FIELDS if x[0] == field), None)
+    if spec:
+        _k, _l, table, link, col = spec
+        q = f"SELECT t.name, COUNT(l.book) FROM {table} t LEFT JOIN {link} l ON l.{col} = t.id GROUP BY t.id"
+    else:
+        c = next((x for x in custom if x["key"] == field and x["normalized"] and x["dtype"] in ("text", "series")), None)
+        if not c:
+            raise ValueError(f"Daf doesn't manage {field}")
+        q = f"SELECT t.value, COUNT(l.book) FROM custom_column_{c['id']} t LEFT JOIN books_custom_column_{c['id']}_link l ON l.value = t.id GROUP BY t.id"
+    db = read_only(config.CALIBRE_DBS[0])
+    try:
+        rows = [(r[0], r[1]) for r in db.execute(q) if r[0] is not None]
+    finally:
+        db.close()
+    names = [{"name": (n.replace("|", ",") if field == "authors" else n), "raw": n, "count": k} for n, k in rows if k]   # unused ones hidden, as Calibre does
+    names.sort(key=lambda x: (-x["count"], fold(x["name"])))
+    return {"field": field, "items": names, "alike": alike([x["name"] for x in names], field)}
+
+
+def _alike_key(name, field):
+    words = re.findall(r"[a-z0-9]+", fold(name))
+    if field == "authors":
+        return " ".join(sorted(words))                      # "J.R.R. Tolkien", "J R R Tolkien", "Tolkien, J. R. R."
+    words = [w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words]
+    return "".join(words)                                   # "Self Help", "Self-Help", "Essays", "Essay"
+
+
+def alike(names, field):
+    """Names that are probably the same one written differently, in groups of two or more."""
+    groups = {}
+    for n in names:
+        k = _alike_key(n, field)
+        if k:
+            groups.setdefault(k, []).append(n)
+    return [g for g in groups.values() if len(g) > 1]
+
+
+def brief(cids):
+    """What each book has now, for filling in what's missing: {id: {title, authors, comments, identifiers, …}}."""
+    books, custom = calibre_rows()
+    db = read_only(config.CALIBRE_DBS[0])
+    try:
+        com = {b: t for b, t in db.execute(f"SELECT book, text FROM comments WHERE book IN ({','.join('?' * len(cids))})", list(cids))}
+        idents = {}
+        for b, t, v in db.execute(f"SELECT book, type, val FROM identifiers WHERE book IN ({','.join('?' * len(cids))})", list(cids)):
+            idents.setdefault(b, {})[t] = v
+    finally:
+        db.close()
+    out = {}
+    for cid in cids:
+        b = books.get(cid)
+        if b:
+            out[cid] = dict(b) | {"comments": (com.get(cid) or "").strip(), "identifiers_map": idents.get(cid, {})}
+    return out, {c["key"] for c in custom}
