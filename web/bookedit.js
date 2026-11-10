@@ -1,0 +1,421 @@
+/* Editing a Calibre book in Daf (calibrewrite.py does the writing, through Calibre itself).
+   C.BookEdit.open(calibreId): one book's details, cover and files. C.BookEdit.bulk(ids): the same
+   change to several books at once (All books' selection). Only what changed is sent. */
+(() => {
+'use strict';
+const C = window.DafCore, { api, esc, toast, $, $$ } = C;
+const E = { d: null, ids: null, orig: null, busy: false };
+const MB = n => n == null ? '' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const ACCEPT = '.epub,.kepub,.azw3,.azw,.mobi,.kfx,.pdf,.fb2,.cbz,.cbr,.cb7,.txt,.rtf,.docx,.html,.htmlz,.djvu,.lit,.odt';
+
+/* ---------- the sheet ---------- */
+function sheet(html){
+  let s = $('#bedit');
+  if (!s) { document.body.insertAdjacentHTML('beforeend', '<div class="beshade" id="beshade"></div><div class="besheet" id="bedit" role="dialog" aria-modal="true"></div>'); s = $('#bedit'); }
+  s.innerHTML = html; s.hidden = false; $('#beshade').hidden = false;
+  document.body.classList.add('beopen');
+  return s;
+}
+function close(force){
+  if (!force && dirty() && !confirm('Leave without saving?')) return;
+  const s = $('#bedit'); if (s) s.hidden = true;
+  const sh = $('#beshade'); if (sh) sh.hidden = true;
+  document.body.classList.remove('beopen');
+  E.d = E.ids = E.orig = null; F.snap = null; F.seq++;
+}
+
+/* ---------- fields ---------- */
+const stars = (name, v) => '<span class="bestars" data-bestars="' + esc(name) + '" data-v="' + (v || '') + '" role="radiogroup" aria-label="Rating">' +
+  [1, 2, 3, 4, 5].map(n => '<button type="button" data-star="' + n + '" class="' + ((v || 0) >= n ? 'on' : (v || 0) >= n - .5 ? 'half' : '') + '" aria-label="' + n + ' star' + (n > 1 ? 's' : '') + '">★</button>').join('') + '</span>';
+const dl = (id, list) => list && list.length ? '<datalist id="' + id + '">' + list.slice(0, 2000).map(x => '<option value="' + esc(x) + '">').join('') + '</datalist>' : '';
+const chips = (name, vals, choices) => '<div class="bechips" data-chips="' + esc(name) + '">' + (vals || []).map(chip).join('') +
+  '<input class="bechipin" list="dl-' + esc(name) + '" autocomplete="off" aria-label="Add"></div>' + dl('dl-' + name, choices);
+const chip = v => '<span class="bechip" data-v="' + esc(v) + '">' + esc(v) + '<button type="button" data-unchip aria-label="Remove ' + esc(v) + '">×</button></span>';
+const row = (label, ctl, cls) => '<div class="berow' + (cls ? ' ' + cls : '') + '"><span>' + esc(label) + '</span><div class="bectl">' + ctl + '</div></div>';
+const inp = (name, v, extra) => '<input class="field" data-f="' + esc(name) + '" value="' + esc(v == null ? '' : v) + '"' + (extra || '') + '>';
+function customCtl(c, v, bulk){
+  const n = c.key;
+  if (c.dtype === 'enumeration') return '<select class="field" data-f="' + esc(n) + '">' + (bulk ? '<option value="">No change</option><option value="\u0000">None</option>' : '<option value=""></option>') +
+    (c.enum || []).map(x => '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select>';
+  if (c.dtype === 'bool') return '<select class="field" data-f="' + esc(n) + '">' + (bulk ? '<option value="">No change</option>' : '<option value=""></option>') + '<option value="true"' + (v === true ? ' selected' : '') + '>Yes</option><option value="false"' + (v === false ? ' selected' : '') + '>No</option></select>';
+  const keep = bulk ? ' placeholder="No change"' : '';
+  if (c.dtype === 'int' || c.dtype === 'float') return inp(n, v, ' type="number" step="' + (c.dtype === 'int' ? '1' : 'any') + '" inputmode="decimal"' + keep);
+  if (c.dtype === 'datetime') return inp(n, v, ' type="date"');
+  if (c.dtype === 'rating') return stars(n, v);
+  if (c.dtype === 'comments') return '<textarea class="field" rows="3" data-f="' + esc(n) + '">' + esc(v || '') + '</textarea>';
+  const list = (E.d && E.d.choices && E.d.choices[n]) || [];
+  return inp(n, Array.isArray(v) ? v.join(', ') : v, (list.length ? ' list="dl-' + esc(n) + '" autocomplete="off"' : '') + keep) + dl('dl-' + n, list);
+}
+
+/* ---------- one book ---------- */
+async function open(cid){
+  cid = String(cid).replace(/^cal:/, '');
+  sheet('<div class="behead"><h2>Edit details</h2></div><div class="bebody"><p class="mute">Loading…</p></div>');
+  let d;
+  try { d = await api('/api/catalog/book/' + encodeURIComponent(cid)); } catch(e){ close(true); toast(e.message); return; }
+  E.d = d; E.ids = null;
+  draw();
+}
+function draw(){
+  const d = E.d, coverUrl = '/api/cover/' + encodeURIComponent(d.id) + '?v=' + (E.coverV || 0);
+  const idents = Object.entries(d.identifiers || {}).map(([k, v]) => k + ': ' + v).join('\n');
+  const s = sheet('<div class="behead"><h2>' + esc(d.title) + '</h2><span class="spacer"></span><button class="btn sm" data-be="find">Find details</button><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-be="save">Save</button></div>' +
+    '<div class="bebody"><div class="beside">' +
+      '<div class="becover">' + (d.cover ? '<img src="' + coverUrl + '" alt="">' : '<span class="becovernone">' + esc(d.title) + '</span>') + '</div>' +
+      '<label class="btn sm befile">Change cover<input type="file" accept="image/*" data-be="coverfile" hidden></label>' +
+      '<button class="btn sm" data-be="coverurl">Cover from a link</button>' +
+      '<h3>Files</h3><div class="befiles">' + (d.files.length ? d.files.map(f => '<div class="befilerow"><b>' + esc(f.format) + '</b><span class="mute tiny">' + MB(f.size) + '</span><span class="spacer"></span>' +
+        (f.exists ? '<a class="ib" href="/api/catalog/book/' + d.calibre_id + '/files/' + esc(f.format) + '" download aria-label="Download ' + esc(f.format) + '">' + ICON.down + '</a>' : '') +
+        '<button class="ib" data-be="filemenu" data-fmt="' + esc(f.format) + '" aria-label="More for ' + esc(f.format) + '">' + ICON.dots + '</button></div>').join('') : '<span class="mute tiny">No file</span>') + '</div>' +
+      '<div id="beconv"></div>' +
+      '<label class="btn sm befile">Add a file<input type="file" accept="' + ACCEPT + '" data-be="addfile" hidden></label>' +
+    '</div><div class="beform">' +
+      row('Title', inp('title', d.title)) +
+      row('Authors', inp('authors', (d.authors || []).join(' & '), ' list="dl-authors" autocomplete="off"') + dl('dl-authors', d.choices.authors)) +
+      row('Series', '<span class="beser">' + inp('series', d.series, ' list="dl-series" autocomplete="off"') + dl('dl-series', d.choices.series) + inp('series_index', d.series ? d.series_index : '', ' type="number" step="any" inputmode="decimal" aria-label="Number in the series"') + '</span>') +
+      row('Tags', chips('tags', d.tags, d.choices.tags), 'betop') +
+      row('Rating', stars('rating', d.rating)) +
+      row('Publisher', inp('publisher', d.publisher, ' list="dl-publisher" autocomplete="off"') + dl('dl-publisher', d.choices.publisher)) +
+      row('Published', inp('published', d.published, ' type="date"')) +
+      row('Languages', inp('languages', (d.languages || []).join(', '), ' list="dl-languages" autocomplete="off"') + dl('dl-languages', d.choices.languages)) +
+      row('Identifiers', '<textarea class="field" rows="' + Math.max(2, Math.min(8, Object.keys(d.identifiers || {}).length + 1)) + '" data-f="identifiers" spellcheck="false">' + esc(idents) + '</textarea>', 'betop') +
+      row('Description', '<textarea class="field" rows="7" data-f="comments">' + esc(d.comments) + '</textarea>', 'betop') +
+      (d.custom || []).filter(c => c.key !== '#isbn').map(c => row(c.label, customCtl(c, d[c.key]), c.dtype === 'comments' ? 'betop' : '')).join('') +
+    '</div></div>');
+  E.orig = values(s);
+  s.dataset.mode = 'one';
+}
+const ICON = {
+  down: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M5.5 9l4.5 4.5L14.5 9M4 16.5h12"/></svg>',
+  dots: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>',
+};
+
+// What the sheet holds now, field by field.
+function values(s){
+  const v = {};
+  $$('[data-f]', s).forEach(el => { v[el.dataset.f] = el.value; });
+  $$('[data-chips]', s).forEach(el => { v[el.dataset.chips] = $$('.bechip', el).map(c => c.dataset.v); });
+  $$('[data-bestars]', s).forEach(el => { v[el.dataset.bestars] = el.dataset.v ? +el.dataset.v : null; });
+  return v;
+}
+function dirty(){
+  const s = $('#bedit'); if (!s || s.hidden || !E.orig) return false;
+  if (F.snap) return JSON.stringify(F.snap) !== JSON.stringify(F.orig);
+  return JSON.stringify(values(s)) !== JSON.stringify(E.orig);
+}
+function changed(){
+  const now = values($('#bedit')), out = {};
+  for (const k of Object.keys(now)) if (JSON.stringify(now[k]) !== JSON.stringify(E.orig[k])) out[k] = now[k];
+  return out;
+}
+function toFields(ch, bulk){
+  const f = {}, custom = Object.fromEntries(((E.d && E.d.custom) || []).map(c => [c.key, c]));
+  for (const [k, v] of Object.entries(ch)) {
+    if (k === 'identifiers') { f.identifiers = {}; String(v).split('\n').forEach(l => { const m = l.match(/^\s*([^:\s]+)\s*:\s*(.+?)\s*$/); if (m) f.identifiers[m[1]] = m[2]; }); }
+    else if (k === 'languages') f.languages = v.split(',').map(x => x.trim()).filter(Boolean);
+    else if (k === 'series_index') { if (v !== '') f.series_index = +v; }
+    else if (custom[k]) {
+      const c = custom[k];
+      if (bulk && v === '') continue;
+      f[k] = v === '\u0000' || v === '' ? null : c.dtype === 'bool' ? v === 'true' : (c.dtype === 'int' || c.dtype === 'float') ? +v : c.multi && typeof v === 'string' ? v.split(',').map(x => x.trim()).filter(Boolean) : v;
+    }
+    else f[k] = v;
+  }
+  return f;
+}
+async function save(){
+  if (E.busy) return;
+  const s = $('#bedit'), btn = $('[data-be="save"]', s);
+  addTyped(s);
+  if (E.ids) return saveBulk();
+  const ch = changed();
+  if (!Object.keys(ch).length) { close(true); return; }
+  E.busy = true; btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await api('/api/catalog/book/' + E.d.calibre_id, { method: 'PUT', body: JSON.stringify({ fields: toFields(ch) }) });
+    toast('Saved in Calibre'); close(true); after();
+  } catch(e){ toast(e.message); btn.disabled = false; btn.textContent = 'Save'; }
+  E.busy = false;
+}
+// After a change: the All books table, the book's page and the Books page show it.
+function after(){
+  if (C.Catalog) C.Catalog.reload();
+  if (['book', 'books'].includes(C.S.route[0])) window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
+
+/* ---------- several books ---------- */
+async function bulk(ids){
+  ids = ids.map(x => String(x).replace(/^cal:/, ''));
+  if (ids.length === 1) return open(ids[0]);
+  sheet('<div class="behead"><h2>' + ids.length + ' books</h2></div><div class="bebody"><p class="mute">Loading…</p></div>');
+  let d;
+  try { d = await api('/api/catalog/book/' + ids[0]); } catch(e){ close(true); toast(e.message); return; }
+  E.d = d; E.ids = ids;
+  const books = (C.Catalog && C.Catalog.books ? C.Catalog.books() : []).filter(b => ids.includes(String(b.calibre_id)));
+  const theirTags = [...new Set(books.flatMap(b => b.tags || []))].sort((a, b) => a.localeCompare(b));
+  const s = sheet('<div class="behead"><h2>' + ids.length + ' books</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-be="save">Save</button></div>' +
+    '<div class="bebody one"><div class="beform">' +
+      row('Authors', inp('authors', '', ' list="dl-authors" autocomplete="off" placeholder="No change"') + dl('dl-authors', d.choices.authors)) +
+      row('Series', inp('series', '', ' list="dl-series" autocomplete="off" placeholder="No change"') + dl('dl-series', d.choices.series)) +
+      '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="number"> Number them from <input class="field benum" data-f2="start" type="number" value="1" step="any" inputmode="decimal"> in the table’s order</label></div>' +
+      row('Add tags', chips('add_tags', [], d.choices.tags), 'betop') +
+      row('Remove tags', chips('remove_tags', [], theirTags), 'betop') +
+      row('Rating', '<span class="bestarrow">' + stars('rating', null) + '<label class="benone"><input type="checkbox" data-f2="norating"> No rating</label></span>') +
+      row('Publisher', inp('publisher', '', ' list="dl-publisher" autocomplete="off" placeholder="No change"') + dl('dl-publisher', d.choices.publisher)) +
+      row('Published', inp('published', '', ' type="date"')) +
+      row('Languages', inp('languages', '', ' list="dl-languages" autocomplete="off" placeholder="No change"') + dl('dl-languages', d.choices.languages)) +
+      (d.custom || []).filter(c => c.key !== '#isbn' && c.dtype !== 'comments').map(c => row(c.label, customCtl(c, null, true))).join('') +
+    '</div></div>');
+  s.dataset.mode = 'bulk';
+  E.orig = values(s);
+}
+async function saveBulk(){
+  const s = $('#bedit'), btn = $('[data-be="save"]', s), ch = changed();
+  const add = ch.add_tags || [], rem = ch.remove_tags || [];
+  delete ch.add_tags; delete ch.remove_tags;
+  for (const k of ['authors', 'series', 'publisher', 'languages', 'published']) if (ch[k] === '') delete ch[k];
+  const fields = toFields(ch, true);
+  if ($('[data-f2="norating"]', s).checked) fields.rating = null;
+  if ($('[data-f2="number"]', s).checked) { fields.series_number = +$('[data-f2="start"]', s).value || 1; }
+  if (!Object.keys(fields).length && !add.length && !rem.length) { close(true); return; }
+  if (fields.authors !== undefined) fields.authors = String(fields.authors).split('&').map(x => x.trim()).filter(Boolean);
+  // In the table's order, for numbering a series.
+  const order = C.Catalog && C.Catalog.books ? C.Catalog.books().map(b => String(b.calibre_id)).filter(id => E.ids.includes(id)) : E.ids;
+  E.busy = true; btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await api('/api/catalog/bulk', { method: 'POST', body: JSON.stringify({ ids: order.length === E.ids.length ? order : E.ids, fields, add_tags: add, remove_tags: rem }) });
+    toast(E.ids.length + ' books changed in Calibre'); close(true); after();
+  } catch(e){ toast(e.message); btn.disabled = false; btn.textContent = 'Save'; }
+  E.busy = false;
+}
+
+/* ---------- covers and files ---------- */
+async function cover(body, type){
+  try {
+    await api('/api/catalog/book/' + E.d.calibre_id + '/cover', { method: 'PUT', body, headers: { 'Content-Type': type } });
+    E.coverV = Date.now(); E.d.cover = true; toast('New cover'); freshCover(E.d.id);
+    const keep = values($('#bedit')), orig = E.orig; draw(); restore(keep); E.orig = orig;
+    if (C.Catalog) C.Catalog.reload();
+  } catch(e){ toast(e.message); }
+}
+// The cover's plain address is kept a week on the device: it's fetched again now, for the book's
+// page, Books and the reader (the table asks for it by its time, catalog.py cover_v).
+function freshCover(id){
+  const u = '/api/cover/' + encodeURIComponent(id);
+  (window.caches ? caches.open('daf-img-v1').then(c => c.delete(u)) : Promise.resolve())
+    .then(() => fetch(u, { cache: 'reload', credentials: 'same-origin' })).catch(() => {});
+}
+function restore(v){
+  const s = $('#bedit');
+  $$('[data-f]', s).forEach(el => { if (v[el.dataset.f] != null) el.value = v[el.dataset.f]; });
+  $$('[data-chips]', s).forEach(el => { $$('.bechip', el).forEach(c => c.remove()); el.insertAdjacentHTML('afterbegin', (v[el.dataset.chips] || []).map(chip).join('')); });
+  $$('[data-bestars]', s).forEach(el => setStars(el, v[el.dataset.bestars]));
+}
+async function refreshFiles(){
+  const keep = values($('#bedit')), orig = E.orig;
+  try { const d = await api('/api/catalog/book/' + E.d.calibre_id); E.d.files = d.files; E.d.formats = d.formats; } catch(e){}
+  draw(); restore(keep); E.orig = orig;
+  if (C.Catalog) C.Catalog.reload();
+}
+function fileMenu(anchor, fmt){
+  const p = $('#pop'), to = (E.d.convert_to || []).filter(x => x !== fmt);
+  p.onclick = p.oninput = p.onkeydown = null;
+  p.innerHTML = '<div class="menu fmenu"><div class="fmh">' + esc(fmt) + '</div>' + to.map(t => '<button data-beconv="' + esc(fmt) + '>' + esc(t) + '"><i></i>Convert to ' + esc(t) + '</button>').join('') +
+    '<hr><button class="danger" data-berm="' + esc(fmt) + '"><i></i><span>Remove the ' + esc(fmt) + ' file</span></button></div>';
+  p.hidden = false; p.style.zIndex = 70;
+  if (matchMedia('(max-width:700px)').matches) return;
+  const r = anchor.getBoundingClientRect();
+  p.style.left = Math.max(8, Math.min(innerWidth - p.offsetWidth - 8, r.right - p.offsetWidth)) + 'px';
+  p.style.top = Math.min(r.bottom + 6, innerHeight - p.offsetHeight - 8) + 'px';
+}
+async function convert(src, to){
+  const box = $('#beconv'), cid = E.d.calibre_id;
+  if (box) box.innerHTML = '<span class="mute tiny">Converting to ' + esc(to) + '…</span>';
+  try {
+    const { job } = await api('/api/catalog/book/' + cid + '/convert', { method: 'POST', body: JSON.stringify({ from: src, to }) });
+    for (;;) {
+      await new Promise(r => setTimeout(r, 2000));
+      const j = await api('/api/catalog/jobs/' + job);
+      if (j.state === 'done') { toast('Converted to ' + to); break; }
+      if (j.state === 'failed') { toast(j.error || 'Calibre couldn’t convert it'); break; }
+    }
+  } catch(e){ toast(e.message); }
+  if (E.d && E.d.calibre_id === cid) refreshFiles();
+}
+
+/* ---------- Find details: Hardcover and Calibre's own sources (calibrefind.py) ---------- */
+const F = { snap: null, orig: null, results: null, pick: null, seq: 0 };
+const far = u => '/api/catalog/coverproxy?u=' + encodeURIComponent(u);          // through the server
+function leaveForm(){ F.snap = values($('#bedit')); F.orig = E.orig; }
+function backToForm(v){ draw(); restore(v || F.snap); E.orig = F.orig; }
+async function find(title, author){
+  if (!F.snap) leaveForm();
+  const n = ++F.seq, d = E.d;
+  sheet('<div class="behead"><h2>Find details</h2><span class="spacer"></span><button class="btn sm" data-be="findback">Back</button></div>' +
+    '<div class="bebody one befind"><form class="befq" data-be="findform"><input class="field" name="t" value="' + esc(title || F.snap.title || d.title) + '" aria-label="Title">' +
+    '<input class="field" name="a" value="' + esc(author || (F.snap.authors || '').split('&')[0].trim()) + '" aria-label="Author"><button class="btn sm">Search</button></form>' +
+    '<div id="befres"><p class="mute">Asking Hardcover and Calibre’s sources…</p></div></div>');
+  try {
+    const body = title ? { title, authors: author ? [author] : [] } : {};
+    const { job } = await api('/api/catalog/book/' + d.calibre_id + '/find', { method: 'POST', body: JSON.stringify(body) });
+    for (;;) {
+      await new Promise(r => setTimeout(r, 1500));
+      if (n !== F.seq || !E.d) return;
+      const j = await api('/api/catalog/jobs/' + job);
+      if (j.state === 'running') continue;
+      if (j.state === 'failed') throw new Error(j.error || 'Nothing came back');
+      F.results = j.results || [];
+      list(j.errors || []);
+      return;
+    }
+  } catch(e){ const box = $('#befres'); if (box) box.innerHTML = '<p class="placeholder">' + esc(e.message) + '</p>'; }
+}
+function list(errs){
+  const box = $('#befres'); if (!box) return;
+  const yr = x => x.published ? x.published.slice(0, 4) : '';
+  box.innerHTML = (F.results.length ? '<div class="befcands">' + F.results.map((x, i) => '<button class="befc" data-befc="' + i + '">' +
+      (x.cover ? '<img src="' + far(x.cover) + '" alt="" loading="lazy">' : '<span class="befnc"></span>') +
+      '<span class="befct"><b>' + esc(x.title || '') + '</b><span>' + esc((x.authors || []).join(', ')) + '</span>' +
+      '<span class="mute tiny">' + [yr(x), x.publisher, x.series ? x.series + (x.series_index ? ' #' + x.series_index : '') : '', x.pages ? x.pages + ' pages' : ''].filter(Boolean).map(esc).join(' · ') + '</span></span>' +
+      '<span class="befsrc">' + esc(x.source) + '</span></button>').join('') + '</div>' : '<p class="mute">Nothing found. Try the title alone, or another spelling.</p>') +
+    errs.map(e => '<p class="mute tiny">' + esc(e) + '</p>').join('');
+}
+// One answer beside what the book has now: tick what to take.
+const FIELDS = [['title', 'Title'], ['authors', 'Authors'], ['series', 'Series'], ['tags', 'Tags'], ['publisher', 'Publisher'], ['published', 'Published'], ['languages', 'Languages'], ['identifiers', 'Identifiers'], ['comments', 'Description'], ['#pages', 'Pages']];
+function foundVal(x, k){
+  if (k === 'authors') return (x.authors || []).join(' & ');
+  if (k === 'series') return x.series ? x.series + (x.series_index != null ? ' #' + x.series_index : '') : '';
+  if (k === 'tags') return x.tags || [];
+  if (k === 'languages') return (x.languages || []).join(', ');
+  if (k === 'identifiers') return Object.entries(x.identifiers || {}).map(([a, b]) => a + ': ' + b).join('\n');
+  if (k === '#pages') return x.pages ? String(x.pages) : '';
+  return x[k] || '';
+}
+function nowVal(k){
+  const v = F.snap;
+  if (k === 'series') return v.series ? v.series + (v.series_index ? ' #' + v.series_index : '') : '';
+  return v[k] == null ? '' : v[k];
+}
+function compare(i){
+  const x = F.results[i]; F.pick = i;
+  const has = k => k !== '#pages' || ('#pages' in F.snap);
+  const show = v => Array.isArray(v) ? v.join(', ') : String(v);
+  const rows = FIELDS.filter(([k]) => has(k)).map(([k, label]) => {
+    const now = nowVal(k), got = foundVal(x, k);
+    if (!show(got)) return '';
+    let tick = !show(now);
+    if (k === 'identifiers') tick = Object.keys(x.identifiers || {}).some(t => !String(now).split('\n').some(l => l.trim().startsWith(t + ':')));
+    const same = show(now).trim() === show(got).trim();
+    return '<label class="befrow' + (same ? ' same' : '') + '"><input type="checkbox" data-take="' + esc(k) + '"' + (tick && !same ? ' checked' : '') + (same ? ' disabled' : '') + '><span class="befl">' + esc(label) +
+      '</span><span class="befnow">' + (show(now) ? esc(show(now)) : '<i class="mute">—</i>') + '</span><span class="befgot">' + esc(show(got)) + '</span></label>';
+  }).join('');
+  sheet('<div class="behead"><h2>' + esc(x.source) + '</h2><span class="spacer"></span><button class="btn sm" data-be="findlist">Back</button><button class="btn sm primary" data-be="take">Use these</button></div>' +
+    '<div class="bebody one befind">' +
+    (x.cover ? '<div class="befcov"><figure>' + (E.d.cover ? '<img src="/api/cover/' + encodeURIComponent(E.d.id) + '?v=' + (E.coverV || 0) + '" alt="">' : '<span class="befnc"></span>') + '<figcaption class="mute tiny">Now</figcaption></figure>' +
+      '<figure><img src="' + far(x.cover) + '" alt=""><figcaption><label><input type="checkbox" data-take="cover"' + (E.d.cover ? '' : ' checked') + '> Use this cover</label></figcaption></figure></div>' : '') +
+    '<div class="befhead"><span></span><span>Now</span><span>Found</span></div>' + rows + '</div>');
+}
+async function take(){
+  const x = F.results[F.pick], v = Object.assign({}, F.snap);
+  const on = k => { const c = $('#bedit [data-take="' + CSS.escape(k) + '"]'); return c && c.checked; };
+  if (on('title')) v.title = x.title;
+  if (on('authors')) v.authors = (x.authors || []).join(' & ');
+  if (on('series')) { v.series = x.series || ''; v.series_index = x.series_index != null ? String(x.series_index) : ''; }
+  if (on('tags')) v.tags = [...new Set([...(v.tags || []), ...(x.tags || [])])];
+  if (on('publisher')) v.publisher = x.publisher || '';
+  if (on('published')) v.published = (x.published || '').slice(0, 10);
+  if (on('languages')) v.languages = (x.languages || []).join(', ');
+  if (on('comments')) v.comments = x.comments || '';
+  if (on('#pages')) v['#pages'] = String(x.pages || '');
+  if (on('identifiers')) {
+    const have = {}; String(v.identifiers || '').split('\n').forEach(l => { const m = l.match(/^\s*([^:\s]+)\s*:\s*(.+?)\s*$/); if (m) have[m[1]] = m[2]; });
+    for (const [a, b] of Object.entries(x.identifiers || {})) if (!have[a]) have[a] = b;
+    v.identifiers = Object.entries(have).map(([a, b]) => a + ': ' + b).join('\n');
+  }
+  const cov = on('cover') && x.cover;
+  backToForm(v); F.snap = null;
+  if (cov) await cover(JSON.stringify({ url: x.cover }), 'application/json');
+  toast('Check the details, then Save');
+}
+
+/* ---------- the chips, the stars ---------- */
+function addTyped(s){ $$('.bechipin', s).forEach(i => { if (i.value.trim()) addChip(i); }); }
+function addChip(i){
+  const box = i.closest('[data-chips]'), have = $$('.bechip', box).map(c => c.dataset.v.toLowerCase());
+  i.value.split(',').map(x => x.trim()).filter(Boolean).forEach(v => { if (!have.includes(v.toLowerCase())) { i.insertAdjacentHTML('beforebegin', chip(v)); have.push(v.toLowerCase()); } });
+  i.value = '';
+}
+function setStars(el, v){
+  el.dataset.v = v || '';
+  $$('[data-star]', el).forEach(b => { const n = +b.dataset.star; b.className = (v || 0) >= n ? 'on' : (v || 0) >= n - .5 ? 'half' : ''; });
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target; if (!t.closest) return;
+  const ed = t.closest('[data-act="bookedit"]'); if (ed) { open(ed.dataset.id); return; }
+  if (!t.closest('#bedit') && !t.closest('#pop')) { if (t.closest('#beshade')) close(); return; }
+  const st = t.closest('[data-star]');
+  if (st) { const el = st.closest('[data-bestars]'), n = +st.dataset.star; setStars(el, +el.dataset.v === n ? null : n); const no = $('[data-f2="norating"]'); if (no) no.checked = false; return; }
+  if (t.closest('[data-unchip]')) { t.closest('.bechip').remove(); return; }
+  const fc = t.closest('[data-befc]'); if (fc) { compare(+fc.dataset.befc); return; }
+  const cv = t.closest('[data-beconv]'); if (cv) { $('#pop').hidden = true; const [a, b] = cv.dataset.beconv.split('>'); convert(a, b); return; }
+  const rm = t.closest('[data-berm]');
+  if (rm) { $('#pop').hidden = true; const fmt = rm.dataset.berm;
+    if (!confirm('Remove the ' + fmt + ' file from Calibre?')) return;
+    api('/api/catalog/book/' + E.d.calibre_id + '/files/' + encodeURIComponent(fmt), { method: 'DELETE' }).then(() => { toast(fmt + ' removed'); refreshFiles(); }).catch(err => toast(err.message));
+    return; }
+  const b = t.closest('[data-be]'); if (!b) { const box = t.closest('.bechips'); if (box) $('.bechipin', box).focus(); return; }
+  const k = b.dataset.be;
+  if (k === 'cancel') close();
+  else if (k === 'find') find();
+  else if (k === 'findback') { F.seq++; backToForm(); F.snap = null; }
+  else if (k === 'findlist') sheetList(F.results);
+  else if (k === 'take') take();
+  else if (k === 'save') save();
+  else if (k === 'coverurl') { const u = (prompt('The cover’s address') || '').trim(); if (u) cover(JSON.stringify({ url: u }), 'application/json'); }
+  else if (k === 'filemenu') { e.stopPropagation(); fileMenu(b, b.dataset.fmt); }
+});
+document.addEventListener('submit', e => {
+  const f = e.target.closest && e.target.closest('[data-be="findform"]'); if (!f) return;
+  e.preventDefault(); find(f.t.value.trim(), f.a.value.trim());
+});
+// Back from one answer to the list, without asking again.
+function sheetList(results){
+  sheet('<div class="behead"><h2>Find details</h2><span class="spacer"></span><button class="btn sm" data-be="findback">Back</button></div>' +
+    '<div class="bebody one befind"><form class="befq" data-be="findform"><input class="field" name="t" value="' + esc(F.snap.title || '') + '" aria-label="Title">' +
+    '<input class="field" name="a" value="' + esc((F.snap.authors || '').split('&')[0].trim()) + '" aria-label="Author"><button class="btn sm">Search</button></form><div id="befres"></div></div>');
+  F.results = results; list([]);
+}
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.matches && t.matches('[data-be="coverfile"]') && t.files[0]) { const f = t.files[0]; cover(f, f.type || 'application/octet-stream'); t.value = ''; }
+  else if (t.matches && t.matches('[data-be="addfile"]') && t.files[0]) {
+    const f = t.files[0], box = $('#beconv'); t.value = '';
+    if (box) box.innerHTML = '<span class="mute tiny">Adding ' + esc(f.name) + '…</span>';
+    api('/api/catalog/book/' + E.d.calibre_id + '/files?name=' + encodeURIComponent(f.name), { method: 'POST', body: f, headers: { 'Content-Type': 'application/octet-stream' } })
+      .then(r => { toast(r.format + ' added'); refreshFiles(); }).catch(err => { toast(err.message); if (box) box.innerHTML = ''; });
+  }
+  else if (t.classList && t.classList.contains('bechipin') && t.value.trim()) addChip(t);
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  // A tag picked from the list goes in at once; typing waits for a comma or Enter.
+  if (t.classList && t.classList.contains('bechipin')) {
+    const opts = t.list ? [...t.list.options].map(o => o.value) : [];
+    if (t.value.includes(',') || (e.inputType === 'insertReplacementText' || !e.inputType) && opts.includes(t.value)) addChip(t);
+  }
+});
+document.addEventListener('keydown', e => {
+  const s = $('#bedit'); if (!s || s.hidden) return;
+  const t = e.target;
+  if (t.classList && t.classList.contains('bechipin')) {
+    if (e.key === 'Enter' && t.value.trim()) { e.preventDefault(); addChip(t); return; }
+    if (e.key === 'Backspace' && !t.value) { const last = $$('.bechip', t.closest('[data-chips]')).pop(); if (last) last.remove(); return; }
+  }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); if (!$('#pop').hidden) $('#pop').hidden = true; else close(); }
+  else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
+}, true);
+
+C.BookEdit = { open, bulk, close };
+})();

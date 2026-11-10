@@ -85,14 +85,19 @@ _cache = {"key": None, "books": None, "custom": None}
 
 def _custom_columns(c):
     out = []
-    for cid, label, name, dtype, multi, normalized in c.execute(
-            "SELECT id, label, name, datatype, is_multiple, normalized FROM custom_columns WHERE mark_for_delete = 0 ORDER BY id"):
+    import json as _json
+    for cid, label, name, dtype, multi, normalized, display in c.execute(
+            "SELECT id, label, name, datatype, is_multiple, normalized, display FROM custom_columns WHERE mark_for_delete = 0 ORDER BY id"):
         if dtype in ("composite",):
             continue
+        try:
+            enum = (_json.loads(display or "{}") or {}).get("enum_values") or None
+        except ValueError:
+            enum = None
         typ = {"int": "number", "float": "number", "bool": "bool", "rating": "rating", "datetime": "date"}.get(dtype, "list" if multi else "text")
         if re.fullmatch(r"\W*", name or ""):
             name = "#" + label
-        out.append({"id": cid, "key": "#" + label, "label": name, "type": typ, "dtype": dtype, "multi": bool(multi), "normalized": bool(normalized)})
+        out.append({"id": cid, "key": "#" + label, "label": name, "type": typ, "dtype": dtype, "multi": bool(multi), "normalized": bool(normalized), "enum": enum})
     return out
 
 
@@ -110,9 +115,13 @@ def calibre_rows(settings=None):
     c = read_only(db)
     try:
         books = {}
-        for bid, title, tsort, ts, pub, sidx, asort, has_cover, mod in c.execute(
-                "SELECT id, title, sort, timestamp, pubdate, series_index, author_sort, has_cover, last_modified FROM books"):
-            books[bid] = {"calibre_id": bid, "title": title, "title_sort": tsort or title, "author_sort": asort or "",
+        for bid, title, tsort, ts, pub, sidx, asort, has_cover, mod, path in c.execute(
+                "SELECT id, title, sort, timestamp, pubdate, series_index, author_sort, has_cover, last_modified, path FROM books"):
+            try:                                     # the cover's own time: its address changes with it
+                cover_v = int((db.parent / path / "cover.jpg").stat().st_mtime) if has_cover else 0
+            except OSError:
+                cover_v = 0
+            books[bid] = {"calibre_id": bid, "title": title, "title_sort": tsort or title, "author_sort": asort or "", "cover_v": cover_v,
                           "added": _day(ts, tz), "published": _day(pub, tz), "modified": _day(mod, tz), "series_index": sidx,
                           "cover": bool(has_cover), "authors": [], "tags": [], "languages": [], "formats": [], "identifiers": [],
                           "series": None, "series_sort": None, "publisher": None, "rating": None, "size": None, "isbn": None}
@@ -179,7 +188,7 @@ def calibre_rows(settings=None):
 
 def columns(custom):
     out = [{"key": k, "label": l, "type": t} for k, l, t, _ in BUILTIN]
-    out += [{"key": c["key"], "label": c["label"], "type": c["type"], "custom": True} for c in custom]
+    out += [{"key": c["key"], "label": c["label"], "type": c["type"], "custom": True, "dtype": c.get("dtype"), "multi": c.get("multi", False), "enum": c.get("enum")} for c in custom]
     return out
 
 
@@ -602,3 +611,66 @@ def clean_views(views):
             seen.add(v["name"].lower())
             uniq.append(v)
     return uniq[:40]
+
+
+# ---------- one book, everything there is to edit (the Edit sheet, bookedit.js) ----------
+EDITABLE = ["title", "authors", "series", "series_index", "tags", "rating", "publisher", "published", "languages", "identifiers", "comments"]
+
+
+def details(conn, cid, settings=None):
+    """One Calibre book for editing: its fields (custom columns too), its description as text, its
+    identifiers, its files and the choices each field has (existing tags, series, publishers…)."""
+    settings = settings or config.load_settings()
+    books, _cols = rows(conn, settings, private=True)
+    custom = calibre_rows(settings)[1]
+    b = next((x for x in books if x["calibre_id"] == cid), None)
+    if not b:
+        return None
+    db = config.CALIBRE_DBS[0]
+    c = read_only(db)
+    try:
+        com = c.execute("SELECT text FROM comments WHERE book = ?", (cid,)).fetchone()
+        idents = {t: v for t, v in c.execute("SELECT type, val FROM identifiers WHERE book = ? ORDER BY type", (cid,))}
+        path = c.execute("SELECT path FROM books WHERE id = ?", (cid,)).fetchone()[0]
+        files = [{"format": f.upper(), "size": s, "name": n} for f, s, n in c.execute("SELECT format, uncompressed_size, name FROM data WHERE book = ? ORDER BY format", (cid,))]
+        choices = {
+            "tags": [r[0] for r in c.execute("SELECT name FROM tags ORDER BY name COLLATE NOCASE")],
+            "series": [r[0] for r in c.execute("SELECT name FROM series ORDER BY sort COLLATE NOCASE")],
+            "publisher": [r[0] for r in c.execute("SELECT name FROM publishers ORDER BY name COLLATE NOCASE")],
+            "authors": [(r[0] or "").replace("|", ",") for r in c.execute("SELECT name FROM authors ORDER BY sort COLLATE NOCASE")],
+            "languages": [r[0] for r in c.execute("SELECT lang_code FROM languages ORDER BY lang_code")],
+        }
+        for col in custom:
+            if col["normalized"] and col["dtype"] in ("text", "series"):
+                try:
+                    choices[col["key"]] = [r[0] for r in c.execute(f"SELECT value FROM custom_column_{col['id']} ORDER BY value COLLATE NOCASE")]
+                except Exception:  # noqa: BLE001
+                    pass
+    finally:
+        c.close()
+    html_text = com[0] if com and com[0] else ""
+    text = re.sub(r"\n{3,}", "\n\n", html.unescape(re.sub(r"<[^>]+>", "", re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>|</h\d>", "\n", html_text)))).strip()
+    for f in files:
+        f["exists"] = (db.parent / path / f"{f['name']}.{f['format'].lower()}").exists()
+    return b | {"comments": text, "comments_html": html_text, "identifiers": idents, "files": files, "choices": choices,
+                "custom": [{"key": col["key"], "label": col["label"], "dtype": col["dtype"], "multi": col["multi"], "enum": col.get("enum")} for col in custom]}
+
+
+def comments_html(text):
+    """Plain text from the Edit sheet → Calibre's HTML description: a paragraph each."""
+    paras = [p.strip() for p in re.split(r"\n\s*\n", text or "") if p.strip()]
+    return "".join("<p>" + html.escape(p).replace("\n", "<br>") + "</p>" for p in paras)
+
+
+def book_file(cid, fmt):
+    """The host path of a book's file in one format, or None."""
+    db = config.CALIBRE_DBS[0]
+    c = read_only(db)
+    try:
+        r = c.execute("SELECT b.path, d.name FROM books b JOIN data d ON d.book = b.id WHERE b.id = ? AND upper(d.format) = ?", (cid, fmt.upper())).fetchone()
+    finally:
+        c.close()
+    if not r:
+        return None
+    p = db.parent / r[0] / f"{r[1]}.{fmt.lower()}"
+    return p if p.exists() else None

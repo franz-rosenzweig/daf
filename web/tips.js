@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-10-calibre-edit', date: 'Nov 10', title: 'Edit books like Calibre', text: 'Edit details on a book’s page or in All books: tags, series, cover, files and conversions, one book or many at once. Find details asks Hardcover and Calibre’s sources and lets you pick field by field.', go: '#catalog' },
   { id: '2026-11-10-all-books', date: 'Nov 10', title: 'All books', text: 'The whole Calibre library as a spreadsheet, under Books: choose the columns, sort by any of them, search the way Calibre does, filter by tag or date added, save views and export CSV.', go: '#catalog' },
   { id: '2026-11-06-reader-apps', date: 'Nov 6', title: 'The Feed in other apps', text: 'Read You, NetNewsWire, Reeder and other RSS apps read the Feed the way they read FreshRSS, read and starred both ways. Make their password in Preferences → Reader apps.', go: '#prefs/readerapps' },
   { id: '2026-11-05-podcasts', date: 'Nov 5', title: 'Podcasts, rebuilt', text: 'Listening, shows, episodes with filters and sorts, a search that finds new shows too, and Audiobookshelf’s recordings and audiobooks, which keep their place with the book.', go: '#podcasts' },

@@ -1200,6 +1200,228 @@ def put_catalog_views(b=Depends(json_body)):
     return {"views": s["catalog_views"]}
 
 
+# ---- Editing Calibre from Daf: every change goes through Calibre itself (calibrewrite.py) ----
+BOOK_FORMATS = {"EPUB", "KEPUB", "AZW3", "AZW", "MOBI", "KFX", "PDF", "FB2", "CBZ", "CBR", "CB7", "TXT", "RTF", "DOCX", "HTML", "HTMLZ", "DJVU", "LIT", "ODT"}
+CONVERT_TO = ["EPUB", "AZW3", "KEPUB", "MOBI", "PDF"]
+
+
+def _calibre(ops, timeout=120):
+    from . import calibrewrite
+    try:
+        return calibrewrite.run(ops, timeout)
+    except calibrewrite.CalibreError as e:
+        raise HTTPException(400, str(e))
+
+
+def _edit_fields(f, custom_keys):
+    """What the Edit sheet sent → Calibre's fields, checked."""
+    if not isinstance(f, dict):
+        raise HTTPException(400, "fields: an object")
+    out = {}
+    for k, v in f.items():
+        if k == "title":
+            if not str(v or "").strip():
+                raise HTTPException(400, "A book needs a title")
+            out["title"] = str(v).strip()[:500]
+        elif k == "authors":
+            names = v if isinstance(v, list) else str(v or "").split("&")
+            out["authors"] = [str(x).strip()[:200] for x in names if str(x).strip()][:30]
+        elif k in ("tags", "languages"):
+            vals = v if isinstance(v, list) else str(v or "").split(",")
+            out[k] = list(dict.fromkeys(str(x).strip()[:200] for x in vals if str(x).strip()))[:200]
+        elif k in ("series", "publisher"):
+            out[k] = str(v or "").strip()[:300] or None
+        elif k in ("series_index", "series_number"):
+            try:
+                out[k] = float(v if v not in (None, "") else 1)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "The number in the series isn't a number")
+        elif k == "rating":
+            try:
+                out["rating"] = None if v in (None, "", 0) else max(0.5, min(5.0, round(float(v) * 2) / 2))
+            except (TypeError, ValueError):
+                raise HTTPException(400, "Rating: 0 to 5 stars")
+        elif k == "published":
+            if v and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(v)):
+                raise HTTPException(400, "Published: a date")
+            out["pubdate"] = v or None
+        elif k == "identifiers":
+            if not isinstance(v, dict):
+                raise HTTPException(400, "identifiers: an object")
+            out["identifiers"] = {str(a).strip().lower()[:40]: str(b).strip()[:300] for a, b in v.items() if str(a).strip() and str(b or "").strip()}
+        elif k == "comments":
+            out["comments"] = catalog.comments_html(str(v or ""))[:100000] or None
+        elif k in custom_keys:
+            out[k] = v if not isinstance(v, str) else (v.strip()[:2000] or None)
+        else:
+            raise HTTPException(400, f"Daf doesn't edit {k}")
+    return out
+
+
+def _custom_keys():
+    _books, custom = catalog.calibre_rows()
+    return {c["key"] for c in custom}
+
+
+@app.get("/api/catalog/book/{cid}", dependencies=[Depends(user)])
+def get_catalog_book(cid: int, c=Depends(conn)):
+    d = catalog.details(c, cid)
+    if not d:
+        raise HTTPException(404, "Calibre has no such book")
+    d["convert_to"] = CONVERT_TO
+    return d
+
+
+@app.put("/api/catalog/book/{cid}", dependencies=[Depends(user)])
+def put_catalog_book(cid: int, b=Depends(json_body)):
+    """The Edit sheet's changes to one book: {fields: {title, authors, series, series_index, tags,
+    rating, publisher, published, languages, identifiers, comments, #custom…}}, only what changed."""
+    fields = _edit_fields((b or {}).get("fields") or {}, _custom_keys())
+    if fields:
+        _calibre([{"op": "set", "ids": [cid], "fields": fields}])
+    return {"ok": True}
+
+
+@app.post("/api/catalog/bulk", dependencies=[Depends(user)])
+def bulk_catalog(b=Depends(json_body)):
+    """Several books at once: {ids, fields (the same for every book; series_number numbers them in
+    the order given), add_tags, remove_tags}."""
+    ids = [int(i) for i in (b or {}).get("ids") or [] if str(i).isdigit()][:1000]
+    if not ids:
+        raise HTTPException(400, "No books")
+    fields = _edit_fields(b.get("fields") or {}, _custom_keys())
+    ops = [{"op": "set", "ids": ids, "fields": fields}] if fields else []
+    add = [str(t).strip() for t in b.get("add_tags") or [] if str(t).strip()]
+    rem = [str(t).strip() for t in b.get("remove_tags") or [] if str(t).strip()]
+    if add or rem:
+        ops.append({"op": "tags", "ids": ids, "add": add, "remove": rem})
+    if ops:
+        _calibre(ops, timeout=600)
+    return {"ok": True, "books": len(ids)}
+
+
+def _image(data):
+    if not data or len(data) > 15 * 1024 * 1024:
+        raise HTTPException(400, "A cover is an image of 15 MB or less")
+    if not (data[:3] == b"\xff\xd8\xff" or data[:8] == b"\x89PNG\r\n\x1a\n" or data[:4] == b"RIFF" and data[8:12] == b"WEBP" or data[:4] == b"GIF8"):
+        raise HTTPException(400, "That isn't a JPEG, PNG, WebP or GIF")
+    return data
+
+
+def _remote_image(url):
+    """A cover from the web, fetched by the server (never from Daf's own network)."""
+    import ipaddress
+    import socket
+    import urllib.parse
+    import urllib.request as _ur
+    u = urllib.parse.urlparse(url)
+    if u.scheme not in ("http", "https") or not u.hostname:
+        raise HTTPException(400, "A cover's address starts with http")
+    try:
+        for info in socket.getaddrinfo(u.hostname, None):
+            ip = ipaddress.ip_address(info[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip in ipaddress.ip_network("100.64.0.0/10"):
+                raise HTTPException(400, "Not an address on the web")
+    except socket.gaierror:
+        raise HTTPException(400, "No such address")
+    req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0 (Daf; Calibre covers)"})
+    try:
+        with _ur.urlopen(req, timeout=25) as r:
+            data = r.read(16 * 1024 * 1024)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"Couldn't get the cover: {e}")
+    return _image(data)
+
+
+@app.get("/api/catalog/coverproxy", dependencies=[Depends(user)])
+def catalog_cover_proxy(u: str):
+    """A cover Find details found, through the server, so the device never asks Amazon or Google itself."""
+    data = _remote_image(u)
+    kind = "image/png" if data[:4] == b"\x89PNG" else "image/webp" if data[8:12] == b"WEBP" else "image/gif" if data[:4] == b"GIF8" else "image/jpeg"
+    return Response(data, media_type=kind, headers={"Cache-Control": "private, max-age=86400"})
+
+
+@app.put("/api/catalog/book/{cid}/cover", dependencies=[Depends(user)])
+async def put_catalog_cover(cid: int, request: Request):
+    """A new cover: the image itself as the body, or {url} for one found online."""
+    from . import calibrewrite
+    if request.headers.get("content-type", "").startswith("application/json"):
+        url = str((await request.json()).get("url") or "")
+        if not re.match(r"^https?://", url):
+            raise HTTPException(400, "A cover's address starts with http")
+        data = await run_in_threadpool(_remote_image, url)
+    else:
+        data = await request.body()
+    await run_in_threadpool(_calibre, [{"op": "cover", "id": cid, "data": calibrewrite.b64(_image(data))}])
+    return {"ok": True}
+
+
+@app.get("/api/catalog/book/{cid}/files/{fmt}", dependencies=[Depends(user)])
+def get_catalog_file(cid: int, fmt: str):
+    p = catalog.book_file(cid, fmt)
+    if not p:
+        raise HTTPException(404, "No such file")
+    return FileResponse(p, filename=p.name)
+
+
+@app.post("/api/catalog/book/{cid}/files", dependencies=[Depends(user)])
+async def post_catalog_file(cid: int, request: Request, name: str = ""):
+    """Another file for the book (the body, named by ?name=): a new format, or one that replaces it."""
+    from . import calibrewrite
+    fmt = name.rsplit(".", 1)[-1].upper() if "." in name else ""
+    if fmt not in BOOK_FORMATS:
+        raise HTTPException(400, "Calibre keeps " + ", ".join(sorted(BOOK_FORMATS)))
+    data = await request.body()
+    if not data or len(data) > 300 * 1024 * 1024:
+        raise HTTPException(400, "A file of 300 MB or less")
+    await run_in_threadpool(_calibre, [{"op": "add_format", "id": cid, "fmt": fmt, "data": calibrewrite.b64(data)}], 600)
+    return {"ok": True, "format": fmt}
+
+
+@app.delete("/api/catalog/book/{cid}/files/{fmt}", dependencies=[Depends(user)])
+def delete_catalog_file(cid: int, fmt: str):
+    _calibre([{"op": "remove_formats", "id": cid, "fmts": [fmt.upper()]}])
+    return {"ok": True}
+
+
+@app.post("/api/catalog/book/{cid}/convert", dependencies=[Depends(user)])
+def convert_catalog_file(cid: int, b=Depends(json_body)):
+    """Calibre converts one of the book's files to another format; GET /api/catalog/jobs/{job} says when."""
+    from . import calibrewrite
+    src, to = str((b or {}).get("from") or "").upper(), str((b or {}).get("to") or "").upper()
+    if to not in CONVERT_TO or not src or src == to:
+        raise HTTPException(400, "Convert to " + ", ".join(CONVERT_TO))
+    if not catalog.book_file(cid, src):
+        raise HTTPException(400, f"The book has no {src} file")
+    return {"job": calibrewrite.start_convert(cid, src, to)}
+
+
+@app.post("/api/catalog/book/{cid}/find", dependencies=[Depends(user)])
+def find_catalog_book(cid: int, b=Depends(json_body), c=Depends(conn)):
+    """Find details: Hardcover and Calibre's own sources, for {title, authors} (the book's own by
+    default). GET /api/catalog/jobs/{job} has {results, errors} when it's done."""
+    from . import calibrefind
+    d = catalog.details(c, cid)
+    if not d:
+        raise HTTPException(404, "Calibre has no such book")
+    b = b if isinstance(b, dict) else {}
+    title = str(b.get("title") or d["title"])[:300]
+    authors = b.get("authors") if isinstance(b.get("authors"), list) else d["authors"]
+    ids = d["identifiers"] if not b.get("title") else {}
+    authors = [str(a)[:200] for a in authors][:5]
+    q = f"{title} {authors[0] if authors else ''}".strip() if b.get("title") else None
+    return {"job": calibrefind.start(db.connect, cid, d["id"], title, authors, ids, q)}
+
+
+@app.get("/api/catalog/jobs/{jid}", dependencies=[Depends(user)])
+def get_catalog_job(jid: str):
+    from . import calibrewrite
+    j = calibrewrite.job(jid)
+    if not j:
+        raise HTTPException(404, "No such job")
+    return j
+
+
 @app.put("/api/nightstand", dependencies=[Depends(user)])
 async def put_nightstand(request: Request, c=Depends(conn)):
     body = await request.json()

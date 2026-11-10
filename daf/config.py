@@ -47,7 +47,7 @@ KOINSIGHT_DB = Path("/srv/docker/koinsight/prod.sqlite3")
 ABS_DB = Path("/srv/docker/audiobookshelf/config/absdatabase.sqlite")
 ABS_USER = "Franz_Rosenzweig"
 ABS_URL = setting("DAF_ABS_URL", "http://127.0.0.1:13378")      # its API, for playing in Daf (absapi.py)
-CALIBRE_DBS = [Path("/srv/docker/cwa-library/metadata.db"), Path("/srv/docker/cwa-libros/metadata.db")]
+CALIBRE_DBS = [Path(os.environ.get("DAF_CALIBRE_DB", "/srv/docker/cwa-library/metadata.db")), Path("/srv/docker/cwa-libros/metadata.db")]   # a sandbox points the first at a copy
 KARAKEEP_DB = Path("/srv/docker/karakeep-app/db.db")
 # Calibre-Web-Automated imports whatever lands here into the Calibre library (then Daf's Books).
 CWA_INGEST = Path(os.environ.get("DAF_CWA_INGEST", "/srv/docker/cwa-ingest"))
