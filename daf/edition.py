@@ -76,6 +76,8 @@ podcast full live official watch read here's what's why how com www http https o
 chapter ever big need bad send someone page feel get got lot lots thing via says said new best top inside""".split())
 WORD = re.compile(r"[a-zא-ת][a-z0-9א-ת'’+\-]{2,}")
 PLATFORM = {"invidious", "youtube", "substack", "google news", "rss", "podcast", "articles", "feed"}
+SECTION_WORDS = {"ideas", "culture", "books", "all", "latest", "news", "science", "technology", "security", "blog", "home", "politics",
+                 "features", "magazine", "opinion", "essays", "history", "arts", "world", "business", "health", "the long read"}
 _building = threading.Lock()
 
 
@@ -132,7 +134,8 @@ def words(text):
 def source_key(name):
     """One name per publication: "Health + Medicine – Articles – The Conversation" and "Politics + Society –
     Articles – The Conversation" are both The Conversation; "Big Think | Invidious" is Big Think."""
-    name = (name or "").split(" | ")[0]          # "Show | Platform", "Name | name in another script"
+    parts = (name or "").split(" | ")             # "Show | Platform", "Name | name in another script", "Ideas | The Atlantic"
+    name = parts[-1] if len(parts) > 1 and parts[0].strip().lower() in SECTION_WORDS else parts[0]
     parts = [p.strip() for p in re.split(r"\s+–\s+|\s+--\s+", name) if p.strip()]
     parts = [p for p in parts if p.lower() not in PLATFORM] or parts
     return (parts[-1] if parts else name).strip()
@@ -1148,7 +1151,7 @@ def pool_page(conn, e):
     """The pool's categories: how many feeds, what came in the last two days, and whether it's muted."""
     from .sources import rss
     since = int(time.time()) - 2 * 86400
-    posts = dict(conn.execute("SELECT f.folder, COUNT(*) FROM docs d JOIN feeds f ON f.id = d.feed WHERE d.added >= ? "
+    posts = dict(conn.execute("SELECT f.folder, COUNT(*) FROM docs d JOIN feeds f ON f.id = d.feed WHERE COALESCE(d.published, d.added) >= ? "
                               "AND f.folder LIKE ? GROUP BY f.folder", (since, rss.POOL + "%")).fetchall())
     out = []
     for folder, n in conn.execute("SELECT folder, COUNT(*) FROM feeds WHERE folder LIKE ? GROUP BY folder ORDER BY folder", (rss.POOL + "%",)):
