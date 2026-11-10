@@ -260,7 +260,8 @@ function bar(p){ return '<span class="pbar"><i style="width:' + Math.max(0, Math
 // edge is dragged too: wider for full, narrower for mini, and further for hidden. It never changes by itself: a touch screen starts mini, a mouse full,
 // and turning a tablet round keeps what was chosen. A swipe in from the left edge brings it over the
 // page for a moment, mini, and further, full. Reading something (an article, a book, a PDF, manga) hides
-// it, as in Readwise; the same swipe brings it. Below 780 px wide the phone's tab bar and its More
+// it, as in Readwise; there the left edge is the page's (a swipe turns it back, and on Android it's the
+// system's Back too), so ⌘\ brings it, not a swipe. Below 780 px wide the phone's tab bar and its More
 // sheet take its place. Each device keeps its own (daf.sideShown, daf.sideSize).
 // html.rail is the mini look (style.css); html.sidehid hides it (the mini one slides in as .peek, the
 // full one as .open over the page).
@@ -277,7 +278,8 @@ function railMode(){
   r.classList.toggle('rail', m === 'mini' || m === 'hidden');
   r.classList.toggle('sidehid', m === 'hidden');
   r.classList.toggle('reading', READING.has((S.route || [])[0]));
-  if (sd && m !== 'phone' && !sd.matches(':hover')) sd.classList.remove('open', 'peek');
+  // (a touch screen keeps :hover on whatever was last touched: only a pointer that hovers holds it open)
+  if (sd && m !== 'phone' && !(matchMedia('(hover: hover)').matches && sd.matches(':hover'))) sd.classList.remove('open', 'peek');
   sideButton();
   let b = $('#sideshow');
   if (m === 'hidden' && !READING.has((S.route || [])[0])) {
@@ -332,12 +334,12 @@ function toggleSide(){
   document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
 })();
 // A swipe in from the left edge, on a touch screen, when the sidebar is hidden: the mini one over the
-// page, and further, the full one.
+// page, and further, the full one. Not over something being read: that swipe is the page's.
 (() => {
   let x0 = null, y0 = 0;
   document.addEventListener('touchstart', e => {
     const t = e.touches[0];
-    x0 = t && t.clientX < 24 && document.documentElement.classList.contains('sidehid') ? t.clientX : null; y0 = t ? t.clientY : 0;
+    x0 = t && t.clientX < 24 && e.touches.length === 1 && document.documentElement.classList.contains('sidehid') && !READING.has((S.route || [])[0]) ? t.clientX : null; y0 = t ? t.clientY : 0;
   }, { passive: true });
   document.addEventListener('touchmove', e => {
     if (x0 == null) return;
@@ -348,6 +350,7 @@ function toggleSide(){
     else if (dx > 40) sd.classList.add('peek');
   }, { passive: true });
   document.addEventListener('touchend', () => { x0 = null; }, { passive: true });
+  document.addEventListener('touchcancel', () => { x0 = null; }, { passive: true });
 })();
 const PIN_ICONS = {
   manga: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 3.5h8.5v13H4zM12.5 5.5H16v11h-3.5"/><path d="M6.5 6.5h3.5M6.5 9h3.5"/></svg>',

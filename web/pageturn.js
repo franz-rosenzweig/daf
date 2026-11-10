@@ -11,7 +11,12 @@
    The page that moves is a picture the browser takes of it (a view transition), so the page coming is
    already the real one underneath, and the browser moves the picture itself. Where there are no view
    transitions, Slide is foliate's own slide and Curl is Slide. With reduced motion asked for, the
-   pages just turn. */
+   pages just turn.
+
+   A swipe can end two ways besides the finger lifting: Android takes it (its Back gesture from the
+   edge, a long press) and sends touchcancel, and the page settles on the nearest whole page instead
+   of staying half over; and a finger held still before it lifts isn't a flick, so the page goes
+   whichever way it's nearer. */
 (() => {
 'use strict';
 const C = window.DafCore;
@@ -38,7 +43,8 @@ PT.attach = view => {
   // foliate's swipe drags the page and settles it; with Slide and Curl the finger is ours instead
   const scrollBy = r.scrollBy.bind(r), snap = r.snap.bind(r);
   r.scrollBy = (dx, dy) => { if (!ours()) scrollBy(dx, dy); };
-  r.snap = (vx, vy) => { if (!ours()) snap(vx, vy); };
+  // (foliate's own swipe, None: a finger that rested before it lifted carries no speed into the snap)
+  r.snap = (vx, vy) => { if (ours()) return; if (S && S.still) { vx = 0; vy = 0; } snap(vx, vy); };
   const s = S;
   r.addEventListener('relocate', e => { s.index = e.detail.index; });
   view.addEventListener('load', e => fingers(e.detail.doc, s));
@@ -176,17 +182,18 @@ function place(t, d){
 /* ---------- the finger on the page ---------- */
 // On each chapter's page (its own frame) and on foliate's margins: a sideways drag in Pages turns.
 function fingers(target, s){
-  let f = null;
+  let f = null, moved = 0, swiping = false;
   const win = target.defaultView || window;
   // where the finger is on the screen: the chapter's frame moves as its page turns under the finger
   const xy = e => { const a = e.changedTouches[0], fr = win.frameElement, b = fr ? fr.getBoundingClientRect() : { left: 0, top: 0 }; return [b.left + a.clientX, b.top + a.clientY]; };
   target.addEventListener('touchstart', e => {
-    f = null;
+    f = null; moved = e.timeStamp; swiping = false; if (S === s) s.still = false;
     if (S !== s || e.touches.length !== 1 || !ours()) return;
     const [x, y] = xy(e);
     f = { x, y };
   }, { passive: true });
   target.addEventListener('touchmove', e => {
+    moved = e.timeStamp; swiping = true;
     if (!f || S !== s) return;
     if (e.touches.length !== 1) { up(f, true); f = null; return; }
     const [x, y] = xy(e), now = e.timeStamp;
@@ -203,12 +210,23 @@ function fingers(target, s){
     d.dx = x - f.x; d.dy = y - f.y;
     cancelAnimationFrame(d.raf); d.raf = requestAnimationFrame(() => d.on());
   }, { passive: true });
-  target.addEventListener('touchend', () => { if (f) up(f, false); f = null; }, { passive: true });
-  target.addEventListener('touchcancel', () => { if (f) up(f, true); f = null; }, { passive: true });
-  function up(f, cancel){
+  target.addEventListener('touchend', e => {
+    if (S === s) s.still = swiping && e.timeStamp - moved > 120;
+    if (f) up(f, false, e.timeStamp); f = null; swiping = false;
+  }, { passive: true });
+  target.addEventListener('touchcancel', () => {
+    if (f) up(f, true); f = null;
+    // foliate's own swipe has no end but touchend: taken away mid-swipe, the page would stay half over
+    if (S === s && swiping && !ours()) { s.still = true; requestAnimationFrame(() => { if (S === s) s.r.snap(0, 0); }); }
+    swiping = false;
+  }, { passive: true });
+  // a long press mid-swipe isn't a word to select
+  target.addEventListener('contextmenu', e => { if (swiping) e.preventDefault(); });
+  function up(f, cancel, at){
     const d = f.d; if (!d || d.up) return;
     d.up = true; cancelAnimationFrame(d.raf);
     if (cancel) { d.v = 0; d.dx = 0; d.dy = 0; }
+    else if (at && at - d.at > 120) d.v = 0;              // it rested before it lifted: no flick
     if (d.lift) d.lift();
     // the click a lifted finger can still make isn't a tap on the page
     const stop = ev => { ev.stopPropagation(); ev.preventDefault(); };
