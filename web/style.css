@@ -2011,6 +2011,7 @@ select.edpast{appearance:auto;padding-right:6px}
 /* Taste */
 .edtaste{max-width:1180px}
 .edlearn{display:flex;flex-wrap:wrap;gap:8px}
+.edlh2{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-2);align-self:center;margin-right:4px}
 .edlchip{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--fg-2)}.edlchip b{color:var(--fg);font-weight:600}
 .edtcols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:22px;align-items:start}
 .edtside{display:flex;flex-direction:column;gap:22px}

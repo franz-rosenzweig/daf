@@ -18,25 +18,27 @@ Pieces open in Daf like anything else, so reading them counts toward the hour, a
 
 ## How it chooses
 
-Every morning, an hour before it's due, Daf gathers what's new: the last day or two of the Feed (Sunday's covers Shabbat too), new uploads from the channels I subscribe to on Invidious (no Shorts, nothing live), and new episodes of the podcasts I follow in AntennaPod. Anything I've already opened, under any feed's copy, is left out, and so is anything muted.
+Every morning, an hour before it's due, Daf gathers what's new: the last day or two of the Feed (Sunday's covers Shabbat too), new uploads from the channels I subscribe to on Invidious (no Shorts, nothing live), the videos [iv-suggest](https://github.com/NeskireDK/iv-suggest) has put in my lanes there (its suggestions from beyond my subscriptions, without the music lanes), and new episodes of the podcasts I follow in AntennaPod. Anything I've already opened or watched is left out, and so is anything muted.
 
 Each candidate gets a score from my **taste**, which Daf builds from what I really do:
 
 - documents I opened, read for a while, highlighted or saved in Daf, and what I read of Daf's articles on the Kindle;
-- my watch history on Invidious;
+- my watch history on Invidious, and the videos I put on my own playlists there (a "Blocked" list counts against);
 - the episodes I played in AntennaPod and Audiobookshelf;
 - the books I've been reading on the Kindle, lightly;
 - my 👍 and 👎 on earlier editions, and the pieces I left alone.
 
-Older habits fade, so the taste follows me as I change: by default something I did a month ago counts half as much as something I did today. The score is mostly how much a piece's source means to me and how much its words match what I finish, turned up or down by its topic.
+Older habits fade, so the taste follows me as I change: by default something I did a month ago counts half as much as something I did today. Invidious keeps the order I watched in but not the dates, so Daf turns places into days with how many videos I really play a day, which iv-suggest records.
+
+A piece's score is how well its words match what I finish, times how much its source means to me. That second part borrows from iv-suggest: it's on a log curve, so one podcast I've played ninety times doesn't leave every other source at nothing, and a source I've never touched gets a floor rather than a zero, because no history isn't the same as dislike. Words I've **taken up lately** (in a few things I engaged with these two weeks and much rarer before) give a piece a lift, which is how a new interest shows up within days instead of a month. A video from one of my iv-suggest lanes gets a little more, since iv-suggest already found it for me, and the topic's More or Less turns the whole thing up or down.
 
 The best few dozen candidates, a few from sources I don't know yet and the parasha's posts then go to the model with the rules (how many videos, how many podcasts, at least one Torah piece, one wildcard, no more than two from one source). It picks the edition, orders it like a paper and writes the reasons from the facts it was given. If the model is off or doesn't answer, the same rules pick from the scores alone, and the reasons are made from the facts.
 
 ## Taste
 
-**Taste**, at the top of the Edition, shows what Daf thinks I like, and it's where I change it.
+**Taste**, at the top of the Edition, shows what Daf thinks I like, and it's where I change it. At the top, **Last 2 weeks** says how it's doing: how many pieces it showed, how many I opened and read, and my thumbs. **Picking up on** lists the words I've taken up lately.
 
-- **Topics:** the subjects my reading falls into, each with how much of it lately and an arrow for rising or fading. **More**, **Less** and **Mute** turn one up, down or off. The model names the topics the first time from my taste, and **Name them again** asks it again after my reading has moved on.
+- **Topics:** the subjects my reading falls into, each with how much of it lately and an arrow for rising or fading. **More**, **Less** and **Mute** turn one up, down or off. The model names the topics the first time from my taste and the topics I named in iv-suggest, and **Name them again** asks it again after my reading has moved on.
 - **Sources:** the ones that count most, with what I've done with each ("24 watched", "20 opened"), and the same three buttons. **Mute** with a name, or with `folder:Releases` for a whole Feed folder, keeps something out for good; **Muted** lists them, each with **Unmute**.
 - **Mix:** **Every morning** turns the daily edition on; **Days** (Sunday to Friday by default); how many **Pieces**, **Videos**, **Podcasts**, **Torah** and **Wildcard**; the **Longest piece**; how fast **Habits fade**; when it's **Ready by**; whether it goes to the **Kindle**; and whether it's **Chosen by the model**.
 

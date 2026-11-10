@@ -403,6 +403,8 @@ def cmd_edition(a):
         for k, v in sorted(p["sources"].items(), key=lambda kv: -kv[1])[:30]:
             print(f"  {v:+.2f}  {k}  {p['facts'].get(k) or ''}")
         print("  words:", ", ".join(w for w, v in sorted(p["words"].items(), key=lambda kv: -kv[1])[:40]))
+        print("  rising:", ", ".join(f"{r['word']} ({r['recent']}, ×{r['lift']})" for r in p["rising"]) or "-")
+        print("  named in iv-suggest:", ", ".join(p["named"]) or "-")
         return
     if a.kindle:
         print(edition.send_kindle(day))

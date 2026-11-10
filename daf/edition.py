@@ -54,7 +54,10 @@ DEFAULTS = {
     "sources": {},          # {source: "more" | "less" | "mute"}; "folder:Name" mutes a Feed folder
 }
 ADJ = {"more": 1.6, "less": 0.55, "mute": 0.0, "": 1.0}
-WATCHES_PER_DAY = 4         # Invidious keeps the order you watched in, not the dates: this turns places into days
+WATCHES_PER_DAY = 7         # Invidious keeps the order you watched in, not the dates: plays a day turn places into days
+                            # (measured from iv-suggest's dated plays when it's there, see invidious())
+BOOST, FLOOR = 2.0, 0.7     # a source's multiplier: the one you return to most at BOOST, one you never touched at FLOOR
+RISING = {"recent": 14, "baseline": 90, "min_recent": 3, "min_lift": 3.0}   # days, and the floors a rising word must clear
 PER_SOURCE = 2              # in one edition
 STOP = set("""a about above after again against all also am an and any are aren't as at be because been before being
 below between both but by can can't cannot could couldn't did didn't do does doesn't doing don't down during each few for
@@ -165,23 +168,61 @@ def _iv_user():
     return u if u and re.fullmatch(r"[\w.@+\-]+", u) else ""
 
 
-def watch_history():
-    """Invidious's watch history, oldest first: [{id, author, title}] (title/author None when Invidious
-    never kept the video's details)."""
+def invidious():
+    """What the Edition reads from Invidious, all of it read-only and in one go: the watch history with
+    titles (iv-suggest's video cache first, when iv-suggest runs there), real plays a day, the account's
+    own playlists, iv-suggest's lanes and the topics named in them. Empty when it isn't set up."""
+    out = {"hist": [], "watched": set(), "rate": WATCHES_PER_DAY, "playlists": [], "lanes": [], "named": [], "suggest": False}
     user = _iv_user()
     if not user:
-        return []
-    rows = _psql(
-        "SELECT w.ord, w.v, COALESCE(cv.author, vi.info::json->>'author'), COALESCE(cv.title, vi.info::json->>'title') "
-        "FROM users u CROSS JOIN LATERAL unnest(u.watched) WITH ORDINALITY AS w(v, ord) "
-        "LEFT JOIN channel_videos cv ON cv.id = w.v LEFT JOIN videos vi ON vi.id = w.v "
-        f"WHERE u.email = '{user}' ORDER BY w.ord")
-    return [{"id": r[1], "author": r[2] or None, "title": r[3] or None} for r in rows if len(r) >= 4]
+        return out
+    q = f"'{user}'"
+    hist_sql = ("SELECT w.v, COALESCE({m}author, cv.author, vi.info::json->>'author'), COALESCE({m}title, cv.title, vi.info::json->>'title'), {g} "
+                "FROM users u CROSS JOIN LATERAL unnest(u.watched) WITH ORDINALITY AS w(v, ord) {join}"
+                "LEFT JOIN channel_videos cv ON cv.id = w.v LEFT JOIN videos vi ON vi.id = w.v "
+                f"WHERE u.email = {q} ORDER BY w.ord")
+    try:
+        rows = _psql(hist_sql.format(m="m.", g="m.genre", join="LEFT JOIN suggest.video_meta m ON m.vid = w.v "))
+        out["suggest"] = True
+    except RuntimeError:            # no iv-suggest: Invidious's own tables
+        try:
+            rows = _psql(hist_sql.format(m="", g="NULL", join="").replace("COALESCE(author, ", "COALESCE(").replace("COALESCE(title, ", "COALESCE("))
+        except RuntimeError as ex:
+            log.warning("invidious history: %s", ex)
+            return out
+    out["hist"] = [{"id": r[0], "author": r[1] or None, "title": r[2] or None, "genre": r[3] or None} for r in rows if len(r) >= 4]
+    out["watched"] = {v["id"] for v in out["hist"]}
+    lanes = f"SELECT plid FROM suggest.lanes WHERE account = {q}" if out["suggest"] else "SELECT NULL WHERE false"
+    try:
+        out["playlists"] = [{"list": r[0], "id": r[1], "title": r[2], "author": r[3]} for r in _psql(
+            "SELECT p.title, pv.id, pv.title, pv.author FROM playlists p JOIN playlist_videos pv ON pv.plid = p.id "
+            f"WHERE p.author = {q} AND p.id NOT IN ({lanes})") if len(r) >= 4]
+    except RuntimeError as ex:
+        log.warning("invidious playlists: %s", ex)
+    if not out["suggest"]:
+        return out
+    try:
+        n, days = _psql(f"SELECT COUNT(*), GREATEST(1, LEAST(14, EXTRACT(epoch FROM now() - MIN(played)) / 86400)) FROM suggest.plays "
+                        f"WHERE account = {q} AND outcome = 'watched' AND played > now() - interval '14 days'")[0]
+        if int(n) >= 10:
+            out["rate"] = max(1.0, int(n) / float(days))
+        out["named"] = [r[0] for r in _psql(f"SELECT title FROM suggest.lanes WHERE account = {q} AND lane LIKE 'topic-%' ORDER BY title")]
+        out["lanes"] = [{"id": r[0], "lane": r[1], "list": r[2], "added": int(float(r[3] or 0)), "title": r[4], "author": r[5],
+                         "seconds": int(r[6] or 0), "genre": r[7] or None, "published": int(float(r[8] or 0))} for r in _psql(
+            "SELECT i.vid, l.lane, l.title, EXTRACT(epoch FROM i.added), COALESCE(m.title, pv.title), COALESCE(m.author, pv.author), "
+            "COALESCE(m.seconds, pv.length_seconds), m.genre, EXTRACT(epoch FROM pv.published) "
+            "FROM suggest.items i JOIN suggest.lanes l ON l.account = i.account AND l.lane = i.lane "
+            "LEFT JOIN suggest.video_meta m ON m.vid = i.vid LEFT JOIN playlist_videos pv ON pv.plid = l.plid AND pv.id = i.vid "
+            f"WHERE i.account = {q} AND i.added > now() - interval '10 days'") if len(r) >= 9]
+    except (RuntimeError, ValueError, IndexError) as ex:
+        log.warning("iv-suggest: %s", ex)
+    return out
 
 
-def taste(conn, e=None, now=None):
-    """{sources: {key: weight 0..1}, words: {word: weight -1..1}, facts: {key: Counter}, topics: [{name, weight, trend}],
-    seen: {fact: count}, recent: [titles finished lately], down: [titles you turned down]}."""
+def taste(conn, e=None, now=None, iv=None):
+    """{sources: {key: 0..1 on a log curve}, mult: {key: FLOOR..BOOST}, words: {word: weight -1..1}, rising: [{word, recent, lift}],
+    facts: {key: Counter}, topics: [{name, weight, trend}], seen: {fact: count}, recent: [titles finished lately],
+    down: [titles you turned down], named: [topics named in iv-suggest]}."""
     e = e or settings()
     now = now or time.time()
     half = e["halflife"] * 86400
@@ -237,16 +278,19 @@ def taste(conn, e=None, now=None):
         if p["facts"] & {"finished", "highlighted"} and p["when"] and now - p["when"] < 30 * 86400:
             recent.append((p["when"], p["title"][:120]))
 
-    # Invidious: what you watched, newest last
-    try:
-        hist = watch_history()
-    except Exception as ex:  # noqa: BLE001
-        log.warning("invidious history: %s", ex)
-        hist = []
-    n = len(hist)
-    for i, v in enumerate(hist):
-        if v["author"] or v["title"]:
-            add(now - (n - i) / WATCHES_PER_DAY * 86400, 1.5, v["author"], v["title"], "watched")
+    # Invidious: what you watched, newest last (places become days at the measured plays a day), and your own
+    # playlists: a video you put on a list is a choice, the list's name says what about, "Blocked" says no
+    iv = iv if iv is not None else invidious()
+    n = len(iv["hist"])
+    for i, v in enumerate(iv["hist"]):
+        if (v["author"] or v["title"]) and v.get("genre") != "Music":
+            add(now - (n - i) / iv["rate"] * 86400, 1.5, v["author"], v["title"], "watched")
+    for v in iv["playlists"]:
+        name = (v["list"] or "").lower()
+        if "block" in name:
+            add(now - 7 * 86400, -3.0, v["author"], v["title"], "down")
+        else:
+            add(now - 21 * 86400, 0.8 if "later" in name else 2.0, v["author"], v["title"], "saved")
 
     # podcasts: AntennaPod's plays (gpodder) and Audiobookshelf's episodes
     for r in conn.execute("SELECT a.position, a.total, a.timestamp, e.title, e.podcast_title FROM gp_actions a "
@@ -285,13 +329,50 @@ def taste(conn, e=None, now=None):
             share = w * k / math.sqrt(len(ws))
             for t in ws:
                 word_w[t] += share
-    top_src = max([v for v in src_w.values() if v > 0] or [1.0])
     top_word = max([abs(v) for v in word_w.values()] or [1.0])
-    sources = {s: round(max(-1.0, min(1.0, v / top_src)), 4) for s, v in src_w.items() if abs(v) > 1e-3}
     vocab = {t: round(v / top_word, 4) for t, v in sorted(word_w.items(), key=lambda kv: -abs(kv[1]))[:1500]}
-    return {"sources": sources, "words": vocab, "facts": {s: dict(c) for s, c in facts.items()},
-            "topics": topic_weights(events, e, now), "seen": dict(seen),
-            "recent": [t for _, t in sorted(recent, reverse=True)[:12]], "down": down[-12:]}
+    # Log, not linear (iv-suggest's lesson): one show played 94 times would otherwise leave every other
+    # source near nothing. The top source gets BOOST, the rest fall along a log curve, and a source with no
+    # history at all gets FLOOR: missing data isn't dislike. One you turned down drops below the floor.
+    pos = {s: v for s, v in src_w.items() if v > 0}
+    top = max(pos.values() or [0])
+    sources = {s: round(math.log1p(v) / math.log1p(top), 4) for s, v in pos.items()} if top > 0 else {}
+    mult = {s: round(FLOOR + (BOOST - FLOOR) * x, 4) for s, x in sources.items()}
+    mult.update({s: round(FLOOR * 0.6, 4) for s, v in src_w.items() if v < -0.5})
+    return {"sources": sources, "mult": mult, "words": vocab, "rising": rising(events, now),
+            "facts": {s: dict(c) for s, c in facts.items()}, "topics": topic_weights(events, e, now), "seen": dict(seen),
+            "recent": [t for _, t in sorted(recent, reverse=True)[:12]], "down": down[-12:], "named": iv["named"]}
+
+
+def rising(events, now):
+    """Words you've taken up lately (iv-suggest's burst): in at least min_recent things you engaged with
+    in the last `recent` days, and min_lift times commoner there than in the `baseline` before. Both
+    floors, because either alone is noise: lift alone promotes a word seen twice, a count alone promotes
+    what you always read."""
+    r0, b0 = now - RISING["recent"] * 86400, now - RISING["baseline"] * 86400
+    rc, bc, rn, bn = Counter(), Counter(), 0, 0
+    seen = set()
+    for when, w, _src, text, _fact in sorted(events, key=lambda ev: -ev[0]):
+        if w <= 0 or when < b0 or text in seen:      # an episode played eight times is one thing taken up, not eight
+            continue
+        seen.add(text)
+        ws = set(words(text))
+        if not ws:
+            continue
+        if when >= r0:
+            rc.update(ws)
+            rn += 1
+        else:
+            bc.update(ws)
+            bn += 1
+    if not rn:
+        return []
+    out = []
+    for w_, n in rc.items():
+        lift = (n / rn) / ((bc[w_] + 1) / max(1, bn))
+        if n >= RISING["min_recent"] and lift >= RISING["min_lift"]:
+            out.append({"word": w_, "recent": n, "lift": round(lift, 1)})
+    return sorted(out, key=lambda x: (-x["recent"] * x["lift"]))[:12]
 
 
 def topic_of(ws, topics):
@@ -350,7 +431,7 @@ def _minutes(kind, words_, seconds):
     return max(1, round((seconds or 0) / 60)) if seconds else None
 
 
-def candidates(conn, e, now, used):
+def candidates(conn, e, now, used, iv=None):
     """Everything new enough to go in today's edition."""
     days = 3 if datetime.fromtimestamp(now).weekday() == 6 else 2      # Sunday's covers Shabbat too
     since = now - days * 86400
@@ -380,23 +461,35 @@ def candidates(conn, e, now, used):
               "thumb": r["thumb"] if r["thumb"] and not r["thumb"].startswith("http") else (r["thumb"] or ""),
               "published": r["published"] or r["added"], "origin": "feed"})
 
+    iv = iv if iv is not None else invidious()
     user = _iv_user()
+
+    def video(vid, author, title, secs, pub, origin, lane=None, added=None):
+        if not re.fullmatch(r"[\w-]{11}", vid or "") or vid in iv["watched"] or not title:
+            return
+        if secs and not 180 <= secs <= e["longest"] * 60:
+            return
+        keep({"id": f"yt:{vid}", "kind": "video", "title": title, "source": author or "", "folder": "", "summary": "",
+              "url": f"https://www.youtube.com/watch?v={vid}", "minutes": _minutes("video", 0, secs), "lane": lane,
+              "thumb": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg", "published": int(added or pub or now), "origin": origin})
+
+    # iv-suggest's lanes first: it already found these for you beyond your subscriptions (no songs)
+    for v in sorted(iv["lanes"], key=lambda v: -v["added"]):
+        if "music" in v["lane"] or v["genre"] == "Music":
+            continue
+        video(v["id"], v["author"], v["title"], v["seconds"], v["published"], "lane", lane=v["list"], added=v["added"])
     if user:
         try:
             rows = _psql(
                 "SELECT id, author, title, length_seconds, extract(epoch FROM published)::bigint FROM channel_videos "
                 f"WHERE ucid IN (SELECT unnest(subscriptions) FROM users WHERE email = '{user}') "
-                f"AND published > to_timestamp({int(since)}) AND length_seconds >= 180 AND NOT live_now "
+                f"AND published > to_timestamp({int(since)}) AND NOT live_now "
                 "AND (premiere_timestamp IS NULL OR premiere_timestamp < now()) ORDER BY published DESC LIMIT 600")
         except Exception as ex:  # noqa: BLE001
             log.warning("invidious subscriptions: %s", ex)
             rows = []
         for vid, author, title, secs, pub in rows:
-            if not re.fullmatch(r"[\w-]{11}", vid):
-                continue
-            keep({"id": f"yt:{vid}", "kind": "video", "title": title, "source": author, "folder": "", "summary": "",
-                  "url": f"https://www.youtube.com/watch?v={vid}", "minutes": _minutes("video", 0, int(secs or 0)),
-                  "thumb": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg", "published": int(pub or now), "origin": "youtube"})
+            video(vid, author, title, int(secs or 0), int(pub or now), "youtube")
 
     for r in conn.execute("SELECT e.url, e.link, e.title, e.podcast_title, e.published, e.duration, e.notes, e.image FROM gp_episodes e "
                           "JOIN gp_subs s ON s.url = e.podcast WHERE s.removed IS NULL AND e.published >= ?", (since,)):
@@ -430,21 +523,27 @@ def score(cands, prof, e, now, parasha=None):
         kept.append(c)
     hi = sorted(raw)[int(len(raw) * 0.95)] if raw else 1
     hi = hi if hi > 0 else 1
+    rise = {r["word"] for r in prof.get("rising") or []}
+    any_src = bool(prof.get("mult"))
     for c in kept:
         key = source_key(c["source"])
         src = prof["sources"].get(key, 0.0)
+        mult = prof["mult"].get(key, FLOOR if any_src else 1.0)
         t = topic_of(c["_ws"], e["topics"])
         c["topic"] = t["name"] if t else ""
         tmult = ADJ.get((t or {}).get("adj") or "", 1.0)
         smult = ADJ.get(e["sources"].get(key) or e["sources"].get(c["source"]) or "", 1.0)
         fresh = 0.5 ** (max(0, now - (c["published"] or now)) / 86400)
-        base = 0.5 * (math.sqrt(src) if src > 0 else src) + 0.42 * max(-1.0, min(1.5, c["_tm"] / hi)) + 0.08 * fresh
+        c["rising"] = sorted(c["_ws"] & rise)
+        # relevance: a floor, so a piece from a source you love still counts when its words are new to Daf
+        rel = 0.35 + 0.65 * max(-0.5, min(1.5, c["_tm"] / hi))
+        rel += 0.12 * min(2, len(c["rising"])) + (0.18 if c.get("lane") else 0) + 0.08 * fresh
         c["torah"] = bool(c.get("folder") == "Divrei Torah" or (parasha and torah.on_parasha(c, parasha)))
         c["parasha"] = bool(parasha and torah.on_parasha(c, parasha))
-        c["score"] = round(base * tmult * smult + (0.15 if c["parasha"] else 0), 4)
+        c["score"] = round(rel * mult * tmult * smult + (0.25 if c["parasha"] else 0), 4)
         f = prof["facts"].get(key) or {}
         c["facts"] = {k: f[k] for k in ("watched", "opened", "played", "highlighted", "saved", "up", "down") if f.get(k)}
-        c["familiar"] = src > 0.04
+        c["familiar"] = src > 0.25 or bool(c.get("lane"))
         del c["_ws"], c["_tm"]
     return kept
 
@@ -485,6 +584,8 @@ def fact_line(c, parasha=None):
         return f"On this week's parasha, {parasha.get('name')}"
     if f.get("up"):
         return f"You liked {name} before"
+    if c.get("lane"):
+        return f"From your “{c['lane']}” lane"
     if f.get("watched"):
         return f"You've watched {f['watched']} from {name}"
     if f.get("played"):
@@ -495,6 +596,8 @@ def fact_line(c, parasha=None):
         return f"You've highlighted {name} before"
     if f.get("opened"):
         return f"You've opened {name} before"
+    if c.get("rising"):
+        return f"You've been into {c['rising'][0]} lately"
     if c.get("topic"):
         return c["topic"]
     return "New from " + name
@@ -587,7 +690,10 @@ def _taste_text(prof):
     srcs = sorted(prof["sources"].items(), key=lambda kv: -kv[1])
     likes = ", ".join(f"{k} {v:.2f}" for k, v in srcs[:25] if v > 0)
     words_ = ", ".join(w for w, v in sorted(prof["words"].items(), key=lambda kv: -kv[1])[:60] if v > 0)
-    return (f"- topics: {topics}\n- sources: {likes}\n- words that recur in what they finish: {words_}\n"
+    rise = ", ".join(r["word"] for r in prof.get("rising") or []) or "nothing in particular"
+    named = ", ".join(prof.get("named") or []) or "none"
+    return (f"- topics: {topics}\n- topics they named themselves: {named}\n- sources: {likes}\n"
+            f"- words that recur in what they finish: {words_}\n- taken up lately: {rise}\n"
             f"- recently finished: {'; '.join(prof['recent'][:10]) or 'nothing yet'}\n"
             f"- turned down: {'; '.join(prof['down'][:8]) or 'nothing yet'}")
 
@@ -600,6 +706,10 @@ def _facts_text(c, parasha):
         f.append(f"PARASHA {parasha.get('name')}")
     elif c.get("torah"):
         f.append("TORAH")
+    if c.get("lane"):
+        f.append(f"from their \"{c['lane']}\" lane of video suggestions")
+    if c.get("rising"):
+        f.append("rising for them lately: " + ", ".join(c["rising"]))
     if c.get("stranger"):
         f.append("STRANGER (outside their usual)")
     return ", ".join(f) or "-"
@@ -723,8 +833,9 @@ def build(day=None, use_ai=None, dry=False, conn=None):
                 e = settings()
             except Exception as ex:  # noqa: BLE001
                 log.warning("edition topics: %s", ex)
-        prof = taste(conn, e, now)
-        cands = score(candidates(conn, e, now, used), prof, e, now, parasha)
+        iv = invidious()
+        prof = taste(conn, e, now, iv)
+        cands = score(candidates(conn, e, now, used, iv), prof, e, now, parasha)
         short = shortlist(cands, e, day)
         how = "rules"
         chosen = None
@@ -938,4 +1049,21 @@ def taste_page(conn):
     muted = sorted(k for k, v in e["sources"].items() if v == "mute")
     adj = {k: v for k, v in e["sources"].items() if v in ("more", "less")}
     return {"topics": p["topics"], "sources": [{"name": k, "weight": round(v, 3), "facts": p["facts"].get(k) or {}, "adj": adj.get(k, "")} for k, v in top],
-            "muted": muted, "seen": p["seen"], "settings": {k: v for k, v in e.items() if k not in ("topics", "sources")}}
+            "muted": muted, "seen": p["seen"], "rising": p["rising"], "named": p["named"], "report": report(conn),
+            "settings": {k: v for k, v in e.items() if k not in ("topics", "sources")}}
+
+
+def report(conn, days=14):
+    """Is it working: of the pieces the last two weeks' editions showed, how many you opened, read, liked."""
+    out = {"days": days, "editions": 0, "shown": 0, "opened": 0, "read": 0, "up": 0, "down": 0}
+    since = (date.today() - timedelta(days=days)).isoformat()
+    for r in conn.execute("SELECT day, made, items FROM editions WHERE day >= ?", (since,)):
+        out["editions"] += 1
+        for it in json.loads(r["items"] or "[]"):
+            s = state(conn, it)
+            out["shown"] += 1
+            out["opened"] += bool(s["opened"])
+            out["read"] += bool(s["done"])
+            out["up"] += s["vote"] > 0
+            out["down"] += s["vote"] < 0
+    return out

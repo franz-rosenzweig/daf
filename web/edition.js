@@ -154,7 +154,10 @@ function drawTaste(){
   const mix = MIX.map(m => '<div class="edmrow"><span>' + m[1] + '</span><div class="edstep"><button data-step="' + m[0] + '" data-d="-1" aria-label="Less">−</button><b>' + esc(fmt(m, s[m[0]])) + '</b><button data-step="' + m[0] + '" data-d="1" aria-label="More">+</button></div></div>').join('');
   const sw = (k, l) => '<label class="edmrow"><span>' + l + '</span><input type="checkbox" class="sw" data-flag="' + k + '"' + (s[k] ? ' checked' : '') + '></label>';
   const days = '<div class="edmrow"><span>Days</span><div class="eddays">' + DAYS.map(([k, l]) => '<button class="' + (s.days.includes(k) ? 'on' : '') + '" data-day="' + k + '">' + l + '</button>').join('') + '</div></div>';
-  page.innerHTML = (learn ? '<div class="edlearn">' + learn + '</div>' : '') +
+  const rp = T.report || {}, rise = (T.rising || []).map(r => '<span class="edlchip">' + esc(r.word) + '</span>').join('');
+  const how = rp.shown ? '<div class="edlearn"><span class="edlh2">Last 2 weeks</span>' + [['Shown', rp.shown], ['Opened', rp.opened], ['Read', rp.read], ['👍', rp.up], ['👎', rp.down]]
+    .map(([l, n]) => '<span class="edlchip"><b>' + l + '</b> ' + n + '</span>').join('') + '</div>' : '';
+  page.innerHTML = how + (learn ? '<div class="edlearn">' + learn + '</div>' : '') + (rise ? '<div class="edlearn"><span class="edlh2">Picking up on</span>' + rise + '</div>' : '') +
     '<div class="edtcols"><section class="card"><div class="cardh"><h2>Topics</h2><button class="linkbtn tiny" data-ed="topics">Name them again</button></div>' + topics + '</section>' +
     '<div class="edtside"><section class="card"><h2>Mix</h2>' + sw('on', 'Every morning') + days + mix + sw('kindle', 'Kindle') + sw('ai', 'Chosen by the model') + '</section></div></div>' +
     '<section class="card"><h2>Sources</h2><div class="edsrcs">' + srcs + '</div>' +
