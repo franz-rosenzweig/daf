@@ -554,7 +554,10 @@ def score(cands, prof, e, now, parasha=None):
         t = topic_of(c["_ws"], e["topics"])
         c["topic"] = t["name"] if t else ""
         tmult = ADJ.get((t or {}).get("adj") or "", 1.0)
-        smult = ADJ.get(e["sources"].get(key) or e["sources"].get(c["source"]) or "", 1.0)
+        # a feed's own dial (by its title), else its publication's, and its folder's (the Feeds page) on top
+        smult = ADJ.get(e["sources"].get(c["source"]) or e["sources"].get(key) or "", 1.0)
+        if c.get("folder") and e["sources"].get("folder:" + c["folder"]) in ("more", "less"):
+            smult *= ADJ[e["sources"]["folder:" + c["folder"]]]
         fresh = 0.5 ** (max(0, now - (c["published"] or now)) / 86400)
         c["rising"] = sorted(c["_ws"] & rise)
         # relevance: a floor, so a piece from a source you love still counts when its words are new to Daf
@@ -738,7 +741,7 @@ def section_for(c):
         return "Listen"
     if c.get("torah"):
         return "Torah"
-    pool = c["folder"][len(rss.POOL):] if rss.is_pool(c.get("folder")) else ""
+    pool = (c.get("folder") or "") if c.get("origin") == "pool" else ""
     return ((c.get("topic") or pool).split(" & ")[0].split(",")[0][:18]) or "Read"
 
 
@@ -1143,19 +1146,25 @@ def taste_page(conn):
     muted = sorted(k for k, v in e["sources"].items() if v == "mute")
     adj = {k: v for k, v in e["sources"].items() if v in ("more", "less")}
     return {"topics": p["topics"], "sources": [{"name": k, "weight": round(v, 3), "facts": p["facts"].get(k) or {}, "adj": adj.get(k, "")} for k, v in top],
-            "pool": pool_page(conn, e), "muted": [m for m in muted if not m.startswith("folder:Pool · ")], "seen": p["seen"], "rising": p["rising"], "named": p["named"], "report": report(conn),
+            "pool": pool_page(conn, e), "muted": [m for m in muted if m[7:] not in _hidden_folders(conn)], "seen": p["seen"], "rising": p["rising"], "named": p["named"], "report": report(conn),
             "settings": {k: v for k, v in e.items() if k not in ("topics", "sources")}}
 
 
+def _hidden_folders(conn):
+    return {r[0] for r in conn.execute("SELECT name FROM feed_folders WHERE show = 'hidden'")}
+
+
 def pool_page(conn, e):
-    """The pool's categories: how many feeds, what came in the last two days, and whether it's muted."""
-    from .sources import rss
+    """The pool (the folders set to Hidden): how many feeds, what came in the last two days, and whether it's muted."""
     since = int(time.time()) - 2 * 86400
-    posts = dict(conn.execute("SELECT f.folder, COUNT(*) FROM docs d JOIN feeds f ON f.id = d.feed WHERE COALESCE(d.published, d.added) >= ? "
-                              "AND f.folder LIKE ? GROUP BY f.folder", (since, rss.POOL + "%")).fetchall())
+    hid = _hidden_folders(conn)
+    posts = {k: v for k, v in conn.execute("SELECT f.folder, COUNT(*) FROM docs d JOIN feeds f ON f.id = d.feed WHERE COALESCE(d.published, d.added) >= ? "
+                                           "GROUP BY f.folder", (since,)).fetchall() if k in hid}
     out = []
-    for folder, n in conn.execute("SELECT folder, COUNT(*) FROM feeds WHERE folder LIKE ? GROUP BY folder ORDER BY folder", (rss.POOL + "%",)):
-        out.append({"name": folder[len(rss.POOL):], "folder": folder, "feeds": n, "posts": posts.get(folder, 0),
+    for folder, n in conn.execute("SELECT folder, COUNT(*) FROM feeds GROUP BY folder ORDER BY folder COLLATE NOCASE"):
+        if folder not in hid:
+            continue
+        out.append({"name": folder, "folder": folder, "feeds": n, "posts": posts.get(folder, 0),
                     "muted": e["sources"].get("folder:" + folder) == "mute"})
     return out
 

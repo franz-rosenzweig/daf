@@ -110,6 +110,14 @@ def _scope(where, kind, cat, feed, args):
     return q
 
 
+def _all_feeds(where, cat, feed, q=None):
+    """All feeds (the Feed with no folder or feed chosen) leaves out the feeds shown in their folder only."""
+    if where != "feed" or cat or feed or q or not feedsrc.daf():
+        return ""
+    from .sources import rss
+    return " AND " + rss.IN_ALL
+
+
 def _tab(where, tab, kind, exp, args):
     """A list's tab. "any" is every one of them, for a search across the whole Library (its Home)."""
     if tab == "any":
@@ -133,7 +141,7 @@ def list_docs(conn, settings, where, tab, kind=None, cat=None, limit=200, offset
 
     def select(text):
         args, sql = [where], "SELECT * FROM docs WHERE where_ = ? AND status != 'deleted'"
-        sql += _scope(where, kind, cat, feed, args) + _tab(where, tab, kind, exp, args)
+        sql += _scope(where, kind, cat, feed, args) + _all_feeds(where, cat, feed, q) + _tab(where, tab, kind, exp, args)
         sql += _filters(flt, args)
         order = SORTS.get(sort, SORTS["new"])
         if q:
@@ -215,15 +223,46 @@ def counts(conn, settings):
     exp = expired_before(settings)
     feed = conn.execute("SELECT category, COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added >= ? GROUP BY category",
                         (exp,)).fetchall()
+    total = conn.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added >= ?" + _all_feeds("feed", None, None),
+                         (exp,)).fetchone()[0]
     lib = conn.execute("SELECT kind, COUNT(*) FROM docs WHERE where_ = 'library' AND status = 'inbox' GROUP BY kind").fetchall()
     fc = json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_counts'").fetchone() or ["{}"])[0])
     expired = conn.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added < ?", (exp,)).fetchone()[0]
-    return {"feed": {r[0] or "": r[1] for r in feed}, "feed_total": sum(r[1] for r in feed),
+    return {"feed": {r[0] or "": r[1] for r in feed}, "feed_total": total, "feed_pins": feed_pins(conn, settings, exp),
+            "feed_pins_hide_empty": bool(settings.get("feed_pins_hide_empty")),
             "freshrss_unread": None if feedsrc.daf() else fc.get("total"), "expired_in_daf": expired,
             "feed_reader": "daf" if feedsrc.daf() else "freshrss",
             "library": {r[0]: r[1] for r in lib},
             "emails_on": bool(settings.get("newsletters")),
             "starred": conn.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'library' AND starred = 1 AND status NOT IN ('archive', 'deleted')").fetchone()[0]}
+
+
+def feed_pins(conn, settings, exp=None):
+    """The folders and feeds pinned under Feed in the sidebar (settings feed_pins), in their order, each
+    with what's unseen in it: [{key, name, count, icon}]. A hidden one isn't shown."""
+    if not feedsrc.daf():
+        return []
+    from .sources import rss
+    if "feed_pins" in settings:
+        pins = [p for p in settings.get("feed_pins") or [] if isinstance(p, str)]
+    else:                                   # never chosen: every folder you see, as it was before pins
+        pins = ["folder:" + f for f in rss.folders(conn)]
+    exp = exp if exp is not None else expired_before(settings)
+    eff, fshow = rss.shows(conn), rss.folder_shows(conn)
+    feeds = {r["id"]: r for r in conn.execute("SELECT id, title, icon FROM feeds")}
+    out = []
+    for p in pins:
+        if p.startswith("folder:"):
+            name = p[7:]
+            if fshow.get(name) == "hidden" or not conn.execute("SELECT 1 FROM feeds WHERE folder = ? LIMIT 1", (name,)).fetchone():
+                continue
+            n = conn.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added >= ? AND category = ?", (exp, name)).fetchone()[0]
+            out.append({"key": p, "name": name, "count": n, "icon": ""})
+        elif p in feeds and eff.get(p) != "hidden":
+            n = conn.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added >= ? AND feed = ?", (exp, p)).fetchone()[0]
+            h = feeds[p]["icon"] or ""
+            out.append({"key": p, "name": feeds[p]["title"] or p, "count": n, "icon": h if h and any(rss.ICONS.glob(h + ".*")) else ""})
+    return out
 
 
 def feed_sources(conn, settings):
@@ -251,7 +290,19 @@ def feed_sources(conn, settings):
     for f in folders.values():
         f["feeds"].sort(key=lambda x: x["title"].casefold())
     out = sorted(folders.values(), key=lambda f: (f["name"] == "", f["name"].casefold()))
-    return {"folders": out, "total": sum(f["count"] for f in out), "stale": stale}
+    hidden = []
+    if feedsrc.daf():
+        from .sources import rss
+        fshow, pins = rss.folder_shows(conn), set(settings.get("feed_pins") or [])
+        for f in out:
+            f["show"], f["pinned"] = fshow.get(f["name"], "all"), "folder:" + f["name"] in pins
+            for x in f["feeds"]:
+                x["pinned"] = x["id"] in pins
+        hidden = sorted({r[0] for r in conn.execute("SELECT name FROM feed_folders WHERE show = 'hidden'")} &
+                        {r[0] for r in conn.execute("SELECT DISTINCT folder FROM feeds")}, key=str.casefold)
+    total = conn.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added >= ?" + _all_feeds("feed", None, None),
+                         (exp,)).fetchone()[0]
+    return {"folders": out, "total": total, "stale": stale, "hidden": hidden}
 
 
 def feed_scope_ids(conn, settings, cat=None, feed=None, older=None):
@@ -280,10 +331,14 @@ def mark_feed_seen(conn, settings, cat=None, feed=None, older=None):
 def edit_feed(conn, stream, title=None, folder=None, full=None, notify=None):
     """Rename a feed or move it to another folder, in FreshRSS and on the items Daf has from it; and
     Daf's own two switches for it: always load the full article, notify of new posts."""
-    subs = feedsrc.get().subscriptions(conn=conn) if feedsrc.daf() else json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])
+    daf = feedsrc.daf()
+    subs = feedsrc.get().subscriptions(conn=conn, pool=True) if daf else json.loads((conn.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])
     old = next((x for x in subs if x["id"] == stream), None)
     if old is None:
         raise KeyError(stream)
+    if daf:
+        from .sources import rss
+        before = rss.shows(conn)
     if full is not None or notify is not None:
         s = config.load_settings()
         for key, on in (("feed_full", full), ("feed_notify", notify)):
@@ -300,9 +355,12 @@ def edit_feed(conn, stream, title=None, folder=None, full=None, notify=None):
         conn.execute("UPDATE docs SET source = ? WHERE where_ = 'feed' AND feed = ?", (title, stream))
         old["title"] = title
     if folder is not None:
-        conn.execute("UPDATE docs SET category = ? WHERE where_ = 'feed' AND feed = ?", (folder, stream))
+        conn.execute("UPDATE docs SET category = ? WHERE where_ IN ('feed', 'pool') AND feed = ?", (folder, stream))
         old["folder"] = folder
-    conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('feed_subs', ?)", (json.dumps(subs),))
+        if daf:
+            rss.resettle(conn, before)          # into a hidden folder, or out of one: its posts go with it
+    if not daf:
+        conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('feed_subs', ?)", (json.dumps(subs),))
     return old
 
 

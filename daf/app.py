@@ -622,6 +622,10 @@ async def put_settings(request: Request):
             s[k] = body[k]
     if isinstance(body.get("nav_pins"), list) and all(isinstance(x, str) and len(x) < 40 for x in body["nav_pins"]):
         s["nav_pins"] = body["nav_pins"][:20]                             # Preferences → Sidebar
+    if isinstance(body.get("feed_pins"), list) and all(isinstance(x, str) and len(x) < 100 for x in body["feed_pins"]):
+        s["feed_pins"] = list(dict.fromkeys(body["feed_pins"]))[:40]      # pinned under Feed: "folder:Name", "feed/12"
+    if "feed_pins_hide_empty" in body:
+        s["feed_pins_hide_empty"] = bool(body["feed_pins_hide_empty"])
     if isinstance(body.get("podcasts"), dict) and isinstance(body["podcasts"].get("transcribe"), bool):
         s["podcasts"] = {"transcribe": body["podcasts"]["transcribe"]}      # Preferences → Podcasts (episodes.py)
     if isinstance(body.get("cards_per_day"), int) and 0 <= body["cards_per_day"] <= 30:
@@ -1902,10 +1906,11 @@ async def put_newsletters(request: Request, c=Depends(conn)):
 
 
 @app.get("/api/feed/folders", dependencies=[Depends(user)])
-def feed_folders(c=Depends(conn)):
+def feed_folders(hidden: int = 0, c=Depends(conn)):
+    """The Feed's folders (with hidden=1, the hidden ones too, for Follow a site in Daf; never for reader apps)."""
     from .sources import feedsrc
     try:
-        return {"folders": feedsrc.get().folders(conn=c)}
+        return {"folders": feedsrc.get().folders(conn=c, **({"hidden": True} if hidden and feedsrc.daf() else {}))}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"{feedsrc.name()} didn't answer: {e}")
 
@@ -1914,6 +1919,60 @@ def feed_folders(c=Depends(conn)):
 def get_feed_sources(c=Depends(conn)):
     """Folders and feeds with their unseen counts, for the Feed's source picker."""
     return reader.feed_sources(c, config.load_settings())
+
+
+@app.get("/api/feed/manage", dependencies=[Depends(user)])
+def get_feed_manage(c=Depends(conn)):
+    """The Feeds page: every folder and feed, the hidden ones too, with its Show, pin, Edition dial, posts a
+    week (the last four weeks), what's unseen, when it last had something new and whether it's failing."""
+    from .sources import feedsrc, rss
+    if not feedsrc.daf():
+        raise HTTPException(409, "The Feeds page needs Daf to read the feeds itself")
+    s = config.load_settings()
+    exp, now = reader.expired_before(s), int(time.time())
+    eff, fshow = rss.shows(c), rss.folder_shows(c)
+    pins = set(s["feed_pins"]) if "feed_pins" in s else {"folder:" + f for f in rss.folders(c)}
+    src = ((s.get("edition") or {}).get("sources") or {})
+    # posts a week, by the posts' own dates: the Feed keeps four weeks of them, the pool (hidden) five days
+    wk = {f: n / 4 for f, n in c.execute("SELECT feed, COUNT(*) FROM docs WHERE where_ = 'feed' AND feed IS NOT NULL AND COALESCE(published, added) >= ? "
+                                         "GROUP BY feed", (now - 28 * 86400,))}
+    for f, n in c.execute("SELECT feed, COUNT(*) FROM docs WHERE where_ = 'pool' AND feed IS NOT NULL AND COALESCE(published, added) >= ? GROUP BY feed",
+                          (now - 5 * 86400,)):
+        wk[f] = wk.get(f, 0) + n * 7 / 5
+    last = {f: max(a or 0, b or 0) for f, a, b in c.execute("SELECT feed, MAX(published), MAX(added) FROM docs WHERE feed IS NOT NULL AND where_ IN ('feed', 'pool') "
+                                                            "GROUP BY feed")}
+    unseen = dict(c.execute("SELECT feed, COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added >= ? AND feed IS NOT NULL "
+                            "GROUP BY feed", (exp,)).fetchall())
+    folders = {}
+    for r in c.execute("SELECT * FROM feeds ORDER BY lower(title)"):
+        name = r["folder"] or ""
+        f = folders.setdefault(name, {"name": name, "show": fshow.get(name, "all"), "pinned": "folder:" + name in pins,
+                                      "edition": src.get("folder:" + name, ""), "feeds": [], "week": 0, "unseen": 0})
+        h = r["icon"] or ""
+        x = {"id": r["id"], "title": r["title"] or r["url"], "url": r["url"], "site": r["site"] or "",
+             "icon": h if h and any(rss.ICONS.glob(h + ".*")) else "", "own_show": r["show"], "show": eff.get(r["id"], "all"),
+             "pinned": r["id"] in pins, "edition": src.get(r["title"] or "", ""), "week": round(wk.get(r["id"], 0), 1),
+             "unseen": unseen.get(r["id"], 0), "last": last.get(r["id"]), "error": r["error"] if (r["errors"] or 0) >= 3 else None,
+             "full": r["id"] in (s.get("feed_full") or []), "notify": r["id"] in (s.get("feed_notify") or [])}
+        f["feeds"].append(x)
+        f["week"] = round(f["week"] + x["week"], 1)
+        f["unseen"] += x["unseen"]
+    out = sorted(folders.values(), key=lambda f: (f["show"] == "hidden", f["name"] == "", f["name"].casefold()))
+    return {"folders": out, "pins": [p for p in (s.get("feed_pins") if "feed_pins" in s else sorted(pins))], "hide_empty": bool(s.get("feed_pins_hide_empty"))}
+
+
+@app.put("/api/feed/show", dependencies=[Depends(user)])
+def put_feed_show(b=Depends(json_body), c=Depends(conn)):
+    """{keys: ["folder:Name" | "feed/12", ...], show: "all" | "folder" | "hidden" | null (a feed: like its folder)}."""
+    from .sources import rss
+    keys = [k for k in (b.get("keys") or []) if isinstance(k, str) and (k.startswith("folder:") or re.fullmatch(r"feed/\d+", k))][:500]
+    if not keys:
+        raise HTTPException(400, "keys")
+    try:
+        moved = rss.set_show(c, keys, b.get("show"))
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, "moved": moved}
 
 
 @app.get("/api/feed/icon/{h}", dependencies=[Depends(user)])
@@ -3117,7 +3176,8 @@ def tools_feed(folder: str = "", limit: int = 60, days: int = 0, name=Depends(de
     unseen = "where_ = 'feed' AND status = 'unseen' AND added >= ?"
     folders = [{"name": r[0], "unread": r[1]} for r in c.execute(
         f"SELECT category, COUNT(*) n FROM docs WHERE {unseen} AND COALESCE(category, '') != '' GROUP BY category ORDER BY n DESC", (since,))]
-    rows = c.execute(f"SELECT * FROM docs WHERE {unseen}" + (" AND category = ?" if folder else "") +
+    from .sources import rss
+    rows = c.execute(f"SELECT * FROM docs WHERE {unseen}" + (" AND category = ?" if folder else f" AND {rss.IN_ALL}") +
                      " ORDER BY COALESCE(published, added) DESC LIMIT ?", (since, *([folder] if folder else []), max(1, min(500, limit)))).fetchall()
     priv = lambda r: library.is_private(f"{r['title'] or ''} {r['source'] or ''} {r['author'] or ''}", s)
     items = [{"id": r["id"], "folder": r["category"] or "", "feed": r["source"] or "", "feed_id": r["feed"] or "",
@@ -3125,7 +3185,7 @@ def tools_feed(folder: str = "", limit: int = 60, days: int = 0, name=Depends(de
               "summary": (r["summary"] or "").strip(), "published": r["published"] or r["added"], "kind": r["kind"],
               "open": base + "/#read/" + _urlq(r["id"], safe="")} for r in rows if not priv(r)]
     from .sources import feedsrc
-    return {"folders": folders, "items": items, "unread": c.execute(f"SELECT COUNT(*) FROM docs WHERE {unseen}", (since,)).fetchone()[0],
+    return {"folders": folders, "items": items, "unread": c.execute(f"SELECT COUNT(*) FROM docs WHERE {unseen} AND {rss.IN_ALL}", (since,)).fetchone()[0],
             "feeds": len(feedsrc.get().subscriptions(conn=c)) if feedsrc.daf() else len(json.loads((c.execute("SELECT v FROM kv WHERE k = 'feed_subs'").fetchone() or ["[]"])[0])),
             "read_24h": c.execute("SELECT COUNT(*) FROM docs WHERE where_ = 'feed' AND status = 'seen' AND COALESCE(published, added) >= ?",
                                   (int(time.time()) - 86400,)).fetchone()[0],

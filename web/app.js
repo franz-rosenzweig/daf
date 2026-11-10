@@ -366,7 +366,8 @@ function drawSideCard(){
   card.innerHTML = '<h2>Sidebar</h2>' +
     '<div class="prow"><div class="d"><b>On this device</b></div><div class="seg">' + [['full', 'Full'], ['mini', 'Mini'], ['hidden', 'Hidden']].map(x => '<button class="' + (cur === x[0] ? 'on' : '') + '" data-sidemode="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>' +
     '<div class="prow"><div class="d"><b>Pinned</b></div></div><div class="pinlist">' +
-    PINS().map(x => '<label class="aaline"><input type="checkbox" data-pin="' + x[0] + '"' + (on.includes(x[0]) ? ' checked' : '') + '> ' + x[1] + '</label>').join('') + '</div>';
+    PINS().map(x => '<label class="aaline"><input type="checkbox" data-pin="' + x[0] + '"' + (on.includes(x[0]) ? ' checked' : '') + '> ' + x[1] + '</label>').join('') + '</div><div id="feedpins"></div>';
+  if (window.DafCore.FeedPins) window.DafCore.FeedPins.card($('#feedpins'));
   if (S.route[1] === 'sidebar') setTimeout(() => card.scrollIntoView({ block: 'start' }), 200);
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-sidemode]'); if (!b) return; const m = b.dataset.sidemode; if (m === 'hidden') setSide(false); else setSide(true, m); drawSideCard(); });

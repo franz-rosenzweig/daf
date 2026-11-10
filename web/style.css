@@ -2051,3 +2051,61 @@ select.edpast{appearance:auto;padding-right:6px}
 .sndrow{align-items:center;gap:10px}
 .sndrow .sndvol{max-width:120px}
 @media (max-width:700px){ .sndrow{flex-wrap:wrap} .sndrow .sndvol{order:3;max-width:none;flex-basis:100%} }
+
+/* The Feeds page and the menu on a folder or a feed (feeds.js) */
+.fdpage{padding-bottom:90px}
+.fdq{width:200px}
+.fdchips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.fdchip{font:inherit;font-size:13px;padding:5px 11px;border-radius:999px;border:1px solid var(--line-2);background:var(--bg);color:var(--fg-2);cursor:pointer}
+.fdchip b{color:var(--fg);margin-left:2px} .fdchip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)} .fdchip.on b{color:inherit} .fdchip.warn b{color:var(--bad)}
+.fdhead,.fdrow{display:grid;grid-template-columns:24px minmax(180px,1fr) 78px 230px 52px 112px 32px;align-items:center;gap:8px}
+.fdhead > :nth-child(5){text-align:center} .fdrow > .fdpin{justify-self:center}
+.fdhead{font-size:12px;color:var(--fg-3);font-weight:600;padding:4px 0 6px;border-bottom:1px solid var(--line)}
+.fdrow{min-height:44px;border-bottom:1px solid var(--line);font-size:14px}
+.fdrow.feed{min-height:38px;font-size:13.5px} .fdrow.sel{background:var(--accent-weak)}
+.fdname{display:flex;align-items:center;gap:8px;min-width:0;border:0;background:none;font:inherit;color:var(--fg);text-align:left;padding:6px 0;cursor:pointer;text-decoration:none}
+.fdname span:not(.mute):not(.fderr),.fdname b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .fdname b{font-weight:600}
+.fdrow.feed .fdname{padding-left:22px}
+.fdico{width:20px;height:20px;border-radius:5px;flex:none;object-fit:cover;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700}
+.fderr{flex:none;width:16px;height:16px;border-radius:50%;background:var(--bad);color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.fdvol{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fg-2);font-variant-numeric:tabular-nums} .fdvol i{display:block;height:5px;border-radius:3px;background:var(--line-2)}
+.fdseg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;justify-self:start}
+.fdseg button{font:inherit;font-size:12.5px;border:0;border-right:1px solid var(--line);background:var(--bg);color:var(--fg-2);padding:4px 9px;cursor:pointer;white-space:nowrap}
+.fdseg button:last-child{border-right:0} .fdseg button.on{background:var(--accent);color:var(--on-accent);font-weight:600}
+.fdseg.inh button.on{background:var(--active);color:var(--fg);font-weight:500}
+.fdpin{color:var(--fg-3)} .fdpin.on{color:var(--fg);background:none}
+.fded{width:auto;min-width:96px;font-size:12.5px;padding:3px 6px}
+.fdmore{color:var(--fg-3)}
+.fdgrp{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);padding:18px 0 6px}
+.fdbulk{position:sticky;bottom:0;z-index:40;margin-top:12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 20px calc(10px + env(safe-area-inset-bottom,0px));background:var(--panel);border-top:1px solid var(--line)}
+.fdbulk .field{width:auto}
+.fdpinrow{display:flex;align-items:center;gap:6px;padding:4px 0} .fdpinrow span:first-child{flex:1}
+.stag{font-size:11px;color:var(--fg-3);border:1px solid var(--line-2);border-radius:999px;padding:0 7px;margin-left:8px;font-weight:400;white-space:nowrap}
+.srow .spin{color:var(--fg-3);flex:none} .srow .spin.on{color:var(--fg)}
+.nv.subfeed .sico{width:16px;height:16px;font-size:9px;border-radius:4px;margin-right:-4px}
+#pop .fmenu{min-width:230px}
+#pop .fmenu .fmh{font-weight:600;font-size:13.5px;padding:8px 10px 6px;color:var(--fg)}
+#pop .fmenu hr{border:0;border-top:1px solid var(--line);margin:4px 2px;width:auto}
+#pop .fmenu .ml{font-size:11.5px;color:var(--fg-3);padding:6px 10px 2px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+#pop .fmenu button{display:flex;align-items:center;justify-content:flex-start;text-align:left;gap:0} #pop .fmenu button i{width:20px;font-style:normal;flex:none}
+.srow a.sgo{text-decoration:none}
+@media (max-width:700px){
+  .fdq{width:120px}
+  .fdhead{display:none}
+  .fdrow{grid-template-columns:24px 1fr auto 32px;grid-template-areas:"ck name pin more" ". show show show" ". ed vol vol";row-gap:6px;padding:8px 0}
+  .fdrow > :nth-child(1){grid-area:ck} .fdrow > .fdname{grid-area:name} .fdrow > .fdvol{grid-area:vol;justify-self:end}
+  .fdrow > .fdseg,.fdrow > span:nth-child(4){grid-area:show} .fdrow > .fdpin,.fdrow > span:nth-child(5){grid-area:pin}
+  .fdrow > .fded,.fdrow > span:nth-child(6){grid-area:ed;justify-self:start} .fdrow > .fdmore,.fdrow > span:nth-child(7){grid-area:more}
+  .fdrow.feed .fdname{padding-left:0}
+  .fdbulk{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  #pop:has(> .fmenu){left:0!important;right:0;top:auto!important;bottom:0;width:auto;border-radius:20px 20px 0 0;padding:10px 12px calc(16px + env(safe-area-inset-bottom,0px));max-height:80vh;overflow:auto}
+  #pop .fmenu{min-width:0}
+  #pop .fmenu button{padding:12px 10px;font-size:15px}
+}
+@media (min-width:701px) and (max-width:1100px){
+  .fdhead,.fdrow{grid-template-columns:22px minmax(120px,1fr) 46px 196px 50px 92px 26px;gap:6px}
+  .fdhead{font-size:11px}
+  .fdseg button{padding:4px 6px;font-size:12px}
+  .fded{min-width:0;width:92px}
+  .fdvol i{display:none}
+}

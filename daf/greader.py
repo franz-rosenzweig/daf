@@ -685,6 +685,9 @@ def _rename_tag(c, P):
     feeds = _folder_feeds(c, old)
     if not feeds and not c.execute("SELECT 1 FROM docs WHERE where_ = 'feed' AND category = ? LIMIT 1", (old,)).fetchone():
         _bad()
+    from .sources import feedsrc, rss
+    if feedsrc.daf():
+        rss.rename_folder(c, old, new)        # first, so its feeds keep their Show as they move
     for x in feeds:
         reader.edit_feed(c, x["id"], None, new)
     c.execute("UPDATE docs SET category = ? WHERE where_ = 'feed' AND category = ?", (new, old))

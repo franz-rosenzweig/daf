@@ -19,6 +19,20 @@ The info panel shows the opening of the post and a **Summarize** button. **Save 
 
 The Feed also reads well in other apps, like Read You on the phone or NetNewsWire on the Mac, with read and starred going both ways. [Reader apps](reader-apps.md) says how to connect one.
 
+### What shows where
+
+I follow a lot more feeds than I want to look at, mostly so the [Edition](edition.md) has plenty to choose from, so every folder has a say in where its posts show up, and any feed in it can have its own:
+
+- **Everywhere** is the usual: in **All feeds**, in its folder, and in the Feed's count.
+- **Its folder** keeps it out of All feeds and the count, so the posts are only there when I open that folder. Releases and the noisier folders live here, and they stay out of Today, the morning email and the Kindle's Daf tab too. The reader apps still see them, in their folder.
+- **Hidden** keeps it out of everything I read, the reader apps included. Daf still reads it every four hours, and the Edition can still choose from it: hidden folders are the Edition's pool.
+
+Separately from that, a folder or a single feed can be **pinned**, and only pinned ones sit under Feed in the sidebar, in the order I put them. Everything else is one tap away in **Sources**. And each one has an **Edition** setting, More, Normal, Less or Off, which is the same dial as the Taste page's.
+
+All of it lives on the **Feeds** page (**Manage** in Sources, or Preferences › Sidebar), which lists every folder and feed, the hidden ones too, with how many posts a week each one gives. The chips at the top show only what's Everywhere, in Its folder, Hidden, **Quiet** (nothing new in a month) or giving **Problems**, the search finds a feed by its name or site, and ticking a few gives a bar to change them all at once, move them to another folder or unfollow them. Right-clicking a folder or a feed in the sidebar, Sources or the Feeds page, or holding a finger on it on the phone or the tablet, gives the same choices in a menu. Preferences › Sidebar has the order of the pins, and **Hide pins with nothing new**.
+
+The settings are kept on the server, so the web app, the Android app, the Mac app and the reader apps all follow the same ones.
+
 ## The Library
 
 The Library is what I save: **Articles**, **Videos**, **Tweets** and **PDFs**, plus **Emails** once you pick newsletters. Each list has **INBOX**, **LATER** and **ARCHIVE**. **Shortlist** (★, or f) is the few things I mean to read soon, and they stay there until I archive them.

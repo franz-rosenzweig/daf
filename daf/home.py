@@ -66,5 +66,10 @@ def shelves(conn, settings):
 
     exp = reader.expired_before(settings)
     out["feed"] = [_doc_card(dict(r)) for r in conn.execute(
-        "SELECT * FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added >= ? ORDER BY added DESC LIMIT 12", (exp,))]
+        f"SELECT * FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND added >= ? AND {_rss().IN_ALL} ORDER BY added DESC LIMIT 12", (exp,))]
     return out
+
+
+def _rss():
+    from .sources import rss
+    return rss

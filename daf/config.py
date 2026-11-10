@@ -178,6 +178,10 @@ def load_settings():
         s["vault_search_exclude"] = [x for x in saved["vault_search_exclude"] if isinstance(x, str)][:50]
     if isinstance(saved.get("nav_pins"), list):       # Preferences → Sidebar
         s["nav_pins"] = [x for x in saved["nav_pins"] if isinstance(x, str)][:20]
+    if isinstance(saved.get("feed_pins"), list):      # the folders and feeds pinned under Feed ("folder:Name", "feed/12")
+        s["feed_pins"] = [x for x in saved["feed_pins"] if isinstance(x, str)][:40]
+    if "feed_pins_hide_empty" in saved:
+        s["feed_pins_hide_empty"] = bool(saved["feed_pins_hide_empty"])
     if isinstance(saved.get("views"), list):          # saved Library and Feed views (Readwise's filtered views)
         s["views"] = [v for v in saved["views"] if isinstance(v, dict) and isinstance(v.get("id"), str)][:30]
     if isinstance(saved.get("goals"), list):

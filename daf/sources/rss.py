@@ -56,17 +56,119 @@ def _done(conn, mine):
         conn.close()
 
 
-# The pool: feeds Daf reads only for the Edition (edition.py), kept out of the Feed. A feed is in it when its
-# folder starts with POOL ("Pool · Science"); its posts are stored with where_ = 'pool', so no Feed list,
-# count, reader app or digest sees them, it's read less often, and its posts go after POOL_DAYS unless an
-# Edition took them (they become ordinary Feed posts then: edition._materialize).
-POOL = "Pool · "
+# Where a feed's posts show (its Show): "all", in All feeds and its folder; "folder", only in its folder (and
+# its pin); "hidden", nowhere you read, only for the Edition (edition.py). A folder has one (table
+# feed_folders) and a feed can have its own (feeds.show; NULL is its folder's). A hidden feed's posts are
+# stored with where_ = 'pool' (the Edition's pool), so no Feed list, count, reader app or digest sees them;
+# it's read less often, and its posts go after POOL_DAYS unless an Edition took them (they become ordinary
+# Feed posts then: edition._materialize). Its folder only is a filter (IN_ALL) on All feeds and what counts it.
+SHOWS = ("all", "folder", "hidden")
+POOL = "Pool · "            # the old way to hide a folder, by its name (migrate_pool takes it off)
 POOL_EVERY = 4 * 3600
 POOL_DAYS = 5
+EFFECTIVE = "COALESCE(f.show, ff.show, 'all')"
+_JOIN = "feeds f LEFT JOIN feed_folders ff ON ff.name = f.folder"
+# Posts that belong in All feeds and its count: not from a feed whose Show is its folder only.
+IN_ALL = f"COALESCE(feed, '') NOT IN (SELECT f.id FROM {_JOIN} WHERE {EFFECTIVE} = 'folder')"
 
 
-def is_pool(folder):
-    return (folder or "").startswith(POOL)
+def shows(conn):
+    """{feed id: its Show, its own or its folder's}."""
+    return {r[0]: r[1] for r in conn.execute(f"SELECT f.id, {EFFECTIVE} FROM {_JOIN}")}
+
+
+def folder_shows(conn):
+    return {r[0]: r[1] for r in conn.execute("SELECT name, show FROM feed_folders")}
+
+
+def hidden_folder(conn, folder):
+    r = conn.execute("SELECT show FROM feed_folders WHERE name = ?", (folder or "",)).fetchone()
+    return bool(r) and r[0] == "hidden"
+
+
+def is_hidden(conn, f):
+    """A feed (its row, or a dict of it): is its Show hidden?"""
+    f = dict(f)
+    return f["show"] == "hidden" if f.get("show") else hidden_folder(conn, f.get("folder"))
+
+
+KEEP = ("id NOT IN (SELECT DISTINCT book_id FROM highlights WHERE book_id IS NOT NULL) AND id NOT IN (SELECT doc_id FROM kindle_sent) "
+        "AND COALESCE(starred, 0) = 0")
+
+
+def set_show(conn, keys, show):
+    """Show for folders ("folder:Name") and feeds ("feed/12"; None: like its folder). The posts of a feed that
+    becomes hidden go to the pool (not what you kept: highlighted, starred, sent to the Kindle), and come back
+    to the Feed when it shows again. Returns how many feeds went between hidden and not."""
+    if show not in SHOWS and show is not None:
+        raise ValueError("Show is all, folder or hidden")
+    before = shows(conn)
+    for k in keys:
+        if k.startswith("folder:"):
+            if show is None:
+                raise ValueError("A folder needs a Show")
+            conn.execute("INSERT INTO feed_folders (name, show) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET show = excluded.show", (k[7:], show))
+        else:
+            conn.execute("UPDATE feeds SET show = ? WHERE id = ?", (show, k))
+    return resettle(conn, before)
+
+
+def resettle(conn, before):
+    """After a Show or a folder changed: the posts of each feed that went hidden or came back move with it."""
+    moved = 0
+    for fid, now in shows(conn).items():
+        if (before.get(fid) == "hidden") == (now == "hidden"):
+            continue
+        moved += 1
+        if now == "hidden":
+            conn.execute(f"UPDATE docs SET where_ = 'pool' WHERE where_ = 'feed' AND feed = ? AND {KEEP}", (fid,))
+            conn.execute("UPDATE feeds SET every = ? WHERE id = ? AND every IS NULL", (POOL_EVERY, fid))
+        else:
+            conn.execute("UPDATE docs SET where_ = 'feed' WHERE where_ = 'pool' AND feed = ?", (fid,))
+            conn.execute("UPDATE feeds SET every = NULL WHERE id = ? AND every = ?", (fid, POOL_EVERY))
+    return moved
+
+
+def rename_folder(conn, old, new):
+    """A folder's Show goes with it to its new name."""
+    if not old or old == new:
+        return
+    r = conn.execute("SELECT show FROM feed_folders WHERE name = ?", (old,)).fetchone()
+    if r:
+        if new:
+            conn.execute("INSERT INTO feed_folders (name, show) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET show = excluded.show", (new, r[0]))
+        conn.execute("DELETE FROM feed_folders WHERE name = ?", (old,))
+
+
+def migrate_pool(conn):
+    """Once: the "Pool · X" folders become X, set to hidden, and the Edition's mutes for them follow."""
+    if conn.execute("SELECT 1 FROM kv WHERE k = 'feed_show_v1'").fetchone():
+        return
+    from .. import config
+    names = [r[0] for r in conn.execute("SELECT DISTINCT folder FROM feeds WHERE folder LIKE ?", (POOL + "%",))]
+    taken = {r[0] for r in conn.execute("SELECT DISTINCT folder FROM feeds WHERE folder NOT LIKE ?", (POOL + "%",))}
+    renamed = {}
+    for old in names:
+        new = old[len(POOL):].strip() or old
+        if new in taken:
+            new = old                              # a folder you see has that name already: it keeps the old one
+        conn.execute("INSERT INTO feed_folders (name, show) VALUES (?, 'hidden') ON CONFLICT(name) DO UPDATE SET show = 'hidden'", (new,))
+        if new != old:
+            conn.execute("UPDATE feeds SET folder = ? WHERE folder = ?", (new, old))
+            conn.execute("UPDATE docs SET category = ? WHERE category = ? AND where_ IN ('feed', 'pool')", (new, old))
+            renamed[old] = new
+    if renamed:
+        s = config.load_settings()
+        src = (s.get("edition") or {}).get("sources") or {}
+        hit = False
+        for old, new in renamed.items():
+            if "folder:" + old in src:
+                src["folder:" + new] = src.pop("folder:" + old)
+                hit = True
+        if hit:
+            s["edition"]["sources"] = src
+            config.save_settings(s)
+    conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('feed_show_v1', ?)", (json.dumps(renamed),))
 
 
 def _icon_key(feed_id):
@@ -77,26 +179,29 @@ def _icon_key(feed_id):
 
 def subscriptions(conn=None, pool=False):
     """The feeds Daf follows: [{id ("feed/12"), title, folder, url, site, icon}], as freshrss.subscriptions.
-    The Edition's pool only with pool=True."""
+    The hidden ones (the Edition's pool) only with pool=True."""
     conn, mine = _conn(conn)
     try:
         out = []
+        eff = shows(conn)
         for r in conn.execute("SELECT * FROM feeds ORDER BY lower(title)"):
-            if is_pool(r["folder"]) and not pool:
+            if eff.get(r["id"]) == "hidden" and not pool:
                 continue
             h = r["icon"] or ""
             out.append({"id": r["id"], "title": r["title"] or r["url"], "folder": r["folder"] or "", "url": r["url"],
                         "site": r["site"] or "", "icon": h if h and any(ICONS.glob(h + ".*")) else "",
-                        "error": r["error"], "fetched": r["fetched"]})
+                        "error": r["error"], "fetched": r["fetched"], "show": eff.get(r["id"], "all"), "own_show": r["show"]})
         return out
     finally:
         _done(conn, mine)
 
 
-def folders(conn=None):
+def folders(conn=None, hidden=False):
+    """The folders; the hidden ones only when asked (the reader apps never see them)."""
     conn, mine = _conn(conn)
     try:
-        return sorted({r[0] for r in conn.execute("SELECT DISTINCT folder FROM feeds WHERE folder != ''") if not is_pool(r[0])}, key=str.casefold)
+        hid = {k for k, v in folder_shows(conn).items() if v == "hidden"}
+        return sorted({r[0] for r in conn.execute("SELECT DISTINCT folder FROM feeds WHERE folder != ''") if hidden or r[0] not in hid}, key=str.casefold)
     finally:
         _done(conn, mine)
 
@@ -229,7 +334,7 @@ def follow(url, folder=None, conn=None):
         tries = [icon_url, d.feed.get("icon"), (d.feed.get("image") or {}).get("href"), urllib.parse.urljoin(site, "/favicon.ico") if site else None]
         got = any(_save_icon(key, u) for u in tries if u)
         conn.execute("INSERT INTO feeds (id, url, title, site, folder, icon, added, every) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                     (fid, feed_url, title, site, folder or "", key if got else None, int(time.time()), POOL_EVERY if is_pool(folder) else None))
+                     (fid, feed_url, title, site, folder or "", key if got else None, int(time.time()), POOL_EVERY if hidden_folder(conn, folder) else None))
         _take(conn, config.load_settings(), dict(conn.execute("SELECT * FROM feeds WHERE id = ?", (fid,)).fetchone()), d)
         conn.execute("UPDATE feeds SET fetched = ?, ok = ? WHERE id = ?", (int(time.time()), int(time.time()), fid))
         return fid, title, feed_url
@@ -355,7 +460,7 @@ def _take(conn, settings, f, d, pictures=False):
     horizon = int(time.time()) - (expire + 2) * 86400
     attrs = json.loads(f.get("attrs") or "{}")
     seen_now = bool(attrs.get("read_upon_reception"))
-    where = "pool" if is_pool(f.get("folder")) else "feed"
+    where = "pool" if is_hidden(conn, f) else "feed"
     now, new = int(time.time()), 0
     for e in d.entries:
         link = (e.get("link") or "").strip()
@@ -392,6 +497,7 @@ def _take(conn, settings, f, d, pictures=False):
 
 def sync(conn, settings, max_items=1500, every=None, force=False):
     """Read the feeds that are due (all of them with force), keep their new posts. Returns (new, unread)."""
+    migrate_pool(conn)
     now = int(time.time())
     every = every or EVERY
     # Once, the first time Daf looks for the posts' pictures: every feed is read afresh (no ETag), so the
@@ -479,8 +585,7 @@ def _forget(conn, settings):
     a reader app (greader.py) go, once they're older than the window; what each feed gave stays in
     feed_seen (a year), so they don't come back."""
     expire = int(settings.get("feed_expire_days", 30))
-    keep = ("id NOT IN (SELECT DISTINCT book_id FROM highlights WHERE book_id IS NOT NULL) AND id NOT IN (SELECT doc_id FROM kindle_sent) "
-            "AND COALESCE(starred, 0) = 0")
+    keep = KEEP
     forget = int(time.time()) - max(30, expire + 2) * 86400
     pictures = [r[0] for r in conn.execute("SELECT thumb FROM docs WHERE where_ = 'feed' AND status IN ('seen', 'deleted') AND added < ? "
                                            f"AND {keep} AND thumb LIKE '/api/thumb/%'", (forget,))]
