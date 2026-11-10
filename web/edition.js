@@ -133,7 +133,7 @@ const seg3 = (kind, name, adj) => '<div class="edseg3">' + [['less', 'Less'], ['
 const ARROW = { up: '<b class="edtr up" title="Rising">↑</b>', down: '<b class="edtr down" title="Fading">↓</b>', steady: '<b class="edtr">–</b>' };
 const MIX = [['pieces', 'Pieces', 3, 20, 1, ''], ['videos', 'Videos', 0, 6, 1, 'up to '], ['podcasts', 'Podcasts', 0, 6, 1, 'up to '], ['torah', 'Torah', 0, 4, 1, 'at least '],
   ['wildcard', 'Wildcard', 0, 3, 1, ''], ['longest', 'Longest piece', 5, 120, 5, ' min'], ['halflife', 'Habits fade over', 7, 180, 7, ' days'], ['hour', 'Ready by', 3, 11, 1, ':00']];
-const fmt = (m, v) => m[5] === ' min' || m[5] === ' days' || m[5] === ':00' ? (m[5] === ':00' ? String(v).padStart(2, '0') + ':00' : v + m[5]) : m[5] + v;
+const fmt = (m, v) => m[5] === ' min' || m[5] === ' days' || m[5] === ':00' ? (m[5] === ':00' ? String(v).padStart(2, '0') + ':00' : v + m[5]) : (!v && m[5] ? 'none' : m[5] + v);
 const DAYS = [['sun', 'Sun'], ['mon', 'Mon'], ['tue', 'Tue'], ['wed', 'Wed'], ['thu', 'Thu'], ['fri', 'Fri'], ['sat', 'Sat']];
 
 async function taste(){
