@@ -73,7 +73,7 @@ extension AppModel {
     /// Asks FreshRSS for what's new now, as pulling the list down does on the phone.
     func refreshFeed() async {
         do {
-            let r = J(try await API.shared.send("POST", "/api/feed/refresh", [:]))
+            let r = J(try await API.shared.send("POST", "/api/feed/refresh", [:], slow: true))
             if r?.b("busy") == true { say("Daf is already syncing; try again in a moment") }
             else { let n = r?.i("new") ?? 0; say(n > 0 ? "\(n) new" : "Nothing new") }
         } catch { self.error = error.localizedDescription }

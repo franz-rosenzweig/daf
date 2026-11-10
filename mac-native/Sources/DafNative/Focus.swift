@@ -28,7 +28,7 @@ final class Focus {
         let center = NotificationCenter.default
         center.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: nil, queue: .main) { n in
             let w = n.object as? NSWindow
-            MainActor.assumeIsolated { if let w, Focus.shared.isOn(w) { Focus.shared.tuck(w) } }
+            MainActor.assumeIsolated { if let w, Focus.shared.isOn(w) { Focus.shared.tuck(w); if Self.isMain(w) { Focus.shared.recollapse(w) } } }
         }
         center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: nil, queue: .main) { n in
             let w = n.object as? NSWindow
@@ -81,6 +81,17 @@ final class Focus {
         guard let s = Self.split(w), s.splitViewItems.count > 1 else { return }
         panes[w.windowNumber] = s.splitViewItems.map(\.isCollapsed)
         for item in s.splitViewItems.dropLast() where !item.isCollapsed { item.animator().isCollapsed = true }
+    }
+
+    /// Once the window is full screen: a pane the change of size brought back (the sidebar) put away
+    /// again, and once more a moment later, should SwiftUI lay the split view out again after it.
+    private func recollapse(_ w: NSWindow) {
+        func again() {
+            guard isOn(w), let s = Self.split(w), s.splitViewItems.count > 1 else { return }
+            for item in s.splitViewItems.dropLast() where !item.isCollapsed { item.isCollapsed = true }
+        }
+        again()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { MainActor.assumeIsolated { again() } }
     }
 
     private func uncollapse(_ w: NSWindow) {
