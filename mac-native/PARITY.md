@@ -137,3 +137,13 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: Follow a Site's folders from /api/feed/folders?hidden=1
 - the Mac has no Sources sheet (its sidebar was the source picker): the Feeds page stands in for it, Manage and the Hidden row included
 
+## All Books (2026-11-10)
+
+- here: All Books (#catalog, catalog.js, /api/catalog) first under Books in the sidebar (and in the mini one), Go › All Books ⇧⌘6, the palette, daf://go/catalog; a page across the window
+- here: the table as an NSTableView: the columns from /api/catalog (Calibre's, its own columns, Daf's), default_columns until chosen, the title always there; a column's name sorts by it (numbers, dates and yes/no biggest first on the first click), dragging a name moves the column, dragging its edge sizes it (48–900); the cells as the page's: the cover beside the title (a private book's in italics), the series' number dimmed, stars with halves, dates (Published by the month), MB, the progress bar with its note, ✓
+- here: the search in the toolbar, sent as q (250 ms after the typing stops, or at Return); an error is a red line over the table; the count in the window's subtitle (N books / N of M)
+- here: Filter on the left: Find a Value, Clear, Added (this week, this month, last 30 days, this year, last year), Missing (no file, cover, tags, rating, series), then the facets with their counts, 30 a group until Show All; a click goes in → not → out (catalog.js's patterns); the groups left open are kept
+- here: Columns: a right-click on the column names (tick on or off, Default Columns), or the Columns popover (the ones showing dragged into order, then the rest)
+- here: Views (PUT /api/catalog/views): pick one (ticked while the page matches it), Save into “…”, Save as a View… (Replace asked), All Books, Newest First, Delete a View…; More: Export as CSV… (/api/catalog/export with the columns showing, also File › Export All Books as CSV…), Show Private Books
+- here: kept on this Mac: the search, the order, the columns, their widths, Show Private Books and the view; the row picked and the scroll, for coming back
+- here: a double-click or Return opens the book's page in Books (one Books doesn't list, without a file say, opens all the same)

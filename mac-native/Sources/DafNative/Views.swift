@@ -16,6 +16,7 @@ struct MainView: View {
         case .today: TodayView()
         case .edition: EditionView()
         case .feeds: FeedsPage()
+        case .catalog: CatalogPage()
         case .review: ReviewView()
         case .home: HomeView()
         case .recovery: RecoveryView()

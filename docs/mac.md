@@ -12,7 +12,7 @@ Only Daf loads in the window. Any other link opens in your browser, `obsidian://
 
 ## The sidebar
 
-The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Edition** (once it's on), **Review**, **Library** with its kinds, **Books**, **Feed** with the folders and feeds I've pinned under it and **Feeds**, and **Highlights**, then what I've pinned (**Edit** beside Pinned picks them), then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
+The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Edition** (once it's on), **Review**, **Library** with its kinds, **Books** (with **All Books** and the shelves under it), **Feed** with the folders and feeds I've pinned under it and **Feeds**, and **Highlights**, then what I've pinned (**Edit** beside Pinned picks them), then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
 
 ⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (the icons, each with its name under it, and ☰ at the top for the full one): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
 
@@ -23,6 +23,14 @@ When the Edition is on (see [The Edition](edition.md)), it sits under Today in t
 ## What shows where in the Feed
 
 As on the page (see [What shows where](feed-and-library.md#what-shows-where)), only the folders and feeds I've pinned sit under Feed in the sidebar, in my order, and **Feeds** under them opens the Feeds page with all of them, the hidden ones too. It's a table: each folder opens on its feeds, with how many posts a week each one gives, **Show** (Everywhere, Its folder or Hidden), the pin, the **Edition** dial and a **…** menu. The chips at the top narrow it to what's Everywhere, in Its folder, Hidden, Quiet or giving Problems, the search in the toolbar finds a feed by its name, folder or site, and a double-click opens a folder's or a feed's posts. Picking several rows gives a bar to change their Show or Edition, move them to a folder (a new one too) or unfollow them. Right-clicking a pinned folder or feed in the sidebar, or a row on the Feeds page, gives the same choices in a menu, and **Settings → General → Under Feed** has the pins' order and **Hide pins with nothing new**.
+
+## All Books
+
+**All Books**, the first thing under **Books** in the sidebar (⇧⌘6), is the whole Calibre library as a spreadsheet, the same one as on the page (see [Calibre in Daf](calibre.md)). On the Mac it's a real Mac table. Clicking a column's name sorts by it and clicking again turns the order around, dragging a column's name moves the column, and dragging its edge makes it wider or narrower. Right-clicking the column names lists every column there is, to tick on or off, and so does **Columns** in the toolbar, where I can also drag the ones showing into a new order. The search in the toolbar is Calibre's search, just like on the page, and when Daf can't read it, a red line over the table says what it didn't understand. The window's title says how many books there are, or how many of them the search found.
+
+**Filter** opens the tag browser on the left: **Added** and **Missing**, then every status, tag, author, series and the rest, each with how many books have it. Clicking a value puts it into the search, a second click makes it "not that", and a third takes it out again, and **Clear** empties the search. **Views** keeps the search, the order and the columns under a name on the server, so the Mac, the tablet and the phone all have the same ones, and **…** has **Export as CSV…** (it's in the File menu too) and **Show Private Books**.
+
+Double-clicking a book, or pressing Return, opens its page in Books. When I come back to All Books, the table is where I left it, with the same book picked.
 
 ## Reading
 
