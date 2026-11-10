@@ -160,6 +160,11 @@ function drawTaste(){
   page.innerHTML = how + (learn ? '<div class="edlearn">' + learn + '</div>' : '') + (rise ? '<div class="edlearn"><span class="edlh2">Picking up on</span>' + rise + '</div>' : '') +
     '<div class="edtcols"><section class="card"><div class="cardh"><h2>Topics</h2><button class="linkbtn tiny" data-ed="topics">Name them again</button></div>' + topics + '</section>' +
     '<div class="edtside"><section class="card"><h2>Mix</h2>' + sw('on', 'Every morning') + days + mix + sw('kindle', 'Kindle') + sw('ai', 'Chosen by the model') + '</section></div></div>' +
+    ((T.pool || []).length ? '<section class="card"><div class="cardh"><h2>Pool</h2><span class="mute tiny">' + T.pool.reduce((n, c) => n + c.feeds, 0) + ' feeds · ' +
+      T.pool.reduce((n, c) => n + c.posts, 0) + ' posts in 2 days</span></div><div class="edsrcs">' + T.pool.map(c =>
+      '<div class="edsrc' + (c.muted ? ' muted' : '') + '"><div><span>' + esc(c.name) + '</span><em>' + c.feeds + ' feeds · ' + c.posts + ' posts</em></div>' +
+      '<button class="linkbtn tiny" data-poolmute="' + esc(c.folder) + '" data-on="' + (c.muted ? '0' : '1') + '">' + (c.muted ? 'Unmute' : 'Mute') + '</button></div>').join('') +
+      '</div></section>' : '') +
     '<section class="card"><h2>Sources</h2><div class="edsrcs">' + srcs + '</div>' +
     '<div class="edmute"><input class="field" id="edmutein" aria-label="Mute a source" placeholder="Source, or folder:Name"><button class="btn sm" data-ed="mute">Mute</button></div>' +
     (muted ? '<h3 class="edmh">Muted</h3><div class="edsrcs">' + muted + '</div>' : '') + '</section>';
@@ -178,6 +183,9 @@ document.addEventListener('click', async e => {
     else { const x = T.sources.find(x => x.name === name); if (x) x.adj = adj === 'mute' ? '' : adj; if (adj === 'mute') { T.sources = T.sources.filter(x => x.name !== name); T.muted = [...T.muted, name].sort(); } }
     drawTaste(); return;
   }
+  const pm = e.target.closest && e.target.closest('[data-poolmute]');
+  if (pm) { const on = pm.dataset.on === '1'; await put({ source: { name: 'folder:' + pm.dataset.poolmute, adj: on ? 'mute' : '' } });
+    const c = T.pool.find(x => x.folder === pm.dataset.poolmute); if (c) c.muted = on; drawTaste(); return; }
   const u = e.target.closest && e.target.closest('[data-unmute]');
   if (u) { await put({ source: { name: u.dataset.unmute, adj: '' } }); T.muted = T.muted.filter(m => m !== u.dataset.unmute); drawTaste(); return; }
   const st = e.target.closest && e.target.closest('[data-step]');

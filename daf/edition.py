@@ -76,6 +76,8 @@ podcast full live official watch read here's what's why how com www http https o
 chapter ever big need bad send someone page feel get got lot lots thing via says said new best top inside""".split())
 WORD = re.compile(r"[a-zא-ת][a-z0-9א-ת'’+\-]{2,}")
 PLATFORM = {"invidious", "youtube", "substack", "google news", "rss", "podcast", "articles", "feed"}
+SECTION_WORDS = {"ideas", "culture", "books", "all", "latest", "news", "science", "technology", "security", "blog", "home", "politics",
+                 "features", "magazine", "opinion", "essays", "history", "arts", "world", "business", "health", "the long read"}
 _building = threading.Lock()
 
 
@@ -132,7 +134,8 @@ def words(text):
 def source_key(name):
     """One name per publication: "Health + Medicine – Articles – The Conversation" and "Politics + Society –
     Articles – The Conversation" are both The Conversation; "Big Think | Invidious" is Big Think."""
-    name = (name or "").split(" | ")[0]          # "Show | Platform", "Name | name in another script"
+    parts = (name or "").split(" | ")             # "Show | Platform", "Name | name in another script", "Ideas | The Atlantic"
+    name = parts[-1] if len(parts) > 1 and parts[0].strip().lower() in SECTION_WORDS else parts[0]
     parts = [p.strip() for p in re.split(r"\s+–\s+|\s+--\s+", name) if p.strip()]
     parts = [p for p in parts if p.lower() not in PLATFORM] or parts
     return (parts[-1] if parts else name).strip()
@@ -455,7 +458,7 @@ def candidates(conn, e, now, used, iv=None):
 
     for r in conn.execute(
             "SELECT d.id, d.kind, d.title, d.source, d.url, d.summary, d.words, d.duration, d.thumb, d.published, d.added, "
-            "d.enclosure, f.folder FROM docs d LEFT JOIN feeds f ON f.id = d.feed WHERE d.where_ = 'feed' AND d.status != 'deleted' "
+            "d.enclosure, f.folder, d.where_ FROM docs d LEFT JOIN feeds f ON f.id = d.feed WHERE d.where_ IN ('feed', 'pool') AND d.status != 'deleted' "
             "AND (d.deleted IS NULL OR d.deleted = 0) AND d.opened IS NULL AND COALESCE(d.published, d.added) >= ? "
             "AND d.kind IN ('article', 'video', 'podcast')", (since,)):
         if (r["kind"] == "video" and not e["videos"]) or (r["kind"] == "podcast" and not e["podcasts"]):
@@ -468,7 +471,7 @@ def candidates(conn, e, now, used, iv=None):
         keep({"id": r["id"], "kind": r["kind"], "title": r["title"] or "", "source": r["source"] or "", "folder": r["folder"] or "",
               "url": r["url"], "summary": summary[:400], "minutes": _minutes(r["kind"], r["words"], r["duration"]),
               "thumb": r["thumb"] if r["thumb"] and not r["thumb"].startswith("http") else (r["thumb"] or ""),
-              "published": r["published"] or r["added"], "origin": "feed"})
+              "published": r["published"] or r["added"], "origin": r["where_"]})
 
     iv = iv if iv is not None else invidious()
     user = _iv_user()
@@ -728,13 +731,15 @@ def pick_local(short, e):
 
 
 def section_for(c):
+    from .sources import rss
     if c["kind"] == "video":
         return "Watch"
     if c["kind"] == "podcast":
         return "Listen"
     if c.get("torah"):
         return "Torah"
-    return (c.get("topic") or "").split(" & ")[0].split(",")[0][:18] or "Read"
+    pool = c["folder"][len(rss.POOL):] if rss.is_pool(c.get("folder")) else ""
+    return ((c.get("topic") or pool).split(" & ")[0].split(",")[0][:18]) or "Read"
 
 
 PROMPT = """You are choosing today's edition of a personal morning paper for one reader. They want a short, finished
@@ -780,6 +785,8 @@ def _facts_text(c, parasha):
     f = [f"{k} {v}" for k, v in (c.get("facts") or {}).items()]
     if c.get("topic"):
         f.append("topic " + c["topic"])
+    if (c.get("folder") or "").startswith("Pool · "):
+        f.append("from the wider pool: " + c["folder"][7:])
     if c.get("parasha") and parasha:
         f.append(f"PARASHA {parasha.get('name')}")
     elif c.get("torah"):
@@ -876,6 +883,9 @@ def _materialize(conn, c):
     """A video or episode from outside the Feed becomes a Feed document, so Daf can play it, show its
     transcript and send it to the Kindle like any other post."""
     if c["origin"] == "feed":
+        return
+    if c["origin"] == "pool":          # from the pool into the Feed, read already, so it opens and keeps like any post
+        conn.execute("UPDATE docs SET where_ = 'feed', status = 'seen' WHERE id = ? AND where_ = 'pool'", (c["id"],))
         return
     now = int(time.time())
     conn.execute(
@@ -1133,8 +1143,21 @@ def taste_page(conn):
     muted = sorted(k for k, v in e["sources"].items() if v == "mute")
     adj = {k: v for k, v in e["sources"].items() if v in ("more", "less")}
     return {"topics": p["topics"], "sources": [{"name": k, "weight": round(v, 3), "facts": p["facts"].get(k) or {}, "adj": adj.get(k, "")} for k, v in top],
-            "muted": muted, "seen": p["seen"], "rising": p["rising"], "named": p["named"], "report": report(conn),
+            "pool": pool_page(conn, e), "muted": [m for m in muted if not m.startswith("folder:Pool · ")], "seen": p["seen"], "rising": p["rising"], "named": p["named"], "report": report(conn),
             "settings": {k: v for k, v in e.items() if k not in ("topics", "sources")}}
+
+
+def pool_page(conn, e):
+    """The pool's categories: how many feeds, what came in the last two days, and whether it's muted."""
+    from .sources import rss
+    since = int(time.time()) - 2 * 86400
+    posts = dict(conn.execute("SELECT f.folder, COUNT(*) FROM docs d JOIN feeds f ON f.id = d.feed WHERE COALESCE(d.published, d.added) >= ? "
+                              "AND f.folder LIKE ? GROUP BY f.folder", (since, rss.POOL + "%")).fetchall())
+    out = []
+    for folder, n in conn.execute("SELECT folder, COUNT(*) FROM feeds WHERE folder LIKE ? GROUP BY folder ORDER BY folder", (rss.POOL + "%",)):
+        out.append({"name": folder[len(rss.POOL):], "folder": folder, "feeds": n, "posts": posts.get(folder, 0),
+                    "muted": e["sources"].get("folder:" + folder) == "mute"})
+    return out
 
 
 def report(conn, days=14):

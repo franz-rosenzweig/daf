@@ -56,18 +56,34 @@ def _done(conn, mine):
         conn.close()
 
 
+# The pool: feeds Daf reads only for the Edition (edition.py), kept out of the Feed. A feed is in it when its
+# folder starts with POOL ("Pool · Science"); its posts are stored with where_ = 'pool', so no Feed list,
+# count, reader app or digest sees them, it's read less often, and its posts go after POOL_DAYS unless an
+# Edition took them (they become ordinary Feed posts then: edition._materialize).
+POOL = "Pool · "
+POOL_EVERY = 4 * 3600
+POOL_DAYS = 5
+
+
+def is_pool(folder):
+    return (folder or "").startswith(POOL)
+
+
 def _icon_key(feed_id):
     return hashlib.sha1(feed_id.encode()).hexdigest()[:16]
 
 
 # ---------------------------------------------------------------- what's followed
 
-def subscriptions(conn=None):
-    """The feeds Daf follows: [{id ("feed/12"), title, folder, url, site, icon}], as freshrss.subscriptions."""
+def subscriptions(conn=None, pool=False):
+    """The feeds Daf follows: [{id ("feed/12"), title, folder, url, site, icon}], as freshrss.subscriptions.
+    The Edition's pool only with pool=True."""
     conn, mine = _conn(conn)
     try:
         out = []
         for r in conn.execute("SELECT * FROM feeds ORDER BY lower(title)"):
+            if is_pool(r["folder"]) and not pool:
+                continue
             h = r["icon"] or ""
             out.append({"id": r["id"], "title": r["title"] or r["url"], "folder": r["folder"] or "", "url": r["url"],
                         "site": r["site"] or "", "icon": h if h and any(ICONS.glob(h + ".*")) else "",
@@ -80,7 +96,7 @@ def subscriptions(conn=None):
 def folders(conn=None):
     conn, mine = _conn(conn)
     try:
-        return sorted({r[0] for r in conn.execute("SELECT DISTINCT folder FROM feeds WHERE folder != ''")}, key=str.casefold)
+        return sorted({r[0] for r in conn.execute("SELECT DISTINCT folder FROM feeds WHERE folder != ''") if not is_pool(r[0])}, key=str.casefold)
     finally:
         _done(conn, mine)
 
@@ -212,8 +228,8 @@ def follow(url, folder=None, conn=None):
         # its icon: the page's, the feed's own, or the site's favicon.ico
         tries = [icon_url, d.feed.get("icon"), (d.feed.get("image") or {}).get("href"), urllib.parse.urljoin(site, "/favicon.ico") if site else None]
         got = any(_save_icon(key, u) for u in tries if u)
-        conn.execute("INSERT INTO feeds (id, url, title, site, folder, icon, added) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                     (fid, feed_url, title, site, folder or "", key if got else None, int(time.time())))
+        conn.execute("INSERT INTO feeds (id, url, title, site, folder, icon, added, every) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                     (fid, feed_url, title, site, folder or "", key if got else None, int(time.time()), POOL_EVERY if is_pool(folder) else None))
         _take(conn, config.load_settings(), dict(conn.execute("SELECT * FROM feeds WHERE id = ?", (fid,)).fetchone()), d)
         conn.execute("UPDATE feeds SET fetched = ?, ok = ? WHERE id = ?", (int(time.time()), int(time.time()), fid))
         return fid, title, feed_url
@@ -339,6 +355,7 @@ def _take(conn, settings, f, d, pictures=False):
     horizon = int(time.time()) - (expire + 2) * 86400
     attrs = json.loads(f.get("attrs") or "{}")
     seen_now = bool(attrs.get("read_upon_reception"))
+    where = "pool" if is_pool(f.get("folder")) else "feed"
     now, new = int(time.time()), 0
     for e in d.entries:
         link = (e.get("link") or "").strip()
@@ -364,8 +381,8 @@ def _take(conn, settings, f, d, pictures=False):
         # thumb: the picture's address for now; keep_pictures keeps it on the server after the sync
         conn.execute(
             "INSERT OR IGNORE INTO docs (id, kind, where_, status, title, author, source, category, url, published, added, "
-            "words, summary, enclosure, ext_id, feed, thumb) VALUES (?, ?, 'feed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (did, kind, "seen" if seen_now else "unseen", html.unescape(e.get("title") or "Untitled").strip()[:500],
+            "words, summary, enclosure, ext_id, feed, thumb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (did, kind, where, "seen" if seen_now else "unseen", html.unescape(e.get("title") or "Untitled").strip()[:500],
              "" if "@" in author else author[:120], f.get("title") or "", f.get("folder") or "", link, published, now,
              content.words(bl), content.summary(bl), enclosure, key[:300], f["id"], _picture(e)))
         conn.execute("INSERT OR REPLACE INTO doc_content (id, blocks, fetched) VALUES (?, ?, ?)", (did, json.dumps(bl), now))
@@ -471,6 +488,10 @@ def _forget(conn, settings):
                  f"AND {keep})", (forget,))
     conn.execute(f"DELETE FROM docs WHERE where_ = 'feed' AND status IN ('seen', 'deleted') AND added < ? AND {keep}", (forget,))
     _drop_pictures(conn, pictures)
+    # the pool's posts the Edition didn't take: gone after POOL_DAYS (feed_seen still keeps them from coming back)
+    old = int(time.time()) - POOL_DAYS * 86400
+    conn.execute(f"DELETE FROM doc_content WHERE id IN (SELECT id FROM docs WHERE where_ = 'pool' AND added < ? AND {keep})", (old,))
+    conn.execute(f"DELETE FROM docs WHERE where_ = 'pool' AND added < ? AND {keep}", (old,))
     conn.execute("DELETE FROM feed_seen WHERE at < ?", (int(time.time()) - 400 * 86400,))
 
 

@@ -35,6 +35,14 @@ A piece's score is how well its words match what I finish, times how much its so
 
 The best sixty or so candidates, a few from sources I don't know yet and the parasha's posts are checked for their whole text (fetched from the page when the feed sent less), and the ones that have it go to the model with the rules (how many videos, how many podcasts, at least one Torah piece, one wildcard, no more than two from one source). It picks the edition, orders it like a paper and writes the reasons from the facts it was given. If the model is off or doesn't answer, the same rules pick from the scores alone, and the reasons are made from the facts.
 
+## The pool
+
+My own Feed is what I chose to follow, and it's small: a day of it gives only a hundred or so pieces with real text, so the Edition kept choosing from the same few sites. The **pool** is a much wider set of feeds Daf reads only for the Edition, sorted into categories like Philosophy & Ideas, Jewish Thought & Torah, Israel & Middle East, AI & Technology, Science, History and Writing & Books. Every feed in it was checked first: it has to be alive and give real text, not a teaser or a link.
+
+The pool stays out of the Feed. Its posts aren't in any Feed list or count, the reader apps don't see them, and they go after five days unless an Edition took them. A piece the Edition does take becomes an ordinary Feed post, so it opens, saves and highlights like any other. The pool's feeds are read every four hours instead of every half hour.
+
+A pool feed's folder starts with "Pool · ", so `daf feeds-add URL --folder "Pool · Science"` puts one in, and `daf pool-add list.json` adds a checked list. On the Taste page, **Pool** shows each category with its feeds and what came in the last two days, and **Mute** keeps a whole category out.
+
 ## Taste
 
 **Taste**, at the top of the Edition, shows what Daf thinks I like, and it's where I change it. At the top, **Last 2 weeks** says how it's doing: how many pieces it showed, how many I opened and read, and my thumbs. **Picking up on** lists the words I've taken up lately.
