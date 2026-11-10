@@ -43,7 +43,7 @@ enum Links {
 
     static func go(_ route: String) {
         let m = AppModel.shared
-        let places: [String: Place] = ["today": .today, "review": .review, "inbox": .library("inbox"), "library": .home,
+        let places: [String: Place] = ["today": .today, "edition": .edition, "review": .review, "inbox": .library("inbox"), "library": .home,
                                        "later": .library("later"), "archive": .library("archive"), "shortlist": .shortlist, "feed": .feed(nil),
                                        "books": .books, "manga": .manga, "torah": .torah, "podcasts": .podcasts, "highlights": .highlights,
                                        "stats": .stats, "sources": .sources, "paper": .paper, "recovery": .recovery]

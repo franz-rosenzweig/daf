@@ -14,6 +14,7 @@ struct MainView: View {
     @ViewBuilder private var page: some View {
         switch model.place {
         case .today: TodayView()
+        case .edition: EditionView()
         case .review: ReviewView()
         case .home: HomeView()
         case .recovery: RecoveryView()

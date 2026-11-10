@@ -119,6 +119,12 @@ struct Sidebar: View {
         let mini = Side.shared.mini
         List(selection: Binding(get: { model.place }, set: { model.place = $0 })) {
             row(.today, "Today", "sun.max", mini)
+            if let ed = model.today?.o("edition"), ed.b("on") || (ed.i("total") ?? 0) > 0 {
+                Label("Edition", systemImage: "newspaper")
+                    .badge(mini || (ed.i("total") ?? 0) == 0 ? nil : Text("\(ed.i("done") ?? 0)/\(ed.i("total") ?? 0)"))
+                    .help(mini ? "Edition" : "")
+                    .tag(Place.edition)
+            }
             row(.review, "Review", "rectangle.stack", mini)
             if mini {
                 row(.home, "Library", "tray.full", mini)

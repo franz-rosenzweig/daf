@@ -135,6 +135,7 @@ final class BookModel {
             if let k = d.o("kindle"), let kf = k.d("fraction"), kf > (d.o("position")?.d("fraction") ?? 0) + 0.02,
                (k.d("at") ?? 0) > (d.o("position")?.d("updated") ?? 0) { kindleAhead = kf }
             startBeats()
+            SoundBed.shared.open(self)
             Task { await audiobookPlace(d.o("position"), offer: !opensAt) }
         } catch { self.error = error.localizedDescription }
     }
@@ -318,6 +319,7 @@ final class BookModel {
         marked = bookmarkHere() != nil
         notePage(printed(at: vis.location) ?? "l\(Int(bytes / 1500))")
         if let k = kindleAhead, fraction >= k - 0.005 { kindleAhead = nil }
+        SoundBed.shared.moved(self)
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
@@ -488,6 +490,7 @@ final class BookModel {
     }
 
     func close() {
+        SoundBed.shared.closed(self)
         beatTimer?.invalidate()
         beatTimer = nil
         saveTask?.cancel()
@@ -1142,6 +1145,7 @@ struct BookReaderView: View {
     @State private var m: BookModel
     @State private var window: NSWindow?
     @State private var showLook = false
+    @State private var showSound = false
     @State private var showPercent = false
     @State private var percent = ""
     /// The footer, faded once a page has turned, and back with the pointer near it.
@@ -1226,6 +1230,10 @@ struct BookReaderView: View {
                         .keyboardShortcut("f", modifiers: .command)
                     Button { Task { await m.toggleBookmark() } } label: { Label(m.marked ? "Remove the Bookmark" : "Bookmark", systemImage: m.marked ? "bookmark.fill" : "bookmark") }
                         .help(m.marked ? "Remove the bookmark (B)" : "Bookmark this page (B)")
+                    Button { showSound.toggle() } label: { Label("Sound", systemImage: "waveform") }
+                        .symbolVariant(SoundBed.shared.mode == .book ? .circle.fill : .none)
+                        .help(SoundBed.shared.mode == .book ? SoundBed.shared.answer?.s("scene") ?? "Sound" : "Sound")
+                        .popover(isPresented: $showSound, arrowEdge: .bottom) { SoundMenu() }
                     Menu {
                         Button(Speaker.shared.key == m.listenKey && Speaker.shared.playing ? "Pause Listening" : "Listen from Here") {
                             if Speaker.shared.key == m.listenKey { Speaker.shared.toggle() } else { Speaker.shared.start(m) }

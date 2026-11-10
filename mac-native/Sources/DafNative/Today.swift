@@ -20,6 +20,7 @@ struct TodayView: View {
                 if let t = model.today {
                     hello(t)
                     notices(t)
+                    KindleSoundRow()
                     LazyVGrid(columns: pair, alignment: .leading, spacing: 20) {
                         GoalCard(today: t)
                         TodayCard("Sittings") { sittings(t) }
