@@ -1539,7 +1539,7 @@ enum SelfTest {
         // Sound (Sound.swift): turned on, Daf is asked for the scene on this page; off, it stops
         let bed = SoundBed.shared
         bed.toggleBook()
-        let answered = await until(40) { (bed.answer?.s("state") ?? "reading") != "reading" }
+        let answered = await until(90) { (bed.answer?.s("state") ?? "reading") != "reading" }      // it asks again every 20 s if Daf is busy
         capture("36b-book-sound", win)
         check(bed.mode == .book && answered, "Sound asks Daf for the scene on the page", "\(bed.answer?.s("state") ?? "-"): \(bed.answer?.s("scene") ?? bed.answer?.s("why") ?? "")")
         bed.toggleBook()
