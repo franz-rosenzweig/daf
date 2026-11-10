@@ -255,7 +255,7 @@ function cover(b, cls){
 function bar(p){ return '<span class="pbar"><i style="width:' + Math.max(0, Math.min(100, p || 0)) + '%"></i></span>'; }
 
 /* ---------- sidebar ---------- */
-// One button, always in the top left corner: in the mini sidebar (icons, each with its name under it)
+// One button, always in the top left corner: in the mini sidebar (icons only, in the full one's groups)
 // it opens the full one, and in the full one it makes it mini again. ⌘\ shows and hides it, and its
 // edge is dragged too: wider for full, narrower for mini, and further for hidden. It never changes by itself: a touch screen starts mini, a mouse full,
 // and turning a tablet round keeps what was chosen. A swipe in from the left edge brings it over the
