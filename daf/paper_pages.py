@@ -35,7 +35,8 @@ Answer with JSON only, no prose and no code fence:
 
 
 def _run_claude(prompt, add_dir, timeout=240):
-    r = subprocess.run([CLAUDE, "--print", "--model", secrets.claude_model(), "--allowedTools", "Read", "--add-dir", str(add_dir)],
+    r = subprocess.run([CLAUDE, "--print", "--model", secrets.claude_model(), "--tools", "Read", "--allowedTools", "Read",
+                        "--strict-mcp-config", "--disable-slash-commands", "--add-dir", str(add_dir)],
                        input=prompt, capture_output=True, text=True, timeout=timeout, cwd=str(add_dir))
     out = r.stdout.strip()
     if r.returncode != 0 or not out:

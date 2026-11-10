@@ -230,7 +230,12 @@ def _ask(meta, part, ps):
                 except (TypeError, ValueError):
                     pass
         snd = dict(sorted(snd.items(), key=lambda kv: -kv[1])[:3])
-        scenes.append({"start": ps[n - 1][0], "scene": " ".join(str(x.get("scene") or "").split())[:60], "sounds": snd})
+        name = " ".join(str(x.get("scene") or "").split())
+        if len(name) > 60:                            # at a word, without a dangling "the" or comma
+            name, cut = name[:61].rsplit(" ", 1)[0], None
+            while cut != name:
+                cut, name = name, re.sub(r"[\s,;:–-]+(the|a|an|of|and|over|by|in|on|at|to|with|from)?$", "", name)
+        scenes.append({"start": ps[n - 1][0], "scene": name, "sounds": snd})
     scenes.sort(key=lambda s: s["start"])
     if not scenes:
         raise RuntimeError("The model's answer had no scenes")
@@ -383,8 +388,11 @@ def router():
 
     @r.post("/api/ebooks/{book_id}/sound", dependencies=[Depends(user)])
     async def post_book_sound(book_id: str, b=Depends(json_body), c=Depends(conn)):
-        """{cfi, fraction, text}: the reader's place → the scene there and its sounds (at)."""
+        """{cfi, fraction, text}: the reader's place (without one, the book's kept place) → the scene there and its sounds (at)."""
         place = {k: b.get(k) for k in ("cfi", "fraction", "text") if b.get(k) is not None}
+        if not place:                             # no page sent: the place Daf keeps for the book
+            pos = c.execute("SELECT cfi, fraction FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
+            place = {k: v for k, v in dict(pos).items() if v is not None} if pos else {}
         return await run_in_threadpool(at, c, book_id, place)
 
     @r.post("/api/kindle/where")

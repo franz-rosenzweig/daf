@@ -326,10 +326,13 @@ def record(conn, path):
                 x = z.read(n).decode("utf-8", "replace")
                 m = DOC_META.search(x)
                 if not m:
+                    if 'class="front"' in x:          # the Edition's front page: a chapter with no article
+                        parts.append(["", 0])
+                        continue
                     return None
                 body = x.split("<body>", 1)[-1]
                 parts.append([html.unescape(m.group(1)), len(re.sub(r"<[^>]+>", "", body)) + IMG_WEIGHT * body.count("<img ")])
-        if not parts:
+        if not any(doc for doc, _ in parts):
             return None
         md5 = partial_md5(path)
     except (OSError, zipfile.BadZipFile):
