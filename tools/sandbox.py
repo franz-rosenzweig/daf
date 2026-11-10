@@ -8,15 +8,19 @@ libraries, items, audio and covers). No sync loop runs; "Sync now" still would, 
       python tools/sandbox.py [host] [port]
 
 The email's HTML and a feedback issue's text land in DAF_STATE as sandbox-mail.html and
-sandbox-issue.md."""
+sandbox-issue.md. Changes to Calibre (edits, covers, files, merges, removals) are written down in
+DAF_STATE/sandbox-calibre.jsonl and go nowhere, unless DAF_CALIBRE_RUN runs Calibre on a copy of the
+library with `docker run` (and DAF_CALIBRE_DB reads that copy): docs/OPERATIONS.md, Calibre in Daf.
+Find details still asks Calibre's sources and Hardcover; that only reads."""
 import hashlib
+import json
 import os
 import sys
 import time
 
 import uvicorn
 
-from daf import absapi, config, digest, feedback, hardcover, manga
+from daf import absapi, calibrefind, calibrewrite, config, digest, feedback, hardcover, manga
 from daf.sources import freshrss, karakeep
 
 OUT = config.STATE
@@ -81,6 +85,23 @@ def _abs_write(method, path, body=None):
 _abs_progress = absapi.progress
 absapi.write = _abs_write
 absapi.progress = lambda: {**_abs_progress(), **{k: v for k, v in _abs_places.items() if k != "open"}}
+
+# Calibre: only a copy of the library may be changed, through a throwaway container (docker run).
+CALIBRE_COPY = os.environ.get("DAF_CALIBRE_RUN", "").startswith("docker run ")
+
+
+def _calibre_run(ops, timeout=120):
+    kept = [{k: (f"<{len(v)} base64 characters>" if k == "data" else v) for k, v in op.items()} for op in ops]
+    said("CALIBRE", json.dumps(kept)[:600])
+    with open(OUT / "sandbox-calibre.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps({"at": int(time.time()), "ops": kept}) + "\n")
+    return {"trash": []} if any(op.get("op") == "trash" for op in ops) else {}
+
+
+if not CALIBRE_COPY:
+    calibrewrite.run = _calibre_run
+    calibrefind.RUN = list(calibrewrite.RUN)    # Find details' identify() reads the web, not the library
+    calibrewrite.RUN = ["false"]                # anything else that still reached Calibre fails instead of writing
 
 if __name__ == "__main__":
     if "/srv/docker/daf" in str(config.STATE):

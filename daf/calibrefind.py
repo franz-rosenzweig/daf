@@ -19,6 +19,7 @@ import uuid
 from . import calibrewrite as W
 
 log = logging.getLogger("daf.calibrefind")
+RUN = W.RUN             # Calibre's runtime, for identify(): it reads the web, never the library
 
 IDENTIFY = r'''
 def main():
@@ -69,7 +70,7 @@ def _text(h):
 def calibre_sources(title, authors, identifiers, timeout=25):
     job = json.dumps({"title": title, "authors": authors, "identifiers": identifiers, "timeout": timeout})
     try:
-        r = subprocess.run(W.RUN + [W.DEBUG, "-c", IDENTIFY], input=job, capture_output=True, text=True, timeout=timeout + 60)
+        r = subprocess.run(RUN + [W.DEBUG, "-c", IDENTIFY], input=job, capture_output=True, text=True, timeout=timeout + 60)
     except (subprocess.TimeoutExpired, OSError) as e:
         raise RuntimeError(f"Calibre's sources didn't answer: {e}")
     line = next((x for x in reversed(r.stdout.splitlines()) if x.startswith("DAFRESULT ")), None)
