@@ -129,6 +129,7 @@ struct Sidebar: View {
             if mini {
                 row(.home, "Library", "tray.full", mini)
                 row(.books, "Books", "books.vertical", mini)
+                row(.catalog, "All Books", "tablecells", mini)
                 row(.feed(nil), "Feed", "dot.radiowaves.up.forward", mini)
             } else {
                 DisclosureGroup(isExpanded: $libOpen) {

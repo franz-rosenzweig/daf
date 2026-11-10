@@ -32,6 +32,9 @@ struct DafNativeApp: App {
                 Button("Add a Photo of a Page…") { PaperPages.choose() }
             }
             ImportFromDevicesCommands()
+            CommandGroup(after: .importExport) {
+                Button("Export All Books as CSV…") { Catalog.shared.export() }.disabled(model.place != .catalog)
+            }
             CommandGroup(after: .help) {
                 Button("Keyboard Shortcuts") { model.sheet = .shortcuts }.keyboardShortcut("/", modifiers: .command)
                 Button("Send Feedback…") { model.sheet = .feedback }
@@ -45,6 +48,7 @@ struct DafNativeApp: App {
                 Button("Feed") { model.place = .feed(nil) }.keyboardShortcut("4")
                 Button("Highlights") { model.place = .highlights }.keyboardShortcut("5")
                 Button("Books") { model.place = .books }.keyboardShortcut("6")
+                Button("All Books") { model.place = .catalog }.keyboardShortcut("6", modifiers: [.command, .shift])
                 Button("Manga") { model.place = .manga }.keyboardShortcut("7")
                 Button("Stats") { model.place = .stats }.keyboardShortcut("8")
                 Divider()

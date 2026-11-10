@@ -176,35 +176,32 @@ struct BulkActions: View {
 
 // MARK: the sidebar's views and shelves
 
-/// Books, opening onto its shelves.
+/// Books, opening onto All Books and the shelves.
 struct BooksRow: View {
     @Environment(AppModel.self) private var model
     @AppStorage("shelvesOpen") private var open = false
 
     var body: some View {
-        if model.shelves.isEmpty {
-            books
-        } else {
-            DisclosureGroup(isExpanded: $open) {
-                ForEach(model.shelves, id: \.self) { s in
-                    // a Kindle shelf is a folder on the Kindle: made, renamed and removed there (kindleshelves.py)
-                    let kindle = s.s("kindle") != nil
-                    Label(s.s("name") ?? "Shelf", systemImage: kindle ? "book.closed" : s.b("hardcover") ? "list.star" : "books.vertical")
-                        .badge(s.i("count") ?? 0)
-                        .tag(Place.shelf(s.s("id") ?? ""))
-                        .help(kindle ? "On the Kindle" : "")
-                        .contextMenu {
-                            if !kindle {
-                                Button("Rename…") { model.sheet = .renameShelf(s.s("id") ?? "") }
-                                Button("Delete the Shelf", role: .destructive) { Task { await model.deleteShelf(s.s("id") ?? "") } }
-                                    .disabled(s.b("hardcover"))
-                                Divider()
-                            }
-                            Button("New Shelf…") { model.sheet = .newShelf(nil) }
+        DisclosureGroup(isExpanded: $open) {
+            Label("All Books", systemImage: "tablecells").tag(Place.catalog)
+            ForEach(model.shelves, id: \.self) { s in
+                // a Kindle shelf is a folder on the Kindle: made, renamed and removed there (kindleshelves.py)
+                let kindle = s.s("kindle") != nil
+                Label(s.s("name") ?? "Shelf", systemImage: kindle ? "book.closed" : s.b("hardcover") ? "list.star" : "books.vertical")
+                    .badge(s.i("count") ?? 0)
+                    .tag(Place.shelf(s.s("id") ?? ""))
+                    .help(kindle ? "On the Kindle" : "")
+                    .contextMenu {
+                        if !kindle {
+                            Button("Rename…") { model.sheet = .renameShelf(s.s("id") ?? "") }
+                            Button("Delete the Shelf", role: .destructive) { Task { await model.deleteShelf(s.s("id") ?? "") } }
+                                .disabled(s.b("hardcover"))
+                            Divider()
                         }
-                }
-            } label: { books }
-        }
+                        Button("New Shelf…") { model.sheet = .newShelf(nil) }
+                    }
+            }
+        } label: { books }
     }
 
     private var books: some View {

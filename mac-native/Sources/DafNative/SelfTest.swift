@@ -1332,6 +1332,8 @@ enum SelfTest {
             _ = await until(8) { m.bookSections.map(\.0).contains("Your library") }
         }
 
+        await allBooks(m)
+
         // Stats
         await go(m, .stats)
         await pause(3)
@@ -1356,6 +1358,123 @@ enum SelfTest {
         check(!m.items.isEmpty, "search finds things in Daf", "\(m.items.count)")
 
         finish(nil)
+    }
+
+    /// All Books (Catalog.swift): the Calibre library as a spreadsheet, searched, filtered, sorted,
+    /// its columns chosen, a view saved and deleted (in the sandbox's settings), exported, a book opened.
+    static func allBooks(_ m: AppModel) async {
+        let cat = Catalog.shared
+        cat.resetAll()
+        cat.resetCols()
+        await go(m, .catalog)
+        let came = await until(20) { cat.loaded && !cat.books.isEmpty }
+        func table() -> NSTableView? {
+            func find(_ v: NSView) -> NSTableView? { (v as? CatalogTableView) ?? v.subviews.lazy.compactMap(find).first }
+            return window?.contentView.flatMap(find)
+        }
+        _ = await until(5) { (table()?.numberOfRows ?? 0) == cat.books.count }
+        await pause(1.5)
+        capture("51b-all-books")
+        let t = table()
+        check(came && m.place?.isPage == true && cat.books.count == cat.total && cat.total > 0, "All Books is a page with every Calibre book", "\(cat.total) books")
+        check(t?.numberOfRows == cat.books.count && t?.tableColumns.map(\.identifier.rawValue) == cat.shown.map(\.key) && cat.shown.first?.key == "title",
+              "as a table with the default columns", t?.tableColumns.map(\.title).joined(separator: ", ") ?? "no table")
+        let byAdded = cat.books.compactMap { $0.s("added") }
+        check(cat.sort == "added" && cat.desc && byAdded == byAdded.sorted(by: >), "newest first", byAdded.prefix(2).joined(separator: ", "))
+
+        // sorted by the title, by a click on its name (the table's order, as the header gives it)
+        t?.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        _ = await until(8) { cat.sort == "title" && cat.version > 0 && !cat.desc }
+        _ = await until(8) { (cat.books.first?.s("title_sort") ?? "") <= (cat.books.last?.s("title_sort") ?? "") }
+        let firstT = cat.books.first?.s("title_sort") ?? "", lastT = cat.books.last?.s("title_sort") ?? ""
+        check(cat.sort == "title" && !cat.desc && firstT.lowercased() <= lastT.lowercased(), "a column's name sorts by it", "\(firstT) … \(lastT)")
+
+        // the search, Calibre's: an author exactly
+        if let author = cat.books.lazy.compactMap({ $0.strings("authors").first }).first {
+            let term = Catalog.term("authors", author)
+            cat.setQ(term)
+            let found = await until(8) { cat.q == term && !cat.books.isEmpty && cat.books.allSatisfy { $0.strings("authors").contains(author) } }
+            check(found && cat.books.count <= cat.total, "the search is Calibre's (authors:\"=…\")", "\(term): \(cat.books.count) of \(cat.total)")
+        }
+        cat.setQ("added:someday")
+        let bad = await until(8) { cat.searchError != nil }
+        await pause(0.5)
+        capture("51c-all-books-bad-search")
+        check(bad, "a search Daf can't read says so", cat.searchError ?? "")
+
+        // Filter: a value's clicks put it in, turn it into "not", and take it out
+        cat.setQ("")
+        cat.side = true
+        _ = await until(8) { cat.facets != nil && cat.q.isEmpty && cat.searchError == nil }
+        if let f = cat.facets?.first(where: { $0.s("key") == "tags" }) ?? cat.facets?.first,
+           let v = (f.list("values").first as? [Any])?.first, let key = f.s("key") {
+            let t1 = Catalog.term(key, v)
+            cat.cycle(t1)
+            let inIt = await until(8) { cat.state(t1) == "in" && cat.q == t1 && cat.books.count <= cat.total }
+            await pause(1)
+            capture("51d-all-books-filter")
+            cat.cycle(t1)
+            let outIt = await until(8) { cat.state(t1) == "out" && cat.q.hasPrefix("not ") }
+            cat.cycle(t1)
+            let gone = await until(8) { cat.q.isEmpty && cat.books.count == cat.total }
+            check(inIt && outIt && gone, "Filter: a value's first click puts it in the search, the second makes it \"not\", the third takes it out", t1)
+        } else { check(false, "Filter has values to filter by", "\(cat.facets?.count ?? -1) fields") }
+        cat.side = false
+
+        // Columns: one more shown, then moved first after the title, then the default again
+        let more = cat.columns.first { !cat.shown.contains($0) }?.key ?? "publisher"
+        cat.toggle(more)
+        _ = await until(5) { table()?.tableColumns.contains { $0.identifier.rawValue == more } == true }
+        let added = table()?.tableColumns.last?.identifier.rawValue == more
+        var keys = cat.shown.map(\.key)
+        keys.removeAll { $0 == more }
+        keys.insert(more, at: 1)
+        cat.setCols(keys)
+        _ = await until(5) { table()?.tableColumns.map(\.identifier.rawValue) == keys }
+        let moved = table()?.tableColumns.map(\.identifier.rawValue) == keys
+        cat.resetCols()
+        _ = await until(5) { table()?.tableColumns.contains { $0.identifier.rawValue == more } == false }
+        check(added && moved && table()?.tableColumns.contains { $0.identifier.rawValue == more } == false, "Columns: one shown, moved, and the default columns back", more)
+
+        // a view saved (on the sandbox's server), chosen, and deleted
+        let name = "Self-test view"
+        cat.setQ("formats:false")
+        _ = await until(8) { cat.q == "formats:false" }
+        do {
+            try await cat.save(as: name)
+            let kept = cat.views.contains { $0.s("name") == name } && cat.view == name
+            cat.resetAll()
+            _ = await until(8) { cat.q.isEmpty }
+            if let v = cat.views.first(where: { $0.s("name") == name }) { cat.apply(v) }
+            let back = await until(8) { cat.q == "formats:false" && cat.view == name }
+            try await cat.delete(view: name)
+            check(kept && back && !cat.views.contains { $0.s("name") == name } && cat.view == nil, "a view is saved, chosen again, and deleted", "\(cat.views.count) views now")
+        } catch { check(false, "a view is saved", error.localizedDescription) }
+        cat.resetAll()
+        _ = await until(8) { cat.q.isEmpty && cat.books.count == cat.total }
+
+        // Export as CSV: what's on the screen, with its columns
+        if let d = try? await API.shared.data(cat.exportPath), let csv = String(data: d, encoding: .utf8) {
+            let rows = csv.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n")      // "\r\n" is one Character
+            let head = rows.first.map(String.init)?.trimmingCharacters(in: CharacterSet(charactersIn: "\u{FEFF}")) ?? ""
+            let lines = rows.count
+            check(head.hasPrefix("Title,") && lines == cat.books.count + 1, "Export as CSV has the columns showing and a line a book", "\(head.prefix(60))… \(lines - 1) books")
+        } else { check(false, "Export as CSV answers") }
+
+        // a book opened from the table: its page in Books; coming back, the same row chosen
+        if let b = cat.books.dropFirst(min(3, cat.books.count - 1)).first, let id = b.s("id") {
+            if let i = cat.books.firstIndex(where: { $0.s("id") == id }) { table()?.selectRowIndexes([i], byExtendingSelection: false) }
+            m.open(book: b)
+            let opened = await until(8) { m.place == .books && m.selected?.id == id }
+            await pause(2)
+            capture("51e-all-books-opened")
+            check(opened && m.selected?.isBook == true, "a double-clicked book opens its page in Books", b.s("title") ?? id)
+            m.place = .catalog
+            _ = await until(8) { (table()?.numberOfRows ?? 0) > 0 }
+            await pause(0.8)
+            let row = table()?.selectedRow ?? -1
+            check(row >= 0 && row < cat.books.count && cat.books[row].s("id") == id, "and coming back, the table is where it was", "row \(row)")
+        }
     }
 
     /// A book Calibre has only as a PDF: its pages in the PDF view, its place kept as the book's.

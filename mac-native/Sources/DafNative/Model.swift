@@ -27,6 +27,7 @@ enum Place: Hashable {
     case paper                        // photos of paper pages
     case recovery
     case books
+    case catalog                      // All Books: the Calibre library as a spreadsheet (Catalog.swift)
     case manga
     case torah
     case podcasts
@@ -36,7 +37,7 @@ enum Place: Hashable {
     case search
 
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
-    var isPage: Bool { self == .today || self == .edition || self == .feeds || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
+    var isPage: Bool { self == .today || self == .edition || self == .feeds || self == .catalog || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
 
     /// A list of the Library's (Inbox, Later, Archive, or a kind).
     var isLibrary: Bool {
@@ -73,6 +74,7 @@ enum Place: Hashable {
         case .paper: return "Paper Pages"
         case .recovery: return "Recovery"
         case .books: return "Books"
+        case .catalog: return "All Books"
         case .search: return "Search"
         }
     }
@@ -334,7 +336,25 @@ final class AppModel {
         }
     }
 
-    var selected: Item? { items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } }
+    var selected: Item? {
+        items.first { $0.id == selection } ?? continueItems.first { $0.id == selection } ?? (held?.id == selection ? held : nil)
+    }
+    /// A book opened from All Books that Books doesn't list (one without a file, say): open all the same.
+    var held: Item?
+
+    /// A book from All Books: its page, in Books.
+    func open(book b: J) {
+        guard let id = b.s("id") else { return }
+        var raw = b.raw
+        raw["type"] = "book"
+        raw["kind"] = "book"
+        raw["has_cover"] = b.b("cover")
+        let by = b.strings("authors").joined(separator: " & ")
+        if !by.isEmpty { raw["author"] = by; raw["source"] = by }
+        held = Item(J(raw))
+        place = .books
+        Task { try? await Task.sleep(nanoseconds: 300_000_000); selection = id }
+    }
 
     /// The vault's essays on this week's parasha (Reference/torah/<parasha>/), as the reader opens
     /// them: Daf makes each readable when it's first opened, and its highlights go into the same note.
@@ -425,7 +445,7 @@ final class AppModel {
                 items = []
             case .recovery:
                 items = []
-            case .review, .highlights, .stats, .podcasts, .sources, .edition, .feeds:
+            case .review, .highlights, .stats, .podcasts, .sources, .edition, .feeds, .catalog:
                 items = []
             case .manga:
                 let j = try await API.shared.json("/api/manga")
@@ -826,6 +846,9 @@ final class AppModel {
             NSApp.activate()
         case "feeds":
             place = .feeds
+            NSApp.activate()
+        case "catalog":
+            place = .catalog
             NSApp.activate()
         case "book" where parts.count > 1:
             place = .books
