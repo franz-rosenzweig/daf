@@ -709,9 +709,8 @@ async def post_edition_build(request: Request):
 
 
 @app.post("/api/edition/kindle", dependencies=[Depends(user)])
-async def post_edition_kindle(request: Request):
+def post_edition_kindle(body=Depends(json_body)):
     from . import edition
-    body = await _body(request)
     try:
         return edition.send_kindle(date.fromisoformat(body["day"]) if body.get("day") else None)
     except ValueError as e:

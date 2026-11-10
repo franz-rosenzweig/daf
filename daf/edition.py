@@ -157,7 +157,10 @@ def _psql(sql):
     cmd = config.setting("DAF_INVIDIOUS_PSQL")
     if not cmd:
         return []
-    r = subprocess.run(shlex.split(cmd) + ["-At", "-F", "\t", "-c", sql], capture_output=True, text=True, timeout=60)
+    try:
+        r = subprocess.run(shlex.split(cmd) + ["-At", "-F", "\t", "-c", sql], capture_output=True, text=True, timeout=60)
+    except (subprocess.SubprocessError, OSError) as e:   # hung, or no docker: as if psql failed
+        raise RuntimeError(f"psql: {e}"[:300]) from e
     if r.returncode != 0:
         raise RuntimeError((r.stderr or "psql failed").strip()[:300])
     return [line.split("\t") for line in r.stdout.splitlines() if line]
@@ -488,8 +491,14 @@ def candidates(conn, e, now, used, iv=None):
         except Exception as ex:  # noqa: BLE001
             log.warning("invidious subscriptions: %s", ex)
             rows = []
-        for vid, author, title, secs, pub in rows:
-            video(vid, author, title, int(secs or 0), int(pub or now), "youtube")
+        for r in rows:
+            if len(r) != 5:                     # a tab or a line break in a title splits its row
+                continue
+            vid, author, title, secs, pub = r
+            try:
+                video(vid, author, title, int(float(secs or 0)), int(float(pub or now)), "youtube")
+            except ValueError:
+                continue
 
     for r in conn.execute("SELECT e.url, e.link, e.title, e.podcast_title, e.published, e.duration, e.notes, e.image FROM gp_episodes e "
                           "JOIN gp_subs s ON s.url = e.podcast WHERE s.removed IS NULL AND e.published >= ?", (since,)):
@@ -824,6 +833,7 @@ def build(day=None, use_ai=None, dry=False, conn=None):
             parasha = (torah.calendar(conn, day) or {}).get("Parashat Hashavua")
         except Exception:  # noqa: BLE001 - Sefaria down: no parasha today
             parasha = None
+        conn.commit()                       # the calendar's cache row: not held through psql and the model
         used = set()
         for r in conn.execute("SELECT items FROM editions WHERE day >= ? AND day != ?", ((day - timedelta(days=21)).isoformat(), day.isoformat())):
             used |= {it.get("id") for it in json.loads(r[0] or "[]")}
@@ -880,9 +890,11 @@ def send_kindle(day=None):
         if not ed:
             raise ValueError("No edition for that day")
         when = datetime.combine(day, datetime.min.time())
+        front = front_page(conn, ed, day)
+        conn.commit()                       # the Hebrew date's cache row: not held through the pictures
         res = kindlesend.make_epub(conn, [it["id"] for it in ed["items"]], when=when,
                                    title=f"Daf, {day.strftime('%A')} {day.day} {day.strftime('%B')} {day.year}",
-                                   fname=f"Daf {day.isoformat()} (Edition).epub", front=front_page(conn, ed, day))
+                                   fname=f"Daf {day.isoformat()} (Edition).epub", front=front)
         conn.execute("UPDATE editions SET kindle = ? WHERE day = ?", (res["file"], day.isoformat()))
         return res
 
@@ -936,12 +948,15 @@ def maybe_build():
             t = json.loads(tries[0]) if tries else {}
             if t.get("day") == day.isoformat() and t.get("n", 0) >= 3:
                 return
-            conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('edition_tries', ?)",
-                         (json.dumps({"day": day.isoformat(), "n": (t.get("n", 0) + 1) if t.get("day") == day.isoformat() else 1}),))
     if not _building.acquire(blocking=False):
         return
     try:
         if not ed:
+            with db.session() as conn:              # a try counts once it starts, not while another is still going
+                tries = conn.execute("SELECT v FROM kv WHERE k = 'edition_tries'").fetchone()
+                t = json.loads(tries[0]) if tries else {}
+                conn.execute("INSERT OR REPLACE INTO kv (k, v) VALUES ('edition_tries', ?)",
+                             (json.dumps({"day": day.isoformat(), "n": (t.get("n", 0) + 1) if t.get("day") == day.isoformat() else 1}),))
             build(day)
         elif e["kindle"]:
             try:

@@ -81,7 +81,12 @@ def questions(s=None, book=False):
 def run(text, timeout=180, s=None):
     """The model's answer to text. Raises RuntimeError with what went wrong."""
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-    r = subprocess.run([CLAUDE, "--print", "--model", model(s)], input=text, capture_output=True, text=True, timeout=timeout, env=env)
+    # No tools, no MCP servers, no commands, and an empty folder to stand in: what Daf sends is text to
+    # answer (feed posts, pages, books), and nothing in it should be able to run anything.
+    room = config.STATE / "ai-room"
+    room.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run([CLAUDE, "--print", "--model", model(s), "--tools", "", "--strict-mcp-config", "--disable-slash-commands"],
+                       input=text, capture_output=True, text=True, timeout=timeout, env=env, cwd=str(room))
     out = (r.stdout or "").strip()
     if r.returncode != 0 or not out:
         raise RuntimeError(plain_error(r.stderr or r.stdout))
