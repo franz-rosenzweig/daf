@@ -58,6 +58,9 @@ final class Catalog {
     /// Their Calibre ids.
     var chosenCals: [Int] { chosenBooks.compactMap { $0.i("calibre_id") } }
     var chosenBooks: [J] { books.filter { chosen.contains($0.s("id") ?? "") } }
+    /// Books whose files are still waiting for their details (Calibre writes them in after each change).
+    private(set) var embedPending = 0
+    @ObservationIgnored private var embedWatch: Task<Void, Never>?
     @ObservationIgnored var scroll: NSPoint?
     @ObservationIgnored private var seq = 0
 
@@ -105,12 +108,35 @@ final class Catalog {
             failed = nil
             loaded = true
             version += 1
+            checkEmbed()
         } catch {
             if n == seq { failed = error.localizedDescription }
         }
     }
 
     func reload() { Task { await load(facets: side) } }
+
+    /// How many books' files are waiting for their details, asked again every few seconds while some are.
+    func checkEmbed() {
+        guard embedWatch == nil else { return }
+        embedWatch = Task {
+            defer { embedWatch = nil }
+            while !Task.isCancelled {
+                guard let n = (try? await API.shared.json("/api/catalog/embed"))?.i("pending") else { return }
+                embedPending = n
+                if n == 0 { return }
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
+    }
+
+    /// ⋯ › Write Details into Every File: Calibre writes each book's details into its files.
+    func embedAll() async throws {
+        let j = J(try await API.shared.send("POST", "/api/catalog/embed", ["all": true]))
+        embedPending = j?.i("pending") ?? embedPending
+        AppModel.shared.say("Writing details into the files of " + plural(embedPending, "book"))
+        checkEmbed()
+    }
 
     /// The search, the order or the columns changed: a view stays chosen while they're its own.
     func changed(load: Bool = true) {
@@ -362,6 +388,7 @@ struct CatalogPage: View {
     @State private var deleting: String?
     /// Books to remove from Calibre, asked first.
     @State private var removing: [J]?
+    @State private var embedding = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -401,6 +428,7 @@ struct CatalogPage: View {
                             Button("Choose All \(cat.books.count)") { cat.chosen = cat.books.compactMap { $0.s("id") } }
                         }
                         Button("Clear") { cat.chosen = [] }
+                        Button("Find Details…") { model.sheet = .fillBooks(cat.chosenCals) }
                         Button("Merge…") { model.sheet = .mergeBooks(cat.chosenCals) }
                         Button("Remove…", role: .destructive) { removing = cat.chosenBooks }
                         Button("Edit \(cat.chosen.count) Books…") { model.sheet = .editBooks(cat.chosenCals) }
@@ -435,6 +463,13 @@ struct CatalogPage: View {
                     .popover(isPresented: $showCols, arrowEdge: .bottom) { CatalogColumns(cat: cat) }
                 viewsMenu
                 Menu {
+                    Button("Tags, Authors and Series…") { model.sheet = .calibreNames }
+                    if cat.embedPending > 0 {
+                        Button("Writing Details into Files · \(cat.embedPending) Left") {}.disabled(true)
+                    } else {
+                        Button("Write Details into Every File…") { embedding = true }
+                    }
+                    Divider()
                     Button("Export as CSV…") { cat.export() }
                     Toggle("Show Private Books", isOn: Binding(get: { cat.priv }, set: { cat.showPrivate($0) }))
                     Divider()
@@ -465,6 +500,9 @@ struct CatalogPage: View {
                 }
             }
         } message: { Text(BookEdit.removeNote(removing ?? [])) }
+        .confirmationDialog("Write the details into the files of all \(plural(cat.total, "book"))?", isPresented: $embedding) {
+            Button("Write Details") { Task { do { try await cat.embedAll() } catch { model.error = error.localizedDescription } } }
+        } message: { Text("Calibre rewrites each file. It takes a few minutes.") }
         .confirmationDialog("Delete the view “\(deleting ?? "")”?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
             Button("Delete", role: .destructive) {
                 if let n = deleting { Task { do { try await cat.delete(view: n) } catch { model.error = error.localizedDescription } } }
@@ -827,6 +865,8 @@ struct CatalogTable: NSViewRepresentable {
 
         @objc private func mergeAll() { merge(cat.chosenCals) }
 
+        @objc private func fillAll() { AppModel.shared.sheet = .fillBooks(cat.chosenCals) }
+
         @objc func moved(_ n: Notification) {
             guard !syncing, let t = table else { return }
             cat.setCols(t.tableColumns.map(\.identifier.rawValue))
@@ -886,6 +926,9 @@ struct CatalogTable: NSViewRepresentable {
                     let a = NSMenuItem(title: "Edit the \(n) Chosen…", action: #selector(editAll), keyEquivalent: "")
                     a.target = self
                     m.addItem(a)
+                    let f = NSMenuItem(title: "Find Details for the \(n) Chosen…", action: #selector(fillAll), keyEquivalent: "")
+                    f.target = self
+                    m.addItem(f)
                     let g = NSMenuItem(title: "Merge the \(n) Chosen…", action: #selector(mergeAll), keyEquivalent: "")
                     g.target = self
                     m.addItem(g)

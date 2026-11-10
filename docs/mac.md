@@ -40,6 +40,12 @@ Choosing several books (⌘-click, ⇧-click, or ⌘A) brings up a bar under the
 
 For tidying, **Filter** has a **Tidy** group: **Possible duplicates**, **Odd characters** in a title, and **Last name first**. With two or more copies of a book chosen, **Merge…** (in the bar, or the right-click menu) asks which one to keep, starting with the one that has a cover and the most files. The kept book takes the others' files, tags, identifiers and anything it's missing, the others go to Calibre's trash, and their highlights, shelves and places in Daf move to the kept one. **Remove…** (also ⌘⌫, or **Remove from Calibre…** at the bottom of Edit Details) sends books to Calibre's trash after asking, and says how many highlights they have in Daf. **… → Calibre's Trash…** lists what was removed lately, each with **Put Back**.
 
+**… → Tags, Authors and Series…** lists every tag, author, series, publisher and my own name columns across the library, a field at a time, each name with how many books have it. **Look Alike** at the top groups names that are probably one thing written two ways, and **Combine** puts each group under the name I pick, the most used one to start with. To rename a name I double-click it (or press Return, or right-click it) and type, and if I rename it to a name that's already there, Daf asks and then combines them. With several chosen (⌘-click, ⇧-click), the bar at the bottom has **Combine…** and **Delete…**; an author can only be renamed. Clicking a name's number closes the sheet and shows those books in All Books.
+
+**Find Details…**, in the bar when I've chosen several books (or in the right-click menu), looks them all up at once and fills in only what each one is missing, from answers that are surely the same book. I untick what I don't want filled in, press **Look Up**, and get a list of the books with what would go in, a box for each line. A line I untick is crossed out and stays as the book has it. **Save** writes the ticked ones into Calibre.
+
+Calibre also writes a book's details into its files after every change, in the background. **… → Write Details into Every File…** does the whole library once, and while Calibre is working, that menu says how many books are left.
+
 ## Reading
 
 An article's toolbar has **Themes & Settings** (Aa), **Listen**, **Save to Library** for something from the Feed, **Done**, the **…** menu and the **Notebook**. The **…** menu has the rest: the Shortlist, Read Later, the original, Focus Mode, the next or previous one in the list, and so on. The time left sits quietly under the text.
