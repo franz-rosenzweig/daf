@@ -2109,3 +2109,93 @@ select.edpast{appearance:auto;padding-right:6px}
   .fded{min-width:0;width:92px}
   .fdvol i{display:none}
 }
+
+/* All books (#catalog, catalog.js): the Calibre library as a spreadsheet. The table scrolls both ways
+   in its own box, so its header row and the Title column stay put. */
+body[data-view="catalog"] #main{display:flex;flex-direction:column;overflow:hidden}
+.cattop{flex:none} .cattop h1{white-space:nowrap}
+.catn{white-space:nowrap}
+.catq{width:min(380px,32vw);min-height:32px;padding:5px 10px;font-size:14px}
+.catq.bad{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+.catb{color:var(--fg-2)} .catb.on{background:var(--active);color:var(--fg)}
+.catb span{max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.catb.ib{width:32px;padding:0}
+.catpage{flex:1;min-height:0;display:flex;position:relative}
+.catside{display:none;width:256px;flex:none;border-right:1px solid var(--line);background:var(--panel);overflow:auto;overscroll-behavior:contain;padding:10px 10px 40px}
+.catpage.filt .catside{display:block}
+.catshade{display:none}
+.catscroll{flex:1;min-width:0;overflow:auto;overscroll-behavior:contain}
+.catmsg{margin:18px 24px}
+.cattable{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:13.5px}
+.cattable th{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line-2);text-align:left;font-weight:600;font-size:12.5px;color:var(--fg-2);padding:0;height:34px;user-select:none;-webkit-user-select:none}
+.cattable th:first-child{left:0;z-index:3}
+.cattable td:first-child{position:sticky;left:0;z-index:1;background:var(--bg)}
+.cattable th:first-child,.cattable td:first-child{box-shadow:inset -1px 0 0 var(--line)}
+.catsort{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:4px;width:100%;height:34px;padding:0 10px;cursor:pointer;white-space:nowrap;overflow:hidden}
+.catsort:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.cattable th.num .catsort{justify-content:flex-end}
+.cattable th.on{color:var(--fg)}
+.catsort i{font-style:normal;color:var(--accent)}
+.catrs{position:absolute;top:0;right:-5px;width:10px;height:100%;cursor:col-resize;z-index:4;touch-action:none}
+.catrs::after{content:"";position:absolute;left:4px;top:9px;bottom:9px;width:1px;background:var(--line)}
+.cattable th.dropl{box-shadow:inset 3px 0 0 var(--accent)} .cattable th.dropr{box-shadow:inset -3px 0 0 var(--accent)}
+.cattable th.dragging{opacity:.5}
+.cattable td{padding:0 10px;height:36px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.cattable td.num{text-align:right;font-variant-numeric:tabular-nums}
+.cattable tbody tr:hover td{background:var(--hover)}
+.cattable tbody tr.sel td{background:var(--active)}
+.cattable tr.priv .catt span{font-style:italic}
+.catt{display:flex;align-items:center;gap:9px;color:var(--fg);text-decoration:none;min-width:0;font-weight:500}
+.catt span{overflow:hidden;text-overflow:ellipsis}
+.catt:hover span{text-decoration:underline}
+.cv.catcv{width:20px;height:28px;min-width:20px;border-radius:3px;flex:none;font-size:0;object-fit:cover;padding:0}
+.catstars{color:var(--accent);letter-spacing:.5px} .catstars i{font-style:normal;color:var(--line-2)}
+.catpct{display:flex;align-items:center;gap:6px;justify-content:flex-end} .catpct .pbar{width:48px;flex:none}
+.catsh{display:flex;gap:6px;position:sticky;top:-10px;background:var(--panel);padding:2px 0 8px;z-index:1}
+.catsh .field{min-height:32px;padding:5px 10px;font-size:13.5px}
+.catsh .field{flex:1;min-width:0} .catdone{display:none}
+.catgh{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:6px;width:100%;padding:8px 4px 6px;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);cursor:pointer}
+.catgh:focus-visible,.catv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.catgh b{margin-left:auto;font-weight:500;color:var(--fg-3);letter-spacing:0}
+.catvs{display:flex;flex-direction:column;padding:0 0 6px}
+.catv{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:5px 6px 5px 4px;border-radius:6px;font-size:13.5px;cursor:pointer;color:var(--fg)}
+.catv:hover{background:var(--hover)}
+.catv i{width:16px;flex:none;font-style:normal;text-align:center;color:var(--accent);font-weight:700}
+.catv span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catv b{font-weight:400;color:var(--fg-3);font-size:12px;font-variant-numeric:tabular-nums}
+.catv.in{background:var(--accent-weak);color:var(--accent-2)}
+.catv.out span{text-decoration:line-through;color:var(--fg-2)} .catv.out i{color:var(--bad)}
+.catall{margin:4px 0 2px 26px;align-self:flex-start}
+#pop .catmenu{min-width:220px}
+#pop .catmenu.wide{min-width:250px;max-height:calc(100vh - 120px);overflow:auto;overscroll-behavior:contain}
+#pop .catmenu > button,#pop .catmenu > a,#pop .catvrow > button:first-child{display:flex;align-items:center;justify-content:flex-start;gap:0}
+#pop .catmenu i{width:20px;font-style:normal;flex:none;color:var(--accent)}
+#pop .catmenu button.on{font-weight:600}
+.catcols{display:flex;flex-direction:column}
+.catcol{display:flex;align-items:center;border-radius:8px}
+.catcol label{flex:1;display:flex;align-items:center;gap:9px;padding:6px 8px;cursor:pointer;font-size:14px}
+.catcol label input{margin:0;accent-color:var(--accent)}
+.catgrip{color:var(--fg-3);cursor:grab;touch-action:none;padding:6px 8px;display:flex}
+.catcol.dragging{background:var(--active)}
+.catvrow{display:flex;align-items:center}
+.catvrow > button:first-child{flex:1;min-width:0}
+#pop .catvdel{color:var(--fg-3);width:32px;padding:8px;justify-content:center;flex:none}
+/* below a laptop's width the Filter panel is a sheet over the books */
+@media (max-width:1100px){
+  .catpage.filt .catshade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:43}
+  .catside{position:fixed;left:0;right:0;bottom:0;width:auto;max-height:72vh;z-index:44;border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;padding:12px 14px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(0,0,0,.18);animation:sheetup .2s ease-out}
+  .catsh{top:-12px;padding-top:4px}
+  .catdone{display:inline-flex}
+}
+@media (max-width:700px){
+  .cattop{flex-wrap:wrap;row-gap:8px;padding-left:14px;padding-right:14px}
+  .catq{order:9;flex-basis:100%;width:auto}
+  .catb{width:34px;padding:0} .catb span{display:none}
+  .cattable col:first-child{width:170px!important}
+  .catside{bottom:calc(64px + env(safe-area-inset-bottom,0px));max-height:66vh;padding-bottom:16px}
+  #pop:has(> .catmenu){left:0!important;right:0;top:auto!important;bottom:0;width:auto;border-radius:20px 20px 0 0;padding:10px 12px calc(16px + env(safe-area-inset-bottom,0px));max-height:80vh;overflow:auto}
+  #pop .catmenu,#pop .catmenu.wide{min-width:0;max-height:none}
+  #pop .catmenu > button,#pop .catmenu > a{padding:12px 10px;font-size:15px}
+  .catcol label{padding:10px 8px;font-size:15px}
+}
+@media (pointer:coarse){ .cattable td{height:42px} .catv{padding:8px 6px 8px 4px;font-size:14.5px} }
