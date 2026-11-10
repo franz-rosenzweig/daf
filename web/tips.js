@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-10-drag-shelves', date: 'Nov 10', title: 'Drag books onto shelves', text: 'Drag a book, or several chosen ones in All books, onto any shelf or Calibre collection. With a finger or the pen, hold a moment first. Shelves in All books’ bar ticks them on and off.', go: '#books' },
   { id: '2026-11-10-calibre-more', date: 'Nov 10', title: 'Tags, authors and series', text: 'All books › ⋯ › Tags, authors and series renames and combines names across the library, with look-alikes found for you. Find details now works on many chosen books at once, and the details go into the book files.', go: '#catalog' },
   { id: '2026-11-10-calibre-tidy', date: 'Nov 10', title: 'Tidy the library', text: 'All books › Filter › Tidy finds possible duplicates, garbled titles and “Last, First” names. Choose books to merge copies into one or remove them; ⋯ › Calibre’s trash puts them back.', go: '#catalog' },
   { id: '2026-11-10-calibre-edit', date: 'Nov 10', title: 'Edit books like Calibre', text: 'Edit details on a book’s page or in All books: tags, series, cover, files and conversions, one book or many at once. Find details asks Hardcover and Calibre’s sources and lets you pick field by field.', go: '#catalog' },

@@ -9,7 +9,7 @@ const SH = C.Shelves = {};
 
 function tile(s){
   const covers = s.covers.map(id => cover({ id, title: '', has_cover: id.startsWith('cal:') }, 'cv shc')).join('');
-  return '<a class="shelf" href="#shelf/' + encodeURIComponent(s.id) + '"><span class="shstack">' + (covers || '<span class="shempty"></span>') + '</span>' +
+  return '<a class="shelf" href="#shelf/' + encodeURIComponent(s.id) + '" data-dropshelf="' + esc(s.id) + '"><span class="shstack">' + (covers || '<span class="shempty"></span>') + '</span>' +
     '<b>' + esc(s.name) + '</b><span class="mute tiny">' + s.count + ' book' + (s.count === 1 ? '' : 's') + (s.hardcover ? ' · Hardcover list' : '') + (s.kindle != null ? ' · Kindle' : '') + '</span></a>';
 }
 

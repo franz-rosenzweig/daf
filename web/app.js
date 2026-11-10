@@ -423,7 +423,7 @@ document.addEventListener('contextmenu', e => {
 
 /* ---------- today ---------- */
 function bookRow(b, extra){
-  return '<a class="brow" href="#book/' + encodeURIComponent(b.id) + '">' + cover(b, 'cv sm') + '<span class="bt"><b>' + esc(shortTitle(b.title)) + '</b><span class="mute tiny">' + esc(b.author || '') + '</span>' +
+  return '<a class="brow" href="#book/' + encodeURIComponent(b.id) + '" data-dragbook="' + esc(b.id) + '" data-title="' + esc(b.title || '') + '">' + cover(b, 'cv sm') + '<span class="bt"><b>' + esc(shortTitle(b.title)) + '</b><span class="mute tiny">' + esc(b.author || '') + '</span>' +
     (b.progress != null ? '<span class="tiny mute">' + bar(b.progress) + ' ' + Math.round(b.progress) + '% · ' + esc(b.progress_note || '') + '</span>' : '') +
     (b.audio_note ? '<span class="tiny mute">Audiobook · ' + esc(b.audio_note) + '</span>' : '') + (extra || '') + '</span></a>';
 }
@@ -703,7 +703,7 @@ async function drawLibrary(q){
   const list = q ? r.books : r.books.slice(0, S.libAll ? 999 : 30);
   g.innerHTML = list.length ? list.map(b => {
     const f = b.daf_fraction != null ? b.daf_fraction * 100 : b.progress;
-    return '<a class="libcard" href="#ebook/' + encodeURIComponent(b.id) + '" title="' + esc(b.title) + '">' + cover(b, 'cv lib') + '<b>' + esc(shortTitle(b.title)) + '</b><span class="mute tiny">' + esc(b.author || '') + '</span>' + (f ? '<span class="tiny mute">' + bar(f) + ' ' + Math.round(f) + '%</span>' : '') + '</a>';
+    return '<a class="libcard" href="#ebook/' + encodeURIComponent(b.id) + '" title="' + esc(b.title) + '" data-dragbook="' + esc(b.id) + '" data-title="' + esc(b.title) + '">' + cover(b, 'cv lib') + '<b>' + esc(shortTitle(b.title)) + '</b><span class="mute tiny">' + esc(b.author || '') + '</span>' + (f ? '<span class="tiny mute">' + bar(f) + ' ' + Math.round(f) + '%</span>' : '') + '</a>';
   }).join('') : '<p class="mute">Nothing by that name in Calibre.</p>';
   if (!q && !S.libAll && r.books.length > 30) g.insertAdjacentHTML('beforeend', '<button class="btn" data-act="liball">Show all ' + r.books.length + '</button>');
 }

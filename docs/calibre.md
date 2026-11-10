@@ -46,6 +46,10 @@ When I have a search, an order and a set of columns I'll want again, **Views ›
 
 The left side has the cover and the files. **Change cover** takes an image from the device, and **Cover from a link** takes the address of one on the web. Under **Files**, each format has a download button and a **⋯** menu with **Convert to** EPUB, AZW3, KEPUB, MOBI or PDF, and **Remove**. **Add a file** puts another format on the same book, or replaces the one it has. A conversion takes from a few seconds to a minute, and the file shows up in the list when Calibre is done.
 
+## Shelves and collections
+
+Rows can be dragged onto shelves and onto Calibre's Collections: one row, or every chosen row at once. **Shelves** in the bar at the bottom ticks them on and off instead. [Books and shelves](books-and-shelves.md#dragging-books-onto-shelves) has the details.
+
 ## Several books at once
 
 In All books, each row has a box at its left. A click on a row chooses it the way a spreadsheet does: on its own, with ⌘ (or Ctrl) one more, and with Shift every row from the last one I clicked. On the tablet and the phone a tap adds the row or takes it out. The box in the header chooses everything the table shows.
