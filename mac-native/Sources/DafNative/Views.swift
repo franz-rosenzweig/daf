@@ -42,9 +42,10 @@ struct MainView: View {
 
     /// Shown or hidden (Side), as the split view keeps it: hidden leaves the list and what's open (or
     /// the page). A pane put away by focus mode doesn't count as hiding it, and while it's on only what's
-    /// open shows, or SwiftUI brings the sidebar back the next time it draws the window.
-    private func columns(page: Bool) -> Binding<NavigationSplitViewVisibility> {
-        Binding(get: { Focus.shared.main ? .detailOnly : Side.shared.hidden ? (page ? .detailOnly : .doubleColumn) : .all },
+    /// open shows, or SwiftUI brings the sidebar back the next time it draws the window. `focusing` is
+    /// read in the body, so the window is drawn again when focus mode comes and goes.
+    private func columns(page: Bool, focusing: Bool) -> Binding<NavigationSplitViewVisibility> {
+        Binding(get: { focusing ? .detailOnly : Side.shared.hidden ? (page ? .detailOnly : .doubleColumn) : .all },
                 set: { v in
                     let hide = v != .all
                     if !Focus.shared.main, Side.shared.hidden != hide { Side.shared.hidden = hide }
@@ -55,7 +56,7 @@ struct MainView: View {
         @Bindable var model = model
         Group {
             if model.place?.isPage == true {
-                NavigationSplitView(columnVisibility: columns(page: true)) {
+                NavigationSplitView(columnVisibility: columns(page: true, focusing: Focus.shared.main)) {
                     sidebar
                         .toolbar(removing: .sidebarToggle)          // SidebarButton instead (full, mini, hidden)
                 } detail: {
@@ -65,7 +66,7 @@ struct MainView: View {
                         .toolbar { ToolbarItem(placement: .navigation) { SidebarButton() } }
                 }
             } else {
-                NavigationSplitView(columnVisibility: columns(page: false)) {
+                NavigationSplitView(columnVisibility: columns(page: false, focusing: Focus.shared.main)) {
                     sidebar
                         .toolbar(removing: .sidebarToggle)
                 } content: {

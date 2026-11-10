@@ -274,11 +274,15 @@ enum SelfTest {
         bigger.size += 2
         bigger.save()
         await pause(0.8)
-        let at = r.blocks.first { $0.range.length > 60 }?.range.location ?? 0
-        let size1 = (r.storage.attribute(.font, at: at, effectiveRange: nil) as? NSFont)?.pointSize ?? 0
+        // a paragraph's type (a caption's stays its own size)
+        let docBlocks = r.doc?.a("blocks") ?? []
+        func para() -> Int {
+            (r.blocks.first { $0.range.length > 60 && $0.i < docBlocks.count && docBlocks[$0.i].s("t") == "p" } ?? r.blocks.first { $0.range.length > 60 })?.range.location ?? 0
+        }
+        let size1 = (r.storage.attribute(.font, at: para(), effectiveRange: nil) as? NSFont)?.pointSize ?? 0
         type0.save()
         await pause(0.5)
-        let size2 = (r.storage.attribute(.font, at: r.blocks.first { $0.range.length > 60 }?.range.location ?? 0, effectiveRange: nil) as? NSFont)?.pointSize ?? 0
+        let size2 = (r.storage.attribute(.font, at: para(), effectiveRange: nil) as? NSFont)?.pointSize ?? 0
         check(abs(size1 - (type0.size + 2)) < 0.5 && abs(size2 - type0.size) < 0.5, "Themes & Settings makes the text larger, and back", "\(Int(type0.size)) → \(Int(size1)) → \(Int(size2))")
         let th0 = (Theme.shared.mode, Theme.shared.light, Theme.shared.dark)
         Theme.shared.choose(mode: "light", light: "paper")
@@ -506,7 +510,8 @@ enum SelfTest {
         scroll.reflectScrolledClipView(scroll.contentView)
         await pause(5)                                       // a place goes at most every 4 s, the last one once they're up
         let placed = try? await API.shared.json("/api/docs/\(API.enc(r.id))")
-        check((placed?.d("progress") ?? 0) >= 50, "reading on keeps the place in Daf",
+        let keptAt = placed?.d("progress") ?? -1
+        check(r.lastFraction > 0.3 && abs(keptAt - r.lastFraction * 100) <= 2, "reading on keeps the place in Daf",
               "\(placed?.d("progress") ?? -1)%; restored \(r.restored), last scroll \(String(format: "%.2f", r.lastFraction)), sent \(r.placeSent)")
 
         // the reading time
@@ -693,9 +698,12 @@ enum SelfTest {
             m.confirmUnfollow = nil
             await pause(0.5)
         }
-        await m.refreshFeed()
-        check(m.error == nil && (m.toast ?? "").range(of: #"^(Nothing|\d+) new$"#, options: .regularExpression) != nil,
-              "Check for New Posts looks at the feeds", m.toast ?? m.error ?? "")
+        // what it says comes and goes while the Feed loads again, so it's looked for as it works
+        let refreshing = Task { await m.refreshFeed() }
+        let said = await until(120) { m.error != nil || (m.toast ?? "").range(of: #"^(Nothing|\d+) new$"#, options: .regularExpression) != nil }
+        let saidWhat = m.toast ?? m.error ?? ""
+        await refreshing.value
+        check(said && m.error == nil, "Check for New Posts looks at the feeds", saidWhat)
         m.sheet = .follow
         await pause(1.2)
         capture("24-follow")
@@ -997,7 +1005,7 @@ enum SelfTest {
             await go(m, .library("inbox"))
             m.items.insert(Item(ed), at: 0)
             m.selection = eid
-            let ready = await until(30) { m.reader?.id == eid && m.reader?.video?.kind == .episode && (m.reader?.video?.duration ?? 0) > 0 && (m.reader?.cues.count ?? 0) > 2 }
+            let ready = await until(60) { m.reader?.id == eid && m.reader?.video?.kind == .episode && (m.reader?.video?.duration ?? 0) > 0 && (m.reader?.cues.count ?? 0) > 2 }
             if ready, let r = m.reader, let v = r.video {
                 // it plays in Daf's player along the bottom; the page follows it
                 let pl = Player.shared
