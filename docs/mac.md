@@ -12,13 +12,17 @@ Only Daf loads in the window. Any other link opens in your browser, `obsidian://
 
 ## The sidebar
 
-The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Edition** (once it's on), **Review**, **Library** with its kinds, **Books**, **Feed** with its folders and **Highlights**, then what I've pinned (**Edit** beside Pinned picks them), then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
+The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Edition** (once it's on), **Review**, **Library** with its kinds, **Books**, **Feed** with the folders and feeds I've pinned under it and **Feeds**, and **Highlights**, then what I've pinned (**Edit** beside Pinned picks them), then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
 
 ⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (the icons, each with its name under it, and ☰ at the top for the full one): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
 
 ## The Edition
 
 When the Edition is on (see [The Edition](edition.md)), it sits under Today in the sidebar with how many of its pieces I've read. It's the page's paper: the date with the Hebrew date and the issue number, a mark for each piece as I get to it and the time left, the lead with its opening lines and the day's list beside it, then the rest as cards, each with why it's there and 👍 and 👎. A piece opens in a window of its own. The toolbar has the past editions, **Taste**, **Kindle** to send it there, and the arrow to make it again. **Taste** shows what Daf thinks I like, and there I turn a topic or a source up, down or off, set the mix, and mute a part of the pool.
+
+## What shows where in the Feed
+
+As on the page (see [What shows where](feed-and-library.md#what-shows-where)), only the folders and feeds I've pinned sit under Feed in the sidebar, in my order, and **Feeds** under them opens the Feeds page with all of them, the hidden ones too. It's a table: each folder opens on its feeds, with how many posts a week each one gives, **Show** (Everywhere, Its folder or Hidden), the pin, the **Edition** dial and a **…** menu. The chips at the top narrow it to what's Everywhere, in Its folder, Hidden, Quiet or giving Problems, the search in the toolbar finds a feed by its name, folder or site, and a double-click opens a folder's or a feed's posts. Picking several rows gives a bar to change their Show or Edition, move them to a folder (a new one too) or unfollow them. Right-clicking a pinned folder or feed in the sidebar, or a row on the Feeds page, gives the same choices in a menu, and **Settings → General → Under Feed** has the pins' order and **Hide pins with nothing new**.
 
 ## Reading
 

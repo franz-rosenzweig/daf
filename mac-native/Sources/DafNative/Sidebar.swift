@@ -141,7 +141,7 @@ struct Sidebar: View {
                 } label: { row(.home, "Library", "tray.full", mini) }
                 BooksRow()
                 DisclosureGroup(isExpanded: $catsOpen) {
-                    FeedFolders()
+                    FeedPins()
                 } label: {
                     row(.feed(nil), "Feed", "dot.radiowaves.up.forward", mini)
                         .contextMenu { ScopeMenu(place: .feed(nil)) }
@@ -241,38 +241,6 @@ struct PinsEditor: View {
         }
         .padding(16)
         .frame(width: 220, alignment: .leading)
-    }
-}
-
-/// The Feed's folders, each opening on its feeds, and the feeds in no folder.
-struct FeedFolders: View {
-    @Environment(AppModel.self) private var model
-    @AppStorage("openFolders") private var open = ""
-
-    var body: some View {
-        ForEach(model.folderNames, id: \.self) { name in
-            if name.isEmpty {
-                ForEach(model.feeds(in: ""), id: \.self) { FeedRow(feed: $0) }
-            } else {
-                DisclosureGroup(isExpanded: expanded(name)) {
-                    ForEach(model.feeds(in: name), id: \.self) { FeedRow(feed: $0) }
-                } label: {
-                    Label(name, systemImage: "folder")
-                        .badge(model.count(.feed(name)) ?? 0)
-                        .tag(Place.feed(name))
-                        .contextMenu { ScopeMenu(place: .feed(name)) }
-                }
-            }
-        }
-    }
-
-    private func expanded(_ name: String) -> Binding<Bool> {
-        Binding(get: { open.split(separator: "\n").contains { $0 == name } },
-                set: { on in
-                    var names = open.split(separator: "\n").map(String.init).filter { $0 != name }
-                    if on { names.append(name) }
-                    open = names.joined(separator: "\n")
-                })
     }
 }
 

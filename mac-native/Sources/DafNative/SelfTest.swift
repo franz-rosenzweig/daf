@@ -603,9 +603,24 @@ enum SelfTest {
         await m.loadSources()
         let feeds = m.feedFolders.flatMap { $0.a("feeds") }
         check(!feeds.isEmpty, "with its folders and their feeds in the sidebar", "\(m.feedFolders.count) folders, \(feeds.count) feeds")
-        if let first = m.folderNames.first(where: { !$0.isEmpty }) { UserDefaults.standard.set(first, forKey: "openFolders") }
         await pause(1)
         capture("05-feed")
+
+        // what shows where (FeedShow.swift): the Feeds page, and a folder pinned under Feed in the sidebar
+        let fm = FeedManage.shared
+        await go(m, .feeds)
+        let managed = await until(20) { !fm.folders.isEmpty }
+        await pause(1.5)
+        capture("05c-feeds")
+        check(managed && m.place == .feeds, "the Feeds page lists every folder and feed", "\(fm.folders.count) folders, \(fm.folders.flatMap { $0.a("feeds") }.count) feeds")
+        if let f = fm.folders.first(where: { $0.s("show") != "hidden" && !($0.s("name") ?? "").isEmpty })?.s("name") {
+            let key = "folder:" + f, was = fm.pins
+            await fm.setPin(key, !was.contains(key))
+            let shown = (m.counts?.a("feed_pins") ?? []).contains { $0.s("key") == key }
+            await fm.setPins(was)
+            check(shown != was.contains(key) && fm.pins == was, "a folder pinned shows under Feed in the sidebar, and unpinned goes", f)
+        }
+        await go(m, .feed(nil))
 
         // several chosen at once: marked seen together, then Undo
         let some = Array(m.items.filter { $0.id.hasPrefix("rss:") || $0.id.hasPrefix("fr:") }.prefix(3))
@@ -1524,7 +1539,7 @@ enum SelfTest {
         // Sound (Sound.swift): turned on, Daf is asked for the scene on this page; off, it stops
         let bed = SoundBed.shared
         bed.toggleBook()
-        let answered = await until(40) { (bed.answer?.s("state") ?? "reading") != "reading" }
+        let answered = await until(90) { (bed.answer?.s("state") ?? "reading") != "reading" }      // it asks again every 20 s if Daf is busy
         capture("36b-book-sound", win)
         check(bed.mode == .book && answered, "Sound asks Daf for the scene on the page", "\(bed.answer?.s("state") ?? "-"): \(bed.answer?.s("scene") ?? bed.answer?.s("why") ?? "")")
         bed.toggleBook()

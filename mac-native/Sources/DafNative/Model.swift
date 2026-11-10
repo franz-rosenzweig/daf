@@ -21,6 +21,7 @@ enum Place: Hashable {
     case shortlist
     case feed(String?)                // nil: everything unseen; else a category
     case feedSource(String)           // one feed ("feed/12")
+    case feeds                        // the Feeds page: what shows where (FeedShow.swift)
     case view(String)                 // a saved view, by its id
     case shelf(String)                // a shelf of books
     case paper                        // photos of paper pages
@@ -35,7 +36,7 @@ enum Place: Hashable {
     case search
 
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
-    var isPage: Bool { self == .today || self == .edition || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
+    var isPage: Bool { self == .today || self == .edition || self == .feeds || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
 
     /// A list of the Library's (Inbox, Later, Archive, or a kind).
     var isLibrary: Bool {
@@ -66,6 +67,7 @@ enum Place: Hashable {
         case .kind(let k): return Self.kinds.first { $0.0 == k }?.1 ?? k.capitalized
         case .feed(let cat): return cat ?? "All Feeds"
         case .feedSource: return "Feed"
+        case .feeds: return "Feeds"
         case .view: return "View"
         case .shelf: return "Shelf"
         case .paper: return "Paper Pages"
@@ -423,7 +425,7 @@ final class AppModel {
                 items = []
             case .recovery:
                 items = []
-            case .review, .highlights, .stats, .podcasts, .sources, .edition:
+            case .review, .highlights, .stats, .podcasts, .sources, .edition, .feeds:
                 items = []
             case .manga:
                 let j = try await API.shared.json("/api/manga")
@@ -821,6 +823,9 @@ final class AppModel {
             NSApp.activate()
         case "edition":
             place = .edition
+            NSApp.activate()
+        case "feeds":
+            place = .feeds
             NSApp.activate()
         case "book" where parts.count > 1:
             place = .books

@@ -99,6 +99,7 @@ struct PrefsView: View {
                         }))
                     }
                 }
+                FeedPinsSettings()
                 Section {
                     Toggle("Show today's minutes in the menu bar", isOn: $menuBar)
                     Toggle("Tell me about new posts in the feeds I choose", isOn: Binding(get: { alerts }, set: { on in

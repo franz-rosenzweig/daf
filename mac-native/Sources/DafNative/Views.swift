@@ -15,6 +15,7 @@ struct MainView: View {
         switch model.place {
         case .today: TodayView()
         case .edition: EditionView()
+        case .feeds: FeedsPage()
         case .review: ReviewView()
         case .home: HomeView()
         case .recovery: RecoveryView()

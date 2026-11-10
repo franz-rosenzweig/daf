@@ -118,23 +118,6 @@ extension AppModel {
 
 // MARK: the sidebar's Feed section
 
-struct FeedRow: View {
-    @Environment(AppModel.self) private var model
-    let feed: J
-
-    var body: some View {
-        let id = feed.s("id") ?? ""
-        Label {
-            Text(feed.s("title") ?? id)
-        } icon: {
-            FeedIcon(hash: feed.s("icon"))
-        }
-        .badge(feed.i("count") ?? 0)
-        .tag(Place.feedSource(id))
-        .contextMenu { FeedMenu(feed: feed) }
-    }
-}
-
 /// The feed's own little picture, from FreshRSS by way of Daf.
 struct FeedIcon: View {
     let hash: String?
@@ -163,40 +146,6 @@ struct ScopeMenu: View {
     }
 }
 
-/// What a feed can do: the same as its row in the page's source picker.
-struct FeedMenu: View {
-    @Environment(AppModel.self) private var model
-    let feed: J
-
-    var body: some View {
-        let id = feed.s("id") ?? ""
-        Button("Mark All Seen") { Task { await model.markSeen(.feedSource(id)) } }
-        OlderMenu(place: .feedSource(id))
-        Divider()
-        Button("Rename…") { model.sheet = .renameFeed(id) }
-        Menu("Move To") {
-            ForEach(model.folderNames.filter { !$0.isEmpty }, id: \.self) { f in
-                Button { Task { await model.editFeed(id, ["folder": f]) } } label: {
-                    if f == feed.s("folder") { Label(f, systemImage: "checkmark") } else { Text(f) }
-                }
-            }
-            Divider()
-            Button("No Folder") { Task { await model.editFeed(id, ["folder": ""]) } }
-        }
-        Toggle("Always Load the Full Article", isOn: Binding(get: { feed.b("full") }, set: { on in Task { await model.editFeed(id, ["full": on]) } }))
-        Toggle("Tell Me About New Posts", isOn: Binding(get: { feed.b("notify") }, set: { on in
-            Task { if await model.editFeed(id, ["notify": on]), on, !FeedNews.shared.on { await FeedNews.shared.enable() } }
-        }))
-        Divider()
-        if let site = feed.s("site"), let url = URL(string: site) { Link("Open the Site", destination: url) }
-        if let u = feed.s("url") {
-            Button("Copy the Feed's Address") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string) }
-        }
-        Divider()
-        Button("Unfollow…", role: .destructive) { model.confirmUnfollow = id }
-    }
-}
-
 /// Mark seen what's older than a day, three days or a week, as the page's list menu.
 struct OlderMenu: View {
     @Environment(AppModel.self) private var model
@@ -220,6 +169,7 @@ struct FollowSheet: View {
     @State private var folder = ""
     @State private var newFolder = ""
     @State private var busy = false
+    @State private var folders: [String]?
 
     var body: some View {
         Form {
@@ -231,7 +181,7 @@ struct FollowSheet: View {
                     }
                 Picker("Folder", selection: $folder) {
                     Text("No folder").tag("")
-                    ForEach(model.folderNames.filter { !$0.isEmpty }, id: \.self) { Text($0).tag($0) }
+                    ForEach((folders ?? model.folderNames).filter { !$0.isEmpty }, id: \.self) { Text($0).tag($0) }
                     Divider()
                     Text("A new folder…").tag("\u{1}new")
                 }
@@ -242,6 +192,7 @@ struct FollowSheet: View {
         }
         .formStyle(.grouped)
         .frame(width: 440)
+        .task { folders = (try? await API.shared.json("/api/feed/folders?hidden=1"))?.strings("folders") }   // the hidden ones too
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {

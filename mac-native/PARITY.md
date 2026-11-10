@@ -128,3 +128,12 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: the mixer in AVAudioEngine: an AVAudioPlayerNode a sound, its loop PAD to PAD + whole seconds, started somewhere in it, faded in and out over 4 s, the volume on top; the files kept on the Mac
 - here: Today's Sound row beside the Kindle (GET /api/sound/kindle, seen in the last half hour): the book, the scene and the volume while it plays, Sound / Stop; it waits for the Kindle's next page and plays on with the window in the background
 
+## What shows where in the Feed (2026-11-10)
+
+- here: under Feed in the sidebar only what's pinned, in order (/api/docs/counts feed_pins), a pinned feed with its icon; feed_pins_hide_empty leaves out the empty ones but the one open; the Feed's count is feed_total; then Feeds
+- here: the Feeds page (feeds.js, /api/feed/manage) as a Table: folders opening on their feeds, Hidden ones last under a Hidden row, A week, Show (Everywhere / Its folder / Hidden; a feed's from its folder shown faint), the pin, Edition (More / Normal / Less / Off, a feed's Like folder), …; the chips All, Everywhere, Its folder, Hidden, Quiet (30 days), Problems; search by title, folder or site; several picked: Show…, Edition…, Move To… (A New Folder…), Unfollow…, Clear; a double-click opens the folder's or feed's posts
+- here: the menu on a folder or a feed (the sidebar's pins, the Feeds page): Pin / Unpin, Show (Like Its Folder for a feed), Edition, Mark All as Seen (and Older Than), for a feed Rename, Move To, its two switches, the site, the address, Unfollow; Feeds
+- here: Settings › General › Under Feed: the pins with Up and Unpin, Feeds, Hide pins with nothing new
+- here: Follow a Site's folders from /api/feed/folders?hidden=1
+- the Mac has no Sources sheet (its sidebar was the source picker): the Feeds page stands in for it, Manage and the Hidden row included
+
