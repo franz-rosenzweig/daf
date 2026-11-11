@@ -100,7 +100,7 @@ html[data-look="2"].l2-side{--plleft:204px}
 html[data-look="2"] .top{background:color-mix(in srgb,var(--bg) 94%,transparent);border-bottom-color:transparent}
 html[data-look="2"]:not(.l2-phone) .main > .top:first-child,html[data-look="2"]:not(.l2-phone) .main > :first-child > .top:first-child{border-radius:22px 22px 0 0}
 html[data-look="2"]:not(.l2-phone) .app.hassubs .main .top{border-radius:0}
-html[data-look="2"] .top h1{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.3px}
+html[data-look="2"]:not(.reading) .top h1{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.3px}   /* a reader's own bar (a book, a PDF) keeps its title as it was */
 html[data-look="2"] .card{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:18px;box-shadow:var(--l2-lift)}
 html[data-look="2"][data-mode="dark"] .card{border-color:rgba(255,255,255,.06)}
 html[data-look="2"] .card h2{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--fg-3)}
