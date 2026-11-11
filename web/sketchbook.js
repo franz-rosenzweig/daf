@@ -82,7 +82,7 @@ const byId = id => cur().find(m => m.id === id);
 // (While typing, the keyboard's shorter window doesn't count: the tablet hasn't turned.)
 const sideways = () => innerWidth > (S.editing && S.fullH && innerWidth === S.fullW ? Math.max(innerHeight, S.fullH) : innerHeight) && innerWidth >= 640;
 function sizes(){
-  if (sideways()) return { mode: 'side', w: Math.round(clamp(innerWidth * store.get('w', 0.4), 300, Math.max(300, innerWidth - 320))) };
+  if (sideways()) { const m = paperW() + 2; return { mode: 'side', w: Math.round(clamp(innerWidth * store.get('w', 0.4), m, Math.max(m, innerWidth - 320))) }; }
   // the keyboard up while typing in it (the app's window shrinks): most of what's left
   const typing = S.editing && S.fullH && innerHeight < S.fullH * 0.8;
   const h = typing ? innerHeight - 110 : Math.round(clamp(innerHeight * store.get('h', 0.42), 170, Math.max(170, innerHeight - 180)));
@@ -170,7 +170,11 @@ function grip(g){
   g.addEventListener('pointermove', e => {
     if (!drag || e.pointerId !== drag.id) return;
     drag.moved = true;
-    if (S.mode === 'side') store.set('w', clamp((innerWidth - e.clientX) / innerWidth, 0.2, 0.8));
+    if (S.mode === 'side') {                      // (never narrower than the page; pushed well past it, it closes)
+      const w = innerWidth - e.clientX;
+      drag.gone = w < paperW() * 0.55;
+      if (!drag.gone) store.set('w', clamp(w / innerWidth, 0.2, 0.8));
+    }
     else {
       const h = S.mode === 'top' ? e.clientY : innerHeight - e.clientY;
       drag.gone = h < 110;
@@ -182,7 +186,7 @@ function grip(g){
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag; drag = null;
     document.documentElement.classList.remove('skdrag');
-    if (d.gone) { store.set('h', 0.42); hide(); return; }
+    if (d.gone) { if (S.mode !== 'side') store.set('h', 0.42); hide(); return; }
     if (d.moved) relayout();
   };
   g.addEventListener('pointerup', up);
@@ -294,12 +298,13 @@ function frameOf(b, W, strokes){
 }
 // The page is one size on this screen, as paper is: as wide as the panel first opens beside a book
 // (four tenths of the screen's long side), the same upright and sideways. A wider panel leaves room
-// around it and the lines stay as they are; only a panel too narrow for it shows it smaller.
-// A phone's page is its whole width.
+// around it and the lines stay as they are, and the panel's edge stops at the page's width, so the
+// lines never change size as it's dragged. A phone's page is its whole width.
+function paperW(){ return Math.round(clamp(Math.max(S.fullW || innerWidth, S.fullH || innerHeight) * 0.4, 300, 720)); }
 function pageW(room){
   const w = S.fullW || innerWidth, h = S.fullH || innerHeight;
   if (Math.min(w, h) < 600) return room;                 // a phone: all of its width
-  return Math.min(room, Math.round(clamp(Math.max(w, h) * 0.4, 300, 720)) - 20);
+  return Math.min(room, paperW() - 20);
 }
 function render(){
   if (!S.page || !S.shown) return;

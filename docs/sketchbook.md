@@ -10,7 +10,7 @@ It's called the Sketchbook so it isn't mixed up with the **Notebook** in the sid
 
 Every reader has the Sketchbook button in its bar (a page with a pen on it): next to the panel button in an article or a video, next to the bookmark in a book, before focus mode in a PDF, and in the manga reader's top bar. The same button closes it. If I had it open the last time I read a book (or an article, a PDF, a manga), it's open again the next time.
 
-- **Sideways** (the tablet on its side, or a computer) it's a panel on the right, and the book or the page gets the rest of the screen. I drag its left edge to make it wider or narrower.
+- **Sideways** (the tablet on its side, or a computer) it's a panel on the right, and the book or the page gets the rest of the screen. I drag its left edge to make it wider, or back to the page's own width; pushed well past that, it closes.
 - **Upright** (the tablet standing, or the phone) it's a sheet at the bottom. I drag the handle on top to the height I want, and dragging it nearly all the way down closes it. The arrow button moves it to the top of the screen, and back.
 
 It stays open in focus mode, and its pens stay with it.
@@ -23,7 +23,7 @@ A book has a page for each chapter and a **General** page. The tab with the dot 
 
 A page is like a note in Obsidian with Ink: typed text and handwriting one under the other.
 
-The page is one size on each screen, like a sheet of paper. On the tablet it's as wide as the Sketchbook is when it first opens beside a book, upright or sideways, so my handwriting and the lines stay the same size whichever way I hold it. When I drag the Sketchbook wider, the page stays as it is and sits in the middle with room around it; only when I make the Sketchbook narrower than the page does the page get smaller. On a phone the page is the phone's whole width.
+The page is one size on each screen, like a sheet of paper. On the tablet it's as wide as the Sketchbook is when it first opens beside a book, upright or sideways, so my handwriting and the lines stay the same size whichever way I hold it. When I drag the Sketchbook wider, the page stays as it is and sits in the middle with room around it, and the edge won't go narrower than the page, so the lines never change size while I drag. On a phone the page is the phone's whole width.
 
 - **With the pen**, I write on the ruled paper at the bottom of the page. Writing under everything starts a new handwriting block; writing near the bottom of one makes it longer. The pens are the same as on a book's pages: the seven kinds, the highlighter, the eraser and the lasso, with their sizes and colours, Undo and Redo, and the S Pen's button opens the round menu over the Sketchbook too. My fingers scroll. A tap with the pen is a dot.
 - **Typing:** a tap with a finger (or a click) on the paper under everything, or the **T** button, starts a new piece of text there. A tap on typed text types into it. When I'm typing, a little bar above the text moves it up or down, or deletes it.

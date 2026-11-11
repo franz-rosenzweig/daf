@@ -159,3 +159,6 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 
 - not yet: the new look as a whole (web/look2.js, look2.css, docs/new-look.md): it is the web app's second look, behind Preferences → New look, and the Mac gets its own version once the web one is settled
 - not yet: the lines where you left off in a book (GET /api/books/{id}/excerpt), for Today
+- not yet: themes and Rooms in the new look (themes.js T.vars2, the Rooms section at the end of look2.css): the backdrop is the room's frame, the sheet its wall
+- not yet: Preferences one page at a time, with Devices & extension as a page of its own (look2.js prefsPages)
+- not yet: the Sketchbook's edge stops at the page's width, and pushed well past it closes (sketchbook.js grip, sizes)

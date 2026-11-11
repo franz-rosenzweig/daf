@@ -146,6 +146,28 @@ T.vars = (p, dark) => {
 };
 const ROOM_KEYS = ['--wall', '--frame', '--frame-fg', '--frame-fg-2', '--frame-fg-3', '--frame-hover', '--frame-active', '--frame-line', '--frame-line-2', '--frame-accent', '--frame-accent-weak', '--frame-on-accent'];
 
+// The new look (look2.css) with a theme: the backdrop behind the sheet a step darker than the theme's
+// sidebar, the sheet the theme's page, cards a step lighter, and Daf's own panels (the Edition's lead,
+// the parasha, the streak) in the theme's accent, dark enough for white on it. In a room the backdrop is
+// the frame's material and the sheet its wall (look2.css). Daf's own theme is the new look's own colours.
+const L2_KEYS = ['--l2-back', '--l2-card', '--l2-ink', '--l2-on-ink', '--l2-well', '--l2-chip', '--l2-tab', '--l2-track', '--l2-sheet', '--l2-lift', '--l2-p1', '--l2-p2'];
+T.vars2 = (p, dark) => {
+  const v = T.vars(p, dark), bg = p.bg, fg = p.fg, room = !!p.frame;
+  let p2 = p.frame || p.accent;
+  for (let i = 0; i < 12 && contrast(p2, '#ffffff') < 4.8; i++) p2 = mix(p2, '#000000', 0.12);
+  Object.assign(v, dark ? {
+    '--l2-back': mix(bg, '#000000', 0.4), '--l2-card': room ? bg : mix(bg, fg, 0.05), '--l2-chip': mix(bg, fg, 0.08), '--l2-tab': mix(bg, fg, 0.2),
+    '--l2-well': 'rgba(255,255,255,.07)', '--l2-sheet': '0 1px 2px rgba(0,0,0,.4),0 18px 50px rgba(0,0,0,.45)', '--l2-lift': '0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.3)',
+  } : {
+    '--l2-back': mix(v['--side'], fg, 0.08), '--l2-card': room ? bg : mix(bg, '#ffffff', 0.65), '--l2-chip': mix(bg, '#ffffff', 0.65), '--l2-tab': mix(bg, '#ffffff', 0.65),
+    '--l2-well': 'rgba(0,0,0,.07)', '--l2-sheet': '0 1px 2px rgba(0,0,0,.05),0 18px 50px rgba(60,50,30,.10)', '--l2-lift': '0 1px 2px rgba(0,0,0,.04),0 10px 28px rgba(60,50,30,.07)',
+  });
+  Object.assign(v, { '--l2-ink': fg, '--l2-on-ink': bg, '--l2-track': v['--line-2'], '--l2-p1': mix(p2, '#000000', 0.35), '--l2-p2': p2 });
+  if (p.pure) v['--l2-back'] = bg;
+  return v;
+};
+const ownL2 = (fam, dark) => fam.id === 'daf' || (fam.id === 'oled' && !dark);
+
 /* ---------- which one, and putting it on ---------- */
 const DEFAULT = { mode: 'system', light: 'daf', dark: 'daf' };
 const media = matchMedia('(prefers-color-scheme: dark)');
@@ -160,23 +182,25 @@ function legacy(){
 T.isDark = a => { a = a || T.get(); return a.mode === 'dark' || (a.mode === 'system' && media.matches); };
 T.apply = a => {
   a = Object.assign({}, DEFAULT, a || T.get()); cur = a;
-  const dark = T.isDark(a), fam = byId(dark ? a.dark : a.light), vars = T.vars(dark ? fam.dark : fam.light, dark), r = document.documentElement;
-  const L2 = r.dataset.look === '2';        // the new look has its own colours (look2.css): the theme's stand down
-  if (L2) { for (const k of Object.keys(vars).concat(ROOM_KEYS)) r.style.removeProperty(k); const cs = getComputedStyle(r); for (const k of ['--bg', '--side', '--fg', '--accent']) vars[k] = cs.getPropertyValue(k).trim() || vars[k]; delete vars['--frame']; }
-  else {
-  for (const k of ROOM_KEYS) if (!(k in vars)) r.style.removeProperty(k);
+  const dark = T.isDark(a), fam = byId(dark ? a.dark : a.light), r = document.documentElement;
+  const L2 = r.dataset.look === '2', own = L2 && ownL2(fam, dark);     // the new look: the theme's own tokens for it (T.vars2), or look2.css's
+  const pal = dark ? fam.dark : fam.light, vars = own ? {} : L2 ? T.vars2(pal, dark) : T.vars(pal, dark);
+  for (const k of Object.keys(T.vars2(pal, dark)).concat(ROOM_KEYS, L2_KEYS)) if (!(k in vars)) r.style.removeProperty(k);
   for (const [k, v] of Object.entries(vars)) r.style.setProperty(k, v);
-  }
+  if (own) { const cs = getComputedStyle(r); for (const k of ['--bg', '--side', '--fg', '--accent', '--l2-back']) vars[k] = cs.getPropertyValue(k).trim(); }
   delete r.dataset.theme;                    // the old fixed themes in style.css stand down
   r.dataset.mode = dark ? 'dark' : 'light'; r.dataset.palette = fam.id;
-  if (fam.room && !L2) r.dataset.room = fam.room; else delete r.dataset.room;
-  // the browser's and the Android app's bars: in a room the frame's colour (the top bar is made of it)
+  if (fam.room) r.dataset.room = fam.room; else delete r.dataset.room;
+  // the browser's and the Android app's bars: in a room the frame's colour (the top bar is made of it); in
+  // the new look the backdrop's, or on a phone the page's
   let m = document.querySelector('meta[name="theme-color"]'); if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
-  m.content = vars['--frame'] || vars['--side'];
+  const l2bar = L2 && (r.classList.contains('l2-phone') ? vars['--bg'] : vars['--l2-back']);
+  m.content = vars['--frame'] || l2bar || vars['--side'];
   // For index.html's first paint: both versions, so the system's mode can pick before any script.
   const lf = byId(a.light), df = byId(a.dark);
-  try { localStorage.setItem('daf.themeVars', JSON.stringify({ a, light: T.vars(lf.light, false), dark: T.vars(df.dark, true), room: { light: lf.room || '', dark: df.room || '' } })); } catch(e){}
-  window.dispatchEvent(new CustomEvent('daf-theme', { detail: { name: fam.id, dark, bg: vars['--bg'], side: vars['--side'], fg: vars['--fg'], accent: vars['--accent'], room: L2 ? '' : fam.room || '',
+  try { localStorage.setItem('daf.themeVars', JSON.stringify({ a, light: T.vars(lf.light, false), dark: T.vars(df.dark, true), room: { light: lf.room || '', dark: df.room || '' },
+    light2: ownL2(lf, false) ? {} : T.vars2(lf.light, false), dark2: ownL2(df, true) ? {} : T.vars2(df.dark, true) })); } catch(e){}
+  window.dispatchEvent(new CustomEvent('daf-theme', { detail: { name: fam.id, dark, bg: l2bar || vars['--bg'], side: vars['--side'], fg: vars['--fg'], accent: vars['--accent'], room: fam.room || '',
     bars: vars['--frame'], barsDark: !!vars['--frame'] && lum(vars['--frame']) < .2 } }));
   window.dispatchEvent(new Event('daf-type'));     // the book's pages take the new colours
 };
