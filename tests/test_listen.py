@@ -230,6 +230,9 @@ class Audiobooks(State):
         self.assertEqual(md["publishedYear"], "2003")
         with self.assertRaises(ValueError):
             absapi.use_details("frankenstein", {"title": "  "})
+        self.fake.search_extra = [{"title": "", "errorMsg": "Not found", "errorCode": 404}]      # Open Library's way of saying none
+        self.assertTrue(all(c["title"] for c in absapi.find_details("frankenstein", "openlibrary")))
+        self.fake.search_extra = []
 
 
 class Routes(State):

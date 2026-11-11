@@ -144,7 +144,7 @@ class FakeABS:
         if p == "/api/search/books":
             t, a, prov = (q.get("title") or [""])[0], (q.get("author") or [""])[0], (q.get("provider") or [""])[0]
             years = {"audible": ["2014", "2019"], "google": ["1851", "2003"], "openlibrary": ["1851", "1992"], "itunes": ["2011"]}.get(prov, ["2000"])
-            return [{"title": t + (" (Unabridged)" if k else ""), "author": a, "narrator": "Tom Weiss" if prov == "audible" else "", "publisher": ["Harper", "Penguin", "Dover"][k % 3],
+            return list(getattr(self, "search_extra", [])) + [{"title": t + (" (Unabridged)" if k else ""), "author": a, "narrator": "Tom Weiss" if prov == "audible" else "", "publisher": ["Harper", "Penguin", "Dover"][k % 3],
                      "publishedYear": y, "description": f"{t}, by {a}.", "genres": ["Fiction", "Classics"], "language": "English",
                      "cover": "data:image/svg+xml;utf8," + urllib.parse.quote(cover_svg(t, a, ["#334", "#543", "#354"][k % 3]).decode()),
                      "series": [], "isbn": "", "asin": ""} for k, y in enumerate(years)]
