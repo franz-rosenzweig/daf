@@ -54,13 +54,14 @@ def job_status(conn, kind, ref):
 QUICK = ("page",)                 # reading a saved page: its own worker, never behind a long transcript
 LONG = ("podtr",)                 # a whole podcast episode through whisper: its own worker too, so a reel doesn't wait an hour
 BOOK = ("bookmap",)               # a whole audiobook through whisper (readalong.py), hours of it: its own worker, one book at a time
+FILES = ("epdl",)                 # a podcast episode kept on the server (downloads.py): its own worker, one file at a time
 
 
 TEXT_JOBS = ("reel", "captions", "whisper", "pdf", "page")     # jobs that bring a document's text
 
 
 def _run_one(lane="main"):
-    kinds = {"quick": QUICK, "long": LONG, "book": BOOK}.get(lane, QUICK + LONG + BOOK)
+    kinds = {"quick": QUICK, "long": LONG, "book": BOOK, "files": FILES}.get(lane, QUICK + LONG + BOOK + FILES)
     with db.session() as conn:
         j = conn.execute(f"SELECT * FROM jobs WHERE status = 'queued' AND kind {'NOT ' if lane == 'main' else ''}IN ({','.join('?' * len(kinds))}) "
                          "ORDER BY id LIMIT 1", kinds).fetchone()
@@ -110,6 +111,9 @@ def _run_one(lane="main"):
         elif j["kind"] == "bookmap":
             from . import readalong
             readalong.build(j["ref"])
+        elif j["kind"] == "epdl":
+            from . import downloads
+            downloads.fetch(j["ref"])
         status, err = "done", None
     except Exception as e:  # noqa: BLE001
         log.exception("job %s", j["id"])
@@ -145,6 +149,7 @@ def start_worker():
     threading.Thread(target=worker, args=(stop, "quick"), name="daf-pages", daemon=True).start()
     threading.Thread(target=worker, args=(stop, "long"), name="daf-podcasts", daemon=True).start()
     threading.Thread(target=worker, args=(stop, "book"), name="daf-audiobooks", daemon=True).start()
+    threading.Thread(target=worker, args=(stop, "files"), name="daf-downloads", daemon=True).start()
     return stop
 
 
