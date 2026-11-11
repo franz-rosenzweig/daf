@@ -153,12 +153,25 @@ L.tintFrom = (el, src) => {
   im.onerror = () => tintMemo.set(src, null);
   im.src = src;
 };
+// Today's panel: the lines where you left off, under the title (/api/books/<id>/excerpt; kept while Daf is open).
+const exMemo = new Map();
+function excerpt(){
+  const h = document.querySelector('#main .l2hero[data-book]:not(.small)'); if (!h) return;
+  const id = h.dataset.book, sub = h.querySelector('.l2hsub');
+  if (!sub || h.querySelector('.l2hex')) return;
+  // (Today draws itself again as its data comes in: put the lines into the panel that's there now)
+  const put = t => { const x = document.querySelector('#main .l2hero[data-book="' + CSS.escape(id) + '"]:not(.small)'), sb = x && x.querySelector('.l2hsub');
+    if (!t || !sb || x.querySelector('.l2hex')) return; sb.insertAdjacentHTML('afterend', '<p class="l2hex" dir="auto">' + esc(t) + '</p>'); };
+  if (exMemo.has(id)) { put(exMemo.get(id)); return; }
+  exMemo.set(id, '');
+  C.api('/api/books/' + encodeURIComponent(id) + '/excerpt').then(r => { exMemo.set(id, r.text || ''); put(r.text); }).catch(() => exMemo.delete(id));
+}
 function scan(){
   document.querySelectorAll('#main [data-tint]').forEach(L.tint);
   document.querySelectorAll('#main .hlgroup, #main .mcont').forEach(el => { const im = el.querySelector('img'); if (im) L.tintFrom(el, im.getAttribute('src')); });
   const pl = document.getElementById('player'), art = pl && pl.querySelector('img.plart');
   if (pl && art) L.tintFrom(pl, art.getAttribute('src'));
-  dupTitle(); prefsSearch(); everywhere(); hlFilter();
+  dupTitle(); prefsSearch(); everywhere(); hlFilter(); excerpt();
 }
 // Preferences: a box that finds a setting by its name. Cards that don't have the words step away, and in a
 // card that does, so do the rows without them (unless it's the card's own name that matched).
@@ -216,7 +229,7 @@ L.hero = (d, isToday, dayN) => {
     '<span>' + [unit, dayN && isToday ? 'Day ' + dayN : '', streak].filter(Boolean).join(' · ') + '</span></div>';
   if (!b) return '<section class="l2hero plain"><div class="l2htext"><span class="l2lab">Today</span><h1>' + esc(new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })) + '</h1>' +
     '<div class="l2hacts"><a class="btn primary" href="#books">Choose a book</a></div></div>' + ringCol + '</section>';
-  return '<section class="l2hero"' + (b.has_cover ? ' data-tint="' + esc(b.id) + '"' : '') + '>' +
+  return '<section class="l2hero" data-book="' + esc(b.id) + '"' + (b.has_cover ? ' data-tint="' + esc(b.id) + '"' : '') + '>' +
     '<a class="l2hcover" href="#book/' + encodeURIComponent(b.id) + '" aria-label="' + esc(C.shortTitle(b.title)) + '">' + C.cover(b, 'cv l2cv') + '</a>' +
     '<div class="l2htext"><span class="l2lab">Continue</span><h1>' + esc(C.shortTitle(b.title)) + '</h1>' +
     '<span class="l2hsub">' + esc([b.author, b.progress != null ? Math.round(b.progress) + '%' : '', b.progress_note].filter(Boolean).join(' · ')) + '</span>' +
@@ -423,6 +436,7 @@ function screenItems(){
   else if (v === 'review') { add('Review more', 'refresh', { go: '#review/more' }); add('Highlights per day', 'target', { go: '#prefs', card: 'reviewcard' }); }
   else if (v === 'stats') { add('Goals', 'target', { go: '#prefs/goals' }); add('Log paper', 'note', { act: 'paper' }); }
   else if (v === 'manga') add('AniList', 'external', { go: '#prefs/anilist' });
+  else if (v === 'podcasts') add('Follow a show', 'plus', { search: true });      // its search finds shows in the directory too
   return it;
 }
 // The places with no tab, small at the foot (on a phone, Search and Add as well, and Listen's pages).
@@ -460,6 +474,7 @@ L.extraRows = () => { const x = L.extra; L.extra = null; return x; };
 function doItem(how, anchor){
   if (how.press) press(how.press, anchor);
   else if (how.go) { $('#pop').hidden = true; goCard(how.go, how.card); }
+  else if (how.search) { $('#pop').hidden = true; setTimeout(L.search, 0); }
 }
 document.addEventListener('click', e => {
   if (!L.on || !e.target.closest) return;

@@ -332,3 +332,13 @@ html[data-look="2"] .find.open .l2every{flex:none;margin-left:6px}
 .pop .menu.l2m.l2cat > button,.pop .menu.l2m.l2cat > a{padding-left:40px}
 .pop .menu.l2m > hr{border:0;border-top:1px solid var(--line);margin:2px 0}
 .pop .menu.l2m .l2m-rows:first-child{border-top:0;padding-top:0}
+
+/* Today's panel: the lines where you left off, fading out */
+.l2hex{font-family:var(--serif);font-size:18px;line-height:1.55;margin:16px 0 0;color:rgba(255,255,255,.9);max-height:calc(1.55em * 3);overflow:hidden;
+  -webkit-mask-image:linear-gradient(180deg,#000 45%,transparent);mask-image:linear-gradient(180deg,#000 45%,transparent);text-wrap:pretty}
+.l2hex + .l2hacts{margin-top:14px}
+@media (max-width:900px){ .l2hex{font-size:16px} }
+@media (max-width:520px){ .l2hex{font-size:15px;max-height:calc(1.55em * 4)} }
+/* a notice's buttons go under its words on a phone */
+html.l2-phone .notice{flex-wrap:wrap}
+html.l2-phone .notice > span:last-child:not(:first-child){flex-basis:100%;padding-left:28px}
