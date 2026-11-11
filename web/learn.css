@@ -63,6 +63,9 @@
 .lnhl span{display:block;margin-top:6px;font-size:12.5px;font-weight:600;color:var(--fg-3)}
 .lnfeeds .lnrowmain svg{color:var(--accent);flex:none}
 .lnsg{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.lnsgo{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:none;padding:0;font:inherit;text-align:left;color:var(--fg);text-decoration:none;cursor:pointer}
+.lnsgo:hover b{text-decoration:underline}
+.lnout{flex:none;color:var(--fg-3);margin-left:2px}
 .lnsk{width:34px;height:34px;flex:none;border-radius:9px;background:var(--active);color:var(--fg-2);display:inline-flex;align-items:center;justify-content:center}
 .lnsugg .btn.sm{align-self:flex-start}
 .lnlook{display:flex;align-items:center;gap:8px;margin:6px 0 0;color:var(--fg-2);font-size:14px}
