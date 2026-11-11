@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The test build only: WidgetLab, the widgets on a page of their own for looking at them. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".WidgetLab"
+            android:exported="true"
+            android:theme="@style/Theme.Daf" />
+    </application>
+</manifest>

@@ -351,4 +351,12 @@ document.addEventListener('click', async e => {
 window.addEventListener('hashchange', () => { if (!/^#podcasts\/(?!shows|episodes|recordings|audiobooks|clips)/.test(location.hash)) { P.show = null; P.absShow = null; P.showN = 80; } });
 // Where you are in a recording or an audiobook changes its row: the lists ask again next time.
 window.addEventListener('daf-abs-place', () => { P.abs = null; });
+// The Listen widget's Play when nothing is in the player: the episode last played, from where it stopped.
+C.Podcasts = Object.assign(C.Podcasts || {}, { resume: async () => {
+  const r = await api('/api/podcasts/listening'), e = (r.going || [])[0];
+  if (!e) return false;
+  P.eps.set(e.audio, Object.assign(P.eps.get(e.audio) || {}, e));
+  await playEp(e.audio);
+  return true;
+} });
 })();

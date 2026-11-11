@@ -53,6 +53,7 @@ public class Widget extends AppWidgetProvider {
 
     /** Asks again if the last answer is older than this, in the background. */
     static void refreshIfOlder(Context context, long ms) {
+        Board.refreshIfOlder(context, ms);      // the other widgets (widgets/Board.kt), if any are placed
         Context app = context.getApplicationContext();
         if (System.currentTimeMillis() - Server.prefs(app).getLong(AT, 0) < ms || asking) return;
         new Thread(() -> fetch(app)).start();
