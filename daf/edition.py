@@ -50,10 +50,12 @@ DEFAULTS = {
     "hour": 5,              # ready by, in the home time zone
     "kindle": True,         # send each edition to the Kindle
     "ai": True,             # let the model pick and order it
-    "topics": [],           # [{name, words: [...], adj: "more" | "less" | "mute" | ""}]
+    "topics": [],           # [{name, words: [...], adj: "more" | "less" | "mute" | "", mine: True on one you added yourself}]
+    "topics_removed": [],   # the names you removed: "Name them again" leaves them out
     "sources": {},          # {source: "more" | "less" | "mute"}; "folder:Name" mutes a Feed folder
 }
 ADJ = {"more": 1.6, "less": 0.55, "mute": 0.0, "": 1.0}
+OWN = ("topics", "sources", "topics_removed")     # changed through their own controls on the Taste page, never as plain settings
 WATCHES_PER_DAY = 7         # Invidious keeps the order you watched in, not the dates: plays a day turn places into days
                             # (measured from iv-suggest's dated plays when it's there, see invidious())
 BOOST, FLOOR = 2.0, 0.7     # a source's multiplier: the one you return to most at BOOST, one you never touched at FLOOR
@@ -97,6 +99,7 @@ def settings(s=None):
     e["halflife"] = max(3, min(365, e["halflife"]))
     e["days"] = [d for d in e["days"] if d in DAYS] if isinstance(e["days"], list) else DEFAULTS["days"]
     e["topics"] = [t for t in e["topics"] if isinstance(t, dict) and t.get("name")] if isinstance(e["topics"], list) else []
+    e["topics_removed"] = [n for n in e["topics_removed"] if isinstance(n, str) and n][-200:] if isinstance(e["topics_removed"], list) else []
     e["sources"] = e["sources"] if isinstance(e["sources"], dict) else {}
     return e
 
@@ -414,7 +417,7 @@ def topic_weights(events, e, now):
     for t in e["topics"]:
         a, b = cur[t["name"]] / top, old[t["name"]] / top_old
         out.append({"name": t["name"], "weight": round(a, 3), "trend": "up" if a - b > 0.12 else "down" if b - a > 0.12 else "steady",
-                    "adj": t.get("adj") or "", "words": t.get("words") or []})
+                    "adj": t.get("adj") or "", "words": t.get("words") or [], "mine": bool(t.get("mine"))})
     return out
 
 
@@ -851,12 +854,96 @@ interests best, the way a newspaper would name its sections for them (short name
 summary of an article, video or episode on it (single words, no phrases).
 
 {taste}
-
+{also}
 Answer with JSON only: {{"topics": [{{"name": "...", "words": ["...", "..."]}}]}}"""
+
+WORDS_PROMPT = """A reader wants their daily paper to follow a topic they named themselves: "{name}". Give 10 to 20
+lowercase keywords that would appear in the title or summary of an article, video or episode on it (single words, no
+phrases).
+
+Answer with JSON only: {{"words": ["...", "..."]}}"""
+
+
+def topic_name(name):
+    """A topic's name as it's kept: one line, at most 40 characters."""
+    return re.sub(r"\s+", " ", str(name or "")).strip()[:40].strip()
+
+
+def _tkey(name):
+    return topic_name(name).casefold()
+
+
+def topic_words(given):
+    """A topic's words as they're kept: cut the way every title is (words()), in the order given, at most 30."""
+    out = []
+    for x in [given] if isinstance(given, str) else given if isinstance(given, list) else []:
+        for w in words(str(x)[:2000]):
+            if w not in out:
+                out.append(w)
+    return out[:30]
+
+
+def words_for(name):
+    """Words for a topic the reader named without giving any: the name's own and the model's, asked once.
+    When the model is off or says nothing usable, the name's own."""
+    try:
+        from . import ai
+        out = ai.run(WORDS_PROMPT.format(name=name), timeout=90)
+        m = re.search(r"\{.*\}", out, re.S)
+        got = json.loads(m.group(0) if m else out).get("words")
+        got = got if isinstance(got, list) else []
+    except Exception as ex:  # noqa: BLE001 - no model, no answer in time, an answer that isn't the JSON asked for
+        log.warning("edition topic words: %s", ex)
+        got = []
+    return topic_words([name] + [str(w) for w in got[:40]])
+
+
+def add_topic(name, given=None):
+    """A topic of the reader's own: on the list as "more", so it counts from the next edition, and kept by
+    "Name them again". Without words the model is asked for some (words_for). A name that's already a
+    topic becomes theirs instead of a second one, with the words given if there were any."""
+    name = topic_name(name)
+    if not name:
+        raise ValueError("A topic needs a name")
+    if name == name.lower():                # typed all in small letters: a capital, like the model's names
+        name = name[:1].upper() + name[1:]
+    same = lambda t: _tkey(t["name"]) == _tkey(name)      # noqa: E731
+    ws = topic_words(given)
+    have = next((t for t in settings()["topics"] if same(t)), None)
+    if not ws and not (have and have.get("words")):
+        ws = words_for(name)                # the slow part, done before the settings are read to be changed
+        if not ws:
+            raise ValueError("A topic needs a few words")
+    e = settings()
+    if any(same(t) for t in e["topics"]):
+        topics = [dict(t, mine=True, words=ws or t.get("words") or []) if same(t) else t for t in e["topics"]]
+    else:
+        topics = e["topics"] + [{"name": name, "words": ws, "adj": "more", "mine": True}]
+    return save({"topics": topics, "topics_removed": [n for n in e["topics_removed"] if _tkey(n) != _tkey(name)]})["topics"]
+
+
+def remove_topic(name):
+    """Take a topic off the list, the model's or the reader's own. Its name is kept in topics_removed,
+    so "Name them again" doesn't bring it back; adding it again does."""
+    e = settings()
+    hit = next((t["name"] for t in e["topics"] if _tkey(t["name"]) == _tkey(name)), None)
+    if hit is None:
+        return e["topics"]
+    return save({"topics": [t for t in e["topics"] if t["name"] != hit],
+                 "topics_removed": [n for n in e["topics_removed"] if _tkey(n) != _tkey(hit)] + [hit]})["topics"]
+
+
+def _topics_also(e):
+    """What the model is told about the reader's own choices before it names topics."""
+    mine, gone = [t["name"] for t in e["topics"] if t.get("mine")], e["topics_removed"]
+    return ((f"\nThe reader keeps these topics of their own, so don't name them or anything that amounts to the same: {'; '.join(mine)}\n" if mine else "")
+            + (f"\nThe reader removed these topics, so don't name them or anything that amounts to the same either: {'; '.join(gone)}\n" if gone else ""))
 
 
 def seed_topics(conn=None, n=10):
-    """Ask the model to name the reader's topics from their taste, once (and on "Name them again")."""
+    """Ask the model to name the reader's topics from their taste, once (and on "Name them again"). Only the
+    model's own are replaced: the topics the reader added stay as they are, after the model's, and the
+    names they removed stay out."""
     from . import ai
     own = conn is None
     conn = conn or db.connect()
@@ -865,19 +952,23 @@ def seed_topics(conn=None, n=10):
     finally:
         if own:
             conn.close()
-    out = ai.run(TOPICS_PROMPT.format(n=n, taste=_taste_text(prof)), timeout=240)
+    out = ai.run(TOPICS_PROMPT.format(n=n, taste=_taste_text(prof), also=_topics_also(settings())), timeout=240)
     m = re.search(r"\{.*\}", out, re.S)
     got = json.loads(m.group(0) if m else out).get("topics") or []
-    old = {t["name"]: t for t in settings()["topics"]}
+    e = settings()                          # read after the model: what was added or removed while it thought counts
+    mine = [t for t in e["topics"] if t.get("mine")]
+    old = {_tkey(t["name"]): t for t in e["topics"]}
+    skip = {_tkey(n) for n in e["topics_removed"]} | {_tkey(t["name"]) for t in mine}
     topics = []
     for g in got[:16]:
-        name = re.sub(r"\s+", " ", str(g.get("name") or "")).strip()[:40]
+        name = topic_name(g.get("name"))
         ws = sorted({w for x in g.get("words") or [] for w in words(str(x))})[:30]
-        if name and ws:
-            topics.append({"name": name, "words": ws, "adj": (old.get(name) or {}).get("adj") or ""})
+        if name and ws and _tkey(name) not in skip:
+            skip.add(_tkey(name))
+            topics.append({"name": name, "words": ws, "adj": (old.get(_tkey(name)) or {}).get("adj") or ""})
     if not topics:
         raise RuntimeError("the model named no topics")
-    return save({"topics": topics})["topics"]
+    return save({"topics": topics + mine})["topics"]
 
 
 # ---- building -------------------------------------------------------------------------------------
@@ -919,7 +1010,8 @@ def build(day=None, use_ai=None, dry=False, conn=None):
         used = set()
         for r in conn.execute("SELECT items FROM editions WHERE day >= ? AND day != ?", ((day - timedelta(days=21)).isoformat(), day.isoformat())):
             used |= {it.get("id") for it in json.loads(r[0] or "[]")}
-        if not e["topics"] and (e["ai"] if use_ai is None else use_ai) and not dry:
+        # The first time only: nothing of the model's yet, and nothing removed (a list emptied by hand stays empty).
+        if not any(not t.get("mine") for t in e["topics"]) and not e["topics_removed"] and (e["ai"] if use_ai is None else use_ai) and not dry:
             try:
                 seed_topics(conn)
                 e = settings()
@@ -1147,7 +1239,7 @@ def taste_page(conn):
     adj = {k: v for k, v in e["sources"].items() if v in ("more", "less")}
     return {"topics": p["topics"], "sources": [{"name": k, "weight": round(v, 3), "facts": p["facts"].get(k) or {}, "adj": adj.get(k, "")} for k, v in top],
             "pool": pool_page(conn, e), "muted": [m for m in muted if m[7:] not in _hidden_folders(conn)], "seen": p["seen"], "rising": p["rising"], "named": p["named"], "report": report(conn),
-            "settings": {k: v for k, v in e.items() if k not in ("topics", "sources")}}
+            "settings": {k: v for k, v in e.items() if k not in OWN}}
 
 
 def _hidden_folders(conn):

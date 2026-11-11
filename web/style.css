@@ -2088,7 +2088,9 @@ select.edpast{appearance:auto;padding-right:6px}
 .edlchip{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--fg-2)}.edlchip b{color:var(--fg);font-weight:600}
 .edtcols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:22px;align-items:start}
 .edtside{display:flex;flex-direction:column;gap:22px}
-.edtrow{display:grid;grid-template-columns:minmax(0,190px) minmax(40px,1fr) 16px 168px;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.edtrow{display:grid;grid-template-columns:minmax(0,190px) minmax(40px,1fr) 16px 168px 30px;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.edtrm{width:30px;height:30px;color:var(--fg-3)}.edtrm:hover{color:var(--bad)}
+.edadd{display:flex;gap:8px;margin-top:4px}.edadd .field{flex:1;min-width:0}.edadd .field+.field{flex:1.5}
 .edbar{height:8px;background:var(--hover);border-radius:4px;overflow:hidden}.edbar i{display:block;height:100%;background:linear-gradient(90deg,var(--g2),var(--g4));border-radius:4px}
 .edtr{color:var(--fg-3);text-align:center}.edtr.up{color:var(--ok)}.edtr.down{color:var(--bad)}
 .edseg3{display:flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
@@ -2113,7 +2115,8 @@ select.edpast{appearance:auto;padding-right:6px}
 @media (max-width:1000px){.edtcols{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:700px){
   .edsrcs{grid-template-columns:minmax(0,1fr)}
-  .edtrow{grid-template-columns:minmax(0,1fr) 16px 150px;row-gap:6px}.edtrow .edbar{grid-column:1/-1;grid-row:2}
+  .edtrow{grid-template-columns:minmax(0,1fr) 16px 132px 28px;column-gap:8px;row-gap:6px}.edtrow .edbar{grid-column:1/-1;grid-row:2}
+  .edtrm{width:28px}.edadd{flex-wrap:wrap}.edadd .field:first-child{flex:1 1 100%}
 }
 
 /* Sound (sound.js): the scene's name and the volume in its menu; Today's row beside the Kindle */
