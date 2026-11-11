@@ -24,6 +24,7 @@ L.shape = () => {
 L.frame = () => {
   const s = L.shape(), wasPhone = root.classList.contains('l2-phone');
   for (const k of ['top', 'side', 'phone']) root.classList.toggle('l2-' + k, k === s);
+  root.classList.toggle('l2-fold', s === 'side' && !!C.lsGet('fold', false));     // the side bar folded to its pictures (sideways only)
   if (wasPhone !== (s === 'phone') && C.Themes) C.Themes.apply();     // the Android bars: the page's colour on a phone, the backdrop's elsewhere
   root.classList.toggle('l2-hover', matchMedia('(hover: hover) and (pointer: fine)').matches);     // a pointer that hovers: names can be tooltips
 };
@@ -83,6 +84,13 @@ function ringSvg(frac){
     '<circle cx="13" cy="13" r="9" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="' + (Math.min(1, frac) * c).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 13 13)"/></svg>';
 }
 
+// The tabs' pictures: beside their names in the side bar, alone when it's folded (and never in the row on top).
+const TICON = { Today: 'M10 6.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7zM10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8',
+  Books: 'M4 4.5h3.5v11H4zM9 4.5h3.5v11H9zM13.6 5.2l2.8.8-2.6 9.8-2.8-.8', Library: 'M5 3.5h10v13l-5-3.3-5 3.3z',
+  Feed: 'M5 4.5a10.5 10.5 0 0 1 10.5 10.5M5 9a6 6 0 0 1 6 6M5.5 14.5h.01', Learn: 'M2.5 8 10 4.5 17.5 8 10 11.5zM5.5 9.6v3.6c1.4 1.3 2.9 2 4.5 2s3.1-.7 4.5-2V9.6M17.5 8v4.2',
+  Highlights: 'M4.5 15.5l1-3.5 7-7 2.5 2.5-7 7zM11.5 6l2.5 2.5M3.5 17.5h6', Listen: 'M4 13.5V11a6 6 0 0 1 12 0v2.5M4 12.5h2.5v4H4zM13.5 12.5H16v4h-2.5z' };
+const tIcon = label => TICON[label] ? '<svg class="l2ti" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="' + TICON[label] + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '';
+const FOLD = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.5 5 6.5 10l5 5M15.5 5l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 L.side = () => {
   const sd = $('#side'); if (!sd) return;
   const d = S.data, all = tabs(), cur = all.find(t => t[1].some(p => isOn(p[0])));
@@ -93,8 +101,9 @@ L.side = () => {
   const fsub = f => '<button class="l2sub folder' + (f.on ? ' on' : '') + '" data-go="' + esc(f.go) + '">' + esc(f.name) + '</button>';
   const pages = cur && (cur[1].length > 1 || folders.length) ? cur[1] : [];
   const onFolder = folders.some(f => f.on);
-  const tabRow = all.map(t => '<button class="l2tab' + (t === cur ? ' on' : '') + '" data-go="' + t[1][0][0] + '">' + t[0] + '</button>' +
-    (t === cur ? pages.map(p => sub(p, ' nested')).join('') + folders.map(f => fsub(f).replace('l2sub folder', 'l2sub folder nested')).join('') : '')).join('');
+  const tabRow = all.map(t => '<button class="l2tab' + (t === cur ? ' on' : '') + '" data-go="' + t[1][0][0] + '" title="' + t[0] + '">' + tIcon(t[0]) + '<span class="l2tl">' + t[0] + '</span></button>' +
+    (t === cur ? pages.map(p => sub(p, ' nested')).join('') + folders.map(f => fsub(f).replace('l2sub folder', 'l2sub folder nested')).join('') : '')).join('') +
+    '<button class="l2fold" data-act="l2fold" aria-label="Fold the side bar" title="Fold the side bar">' + FOLD + '</button>';
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const phone = all.filter(t => t[0] !== 'Listen').slice(0, 5);
   sd.innerHTML =
@@ -265,7 +274,7 @@ function listenTitle(){
 function dupTitle(){
   const sub = document.querySelector('.l2subs .l2sub.on'), h = document.querySelector('#main .top h1');
   if (!h) return;
-  const same = !!sub && L.shape() !== 'side' && !h.querySelector('select,a,svg:not(.srcpick svg),button:not(.srcpick)') && h.textContent.trim().toLowerCase() === sub.textContent.trim().toLowerCase();
+  const same = !!sub && (L.shape() !== 'side' || root.classList.contains('l2-fold')) && !h.querySelector('select,a,svg:not(.srcpick svg),button:not(.srcpick)') && h.textContent.trim().toLowerCase() === sub.textContent.trim().toLowerCase();
   h.classList.toggle('l2same', same);
   // (a child's own computed display, not whether it shows: the bar itself may be the hidden one)
   const top = h.closest('.top'); if (top) top.classList.toggle('l2bare', same && ![...top.children].some(c => c !== h && !c.classList.contains('spacer') && getComputedStyle(c).display !== 'none'));
@@ -622,6 +631,11 @@ function mergeOwn(menu){
 }
 
 addEventListener('resize', () => { if (L.on) L.frame(); });
+document.addEventListener('click', e => {
+  const b = L.on && e.target.closest && e.target.closest('[data-act="l2fold"]'); if (!b) return;
+  C.lsSet('fold', !C.lsGet('fold', false)); L.frame(); dupTitle();
+  window.dispatchEvent(new Event('resize'));          // (a reader or a list laid out by the width redraws)
+});
 
 // Preferences: the switch, on this device.
 L.card = () => '<section class="card" id="lookcard"><h2>New look</h2><div class="prow"><div class="d"><b>On this device</b></div>' +

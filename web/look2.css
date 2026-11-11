@@ -416,3 +416,25 @@ html[data-look="2"] .l2pp .prow > .d{flex:1 1 240px}
 html.l2-phone .l2pp .prefspage{padding-top:8px}
 /* Listen: the Podcasts screen's chips are the row of pages above (look2.js LISTEN) */
 html[data-look="2"] #main .pccats{display:none!important}
+
+/* ---------- the tabs' pictures, and the side bar folded to them (look2.js TICON, l2fold) ---------- */
+.l2ti{flex:none;display:none}
+.l2fold{display:none}
+html.l2-side .l2tab{display:flex;align-items:center;gap:11px}
+html.l2-side .l2ti{display:block;opacity:.85}
+html.l2-side .l2tabs{height:100%}
+html.l2-side .l2fold{display:inline-flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px;margin:auto 0 0 4px;border:0;border-radius:50%;background:var(--l2-chip);color:var(--fg-2)}
+html.l2-side.l2-fold .app:not(.loggedout){grid-template-columns:72px minmax(0,1fr);grid-template-rows:calc(60px + env(safe-area-inset-top,0px)) auto minmax(0,1fr)}
+html.l2-side.l2-fold .l2brand{padding:env(safe-area-inset-top,0px) 0 0;justify-content:center}
+html.l2-side.l2-fold .l2pill{padding:0;width:48px;font-size:14px}
+html.l2-side.l2-fold .l2tabs{grid-area:2/1/4/2;align-items:center;padding:0 0 20px}
+html.l2-side.l2-fold .l2tab{width:48px;height:48px;padding:0;justify-content:center}
+html.l2-side.l2-fold .l2tab.on{background:var(--l2-tab)}
+html.l2-side.l2-fold .l2ti{opacity:1}
+html.l2-side.l2-fold .l2tl,html.l2-side.l2-fold .l2sub.nested{display:none}
+html.l2-side.l2-fold .l2fold{margin:auto 0 0;transform:scaleX(-1)}
+html.l2-side.l2-fold .l2subs{display:flex;grid-area:2/2;margin:0 16px 0 0}
+html.l2-side.l2-fold .l2subs:empty{display:none}
+html.l2-side.l2-fold .main,html.l2-side.l2-fold .app.hassubs .main{grid-area:3/2;margin:0 16px 16px 0;border-radius:22px}
+html.l2-side.l2-fold .app.hassubs .main{border-radius:0 0 22px 22px}
+html[data-look="2"].l2-side.l2-fold{--plleft:72px}
