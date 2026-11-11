@@ -33,7 +33,7 @@ function playerItem(p){
     fetch('/api/abs/progress', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
   };
   return { id: key(p.item, p.episode), kind: p.kind, title: p.title, sub: p.sub, art: p.art, tracks: p.tracks, duration: p.duration, chapters: p.chapters,
-    open: p.book ? '#book/' + encodeURIComponent(p.book) : p.episode ? '#podcasts/abs/' + encodeURIComponent(p.item) : '#podcasts/audiobooks',
+    open: p.episode ? '#podcasts/abs/' + encodeURIComponent(p.item) : '#podcasts/audiobooks/' + encodeURIComponent(p.item),   // its own page (abshelf.js)
     save(ev, x){
       if (ev === 'play') { since = Date.now(); }
       else if (ev === 'tick') { if (Date.now() - sent > 60000) post(x.at); }

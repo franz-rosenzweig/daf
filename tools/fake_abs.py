@@ -56,12 +56,12 @@ def cover_svg(title, author, colour):
         else:
             cur = (cur + " " + w).strip()
     lines.append(cur)
-    t = "".join(f'<text x="30" y="{150 + i * 46}" font-family="Georgia,serif" font-size="40" fill="#fff">{html.escape(x)}</text>' for i, x in enumerate(lines))
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+    t = "".join(f'<text x="34" y="{110 + i * 48}" font-family="Georgia,serif" font-size="42" fill="#fff">{html.escape(x)}</text>' for i, x in enumerate(lines))
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
             f'<stop offset="0" stop-color="{colour}"/><stop offset="1" stop-color="#000" stop-opacity=".85"/></linearGradient></defs>'
-            f'<rect width="400" height="600" fill="{colour}"/><rect width="400" height="600" fill="url(#g)" opacity=".55"/>'
-            f'<rect x="18" y="18" width="364" height="564" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>{t}'
-            f'<text x="30" y="545" font-family="Helvetica,Arial,sans-serif" font-size="22" fill="#fff" fill-opacity=".85">{html.escape(author)}</text></svg>').encode()
+            f'<rect width="500" height="500" fill="{colour}"/><rect width="500" height="500" fill="url(#g)" opacity=".55"/>'
+            f'<rect x="18" y="18" width="464" height="464" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>{t}'
+            f'<text x="34" y="452" font-family="Helvetica,Arial,sans-serif" font-size="24" fill="#fff" fill-opacity=".85">{html.escape(author)}</text></svg>').encode()
 
 
 class FakeABS:

@@ -2020,6 +2020,123 @@ body.playerbig .pmini{visibility:hidden}
 }
 
 
+/* ---------- Listen's own pages (podcasts.js, abshelf.js): Add a podcast, a show's downloads, the Audiobooks
+   page by series, author, narrator or collection, and an audiobook's page. Labels only; 40 px to touch. ---------- */
+.pcadd svg{flex:none}
+.pclab{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3)}
+.pcaddpage{gap:14px}
+.pcbigsearch{display:flex;align-items:center;gap:10px;height:54px;padding:0 20px;border-radius:999px;border:1px solid var(--line-2);background:var(--bg);box-shadow:var(--shadow);color:var(--fg-3);cursor:text}
+.pcbigsearch:focus-within{border-color:var(--accent)}
+.pcbigsearch input{flex:1;min-width:0;height:100%;border:0;background:none;outline:none;font:inherit;font-size:17px;color:var(--fg)}
+.pcbigsearch input::-webkit-search-cancel-button{display:none}
+#pcaddres{display:flex;flex-direction:column;gap:16px}
+.pcfinds{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:16px}
+.pcfind{padding:12px;gap:10px;border-radius:16px}
+.pcfinda{display:flex;flex-direction:column;gap:2px;color:var(--fg);text-decoration:none;min-width:0}
+.pcfinda .pctimg{margin-bottom:8px}
+.pcfinda b{font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pcfinda:hover b{color:var(--accent)}
+.pcfinda .mute{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcfind .btn{min-height:40px;margin-top:auto}
+.pclist{padding:2px 16px;gap:0}
+.pcdlset{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pcdlset .pclab{text-transform:none;letter-spacing:0;font-size:13.5px;font-weight:600;color:var(--fg-2)}
+.pcdl{flex:none;width:40px;height:40px;color:var(--fg-3)}
+.pcdl.done{color:var(--accent)}
+.pcdl.failed{color:var(--fg)}
+.pcspin{animation:pcspin 1s linear infinite}
+@keyframes pcspin{to{transform:rotate(360deg)}}
+/* the Audiobooks page: cards with their covers fanned */
+.abgroups{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.abgroup{padding:16px;gap:2px;color:var(--fg);text-decoration:none;border-radius:16px}
+.abgroup b{font-size:17px;margin-top:12px;line-height:1.25}
+.abgroup:hover b{color:var(--accent)}
+.abfan{display:flex;align-items:flex-end;height:136px;padding:0 4px}
+.abfanimg{width:108px;height:108px;flex:none;object-fit:cover;border-radius:6px;background:var(--active);box-shadow:0 8px 18px rgba(0,0,0,.28)}
+.abfan .abfanimg + .abfanimg{margin-left:-58px}
+.abfan .abfanimg:nth-child(1){transform:rotate(-5deg)}
+.abfan .abfanimg:nth-child(2){transform:translateY(-8px) rotate(1deg)}
+.abfan .abfanimg:nth-child(3){transform:rotate(6deg)}
+.abfan.n1 .abfanimg{transform:none}
+.abfanimg.pcart0{display:grid;place-items:center}
+/* an audiobook's page */
+.abgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}
+.abmain{display:flex;flex-direction:column;gap:16px;min-width:0}
+.abside{display:flex;flex-direction:column;gap:14px}
+.abhead{align-items:flex-end}
+.abcover{width:156px;height:156px;flex:none;border-radius:10px;object-fit:cover;background:var(--active);box-shadow:0 14px 28px rgba(0,0,0,.28)}
+.abcover.pcart0{display:grid;place-items:center}
+.abby{color:var(--fg-2);font-size:15px}
+.abprog{margin-top:4px}
+.abprog .pcbar{flex:0 1 220px;height:5px}
+.abhead .pcacts{margin-top:10px}
+.abhead .pcacts .btn{min-height:44px;padding:0 18px}
+.abhead .pcacts .abmore{padding:0 12px}
+.abrows{padding:2px 14px;gap:0}
+.abrow{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line)}
+.abrow:last-child{border-bottom:0}
+.abrow.on{background:var(--accent-weak);border-radius:8px;border-bottom-color:transparent}
+.abrowb{flex:1;min-width:0;display:flex;align-items:center;gap:12px;min-height:54px;padding:8px 4px;border:0;background:none;font:inherit;color:var(--fg);text-align:left}
+button.abrowb{cursor:pointer}
+button.abrowb:hover b{color:var(--accent)}
+.abn{width:24px;flex:none;text-align:right;font-size:12.5px;font-weight:700;color:var(--fg-3);font-variant-numeric:tabular-nums}
+.abt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.abt b{font-weight:600;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.abrow.on .abt b{font-weight:700}
+.abr{flex:none;font-size:13px;font-weight:600;color:var(--fg-3);font-variant-numeric:tabular-nums}
+.abdl{margin:12px 4px 6px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 18px}
+.abdl > div{display:contents}
+.abdl dt{color:var(--fg-3);font-size:13px;padding-top:1px}
+.abdl dd{margin:0;font-size:14.5px;overflow-wrap:anywhere}
+.abdesc{margin:4px 4px 12px}
+.abfind{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 4px;border-top:1px solid var(--line)}
+.abfind select{flex:0 1 220px;min-height:40px}
+.abcand{gap:12px;padding:8px 4px}
+.abcandimg{width:48px;height:48px;flex:none;border-radius:6px;object-fit:cover;background:var(--active)}
+.abcand .btn{min-height:36px}
+.abcard{padding:16px;gap:8px}
+.abspeed{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600}
+.abspeed > span{flex:1}
+.abspeed b{width:56px;text-align:center;font-size:17px;font-variant-numeric:tabular-nums}
+.abpm{width:36px;height:36px;border-radius:50%;background:var(--active);color:var(--fg);font-size:19px;line-height:1}
+.abpm:hover{background:var(--hover)}
+.abl{font-size:14px;font-weight:600;margin-top:6px}
+.abweekh{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.abweekh b{font-size:15px}
+.abweek{display:flex;align-items:flex-end;gap:8px;height:88px;margin-top:6px}
+.abday{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px}
+.abday i{display:block;width:100%;border-radius:4px;background:var(--active)}
+.abday i.on{background:var(--accent)}
+.abday span{font-size:11px;color:var(--fg-3)}
+.abside .pcchips{flex-wrap:wrap;overflow:visible;margin:0;padding:0}
+@media (max-width:1000px){
+  .abgrid{grid-template-columns:minmax(0,1fr)}
+  .abside{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}
+}
+@media (pointer:coarse){
+  .abpm{width:44px;height:44px}
+  .pcdl{width:44px;height:44px}
+  .abrow .ib{width:44px;height:44px}
+}
+@media (max-width:700px){
+  .pcadd span,.pcaddrss span{display:none}
+  .pcadd,.pcaddrss{padding:0 11px}
+  .pcfinds{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .pcfind{padding:10px}
+  .pcdlset{width:100%}
+  .abgroups{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .abgroup{padding:12px}
+  .abfan{height:104px}
+  .abfanimg{width:80px;height:80px}
+  .abfan .abfanimg + .abfanimg{margin-left:-44px}
+  .abgroup b{font-size:15px}
+  .abhead{align-items:flex-start}
+  .abcover{width:112px;height:112px}
+  .abhead .pcacts .btn{padding:0 14px}
+  .abside{grid-template-columns:minmax(0,1fr)}
+  .abside .pcchips{margin:0;padding:0}
+}
+
 /* ---------- the Edition (web/edition.js) ---------- */
 .edpage{max-width:1180px;gap:0}
 .edmast{display:flex;align-items:center;justify-content:space-between;gap:16px 24px;flex-wrap:wrap;padding:2px 0 16px;border-bottom:3px double var(--line-2)}
