@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-11-more-sounds', date: 'Nov 11', title: 'Many more sounds', text: 'Sound has over a hundred new beds under the book: trains and stations, ships and harbours, a library, a forge, an old-city market, rain on a tent or a tin roof, frogs, owls and wolves far off, and more quiet music.', go: '#books' },
   { id: '2026-11-10-pdf-viewer', date: 'Nov 10', title: 'A real PDF viewer', text: 'The button beside Back opens the pages as small pictures, the PDF’s contents, its highlights and a search; All pages shows them in a grid. Tap the page number to go to a page. The view menu fits the page, goes page by page, shows two pages side by side or darkens them, and two fingers pinch it larger.', go: '#books' },
   { id: '2026-11-10-reader-fixes', date: 'Nov 10', title: 'Page turns that don’t get stuck', text: 'A swipe the tablet takes away halfway now settles on a page, and with the Sketchbook below a book in focus mode, the status bar stays at the bottom. Contents is on the left of a book’s bar.', go: '#books' },
   { id: '2026-11-10-drag-shelves', date: 'Nov 10', title: 'Drag books onto shelves', text: 'Drag a book, or several chosen ones in All books, onto any shelf or Calibre collection. With a finger or the pen, hold a moment first. Shelves in All books’ bar ticks them on and off.', go: '#books' },

@@ -18,6 +18,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 - [The Notebook](sketchbook.md) — one notebook beside whatever I'm reading or watching: my highlights, and what I write and draw about them, kept in Obsidian and on the Kindle
 - [The Edition](edition.md) — a short paper each morning, chosen by what I read, watch and listen to, and the Taste behind it
 - [Sound](sound.md) — rain, fire, the sea or a crowd under the book, following the scene, in Daf or beside the Kindle
+- [The sounds and who recorded them](sound-list.md) — every one of Daf's own sounds, with its recording on Freesound
 - [The Feed and the Library](feed-and-library.md) — FreshRSS, the Library and its tags, imports, the morning email, newsletters, Home, search and Send to Kindle
 - [Videos and podcasts](videos-and-podcasts.md) — transcripts, clips, episode pages, and AntennaPod
 - [Learn](learn.md) — areas: a subject each, with its books, articles, videos and feeds in order, and a helper that suggests more

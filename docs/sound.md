@@ -32,20 +32,25 @@ What it decided is kept for the book, so it's only read once. If the book's file
 
 ## The sounds
 
-There are thirty, all recordings that loop without a seam, at one loudness:
+There are a hundred and thirty-four now, all recordings that loop without a seam. Each kind is set to the same loudness as the others like it, so going from the rain on a tent to the inside of a train doesn't make me jump:
 
-- **Rain:** steady rain, drizzle, a downpour, a thunderstorm, and a summer night with thunder far off.
-- **Wind:** a gale round the house, and a thin empty wind for moors and ruins.
+- **Rain and storms:** steady rain, drizzle, a downpour, a thunderstorm and a summer night with thunder far off, and rain the way you hear it from somewhere: on a tent, a window, a tin roof, the roof from the attic, a car, an umbrella, a city street and a wood, running down a gutter, the drips after it stops, and a storm in the trees or on a tent.
+- **Wind, snow and sand:** a gale round the house, a thin empty wind, wind in the trees, in dry grass and in the reeds, on a mountain, across a desert and over polar ice, a sandstorm, snow falling at night, a cold autumn wood, and a barn creaking in the wind.
 - **Fire:** a hearth, a campfire, a wood stove, and a fire in a big hall that rings.
-- **Water:** surf, a rough sea, ocean breakers, and a stream.
-- **Outdoors:** a forest at dawn, a spring garden, a meadow, a rainforest, a warm night with crickets and cicadas, and just crickets.
-- **People:** a busy crowd indoors, the murmur of a café or an inn, chatter on a street, and a city at night.
-- **Music**, for when no place can be heard: calm, vast, sacred, meditative, and a bowl and a gong.
+- **Water:** surf, a rough sea, ocean breakers, a stream, a wide river, a waterfall, a lake, a pebble beach, a canal in the morning, a fountain in a courtyard, a watermill, a cave, a sea cave, and under the water.
+- **Ships:** a wooden ship creaking, an engine room below decks, a sailboat's cabin, a rowing boat, a harbour, gulls on a rocky shore, a river boat, and the rigging of moored boats in the wind.
+- **Getting around:** a train, an old steam train, a big station, the underground, a tram, a bus, a car, an airliner, a horse-drawn carriage, and a spaceship.
+- **Outdoors:** a forest at dawn, a spring garden, a meadow, a rainforest and a jungle by day, crickets on a warm night, frogs, a pond at night, an owl, wolves, loons, cicadas at noon, a hot afternoon in a field, a beehive, crows in fog, an evening in the country, a summer night by a farm, a farm by day, sheep with their bells, and cows with theirs.
+- **Towns and people:** a busy crowd indoors, a café or an inn, chatter on a street, a city at night and by day, a road with birds, a market, an old-city bazaar, a fairground, a pub, a big crowd, a party in the next room, a museum, and fireworks far off.
+- **Rooms:** church bells, a cathedral, a hall before prayers, a library, a clock ticking, a quiet flat at night, a big hall of quiet people, a hospital, a hotel lobby, a prison, a pan frying, an electric fan, a pencil on paper, and a tunnel.
+- **Work:** a factory, a forge, a printing works, a workshop, a typewriter, and a hall humming with machines.
+- **Music**, for when no place can be heard: calm, vast, sacred, meditative, a bowl and a gong, piano, a sad cello, guitar, harp, a choir with no words, two drones, something darker for dread, and a church organ.
 
-They're the same recordings [Chataltul](https://stuffs.tiresia.xyz/kavana/) plays, all Creative Commons 0 from Freesound (Chataltul's [list of sounds](https://github.com/franz-rosenzweig/kavana/blob/master/docs/sounds.md) names who recorded each one). Daf keeps its own copy, fetched the first time a sound is needed.
+Thirty of them are the recordings [Chataltul](https://stuffs.tiresia.xyz/kavana/) plays (its [list of sounds](https://github.com/franz-rosenzweig/kavana/blob/master/docs/sounds.md) names who recorded each one), and Daf fetches its own copy of one the first time it's needed. The rest are Daf's own. I found them on Freesound, and they're all Creative Commons 0 too, which means the people who recorded them gave them away to everyone. Nobody has to credit them for that, but I want to, so [The sounds and who recorded them](sound-list.md) names every one.
 
 ## Good to know
 
 - A book needs to be an EPUB for Sound, since Daf reads its text to find the scenes.
 - Sound and Listen can play together: the voice reads the page and the scene plays underneath.
 - On the Kindle, sending the page uses a little Wi-Fi with each page turn, so I leave **Sound in Daf** off when I'm not using it.
+- Daf's own sounds live on the server it runs on. A new copy of Daf has only the thirty from Chataltul until `tools/sounds.py make` has made the rest (the [working notes](OPERATIONS.md) say how), and until then Sound just chooses from the ones it has.

@@ -4,17 +4,19 @@ The model reads a part of the book once (a chapter, or a long one's half) and sa
 change and what each would sound like, in Daf's own sounds (SOUNDS): rain on the moor, a fire in a
 hall, the sea from a ship's deck, a crowd in an inn, or for a book of essays or prayer, some quiet
 music. Daf keeps what it said (table soundscapes) and, wherever you are, gives the scene you're in,
-so the reader (web/soundscape.js) can fade from one bed into the next.
+so the reader (web/sound.js) can fade from one bed into the next.
 
 Where you are comes as the reader's place (its CFI, fraction and the words on the page) or the
 Kindle's (the plugin's page, POST /api/kindle/where): audiomap.py finds it in the book's text, the
 same way it finds the audiobook's place. A part is read when you first get to it, and the next one
 while you read on, so most of the time it's there already.
 
-The sounds are the recordings Chataltul plays, all Creative Commons 0 (public domain): seamless
-loops with half a second of their own end before them and of their start after them (PAD in
-soundscape.js), at one loudness. Daf keeps a copy in STATE/sounds, fetched the first time one is
-needed from DAF_SOUNDS_URL.
+The sounds are recordings, all Creative Commons 0 (public domain): seamless loops with half a
+second of their own end before them and of their start after them (PAD in sound.js), each kind at
+one loudness. Thirty are the ones Chataltul plays (BORROWED): Daf keeps a copy in STATE/sounds,
+fetched from DAF_SOUNDS_URL the first time one is needed. The rest are Daf's own (OWN), which
+tools/sounds.py makes into STATE/sounds from recordings on Freesound, with sounds.json beside them
+naming each one's recording and who made it. A Daf without those files just doesn't offer them.
 """
 import bisect
 import functools
@@ -33,8 +35,9 @@ from . import ai, audiomap, config, db, ebooks
 
 log = logging.getLogger("daf.soundscape")
 
-# id: (file, what it sounds like and where it fits: the model chooses by this)
-SOUNDS = {
+# id: (file, what it sounds like and where it fits: the model chooses by this). Chataltul's, fetched
+# from SOURCE the first time one is needed.
+BORROWED = {
     "rain": ("rain-1", "steady rain"),
     "drizzle": ("lightrain-1", "soft rain over open country"),
     "downpour": ("heavyrain-1", "a heavy downpour"),
@@ -66,6 +69,124 @@ SOUNDS = {
     "meditative": ("bowls-1", "music: singing bowls, waves and a bird (meditation, healing)"),
     "gong": ("tibetan-1", "music: a singing bowl and a gong (stillness, ritual)"),
 }
+# Daf's own: tools/sounds.py makes them into DIR (its PICKS say from which recordings).
+OWN = {
+    # Rain and storms
+    "rain-tent": ("rain-tent-1", "rain pattering on a tent, from inside: camping, a soldier's bivouac, a night in the open"),
+    "rain-window": ("rain-window-1", "rain on a window and its sill, heard from inside: a rainy day in a room, a study"),
+    "tin-roof": ("tin-roof-1", "rain drumming on a metal roof, from inside: a hut, a shed, a shack, the tropics"),
+    "rain-roof": ("rain-roof-1", "rain on the roof, heard from the attic: a house in the rain, a bedroom under the eaves"),
+    "rain-car": ("rain-car-1", "rain on the roof of a parked car, from inside: waiting in a car, a stakeout"),
+    "rain-city": ("rain-city-1", "rain falling on a quiet city street: wet pavements, a town in the rain"),
+    "rain-leaves": ("rain-leaves-1", "a shower falling on the leaves of a forest: rain in the woods, a jungle path"),
+    "gutter": ("gutter-1", "rain running down a gutter and dripping: a porch, a doorway, a yard in the rain"),
+    "drips": ("drips-1", "water dripping softly after the rain: the shower is over, a wet garden, a leaking roof"),
+    "storm-trees": ("storm-trees-1", "a storm in the trees: wind roaring through branches and rain, a wild night outdoors"),
+    "storm-tent": ("storm-tent-1", "wind and rain shaking a tent: a storm at camp, an expedition, the mountains"),
+    "umbrella": ("umbrella-1", "rain pattering on an umbrella: walking in the rain, waiting at a stop"),
+    # Wind, snow and sand
+    "wind-trees": ("wind-trees-1", "wind rustling through big trees at night: a windy evening, a wood, a garden"),
+    "wind-grass": ("wind-grass-1", "wind blowing through dry grass: a prairie, a field, the steppe, open plains"),
+    "reeds": ("reeds-1", "wind in the reeds, birds here and there: a marsh, a riverbank, the fens"),
+    "mountain": ("mountain-1", "wind on a mountainside, in gusts: a summit, a pass, the hills, a climb"),
+    "desert-wind": ("desert-wind-1", "a dry wind moaning across empty ground: a desert, a wasteland, a ruin in the sun"),
+    "sandstorm": ("sandstorm-1", "a sandstorm: hot wind roaring, sand hissing, a caravan caught in the desert"),
+    "polar-wind": ("polar-wind-1", "a cold wind over ice and snow: the Arctic, a frozen shore, a winter expedition"),
+    "snowfall": ("snowfall-1", "snow falling softly at night, everything muffled: a winter town, a snowy evening"),
+    "autumn": ("autumn-1", "a cold, quiet wood in late autumn: bare trees, a few birds, a breeze in dry leaves"),
+    "barn-wind": ("barn-wind-1", "inside a barn in a strong wind: creaking boards and rattles, a farm in a storm"),
+    # Water
+    "river": ("river-1", "a wide river flowing past in the evening: a riverbank, a bridge, a ford"),
+    "waterfall": ("waterfall-1", "a mountain waterfall, steady and close: a gorge, a cascade, a hike"),
+    "lake": ("lake-1", "small waves lapping on a lake shore, a bird now and then: a quiet lake, a pond"),
+    "pebbles": ("pebbles-1", "waves rolling the pebbles on a shingle beach: a cold coast, a cove"),
+    "canal": ("canal-1", "a canal in the early morning: water lapping at the stones, a boat, a gull"),
+    "fountain": ("fountain-1", "a fountain splashing in a courtyard garden, birds: a cloister, a palace garden"),
+    "watermill": ("watermill-1", "a watermill's wheel turning and splashing: a mill, a millstream, an old village"),
+    "underwater": ("underwater-1", "under the water: a deep muffled hush with bubbles, diving, a submarine, drowning"),
+    "cave": ("cave-1", "water dripping in a cave, ringing off the rock: a cavern, a mine, a cellar, a grotto"),
+    "sea-cave": ("sea-cave-1", "drips in a sea cave with the waves booming outside: a smugglers' cave, a cliff"),
+    # Ships and the sea
+    "ship": ("ship-1", "a big wooden ship creaking and groaning on the swell: below decks on a sailing ship"),
+    "engine-room": ("engine-room-1", "a ship's engines humming below decks: a steamer, a ferry, a cabin at sea"),
+    "sailing": ("sailing-1", "inside a sailboat's cabin, water rushing past the hull: a voyage, a yacht at sea"),
+    "rowing": ("rowing-1", "paddles dipping as a small boat moves over calm water: a rowing boat, a canoe"),
+    "harbour": ("harbour-1", "a harbour: boats, water against the quay, gulls, the sea beyond"),
+    "gulls": ("gulls-1", "gulls and small birds over waves on a rocky shore: a coast, an island"),
+    "river-boat": ("river-boat-1", "a motor boat chugging along a river: a river journey, a launch, a ferry"),
+    "rigging": ("rigging-1", "wind in the rigging of moored boats, lines clinking on masts: a marina, a quay"),
+    # Getting around
+    "train": ("train-1", "inside a train carriage, the wheels clacking on the rails: a journey by rail"),
+    "steam-train": ("steam-train-1", "inside an old steam train's carriage, rumbling along: a journey long ago"),
+    "station": ("station-1", "a big railway station: a train idling, people waiting, the hall's echo"),
+    "subway": ("subway-1", "riding the underground through a tunnel: the subway, the metro, the Tube"),
+    "bus": ("bus-1", "riding a bus: the engine, the road, a stop now and then"),
+    "car": ("car-1", "inside a car on an open road, windows up: a drive, a road trip, a getaway"),
+    "airplane": ("airplane-1", "the steady roar inside an airliner's cabin: a flight, a long-haul trip"),
+    "carriage": ("carriage-1", "riding in a horse-drawn carriage: hooves and wheels on a country road"),
+    "spaceship": ("spaceship-1", "the low hum inside a spaceship: a starship's corridor, a cabin in orbit"),
+    "tram": ("tram-1", "riding a streetcar through town: a tram, a trolley, the city going by"),
+    # Towns and crowds
+    "city-day": ("city-day-1", "a busy city by day, heard from a balcony: traffic, buses, a modern town"),
+    "road": ("road-1", "a road with light traffic and birds: a suburb, a small town, a street by day"),
+    "market": ("market-1", "a busy market: stalls, shoppers, chatter in the open air, a market square"),
+    "bazaar": ("bazaar-1", "a bazaar in an old Middle Eastern city at evening: a souk, the Old City, alleys"),
+    "fair": ("fair-1", "a fairground: rides, a crowd, music in the distance, a carnival, a funfair"),
+    "pub": ("pub-1", "a busy pub or bar, all talk and clatter: a tavern at night, a saloon"),
+    "big-crowd": ("big-crowd-1", "a big crowd outdoors, talking: a festival, a rally, a fair, a busy square"),
+    "party": ("party-1", "a party in the next room, voices muffled through the wall"),
+    "museum": ("museum-1", "a museum or gallery: footsteps on hard floors, hushed voices in big rooms"),
+    "fireworks": ("fireworks-1", "fireworks bursting far away over a town: a celebration, New Year's night"),
+    # Rooms and buildings
+    "church-bells": ("church-bells-1", "church bells ringing out over a town: a Sunday, a wedding, a holiday"),
+    "cathedral": ("cathedral-1", "the hush of a cathedral: a vast stone room, a door far off, the city outside"),
+    "prayer-hall": ("prayer-hall-1", "people murmuring in a big echoing hall: a church or synagogue before the service"),
+    "library": ("library-1", "a library: pages, footsteps and the odd hushed voice far off, a reading room"),
+    "clock": ("clock-1", "a clock ticking in a quiet room: waiting, a study, a sickroom, a long night"),
+    "quiet-flat": ("quiet-flat-1", "a small flat late at night: a clock in the kitchen, the city far off, stillness"),
+    "hall": ("hall-1", "a large hall full of quiet people: a courtroom before the judge comes, a lecture"),
+    "hospital": ("hospital-1", "a hospital corridor: a quiet hum, doors, a ward at night, a waiting room"),
+    "hotel": ("hotel-1", "a hotel lobby in the morning: soft voices, the street outside, a grand hotel"),
+    "prison": ("prison-1", "a prison: voices echoing down hard corridors, a cell block, a jail"),
+    "kitchen": ("kitchen-1", "something frying in a pan: a kitchen, breakfast cooking, a cook at the stove"),
+    "fan": ("fan-1", "an electric fan humming: a hot room, a summer afternoon indoors, a sickbed"),
+    "pencil": ("pencil-1", "a pencil writing on paper: a letter, a diary, homework, someone at a desk"),
+    "tunnel": ("tunnel-1", "a tunnel: dripping water and wind at its mouth, rain outside, an underpass, a cellar"),
+    # Work
+    "machine-hall": ("machine-hall-1", "a big room humming with machines: an engine room, a power station, a laboratory"),
+    "factory": ("factory-1", "a factory floor: machines running, a steady industrial din, a mill town"),
+    "forge": ("forge-1", "a forge's fire roaring under the bellows: a blacksmith's, a foundry"),
+    "printing-press": ("printing-press-1", "a printing works: presses running, a newspaper being printed, a big machine hall"),
+    "workshop": ("workshop-1", "a quiet workshop: a clock, a low hum, birds outside, a craftsman's bench"),
+    "typewriter": ("typewriter-1", "someone typing on an old typewriter: an office, a newsroom, a writer at work"),
+    # Woods, fields and animals
+    "frogs": ("frogs-1", "a chorus of frogs and toads: a pond or marsh on a spring night"),
+    "pond-night": ("pond-night-1", "a pond at night: frogs, crickets and insects, a swamp, a bayou"),
+    "owl": ("owl-1", "an owl calling in the dark: a night in the woods, an old house at night"),
+    "cicadas": ("cicadas-1", "cicadas at midday in the heat: southern countryside, olive groves, siesta"),
+    "heat": ("heat-1", "a drowsy hot summer afternoon in a field: insects humming, heat haze"),
+    "bees": ("bees-1", "bees humming at a hive: an orchard, a garden in summer, a beekeeper"),
+    "jungle-day": ("jungle-day-1", "a tropical jungle by day: insects, exotic birds, a river through the forest"),
+    "evening": ("evening-1", "evening in the countryside: birds settling, a field at dusk, a farm far off"),
+    "night-farm": ("night-farm-1", "a summer night near a farm: crickets, insects, a bird now and then"),
+    "crows": ("crows-1", "crows calling in fog, small birds: a bare wood, a churchyard, a grey morning"),
+    "loons": ("loons-1", "loons calling across a lake: a northern lake at dusk, wilderness"),
+    "sheep": ("sheep-1", "a flock of sheep with bells: a hillside pasture, a shepherd, the hills"),
+    "farmyard": ("farmyard-1", "a farm by day: birds, animals here and there, a breeze, the countryside"),
+    "wolves": ("wolves-1", "a pack of wolves howling in the dark: a winter forest, the wild, a lonely night"),
+    "cowbells": ("cowbells-1", "cows grazing with their bells: an alpine meadow, a high pasture, a mountain farm"),
+    # Music
+    "piano": ("piano-1", "music: soft piano and guitar, slow and open (thought, memory, a letter)"),
+    "melancholy": ("melancholy-1", "music: a slow, sad cello with muted piano (sorrow, loss, a farewell)"),
+    "guitar": ("guitar-1", "music: slow ambient guitar, bright and warm (hope, morning, a journey)"),
+    "harp": ("harp-1", "music: a dreamy harp drifting (wonder, a fairy tale, childhood)"),
+    "choir": ("choir-1", "music: wordless voices, an ethereal choir (prayer, heaven, grief)"),
+    "drone": ("drone-1", "music: a deep, sacred drone (a sanctuary, awe, the holy)"),
+    "warm-drone": ("warm-drone-1", "music: a warm, low pad that barely moves (rest, night, a quiet mind)"),
+    "dread": ("dread-1", "music: dark, uneasy drones (dread, suspense, something wrong)"),
+    "organ": ("organ-1", "music: a church organ playing slowly (a service, a funeral, a wedding, a cathedral)"),
+}
+SOUNDS = {**BORROWED, **OWN}
 SOURCE = os.environ.get("DAF_SOUNDS_URL") or "https://stuffs.tiresia.xyz/kavana/audio/"
 DIR = config.STATE / "sounds"
 PART_MIN, PART_MAX = 3000, 45000         # characters: a part shorter joins the next; a longer one is cut at a paragraph
@@ -77,14 +198,23 @@ LEAF = ("p", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "dd", "dt",
 _fetch = threading.Lock()
 
 
+def offered():
+    """The sounds this Daf can play, as SOUNDS: every borrowed one (fetched when it's first needed),
+    and those of its own whose file is here."""
+    return {k: v for k, v in SOUNDS.items() if k in BORROWED or (DIR / f"{v[0]}.mp3").exists()}
+
+
 def sound_file(name):
-    """The path of a sound's recording, fetched from SOURCE the first time; None for no such sound."""
+    """The path of a sound's recording, a borrowed one fetched from SOURCE the first time; None for no
+    such sound, or one of Daf's own that isn't here."""
     s = SOUNDS.get(name)
     if not s:
         return None
     p = DIR / f"{s[0]}.mp3"
     if p.exists():
         return p
+    if name not in BORROWED:
+        return None
     with _fetch:
         if p.exists():
             return p
@@ -188,6 +318,8 @@ three of these sounds (nothing else):
 
 - Start a new scene only when the place, the weather or what a listener would hear really changes. A
   chapter usually has one to four; a long run of talk in one room is one.
+- Choose the closest: a sound of the place itself (a train, a library, a forge, rain on a tent) over
+  a general one, and add what's around it only when it would be heard.
 - Each sound gets a level from 0.2 (just there) to 1 (full). It sits under reading, so keep it gentle;
   a storm the story is about can be loud.
 - This is the ground under the scene, not effects: don't follow one door, one shot or one bell.
@@ -205,7 +337,8 @@ Answer with JSON only, a list, the first scene at the first paragraph:
 def _ask(meta, part, ps):
     by = f' by {meta["author"]}' if meta.get("author") else ""
     where = f', from "{part["title"]}"' if part.get("title") else ""
-    sounds = "\n".join(f"{k}: {v[1]}" for k, v in SOUNDS.items())
+    can = offered()
+    sounds = "\n".join(f"{k}: {v[1]}" for k, v in can.items())
     text = "\n".join(f"[{i + 1}] {t}" for i, (_, t) in enumerate(ps))
     out = ai.run(PROMPT.format(title=meta.get("title") or "a book", by=by, where=where, sounds=sounds, text=text), timeout=300)
     m = re.search(r"\[.*\]", out, re.S)
@@ -224,7 +357,7 @@ def _ask(meta, part, ps):
             continue
         snd = {}
         for k, v in (x.get("sounds") or {}).items() if isinstance(x.get("sounds"), dict) else ():
-            if k in SOUNDS:
+            if k in can:
                 try:
                     snd[k] = round(min(1.0, max(0.1, float(v))), 2)
                 except (TypeError, ValueError):
@@ -384,6 +517,8 @@ def router():
             p = await run_in_threadpool(sound_file, name)
         except Exception as e:                    # noqa: BLE001
             raise HTTPException(502, f"The sound didn't come: {e}") from e
+        if p is None:                             # one of Daf's own that this copy hasn't got
+            raise HTTPException(404, "This sound isn't here")
         return FileResponse(p, media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
     @r.post("/api/ebooks/{book_id}/sound", dependencies=[Depends(user)])
@@ -426,6 +561,6 @@ def router():
 
     @r.get("/api/sound/sounds", dependencies=[Depends(user)])
     def get_sounds():
-        return {"sounds": [{"id": k, "about": v[1]} for k, v in SOUNDS.items()]}
+        return {"sounds": [{"id": k, "about": v[1]} for k, v in offered().items()]}
 
     return r
