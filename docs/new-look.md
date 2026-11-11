@@ -8,7 +8,7 @@ The idea behind it is that each screen has one main thing on it, and everything 
 
 ## Getting around
 
-There are six tabs: **Today**, **Books**, **Library**, **Feed**, **Highlights** and **Listen**. Each one has its own pages in a small row under it: Today and Recovery; Books, All Books, Manga and Torah; Library with its kinds (Articles, Videos and the rest, and my saved views) and the Shortlist; the Edition, the Feed and its folders; Highlights and the Review; and Podcasts. A pinned place only shows when it's pinned in Preferences → Sidebar.
+There are six tabs: **Today**, **Books**, **Library**, **Feed**, **Highlights** and **Listen**. Each one has its own pages in a small row under it: Today and Recovery; Books, All Books, Manga and Torah; Library with its kinds (Articles, Videos and the rest, and my saved views) and the Shortlist; the Edition, the Feed and its folders; Highlights and the Review; and Listen's own, Listening, Shows, Episodes, Recordings, Audiobooks and Clips, each with its own name at the top. A pinned place only shows when it's pinned in Preferences → Sidebar.
 
 Where the tabs go depends on what I'm holding. On the Mac, or the tablet held upright, they're a row along the top. On the tablet held sideways they're a list down the left, with the tab's pages under it. On the phone they're a bar along the bottom with five of them, and the rest is in **⋯** at the end of it. It only changes when I turn the device, never by itself.
 

@@ -33,8 +33,16 @@ L.frame = () => {
 const OWNS = { today: ['today'], books: ['books', 'book', 'shelf'], catalog: ['catalog'], manga: ['manga', 'mread'], torah: ['torah'],
   library: ['library', 'view'], 'library/starred': [], edition: ['edition'], feed: ['feed', 'feeds'],
   highlights: ['highlights'], review: ['review'], paper: ['paper'], podcasts: ['podcasts'], recovery: ['recovery'] };
+// Listen's pages are the Podcasts screen's own (podcasts.js CATS): a show is under Shows, one of
+// Audiobookshelf's recordings under Recordings.
+const LISTEN = [['podcasts', 'Listening'], ['podcasts/shows', 'Shows'], ['podcasts/episodes', 'Episodes'], ['podcasts/recordings', 'Recordings'], ['podcasts/audiobooks', 'Audiobooks'], ['podcasts/clips', 'Clips']];
 const isOn = key => {
   const r = S.route || [];
+  if (key.startsWith('podcasts')) {
+    if (r[0] !== 'podcasts') return false;
+    const cat = LISTEN.some(p => p[0] === 'podcasts/' + r[1]) ? r[1] : r[1] === 'abs' ? 'recordings' : r[1] ? 'shows' : '';
+    return key === (cat ? 'podcasts/' + cat : 'podcasts');
+  }
   if (r.join('/') === 'library/starred') return key === 'library/starred';
   return (OWNS[key] || []).includes(r[0]);
 };
@@ -47,7 +55,7 @@ function tabs(){
     ['Library', [['library', 'Library'], pin('shortlist') && ['library/starred', 'Shortlist']]],
     ['Feed', [ed && ['edition', 'Edition'], ['feed', 'Feed']]],
     ['Highlights', [['highlights', 'Highlights'], ['review', 'Review'], pin('paper') && ['paper', 'Paper pages']]],
-    ['Listen', [pin('podcasts') && ['podcasts', 'Podcasts']]],
+    ['Listen', pin('podcasts') ? LISTEN : []],
   ].map(([label, pages]) => [label, pages.filter(Boolean)]).filter(t => t[1].length);
 }
 // The Feed's pinned folders and feeds, from the old sidebar's own rows (reader.js navFeed).
@@ -172,7 +180,7 @@ function scan(){
   document.querySelectorAll('#main .hlgroup, #main .mcont').forEach(el => { const im = el.querySelector('img'); if (im) L.tintFrom(el, im.getAttribute('src')); });
   const pl = document.getElementById('player'), art = pl && pl.querySelector('img.plart');
   if (pl && art) L.tintFrom(pl, art.getAttribute('src'));
-  dupTitle(); prefsSearch(); prefsPages(); everywhere(); hlFilter(); excerpt();
+  listenTitle(); dupTitle(); prefsSearch(); prefsPages(); everywhere(); hlFilter(); excerpt();
 }
 // Preferences: a box that finds a setting by its name. Cards that don't have the words step away, and in a
 // card that does, so do the rows without them (unless it's the card's own name that matched).
@@ -245,6 +253,13 @@ document.addEventListener('click', e => {
   const g = document.querySelector('#main .prefsgrid');
   if (g && g.dataset.pushed) history.back(); else location.hash = '#prefs';
 });
+// Listen: the page's name is the one it's on (Listening, Shows, Audiobooks…), not "Podcasts" over all
+// of them; its chips are the row of pages above, so they step back.
+function listenTitle(){
+  if ((S.route || [])[0] !== 'podcasts') return;
+  const on = document.querySelector('#main .pccats .pccat.on'), h = document.querySelector('#main > .top h1');
+  if (on && h && h.textContent !== on.textContent) h.textContent = on.textContent;
+}
 // A screen's own name, when the row of pages just above already says it ("Highlights" under Highlights ·
 // Review): the name steps back, and so does its bar if nothing else is in it.
 function dupTitle(){

@@ -414,3 +414,5 @@ html[data-look="2"] .l2pp .prow{flex-wrap:wrap}
 html[data-look="2"] .l2pp .prow > .d{flex:1 1 240px}
 @media (max-width:1100px){ html[data-look="2"]:not(.l2-phone) .prefsgrid.l2pp{grid-template-columns:190px minmax(0,1fr)} html[data-look="2"]:not(.l2-phone) .l2pp .prefsnav{padding-left:10px} }
 html.l2-phone .l2pp .prefspage{padding-top:8px}
+/* Listen: the Podcasts screen's chips are the row of pages above (look2.js LISTEN) */
+html[data-look="2"] #main .pccats{display:none!important}
