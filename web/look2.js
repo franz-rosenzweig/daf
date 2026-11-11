@@ -40,8 +40,8 @@ function tabs(){
   const d = S.data, pins = C.pinsOn(), pin = k => pins.includes(k);
   const ed = d && d.edition && (d.edition.on || d.edition.total);
   return [
-    ['Today', [['today', 'Today']]],
-    ['Books', [['books', 'Books'], ['catalog', 'All Books'], pin('manga') && ['manga', 'Manga'], pin('torah') && ['torah', 'Torah'], pin('recovery') && ['recovery', 'Recovery']]],
+    ['Today', [['today', 'Today'], pin('recovery') && ['recovery', 'Recovery']]],
+    ['Books', [['books', 'Books'], ['catalog', 'All Books'], pin('manga') && ['manga', 'Manga'], pin('torah') && ['torah', 'Torah']]],
     ['Library', [['library', 'Library'], pin('shortlist') && ['library/starred', 'Shortlist']]],
     ['Feed', [ed && ['edition', 'Edition'], ['feed', 'Feed']]],
     ['Highlights', [['highlights', 'Highlights'], ['review', 'Review'], pin('paper') && ['paper', 'Paper pages']]],
