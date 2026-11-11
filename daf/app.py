@@ -3254,6 +3254,52 @@ def post_podcasts_follow(b=Depends(json_body), c=Depends(conn)):
     return podcasts.follow(c, feed, b.get("follow", True) is not False)
 
 
+@app.post("/api/podcasts/played", dependencies=[Depends(user)])
+def post_podcasts_played(b=Depends(json_body), c=Depends(conn)):
+    """{feed}: Mark all played (AntennaPod gets it at its next sync)."""
+    from . import podcasts
+    feed = str(b.get("feed") or "").strip()
+    if not re.match(r"^https?://", feed):
+        raise HTTPException(400, "A feed's address")
+    return podcasts.mark_played(c, feed)
+
+
+# ---- downloads (downloads.py): a show's choice, one episode kept or let go, the kept file ----
+
+@app.post("/api/podcasts/download", dependencies=[Depends(user)])
+def post_podcasts_download(b=Depends(json_body), c=Depends(conn)):
+    """{feed, mode}: what Daf keeps of a show: off, new (what comes from now on) or all."""
+    from . import downloads
+    feed = str(b.get("feed") or "").strip()
+    if not re.match(r"^https?://", feed):
+        raise HTTPException(400, "A feed's address")
+    try:
+        return downloads.set_mode(c, feed, str(b.get("mode") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/podcasts/keep", dependencies=[Depends(user)])
+def post_podcasts_keep(b=Depends(json_body), c=Depends(conn)):
+    """{audio, keep}: keep one episode on the server, or let go of it (its file, or its place in the line)."""
+    from . import downloads
+    audio = str(b.get("audio") or "").strip()
+    if not re.match(r"^https?://", audio) or not (c.execute("SELECT 1 FROM gp_episodes WHERE url = ?", (audio,)).fetchone()
+                                                 or c.execute("SELECT 1 FROM ep_files WHERE audio = ?", (audio,)).fetchone()):
+        raise HTTPException(404, "Not an episode Daf knows")
+    return {"kept": downloads.want(c, audio) if b.get("keep", True) is not False else downloads.drop(c, audio)}
+
+
+@app.get("/api/podcasts/kept", dependencies=[Depends(user)])
+def get_podcasts_kept(u: str, c=Depends(conn)):
+    """An episode Daf keeps, from its own copy (FileResponse answers Range, so it seeks)."""
+    from . import downloads
+    k = downloads.kept(c, u)
+    if not k:
+        raise HTTPException(404, "Daf doesn't keep this episode")
+    return FileResponse(k[0], media_type=k[1], headers={"Cache-Control": "private, max-age=86400"})
+
+
 @app.get("/api/podcasts/play", dependencies=[Depends(user)])
 def get_podcasts_play(audio: str, c=Depends(conn)):
     """An episode for the player straight from a list: its page's doc and what the page would know."""
@@ -3403,15 +3449,121 @@ def get_abs(c=Depends(conn)):
     """The podcast libraries (each its own category), the audiobooks, and what you're in the middle of."""
     from . import absapi
     try:
-        return {"recordings": absapi.recordings(), "audiobooks": absapi.audiobooks(c), "going": absapi.going()}
+        out = {"recordings": absapi.recordings(), "audiobooks": absapi.audiobooks(c), "going": absapi.going()}
     except (absapi.Unavailable, OSError) as e:
-        return {"recordings": [], "audiobooks": [], "going": [], "error": str(e)}
+        return {"recordings": [], "audiobooks": [], "going": [], "collections": [], "error": str(e)}
+    try:
+        out["collections"] = absapi.collections()          # the Audiobooks page's Collections
+    except Exception:  # noqa: BLE001 - the books come all the same
+        out["collections"] = []
+    return out
 
 
 @app.get("/api/abs/show/{item_id}", dependencies=[Depends(user)])
 def get_abs_show(item_id: str):
     from . import absapi
     return _abs(absapi.show, item_id)
+
+
+# ---- an audiobook's page: chapters, bookmarks, details, files, collections, its week ----------
+
+def _abs_id(x):
+    x = str(x or "")
+    if not re.match(r"^[\w-]+$", x):
+        raise HTTPException(400, "An Audiobookshelf item")
+    return x
+
+
+def _abs_write(f, *a):
+    """A write to ABS: what it says when it won't, as it says it."""
+    import urllib.error
+    try:
+        return _abs(f, *a)
+    except urllib.error.HTTPError as e:
+        raise HTTPException(502, f"Audiobookshelf said no ({e.code})")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/abs/book/{item_id}/page", dependencies=[Depends(user)])
+def get_abs_book_page(item_id: str, c=Depends(conn)):
+    from . import absapi
+    return _abs(absapi.book_page, c, _abs_id(item_id))
+
+
+@app.post("/api/abs/book/{item_id}/bookmark", dependencies=[Depends(user)])
+def post_abs_bookmark(item_id: str, b=Depends(json_body)):
+    """{t, title, op}: op "add" (the default), "edit" (the title of the one at t) or "drop"."""
+    from . import absapi
+    item_id = _abs_id(item_id)
+    try:
+        t = float(b["t"])
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(400, "t, in seconds")
+    title, op = str(b.get("title") or "")[:300], str(b.get("op") or "add")
+    f = {"add": absapi.bookmark_add, "edit": absapi.bookmark_edit}.get(op)
+    if op == "drop":
+        _abs_write(absapi.bookmark_drop, item_id, t)
+    elif f:
+        _abs_write(f, item_id, t, title)
+    else:
+        raise HTTPException(400, "add, edit or drop")
+    return {"bookmarks": [x for x in absapi.book_page_marks(item_id)]}
+
+
+@app.post("/api/abs/book/{item_id}/collection", dependencies=[Depends(user)])
+def post_abs_collection(item_id: str, b=Depends(json_body)):
+    """{id, on}: in or out of one of your collections; or {name}: a new collection with this book in it."""
+    from . import absapi
+    item_id = _abs_id(item_id)
+    if b.get("name"):
+        name = str(b["name"]).strip()[:120]
+        if not name:
+            raise HTTPException(400, "A name")
+        made = _abs_write(absapi.collection_new, item_id, name)
+    else:
+        _abs_write(absapi.collection_set, item_id, _abs_id(b.get("id")), b.get("on", True) is not False)
+        made = None
+    lib = _abs(absapi.item, item_id).get("libraryId")
+    return {"made": made, "collections": [{"id": x["id"], "name": x["name"], "on": item_id in x["books"]}
+                                          for x in _abs(absapi.collections) if x["library"] == lib]}
+
+
+@app.post("/api/abs/book/{item_id}/finished", dependencies=[Depends(user)])
+def post_abs_finished(item_id: str, b=Depends(json_body)):
+    from . import absapi
+    _abs_write(absapi.finished, _abs_id(item_id), b.get("on", True) is not False)
+    return {"done": b.get("on", True) is not False}
+
+
+@app.get("/api/abs/providers", dependencies=[Depends(user)])
+def get_abs_providers():
+    from . import absapi
+    return {"providers": _abs(absapi.providers)}
+
+
+@app.get("/api/abs/book/{item_id}/find", dependencies=[Depends(user)])
+def get_abs_find(item_id: str, provider: str = "audible", title: str = "", author: str = ""):
+    """Find details: candidates from one of ABS's own match providers."""
+    from . import absapi
+    import urllib.error
+    if not re.match(r"^[\w.-]+$", provider):
+        raise HTTPException(400, "A provider")
+    try:
+        return {"results": _abs(absapi.find_details, _abs_id(item_id), provider, title.strip() or None, author.strip() if author else None)}
+    except urllib.error.HTTPError as e:
+        raise HTTPException(502, f"Audiobookshelf didn't find it ({e.code})")
+
+
+@app.post("/api/abs/book/{item_id}/use", dependencies=[Depends(user)])
+def post_abs_use(item_id: str, b=Depends(json_body), c=Depends(conn)):
+    """{candidate}: Use: its details become the audiobook's in ABS."""
+    from . import absapi
+    item_id = _abs_id(item_id)
+    if not isinstance(b.get("candidate"), dict):
+        raise HTTPException(400, "A candidate")
+    used = _abs_write(absapi.use_details, item_id, b["candidate"])
+    return {"used": used, "page": _abs(absapi.book_page, c, item_id)}
 
 
 @app.get("/api/abs/play/{item_id}", dependencies=[Depends(user)])

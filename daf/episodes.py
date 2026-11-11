@@ -522,8 +522,11 @@ def transcribe(audio):
     else:
         tmpdir = config.STATE / "tmp"
         tmpdir.mkdir(parents=True, exist_ok=True)
+        from . import downloads
+        with db.session() as conn:
+            kept = downloads.kept(conn, audio)
         with tempfile.TemporaryDirectory(dir=tmpdir) as tmp:
-            path = _download(audio, tmp)
+            path = str(kept[0]) if kept else _download(audio, tmp)     # Daf's own copy, when it keeps the episode
             if not chapters:
                 chapters = _chapters_probe(path)
             res = media.whisper(path)
@@ -589,8 +592,11 @@ def state(conn, d, opening=True):
         want(conn, audio, "auto")
     tr = transcript(conn, audio)
     pos = position(conn, audio)
-    src = audio if audio.startswith("https://") else "/api/podcasts/audio?u=" + urllib.parse.quote(audio, safe="")
-    return {"audio": src, "orig": audio, "position": pos, "duration": d.get("duration") or m.get("duration"),
+    from . import downloads
+    kept = downloads.kept(conn, audio)              # Daf's own copy, when the show or the row asked for one
+    src = ("/api/podcasts/kept?u=" if kept else "" if audio.startswith("https://") else "/api/podcasts/audio?u=") + (
+        urllib.parse.quote(audio, safe="") if kept or not audio.startswith("https://") else audio)
+    return {"audio": src, "orig": audio, "kept": bool(kept), "position": pos, "duration": d.get("duration") or m.get("duration"),
             "chapters": tr[1] if tr else [], "image": m.get("image") or d.get("thumb"), "podcast": m.get("podcast_title") or d.get("source"),
             "feed": m.get("podcast"), "transcript": status(conn, audio)}
 

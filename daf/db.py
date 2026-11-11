@@ -313,6 +313,10 @@ CREATE TABLE IF NOT EXISTS gp_actions (id INTEGER PRIMARY KEY AUTOINCREMENT, pod
 CREATE TABLE IF NOT EXISTS gp_episodes (url TEXT PRIMARY KEY, link TEXT, title TEXT, podcast TEXT, podcast_title TEXT, published INTEGER);
 CREATE TABLE IF NOT EXISTS episode_text (    -- a podcast episode's transcript (episodes.py), by its audio's address
   audio TEXT PRIMARY KEY, blocks TEXT NOT NULL, chapters TEXT, source TEXT, lang TEXT, made INTEGER);
+CREATE TABLE IF NOT EXISTS ep_files (        -- podcast episodes kept on the server (downloads.py), by their audio's address
+  audio TEXT PRIMARY KEY, feed TEXT, path TEXT, size INTEGER, type TEXT,
+  state TEXT NOT NULL,                      -- queued | going | done | failed
+  error TEXT, asked INTEGER, done INTEGER);
 CREATE TABLE IF NOT EXISTS nudges (at INTEGER NOT NULL, app TEXT, shown INTEGER NOT NULL, reason TEXT, minutes_left INTEGER);
 CREATE TABLE IF NOT EXISTS inbox (           -- links shared to Daf from the phone, until Karakeep has them
   id INTEGER PRIMARY KEY AUTOINCREMENT,

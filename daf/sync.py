@@ -158,6 +158,8 @@ def run():
             from . import manga
             manga.prune()
             gpodder.refresh_feeds(conn)
+            from . import downloads
+            downloads.plan(conn)                 # the shows that keep their episodes: what came today
         except Exception as e:  # noqa: BLE001
             report["media"] = f"failed: {e}"
             log.exception("media")
