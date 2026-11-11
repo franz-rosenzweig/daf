@@ -116,10 +116,20 @@ function draw(){
     p.feeds.map(f => '<div class="lnrow" data-ref="' + esc(f.ref) + '"><a class="lnrowmain" href="#' + esc(f.go) + '">' + svg(KIND.feed) + '<span class="lnrt"><b>' + esc(f.title) + '</b></span></a>' +
       (f.new ? '<span class="lnst new">' + f.new + ' new</span>' : '') + (P.editing ? '<span class="lnedit"><button data-ln-rm aria-label="Take out">×</button></span>' : '') + '</div>').join('') + '</section>';
   const sugg = a.suggest ? '<section class="card lnsugg"><div class="cardh"><h2>Suggestions</h2></div>' +
-    p.suggestions.map(s => '<div class="lnsg"><span class="lnsk">' + svg(KIND[s.kind] || KIND.article) + '</span><span class="lnrt"><b>' + esc(s.title) + '</b><i>' + esc([KNAME[s.kind], s.by].filter(Boolean).join(' · ')) + '</i></span>' +
+    p.suggestions.map(s => '<div class="lnsg">' + see(s) + '<span class="lnsk">' + svg(KIND[s.kind] || KIND.article) + '</span><span class="lnrt"><b>' + esc(s.title) + '</b><i>' + esc([KNAME[s.kind], s.by].filter(Boolean).join(' · ')) + OUT + '</i></span>' + (s.kind === 'book' ? '</button>' : '</a>') +
       '<button class="btn sm primary" data-ln-take="' + esc(s.id) + '">Add</button><button class="lnno" data-ln-skip="' + esc(s.id) + '" aria-label="Not this">×</button></div>').join('') +
     (p.looking ? '<p class="lnlook"><span class="spin"></span>Looking…</p>' : (p.error ? '<p class="mute tiny">' + esc(p.error) + '</p>' : '') + '<button class="btn sm" data-ln="more">Find more</button>') + '</section>' : '';
   page.innerHTML = hero + steps + '<div class="lncols"><section class="card lnlist">' + chips + body + '</section><div class="lnside">' + feeds + sugg + '</div></div>';
+}
+
+// A suggestion opens where it comes from, to see it before adding it: the page or the video itself, a feed's
+// site, and a book in Add a book (its cover and details, found by its title).
+const OUT = '<svg class="lnout" width="12" height="12" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h12v-4M11 3h6v6M17 3l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function see(s){
+  if (s.kind === 'book' || !s.url) return '<button class="lnsgo" data-ln-find="' + esc([s.title, s.by].filter(Boolean).join(' ')) + '">';
+  let href = s.url;
+  if (s.kind === 'feed') { try { href = new URL(s.url).origin; } catch(e){} }
+  return '<a class="lnsgo" href="' + esc(href) + '" target="_blank" rel="noopener">';
 }
 
 /* ---------- the sheets ---------- */
