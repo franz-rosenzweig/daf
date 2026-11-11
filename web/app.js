@@ -268,12 +268,19 @@ function bar(p){ return '<span class="pbar"><i style="width:' + Math.max(0, Math
 const READING = new Set(['read', 'ebook', 'pdf', 'mread']);
 const sideSize = () => { const v = lsGet('sideSize', null) || lsGet('side', null); return v === 'mini' || v === 'full' ? v : (matchMedia('(pointer: coarse)').matches ? 'mini' : 'full'); };
 const sideShown = () => { const v = lsGet('sideShown', null); return v == null ? lsGet('side', null) !== 'hidden' : !!v; };
+const LOOK2 = document.documentElement.dataset.look === '2';     // the new look: its frame is look2.js's
 function sideMode(){
+  if (LOOK2) return window.DafCore && window.DafCore.Look && window.DafCore.Look.shape() === 'phone' ? 'phone' : 'full';
   if (window.innerWidth <= 780) return 'phone';
   if (READING.has((S.route || [])[0]) || !sideShown()) return 'hidden';
   return sideSize();
 }
 function railMode(){
+  if (LOOK2) {
+    const r = document.documentElement, L = window.DafCore && window.DafCore.Look, b = $('#sideshow');
+    r.classList.remove('rail', 'sidehid'); r.classList.toggle('reading', READING.has((S.route || [])[0]));
+    if (L) L.frame(); if (b) b.remove(); return;
+  }
   const m = sideMode(), r = document.documentElement, sd = $('#side');
   r.classList.toggle('rail', m === 'mini' || m === 'hidden');
   r.classList.toggle('sidehid', m === 'hidden');
@@ -303,6 +310,7 @@ function setSide(shown, size){
 }
 // The button and ⌘\: shown or hidden. On a reading screen, over the page for a moment.
 function toggleSide(){
+  if (LOOK2) return;
   const sd = $('#side'), m = sideMode();
   if (m === 'phone') return;
   if (READING.has(S.route[0])) { const on = sd.classList.contains('peek') || sd.classList.contains('open'); sd.classList.remove('peek', 'open'); if (!on) sd.classList.add('peek'); return; }
@@ -383,6 +391,7 @@ document.addEventListener('change', async e => {
   catch(err){ toast(err.message); }
 });
 function renderSide(){
+  if (LOOK2 && window.DafCore && window.DafCore.Look) { window.DafCore.Look.side(); return; }
   const v = S.route[0];
   const n = (key, label, icon, extra) => '<button class="nv' + (v === key || (key === 'books' && (v === 'book' || v === 'catalog')) ? ' on' : '') + '" data-go="' + key + '">' + icon + '<span>' + label + '</span>' + (extra || '') + '</button>';
   const d = S.data;
@@ -890,7 +899,7 @@ async function renderPrefs(){
 // cards on a wide screen, a row across the top on a narrow one. The one being read is marked.
 const PREF_GROUPS = [
   ['Reading', [['goalscard', 'Goals'], ['countcard', 'What counts'], ['reviewcard', 'Daily review'], ['readercard', 'Reader'], ['dayscard', 'Days']]],
-  ['Look', [['appearcard', 'Appearance'], ['sidecard', 'Sidebar'], ['keyscard', 'Keyboard']]],
+  ['Look', [['lookcard', 'New look'], ['appearcard', 'Appearance'], ['sidecard', 'Sidebar'], ['keyscard', 'Keyboard']]],
   ['Connections', [['phonecard', 'Phone'], ['podcard', 'Podcasts'], ['hccard', 'Hardcover'], ['nlcard', 'Newsletters'], ['digestcard', 'Morning email'], ['alcard', 'AniList'], ['gracard', 'Reader apps']]],
   ['AI', [['aicard', 'AI']]],
   ['Library', [['tagscard', 'Library tags'], ['importcard', 'Import']]],
@@ -899,6 +908,7 @@ const PREF_GROUPS = [
 ];
 function organizePrefs(){
   const page = $('#main .page'); if (!page) return;
+  if (window.DafCore.Look && !$('#lookcard') && $('#appearcard')) $('#appearcard').insertAdjacentHTML('beforebegin', window.DafCore.Look.card());
   page.classList.add('prefspage');
   const placed = new Set(); let nav = '';
   for (const [group, cards] of PREF_GROUPS) {
@@ -1316,7 +1326,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest && e.target.closest('a[data-swap]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault(); swap(a.getAttribute('href'));
 });
-window.DafCore = { api, swr, outbox, keepOffline, errs: ERRS, esc, toast, $, $$, epochDate, ago, shortTitle, shortDate, cover, bar, ring, bookRow, I, S, renderSide, load, closeModal, hlCard, colorDots, HL_COLORS, drawHighlights: () => drawHighlights(), views: {}, navExtra: null, Voices, swap };
+window.DafCore = { api, swr, outbox, keepOffline, errs: ERRS, esc, toast, $, $$, epochDate, ago, shortTitle, shortDate, cover, bar, ring, bookRow, I, S, renderSide, load, pinsOn, PINS, lsGet, lsSet, atWord, closeModal, hlCard, colorDots, HL_COLORS, drawHighlights: () => drawHighlights(), views: {}, navExtra: null, Voices, swap };
 window.addEventListener('daf-hl-changed', () => { if (S.route[0] === 'review' && S.rev) drawReview(); });
 
 async function start(){
