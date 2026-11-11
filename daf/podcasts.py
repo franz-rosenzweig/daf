@@ -103,8 +103,13 @@ def episode_list(conn, feed=None, flt="", sort="newest", limit=60, offset=0, q="
     have = {r[0] for r in conn.execute("SELECT audio FROM episode_text")}
     clips = _clips(conn)
     eps = [_row(r, st, have, clips, {}) for r in rows]
+    from . import downloads
+    kept = downloads.states(conn)
+    for e in eps:
+        e["kept"] = kept.get(e["audio"])
     keep = {"unplayed": lambda e: e["at"] is None, "progress": lambda e: e["started"], "played": lambda e: e["done"],
-            "transcribed": lambda e: e["transcript"], "clipped": lambda e: e["clips"] > 0}.get(flt)
+            "transcribed": lambda e: e["transcript"], "clipped": lambda e: e["clips"] > 0,
+            "downloaded": lambda e: e["kept"] == "done"}.get(flt)
     if keep:
         eps = [e for e in eps if keep(e)]
     if q:
@@ -134,10 +139,31 @@ def show(conn, feed_url, read=True):
     eps = episode_list(conn, feed_url, limit=1000)
     title = (sub["title"] if sub and sub["title"] else None) or info.get("title") or feed_url
     newest = max([e["published"] or 0 for e in eps["episodes"]] or [0]) or None
+    from . import downloads
     return {"feed": feed_url, "title": title, "image": info.get("image"), "author": info.get("author") or "",
             "description": _plain(info.get("description") or ""), "link": info.get("link") or "", "updated": newest,
             "count": eps["total"], "following": bool(sub and sub["removed"] is None), "error": info.get("error"),
-            "episodes": eps["episodes"]}
+            "download": downloads.mode(conn, feed_url)["mode"], "episodes": eps["episodes"]}
+
+
+def mark_played(conn, feed_url):
+    """Mark all played: every episode of the show not played yet gets a play to its end (device "daf"),
+    so AntennaPod marks it played at its next sync. No listening time: it starts where it ends."""
+    from . import gpodder
+    rows = conn.execute("SELECT url, duration, guid FROM gp_episodes WHERE podcast = ?", (feed_url,)).fetchall()
+    st = _states(conn, [r["url"] for r in rows])
+    now, n, acts = int(time.time()), 0, []
+    for r in rows:
+        pos, total = st.get(r["url"], (None, None))
+        dur = r["duration"] or total or 0
+        if pos is not None and dur and pos >= dur - DONE_LEFT:
+            continue
+        end = int(dur) or 1
+        acts.append({"podcast": feed_url, "episode": r["url"], "action": "play", "started": end, "position": end, "total": end,
+                     "timestamp": now, "device": "daf", "guid": r["guid"]})
+        n += 1
+    gpodder.actions_upload(conn, acts)
+    return {"marked": n}
 
 
 def follow(conn, feed_url, on=True):
