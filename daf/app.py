@@ -742,11 +742,18 @@ def get_edition_taste(c=Depends(conn)):
 
 @app.put("/api/edition/settings", dependencies=[Depends(user)])
 async def put_edition_settings(request: Request):
-    """The Taste page's controls: the mix, a topic's or a source's more / less / mute."""
+    """The Taste page's controls: the mix, a topic's or a source's more / less / mute, a topic added or removed."""
     from . import edition
     body = await _body(request)
+    try:
+        if isinstance(body.get("topic_add"), dict):       # {"name", "words"?}: one of your own; without words the model is asked for some
+            await run_in_threadpool(edition.add_topic, body["topic_add"].get("name"), body["topic_add"].get("words"))
+        if isinstance(body.get("topic_remove"), str):     # a name: off the list, and out of "Name them again"
+            edition.remove_topic(body["topic_remove"])
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
     e = edition.settings()
-    changes = {k: v for k, v in body.items() if k in edition.DEFAULTS and k not in ("topics", "sources")}
+    changes = {k: v for k, v in body.items() if k in edition.DEFAULTS and k not in edition.OWN}
     if isinstance(body.get("topic"), dict):           # {"name", "adj"}
         name, adj = str(body["topic"].get("name") or ""), body["topic"].get("adj") or ""
         if adj not in edition.ADJ:
@@ -762,7 +769,7 @@ async def put_edition_settings(request: Request):
         else:
             src.pop(name, None)
         changes["sources"] = src
-    return {"settings": {k: v for k, v in edition.save(changes).items() if k not in ("topics", "sources")}}
+    return {"settings": {k: v for k, v in edition.save(changes).items() if k not in edition.OWN}}
 
 
 @app.post("/api/edition/topics", dependencies=[Depends(user)])

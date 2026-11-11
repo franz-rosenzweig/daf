@@ -13,6 +13,7 @@ const UP = svg(THUMB, 17), DOWN = '<span class="flip">' + svg(THUMB, 17) + '</sp
 const CHECK = svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 15);
 const KINDLE = svg('<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8.5 7h7M8.5 10.5h7M8.5 14h4"/>');
 const AGAIN = svg('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>');
+const X = svg('<path d="M6 6l12 12M18 6L6 18"/>', 15);
 C.I.edition = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3.5 4.5h10v11.5H5.2a1.7 1.7 0 0 1-1.7-1.7z"/><path d="M13.5 7.5h3v7a1.5 1.5 0 0 1-3 0M6 7.5h5M6 10.5h5M6 13.5h3"/></svg>';
 
 const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -147,8 +148,10 @@ function drawTaste(){
   const learn = [['watched', 'Watched'], ['opened', 'Opened'], ['played', 'Played'], ['highlighted', 'Highlighted'], ['saved', 'Saved'], ['up', 'Thumbs up'], ['down', 'Thumbs down']]
     .filter(([k]) => seen[k]).map(([k, l]) => '<span class="edlchip"><b>' + l + '</b> ' + seen[k] + '</span>').join('');
   const top = Math.max(0.01, ...T.topics.map(t => t.weight));
-  const topics = T.topics.length ? T.topics.map(t => '<div class="edtrow"><span class="edtn">' + esc(t.name) + '</span><div class="edbar"><i style="width:' + Math.round(100 * t.weight / top) + '%"></i></div>' +
-      (ARROW[t.trend] || '') + seg3('topic', t.name, t.adj) + '</div>').join('') : '<p class="mute" style="margin:0">None yet.</p>';
+  const topics = (T.topics.length ? T.topics.map(t => '<div class="edtrow"><span class="edtn" title="' + esc((t.words || []).join(', ')) + '">' + esc(t.name) + '</span><div class="edbar"><i style="width:' + Math.round(100 * t.weight / top) + '%"></i></div>' +
+      (ARROW[t.trend] || '') + seg3('topic', t.name, t.adj) + '<button class="ib edtrm" data-topicrm="' + esc(t.name) + '" aria-label="Remove ' + esc(t.name) + '" title="Remove">' + X + '</button></div>').join('') : '<p class="mute" style="margin:0">None yet.</p>') +
+    '<div class="edadd"><input class="field" id="edtopicin" aria-label="Add a topic" placeholder="Add a topic" maxlength="40" enterkeyhint="done">' +
+    '<input class="field" id="edtopicwords" aria-label="Words" placeholder="Words" enterkeyhint="done"><button class="btn sm" data-ed="addtopic">Add</button></div>';
   const srcs = T.sources.map(x => '<div class="edsrc"><div><span>' + esc(x.name) + '</span><em>' + esc(facts(x.facts)) + '</em></div>' + seg3('source', x.name, x.adj) + '</div>').join('');
   const muted = T.muted.map(m => '<div class="edsrc muted"><div><span>' + esc(m.replace(/^folder:/, '')) + '</span><em>' + (m.startsWith('folder:') ? 'folder' : '') + '</em></div><button class="linkbtn tiny" data-unmute="' + esc(m) + '">Unmute</button></div>').join('');
   const mix = MIX.map(m => '<div class="edmrow"><span>' + m[1] + '</span><div class="edstep"><button data-step="' + m[0] + '" data-d="-1" aria-label="Less">−</button><b>' + esc(fmt(m, s[m[0]])) + '</b><button data-step="' + m[0] + '" data-d="1" aria-label="More">+</button></div></div>').join('');
@@ -170,8 +173,21 @@ function drawTaste(){
     (muted ? '<h3 class="edmh">Muted</h3><div class="edsrcs">' + muted + '</div>' : '') + '</section>';
 }
 async function put(body){
-  try { const r = await api('/api/edition/settings', { method: 'PUT', body: JSON.stringify(body) }); T.settings = Object.assign(T.settings, r.settings); }
-  catch(e) { toast(e.message); }
+  try { const r = await api('/api/edition/settings', { method: 'PUT', body: JSON.stringify(body) }); T.settings = Object.assign(T.settings, r.settings); return true; }
+  catch(e) { toast(e.message); return false; }
+}
+// A topic of your own: a name and, if you like, its words (without them the server asks the model for some, which takes a moment).
+async function addTopic(){
+  const b = $('[data-ed=addtopic]'), name = ($('#edtopicin').value || '').trim(), words = ($('#edtopicwords').value || '').trim();
+  if (!b || b.disabled || !name) return;
+  b.disabled = true; b.textContent = 'Adding…';
+  if (!await put({ topic_add: words ? { name, words } : { name } })) { b.disabled = false; b.textContent = 'Add'; return; }
+  await again();
+}
+// The page's numbers again: a topic more or fewer moves what the others catch.
+async function again(){
+  try { T = await api('/api/edition/taste'); } catch(e) { toast(e.message); }
+  drawTaste();
 }
 document.addEventListener('click', async e => {
   if (!T || C.S.route[0] !== 'edition' || C.S.route[1] !== 'taste') return;
@@ -182,6 +198,13 @@ document.addEventListener('click', async e => {
     if (kind === 'topic') { const t = T.topics.find(x => x.name === name); if (t) t.adj = adj; }
     else { const x = T.sources.find(x => x.name === name); if (x) x.adj = adj === 'mute' ? '' : adj; if (adj === 'mute') { T.sources = T.sources.filter(x => x.name !== name); T.muted = [...T.muted, name].sort(); } }
     drawTaste(); return;
+  }
+  const rm = e.target.closest && e.target.closest('[data-topicrm]');
+  if (rm) {
+    const name = rm.dataset.topicrm;
+    if (!confirm('Remove “' + name + '”?')) return;
+    if (await put({ topic_remove: name })) { T.topics = T.topics.filter(x => x.name !== name); drawTaste(); await again(); }
+    return;
   }
   const pm = e.target.closest && e.target.closest('[data-poolmute]');
   if (pm) { const on = pm.dataset.on === '1'; await put({ source: { name: 'folder:' + pm.dataset.poolmute, adj: on ? 'mute' : '' } });
@@ -203,11 +226,15 @@ document.addEventListener('click', async e => {
     const v = ($('#edmutein').value || '').trim(); if (!v) return;
     await put({ source: { name: v, adj: 'mute' } }); T.muted = [...new Set([...T.muted, v])].sort(); drawTaste(); return;
   }
+  if (b && b.dataset.ed === 'addtopic') return addTopic();
   if (b && b.dataset.ed === 'topics') {
     b.disabled = true; b.textContent = 'Naming…';
     try { await api('/api/edition/topics', { method: 'POST' }); T = await api('/api/edition/taste'); drawTaste(); }
     catch(err) { toast(err.message); b.disabled = false; b.textContent = 'Name them again'; }
   }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.isComposing && (e.target.id === 'edtopicin' || e.target.id === 'edtopicwords')) { e.preventDefault(); addTopic(); }
 });
 document.addEventListener('change', async e => {
   const f = e.target.dataset && e.target.dataset.flag;
