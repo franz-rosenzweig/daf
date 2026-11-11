@@ -99,6 +99,7 @@ function openAdd(file, url){
     '<div class="addfeed"><span class="mute tiny">Or follow the site in the Feed, in</span><select class="field sm" id="addfolder" aria-label="Feed folder"><option value="">no folder</option></select><button class="btn sm" type="button" id="addfollow">Follow</button></div>' +
     '<label class="adddrop" id="adddrop"><input type="file" id="addfile" accept=".epub,.kepub,.mobi,.azw3,.azw,.fb2,.cbz,.pdf" multiple hidden><b>Drop books or PDFs here</b><span class="mute tiny">or click to choose. EPUB, MOBI, AZW3 and FB2 go into Calibre, then Books, where Daf opens them. PDFs go straight into the Library.</span></label>' +
     '<div id="addstatus" class="tiny" role="status"></div><div style="display:flex;justify-content:flex-end"><button class="btn" data-act="close">Close</button></div>';
+  if (C.Learn) C.Learn.addPicker(m);                 // Learn: which area it goes into (learn.js)
   if (file) uploadFiles(Array.isArray(file) ? file : [file]); else $('#addurl').focus();
   api('/api/feed/folders?hidden=1').then(r => { const s = $('#addfolder'); if (s) s.innerHTML = '<option value="">no folder</option>' + r.folders.filter(f => f !== 'Uncategorized').map(f => '<option>' + esc(f) + '</option>').join(''); }).catch(() => {});
 }
@@ -107,7 +108,9 @@ document.addEventListener('click', async e => {
   const url = $('#addurl').value.trim(), st = $('#addstatus');
   if (!url) { st.textContent = 'Paste the site’s address or its feed first.'; $('#addurl').focus(); return; }
   st.textContent = byDaf() ? 'Looking for its feed…' : 'Asking FreshRSS…'; e.target.disabled = true;
-  try { const r = await api('/api/add/feed', { method:'POST', body:JSON.stringify({ url, folder:$('#addfolder').value }) }); st.innerHTML = 'Following <b>' + esc(r.name) + '</b>. New posts show up in the Feed after the next sync.'; $('#addurl').value = ''; }
+  try { const r = await api('/api/add/feed', { method:'POST', body:JSON.stringify({ url, folder:$('#addfolder').value }) }); st.innerHTML = 'Following <b>' + esc(r.name) + '</b>. New posts show up in the Feed after the next sync.';
+    const area = C.Learn && C.Learn.chosen(); if (area) await C.Learn.put(area, { feed: url }).catch(() => {});
+    $('#addurl').value = ''; }
   catch(err){ st.textContent = err.message; }
   e.target.disabled = false;
 });
@@ -138,6 +141,7 @@ document.addEventListener('submit', async e => {
   st.textContent = 'Saving…';
   try {
     const r = await api('/api/add/link', { method:'POST', body:JSON.stringify({ url }) });
+    const area = C.Learn && C.Learn.chosen(); if (area) await C.Learn.put(area, r.id ? { ref: 'doc:' + r.id } : { url }).catch(() => {});
     st.innerHTML = r.where === 'library' ? 'Saved to the Library. ' + (r.id ? '<a href="#read/' + encodeURIComponent(r.id) + '" data-act="close">Open it</a>' : '') : 'It didn’t save just now, so it waits in Daf’s inbox and goes in on the next sync.';
     $('#addurl').value = ''; refreshCounts();
     if (R.list && R.list.where === 'library') listView(R.list.where, R.list.arg);

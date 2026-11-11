@@ -47,7 +47,7 @@ class Areas(unittest.TestCase):
         self.assertEqual(p["feeds"][0]["st"], "1 new")
         s = p["area"]
         self.assertEqual(s["counts"], "3 books · 1 article · 1 video · 1 feed")
-        self.assertEqual((s["n"], s["done"]), (6, 1))
+        self.assertEqual((s["n"], s["done"]), (5, 1))         # the feed is followed, not counted
 
     def test_a_private_book_never_shows(self):
         areas.add(self.c, self.a, "book:cal:3")

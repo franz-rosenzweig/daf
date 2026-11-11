@@ -188,8 +188,9 @@ def _summary(c, a):
     words = {"book": ("book", "books"), "article": ("article", "articles"), "video": ("video", "videos"), "feed": ("feed", "feeds")}
     counts = " · ".join(f"{n} {words[k][n != 1]}" for k, n in count.items() if n)
     secs = _month_seconds(c, [x["id"] for x in items if x.get("id")])
+    things = [x for x in items if x["kind"] != "feed"]          # (a feed is followed, never finished)
     return {"id": a["id"], "name": a["name"], "goal": a["goal"] or "", "color": a["color"] or COLORS[0], "suggest": bool(a["suggest"]),
-            "counts": counts, "n": len(items), "done": sum(1 for x in items if x["st"] == "Done"),
+            "counts": counts, "n": len(things), "done": sum(1 for x in things if x["st"] == "Done"),
             "month": _hm(secs) + " this month" if secs >= 60 else "",
             "pics": [x["pic"] for x in items if x["pic"]][:4], "tiles": [x["title"] for x in items if not x["pic"]][:4]}
 

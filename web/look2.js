@@ -33,7 +33,7 @@ L.frame = () => {
 // it is (Preferences → Sidebar's list, settings nav_pins).
 const OWNS = { today: ['today'], books: ['books', 'book', 'shelf'], catalog: ['catalog'], manga: ['manga', 'mread'], torah: ['torah'],
   library: ['library', 'view'], 'library/starred': [], edition: ['edition'], feed: ['feed', 'feeds'],
-  highlights: ['highlights'], review: ['review'], paper: ['paper'], podcasts: ['podcasts'], recovery: ['recovery'] };
+  highlights: ['highlights'], review: ['review'], paper: ['paper'], learn: ['learn'], podcasts: ['podcasts'], recovery: ['recovery'] };
 // Listen's pages are the Podcasts screen's own (podcasts.js CATS): a show is under Shows, one of
 // Audiobookshelf's recordings under Recordings.
 const LISTEN = [['podcasts', 'Listening'], ['podcasts/shows', 'Shows'], ['podcasts/episodes', 'Episodes'], ['podcasts/recordings', 'Recordings'], ['podcasts/audiobooks', 'Audiobooks'], ['podcasts/clips', 'Clips']];
@@ -55,7 +55,7 @@ function tabs(){
     ['Books', [['books', 'Books'], ['catalog', 'All Books'], pin('manga') && ['manga', 'Manga'], pin('torah') && ['torah', 'Torah']]],
     ['Library', [['library', 'Library'], pin('shortlist') && ['library/starred', 'Shortlist']]],
     ['Feed', [ed && ['edition', 'Edition'], ['feed', 'Feed']]],
-    ['Highlights', [['highlights', 'Highlights'], ['review', 'Review'], pin('paper') && ['paper', 'Paper pages']]],
+    ['Learn', [['learn', 'Areas'], ['highlights', 'Highlights'], ['review', 'Review'], pin('paper') && ['paper', 'Paper pages']]],
     ['Listen', pin('podcasts') ? LISTEN : []],
   ].map(([label, pages]) => [label, pages.filter(Boolean)]).filter(t => t[1].length);
 }
@@ -66,6 +66,11 @@ function feedFolders(){
   return [...box.querySelectorAll('.nv.sub')].map(b => ({ go: b.dataset.go, name: (b.querySelector('span:not(.ct)') || b).textContent.trim(), on: b.classList.contains('on') }));
 }
 
+// Learn's areas (learn.js keeps them), under Areas.
+function learnAreas(){
+  const r = S.route || [], list = (C.Learn && C.Learn.areas) || [];
+  return list.map(a => ({ go: 'learn/' + encodeURIComponent(a.id), name: a.name, on: r[0] === 'learn' && decodeURIComponent(r[1] || '') === a.id }));
+}
 // Library's kinds (Articles, Videos, …) and saved views, from the old sidebar's own rows (reader.js
 // navLibrary, which only lists them while its arrow is open: so it's opened for the asking, then put back).
 function libraryKinds(){
@@ -97,12 +102,16 @@ L.side = () => {
   const day = d && d.main && !(d.main.kind === 'minutes' && d.main.period === 'day');
   const done = d ? (day ? d.main.done : Math.floor(d.counted)) : 0, goal = d ? (day ? d.main.target : Math.round(d.goal || 60)) : 0;
   const sub = (p, cls) => '<button class="l2sub' + (cls || '') + (isOn(p[0]) ? ' on' : '') + '" data-go="' + p[0] + '">' + p[1] + '</button>';
-  const folders = cur && cur[0] === 'Feed' ? feedFolders() : cur && cur[0] === 'Library' ? libraryKinds() : [];
+  const folders = cur && cur[0] === 'Feed' ? feedFolders() : cur && cur[0] === 'Library' ? libraryKinds() : cur && cur[0] === 'Learn' ? learnAreas() : [];
   const fsub = f => '<button class="l2sub folder' + (f.on ? ' on' : '') + '" data-go="' + esc(f.go) + '">' + esc(f.name) + '</button>';
   const pages = cur && (cur[1].length > 1 || folders.length) ? cur[1] : [];
   const onFolder = folders.some(f => f.on);
+  // (Library's kinds and Learn's areas come right under its first page; Feed's folders after its pages)
+  const firstThen = cur && (cur[0] === 'Library' || cur[0] === 'Learn');
+  const nest = f => fsub(f).replace('l2sub folder', 'l2sub folder nested');
   const tabRow = all.map(t => '<button class="l2tab' + (t === cur ? ' on' : '') + '" data-go="' + t[1][0][0] + '" title="' + t[0] + '">' + tIcon(t[0]) + '<span class="l2tl">' + t[0] + '</span></button>' +
-    (t === cur ? pages.map(p => sub(p, ' nested')).join('') + folders.map(f => fsub(f).replace('l2sub folder', 'l2sub folder nested')).join('') : '')).join('') +
+    (t !== cur ? '' : firstThen ? (pages[0] ? sub(pages[0], ' nested' + (onFolder ? ' off' : '')) : '') + folders.map(nest).join('') + pages.slice(1).map(p => sub(p, ' nested')).join('')
+      : pages.map(p => sub(p, ' nested')).join('') + folders.map(nest).join(''))).join('') +
     '<button class="l2fold" data-act="l2fold" aria-label="Fold the side bar" title="Fold the side bar">' + FOLD + '</button>';
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const phone = all.filter(t => t[0] !== 'Listen').slice(0, 5);
@@ -115,7 +124,7 @@ L.side = () => {
       '<button class="l2mins" data-go="stats" aria-label="Stats">' + ringSvg(goal ? done / goal : 0) + (d ? '<span>' + done + ' of ' + goal + '</span>' : '') + '</button>' +
       '<button class="l2round" data-act="l2menu" aria-label="More">' + DOTS + '</button>' +
     '</div>' +
-    '<div class="l2subs">' + (cur && cur[0] === 'Library' ? sub(pages[0], onFolder ? ' off' : '') + folders.map(fsub).join('') + pages.slice(1).map(p => sub(p)).join('')
+    '<div class="l2subs">' + (cur && (cur[0] === 'Library' || cur[0] === 'Learn') ? sub(pages[0], onFolder ? ' off' : '') + folders.map(fsub).join('') + pages.slice(1).map(p => sub(p)).join('')
       : pages.map(p => sub(p, onFolder && p[0] === 'feed' ? ' off' : '')).join('') + folders.map(fsub).join('')) + '</div>' +
     '<div class="mobbar l2bar">' + phone.map(t => '<button class="mb' + (t === cur ? ' on' : '') + '" data-go="' + t[1][0][0] + '"><span>' + t[0] + '</span></button>').join('') +
       '<button class="mb l2more" data-act="l2menu" aria-label="More">' + DOTS + '</button></div>';
@@ -504,6 +513,7 @@ function screenItems(){
   else if (v === 'book') {
     pr('Listen from here', 'headphones', '[data-abk="here"]'); pr('Edit details', 'edit', '[data-act="bookedit"]');
     const o = q('.bookhead a[target="_blank"]'); if (o) add('Open the original', 'external', { href: o.href, blank: true });
+    const bid = decodeURIComponent(r[1] || ''); if (bid && C.Learn) add('Add to an area', 'plus', { fn: () => C.Learn.pick('book:' + bid, (q('.btitle') || {}).textContent) });
     const vl = q('.l2vault code'); if (vl) add('Open the note in Obsidian', 'external', { href: 'obsidian://open?vault=' + encodeURIComponent(q('.l2vault').dataset.vname || '') + '&file=' + encodeURIComponent(vl.textContent.trim()) });
   }
   else if (v === 'catalog') { pr('Columns', 'columns', '[data-act="cat:cols"]'); pr('Views', 'views', '[data-act="cat:views"]'); }
@@ -513,7 +523,9 @@ function screenItems(){
   else if (v === 'review') { add('Review more', 'refresh', { go: '#review/more' }); add('Highlights per day', 'target', { go: '#prefs', card: 'reviewcard' }); }
   else if (v === 'stats') { add('Goals', 'target', { go: '#prefs/goals' }); add('Log paper', 'note', { act: 'paper' }); }
   else if (v === 'manga') add('AniList', 'external', { go: '#prefs/anilist' });
-  else if (v === 'podcasts') add('Follow a show', 'plus', { search: true });      // its search finds shows in the directory too
+  else if (v === 'podcasts') add('Follow a show', 'plus', { search: true });
+  else if (v === 'learn' && !r[1]) add('New area', 'plus', { press: '#main [data-ln="new"]' });
+  else if (v === 'learn') { add('Add', 'plus', { press: '#main [data-ln="add"]' }); add('Find more', 'refresh', { press: '#main [data-ln="more"]' }); }      // its search finds shows in the directory too
   return it;
 }
 // The places with no tab, small at the foot (on a phone, Search and Add as well, and Listen's pages).
@@ -552,6 +564,7 @@ function doItem(how, anchor){
   if (how.press) press(how.press, anchor);
   else if (how.go) { $('#pop').hidden = true; goCard(how.go, how.card); }
   else if (how.search) { $('#pop').hidden = true; setTimeout(L.search, 0); }
+  else if (how.fn) { $('#pop').hidden = true; setTimeout(how.fn, 0); }
 }
 document.addEventListener('click', e => {
   if (!L.on || !e.target.closest) return;

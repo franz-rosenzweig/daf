@@ -361,6 +361,7 @@ function toggleSide(){
   document.addEventListener('touchcancel', () => { x0 = null; }, { passive: true });
 })();
 const PIN_ICONS = {
+  learn: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8 10 4.5 17.5 8 10 11.5zM5.5 9.6v3.6c1.4 1.3 2.9 2 4.5 2s3.1-.7 4.5-2V9.6"/></svg>',
   manga: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 3.5h8.5v13H4zM12.5 5.5H16v11h-3.5"/><path d="M6.5 6.5h3.5M6.5 9h3.5"/></svg>',
   recovery: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 14.5h14M5.5 14.5a4.5 4.5 0 0 1 9 0M10 4.5v2M4.6 7.1l1.4 1.4M15.4 7.1 14 8.5"/></svg>',
   podcasts: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="7.5" y="3" width="5" height="9" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
@@ -368,7 +369,7 @@ const PIN_ICONS = {
 };
 // The places that can be pinned, in the order they show: [key, label, hash, icon].
 const PINS = () => [['podcasts', 'Podcasts', 'podcasts', PIN_ICONS.podcasts], ['manga', 'Manga', 'manga', PIN_ICONS.manga], ['torah', 'Torah', 'torah', I.torah],
-  ['recovery', 'Recovery', 'recovery', PIN_ICONS.recovery], ['shortlist', 'Shortlist', 'library/starred', PIN_ICONS.shortlist], ['paper', 'Paper pages', 'paper', I.camera], ['sources', 'Sources', 'sources', I.sources]];
+  ['recovery', 'Recovery', 'recovery', PIN_ICONS.recovery], ['shortlist', 'Shortlist', 'library/starred', PIN_ICONS.shortlist], ['paper', 'Paper pages', 'paper', I.camera], ['sources', 'Sources', 'sources', I.sources], ['learn', 'Learn', 'learn', PIN_ICONS.learn]];
 const pinsOn = () => { const p = (S.settings || (S.data && S.data.settings) || {}).nav_pins; return Array.isArray(p) ? p : ['podcasts', 'manga', 'torah', 'recovery', 'shortlist']; };
 // Preferences → Sidebar: how it is on this device, and what's pinned (settings nav_pins, every device).
 function drawSideCard(){
