@@ -1868,6 +1868,122 @@ def _shelf_list(c):
     return out
 
 
+# ---- Learn's areas (areas.py, web/learn.js) -------------------------------------------------
+
+def _area_err(fn, *a):
+    from . import areas
+    try:
+        return fn(*a)
+    except KeyError:
+        raise HTTPException(404, "No such area")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/areas", dependencies=[Depends(user)])
+def get_areas(ref: str = "", c=Depends(conn)):
+    from . import areas
+    return {"areas": areas.list_areas(c), "in": areas.areas_of(c, ref) if ref else []}
+
+
+@app.post("/api/areas", dependencies=[Depends(user)])
+def post_area(b=Depends(json_body), c=Depends(conn)):
+    from . import areas
+    aid = _area_err(areas.create, c, b.get("name"), b.get("goal") or "", b.get("color"), b.get("suggest", True) is not False)
+    if b.get("suggest", True) is not False:
+        areas.suggest_start(aid)
+    return {"id": aid, "areas": areas.list_areas(c)}
+
+
+@app.put("/api/areas/order", dependencies=[Depends(user)])
+def put_area_order(b=Depends(json_body), c=Depends(conn)):
+    from . import areas
+    areas.reorder(c, [str(x) for x in b.get("ids") or []])
+    return {"areas": areas.list_areas(c)}
+
+
+@app.get("/api/areas/{aid}", dependencies=[Depends(user)])
+def get_area(aid: str, c=Depends(conn)):
+    from . import areas
+    p = _area_err(areas.page, c, aid)
+    p["error"] = areas.error(aid)
+    return p
+
+
+@app.put("/api/areas/{aid}", dependencies=[Depends(user)])
+def put_area(aid: str, b=Depends(json_body), c=Depends(conn)):
+    from . import areas
+    _area_err(areas.update, c, aid, b)
+    return {"areas": areas.list_areas(c)}
+
+
+@app.delete("/api/areas/{aid}", dependencies=[Depends(user)])
+def delete_area(aid: str, c=Depends(conn)):
+    from . import areas
+    areas.delete(c, aid)
+    return {"areas": areas.list_areas(c)}
+
+
+@app.post("/api/areas/{aid}/items", dependencies=[Depends(user)])
+def post_area_item(aid: str, b=Depends(json_body), c=Depends(conn)):
+    """Add to an area: a ref (book:, doc:, feed:), or a link, which is saved to the Library first."""
+    from . import areas
+    ref = str(b.get("ref") or "")
+    url = str(b.get("url") or "").strip()
+    feed = str(b.get("feed") or "").strip()
+    if feed:                                            # a site or feed: followed (or found among the followed), then in the area
+        if not re.match(r"^https?://\S+$", feed):
+            raise HTTPException(400, "A link starting with http:// or https://, please")
+        try:
+            ref = "feed:" + areas._follow(c, feed)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, str(e)[:200])
+    elif url:
+        if not re.match(r"^https?://\S+$", url):
+            raise HTTPException(400, "A link starting with http:// or https://, please")
+        did = areas._save_link(c, url, str(b.get("title") or "").strip() or None)
+        ref = ("doc:" + did) if did else ("url:" + url)
+    _area_err(areas.add, c, aid, ref)
+    return {"ref": ref}
+
+
+@app.delete("/api/areas/{aid}/items", dependencies=[Depends(user)])
+def delete_area_item(aid: str, ref: str, c=Depends(conn)):
+    from . import areas
+    areas.remove(c, aid, ref)
+    return {"ok": True}
+
+
+@app.put("/api/areas/{aid}/items/order", dependencies=[Depends(user)])
+def put_area_items_order(aid: str, b=Depends(json_body), c=Depends(conn)):
+    from . import areas
+    areas.order_items(c, aid, [str(x) for x in b.get("refs") or []])
+    return {"ok": True}
+
+
+@app.post("/api/areas/{aid}/suggest", dependencies=[Depends(user)])
+def post_area_suggest(aid: str, c=Depends(conn)):
+    from . import areas
+    if not c.execute("SELECT 1 FROM areas WHERE id = ?", (aid,)).fetchone():
+        raise HTTPException(404, "No such area")
+    return {"looking": areas.suggest_start(aid) or True}
+
+
+@app.post("/api/areas/suggestions/{sid}", dependencies=[Depends(user)])
+def post_area_suggestion(sid: str, b=Depends(json_body), c=Depends(conn)):
+    """A suggestion: add it (Add) or set it aside (skip)."""
+    from . import areas
+    if b.get("skip"):
+        areas.skip(c, sid)
+        return {"ok": True}
+    try:
+        return {"ref": areas.take(c, sid)}
+    except KeyError:
+        raise HTTPException(404, "No such suggestion")
+    except Exception as e:  # noqa: BLE001 - a feed that won't follow, a page that won't save
+        raise HTTPException(502, str(e)[:200])
+
+
 @app.get("/api/shelves", dependencies=[Depends(user)])
 def get_shelves(c=Depends(conn)):
     return {"shelves": _shelf_list(c)}

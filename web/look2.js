@@ -24,6 +24,7 @@ L.shape = () => {
 L.frame = () => {
   const s = L.shape(), wasPhone = root.classList.contains('l2-phone');
   for (const k of ['top', 'side', 'phone']) root.classList.toggle('l2-' + k, k === s);
+  root.classList.toggle('l2-fold', s === 'side' && !!C.lsGet('fold', false));     // the side bar folded to its pictures (sideways only)
   if (wasPhone !== (s === 'phone') && C.Themes) C.Themes.apply();     // the Android bars: the page's colour on a phone, the backdrop's elsewhere
   root.classList.toggle('l2-hover', matchMedia('(hover: hover) and (pointer: fine)').matches);     // a pointer that hovers: names can be tooltips
 };
@@ -32,9 +33,17 @@ L.frame = () => {
 // it is (Preferences → Sidebar's list, settings nav_pins).
 const OWNS = { today: ['today'], books: ['books', 'book', 'shelf'], catalog: ['catalog'], manga: ['manga', 'mread'], torah: ['torah'],
   library: ['library', 'view'], 'library/starred': [], edition: ['edition'], feed: ['feed', 'feeds'],
-  highlights: ['highlights'], review: ['review'], paper: ['paper'], podcasts: ['podcasts'], recovery: ['recovery'] };
+  highlights: ['highlights'], review: ['review'], paper: ['paper'], learn: ['learn'], podcasts: ['podcasts'], recovery: ['recovery'] };
+// Listen's pages are the Podcasts screen's own (podcasts.js CATS): a show is under Shows, one of
+// Audiobookshelf's recordings under Recordings.
+const LISTEN = [['podcasts', 'Listening'], ['podcasts/shows', 'Shows'], ['podcasts/episodes', 'Episodes'], ['podcasts/recordings', 'Recordings'], ['podcasts/audiobooks', 'Audiobooks'], ['podcasts/clips', 'Clips']];
 const isOn = key => {
   const r = S.route || [];
+  if (key.startsWith('podcasts')) {
+    if (r[0] !== 'podcasts') return false;
+    const cat = LISTEN.some(p => p[0] === 'podcasts/' + r[1]) ? r[1] : r[1] === 'abs' ? 'recordings' : r[1] ? 'shows' : '';
+    return key === (cat ? 'podcasts/' + cat : 'podcasts');
+  }
   if (r.join('/') === 'library/starred') return key === 'library/starred';
   return (OWNS[key] || []).includes(r[0]);
 };
@@ -46,8 +55,8 @@ function tabs(){
     ['Books', [['books', 'Books'], ['catalog', 'All Books'], pin('manga') && ['manga', 'Manga'], pin('torah') && ['torah', 'Torah']]],
     ['Library', [['library', 'Library'], pin('shortlist') && ['library/starred', 'Shortlist']]],
     ['Feed', [ed && ['edition', 'Edition'], ['feed', 'Feed']]],
-    ['Highlights', [['highlights', 'Highlights'], ['review', 'Review'], pin('paper') && ['paper', 'Paper pages']]],
-    ['Listen', [pin('podcasts') && ['podcasts', 'Podcasts']]],
+    ['Learn', [['learn', 'Areas'], ['highlights', 'Highlights'], ['review', 'Review'], pin('paper') && ['paper', 'Paper pages']]],
+    ['Listen', pin('podcasts') ? LISTEN : []],
   ].map(([label, pages]) => [label, pages.filter(Boolean)]).filter(t => t[1].length);
 }
 // The Feed's pinned folders and feeds, from the old sidebar's own rows (reader.js navFeed).
@@ -57,6 +66,11 @@ function feedFolders(){
   return [...box.querySelectorAll('.nv.sub')].map(b => ({ go: b.dataset.go, name: (b.querySelector('span:not(.ct)') || b).textContent.trim(), on: b.classList.contains('on') }));
 }
 
+// Learn's areas (learn.js keeps them), under Areas.
+function learnAreas(){
+  const r = S.route || [], list = (C.Learn && C.Learn.areas) || [];
+  return list.map(a => ({ go: 'learn/' + encodeURIComponent(a.id), name: a.name, on: r[0] === 'learn' && decodeURIComponent(r[1] || '') === a.id }));
+}
 // Library's kinds (Articles, Videos, …) and saved views, from the old sidebar's own rows (reader.js
 // navLibrary, which only lists them while its arrow is open: so it's opened for the asking, then put back).
 function libraryKinds(){
@@ -75,18 +89,30 @@ function ringSvg(frac){
     '<circle cx="13" cy="13" r="9" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="' + (Math.min(1, frac) * c).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 13 13)"/></svg>';
 }
 
+// The tabs' pictures: beside their names in the side bar, alone when it's folded (and never in the row on top).
+const TICON = { Today: 'M10 6.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7zM10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8',
+  Books: 'M4 4.5h3.5v11H4zM9 4.5h3.5v11H9zM13.6 5.2l2.8.8-2.6 9.8-2.8-.8', Library: 'M5 3.5h10v13l-5-3.3-5 3.3z',
+  Feed: 'M5 4.5a10.5 10.5 0 0 1 10.5 10.5M5 9a6 6 0 0 1 6 6M5.5 14.5h.01', Learn: 'M2.5 8 10 4.5 17.5 8 10 11.5zM5.5 9.6v3.6c1.4 1.3 2.9 2 4.5 2s3.1-.7 4.5-2V9.6M17.5 8v4.2',
+  Highlights: 'M4.5 15.5l1-3.5 7-7 2.5 2.5-7 7zM11.5 6l2.5 2.5M3.5 17.5h6', Listen: 'M4 13.5V11a6 6 0 0 1 12 0v2.5M4 12.5h2.5v4H4zM13.5 12.5H16v4h-2.5z' };
+const tIcon = label => TICON[label] ? '<svg class="l2ti" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="' + TICON[label] + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '';
+const FOLD = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.5 5 6.5 10l5 5M15.5 5l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 L.side = () => {
   const sd = $('#side'); if (!sd) return;
   const d = S.data, all = tabs(), cur = all.find(t => t[1].some(p => isOn(p[0])));
   const day = d && d.main && !(d.main.kind === 'minutes' && d.main.period === 'day');
   const done = d ? (day ? d.main.done : Math.floor(d.counted)) : 0, goal = d ? (day ? d.main.target : Math.round(d.goal || 60)) : 0;
   const sub = (p, cls) => '<button class="l2sub' + (cls || '') + (isOn(p[0]) ? ' on' : '') + '" data-go="' + p[0] + '">' + p[1] + '</button>';
-  const folders = cur && cur[0] === 'Feed' ? feedFolders() : cur && cur[0] === 'Library' ? libraryKinds() : [];
+  const folders = cur && cur[0] === 'Feed' ? feedFolders() : cur && cur[0] === 'Library' ? libraryKinds() : cur && cur[0] === 'Learn' ? learnAreas() : [];
   const fsub = f => '<button class="l2sub folder' + (f.on ? ' on' : '') + '" data-go="' + esc(f.go) + '">' + esc(f.name) + '</button>';
   const pages = cur && (cur[1].length > 1 || folders.length) ? cur[1] : [];
   const onFolder = folders.some(f => f.on);
-  const tabRow = all.map(t => '<button class="l2tab' + (t === cur ? ' on' : '') + '" data-go="' + t[1][0][0] + '">' + t[0] + '</button>' +
-    (t === cur ? pages.map(p => sub(p, ' nested')).join('') + folders.map(f => fsub(f).replace('l2sub folder', 'l2sub folder nested')).join('') : '')).join('');
+  // (Library's kinds and Learn's areas come right under its first page; Feed's folders after its pages)
+  const firstThen = cur && (cur[0] === 'Library' || cur[0] === 'Learn');
+  const nest = f => fsub(f).replace('l2sub folder', 'l2sub folder nested');
+  const tabRow = all.map(t => '<button class="l2tab' + (t === cur ? ' on' : '') + '" data-go="' + t[1][0][0] + '" title="' + t[0] + '">' + tIcon(t[0]) + '<span class="l2tl">' + t[0] + '</span></button>' +
+    (t !== cur ? '' : firstThen ? (pages[0] ? sub(pages[0], ' nested' + (onFolder ? ' off' : '')) : '') + folders.map(nest).join('') + pages.slice(1).map(p => sub(p, ' nested')).join('')
+      : pages.map(p => sub(p, ' nested')).join('') + folders.map(nest).join(''))).join('') +
+    '<button class="l2fold" data-act="l2fold" aria-label="Fold the side bar" title="Fold the side bar">' + FOLD + '</button>';
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const phone = all.filter(t => t[0] !== 'Listen').slice(0, 5);
   sd.innerHTML =
@@ -98,7 +124,7 @@ L.side = () => {
       '<button class="l2mins" data-go="stats" aria-label="Stats">' + ringSvg(goal ? done / goal : 0) + (d ? '<span>' + done + ' of ' + goal + '</span>' : '') + '</button>' +
       '<button class="l2round" data-act="l2menu" aria-label="More">' + DOTS + '</button>' +
     '</div>' +
-    '<div class="l2subs">' + (cur && cur[0] === 'Library' ? sub(pages[0], onFolder ? ' off' : '') + folders.map(fsub).join('') + pages.slice(1).map(p => sub(p)).join('')
+    '<div class="l2subs">' + (cur && (cur[0] === 'Library' || cur[0] === 'Learn') ? sub(pages[0], onFolder ? ' off' : '') + folders.map(fsub).join('') + pages.slice(1).map(p => sub(p)).join('')
       : pages.map(p => sub(p, onFolder && p[0] === 'feed' ? ' off' : '')).join('') + folders.map(fsub).join('')) + '</div>' +
     '<div class="mobbar l2bar">' + phone.map(t => '<button class="mb' + (t === cur ? ' on' : '') + '" data-go="' + t[1][0][0] + '"><span>' + t[0] + '</span></button>').join('') +
       '<button class="mb l2more" data-act="l2menu" aria-label="More">' + DOTS + '</button></div>';
@@ -172,7 +198,7 @@ function scan(){
   document.querySelectorAll('#main .hlgroup, #main .mcont').forEach(el => { const im = el.querySelector('img'); if (im) L.tintFrom(el, im.getAttribute('src')); });
   const pl = document.getElementById('player'), art = pl && pl.querySelector('img.plart');
   if (pl && art) L.tintFrom(pl, art.getAttribute('src'));
-  dupTitle(); prefsSearch(); prefsPages(); everywhere(); hlFilter(); excerpt();
+  listenTitle(); dupTitle(); prefsSearch(); prefsPages(); everywhere(); hlFilter(); excerpt();
 }
 // Preferences: a box that finds a setting by its name. Cards that don't have the words step away, and in a
 // card that does, so do the rows without them (unless it's the card's own name that matched).
@@ -245,12 +271,19 @@ document.addEventListener('click', e => {
   const g = document.querySelector('#main .prefsgrid');
   if (g && g.dataset.pushed) history.back(); else location.hash = '#prefs';
 });
+// Listen: the page's name is the one it's on (Listening, Shows, Audiobooks…), not "Podcasts" over all
+// of them; its chips are the row of pages above, so they step back.
+function listenTitle(){
+  if ((S.route || [])[0] !== 'podcasts') return;
+  const on = document.querySelector('#main .pccats .pccat.on'), h = document.querySelector('#main > .top h1');
+  if (on && h && h.textContent !== on.textContent) h.textContent = on.textContent;
+}
 // A screen's own name, when the row of pages just above already says it ("Highlights" under Highlights ·
 // Review): the name steps back, and so does its bar if nothing else is in it.
 function dupTitle(){
   const sub = document.querySelector('.l2subs .l2sub.on'), h = document.querySelector('#main .top h1');
   if (!h) return;
-  const same = !!sub && L.shape() !== 'side' && !h.querySelector('select,a,svg:not(.srcpick svg),button:not(.srcpick)') && h.textContent.trim().toLowerCase() === sub.textContent.trim().toLowerCase();
+  const same = !!sub && (L.shape() !== 'side' || root.classList.contains('l2-fold')) && !h.querySelector('select,a,svg:not(.srcpick svg),button:not(.srcpick)') && h.textContent.trim().toLowerCase() === sub.textContent.trim().toLowerCase();
   h.classList.toggle('l2same', same);
   // (a child's own computed display, not whether it shows: the bar itself may be the hidden one)
   const top = h.closest('.top'); if (top) top.classList.toggle('l2bare', same && ![...top.children].some(c => c !== h && !c.classList.contains('spacer') && getComputedStyle(c).display !== 'none'));
@@ -480,6 +513,7 @@ function screenItems(){
   else if (v === 'book') {
     pr('Listen from here', 'headphones', '[data-abk="here"]'); pr('Edit details', 'edit', '[data-act="bookedit"]');
     const o = q('.bookhead a[target="_blank"]'); if (o) add('Open the original', 'external', { href: o.href, blank: true });
+    const bid = decodeURIComponent(r[1] || ''); if (bid && C.Learn) add('Add to an area', 'plus', { fn: () => C.Learn.pick('book:' + bid, (q('.btitle') || {}).textContent) });
     const vl = q('.l2vault code'); if (vl) add('Open the note in Obsidian', 'external', { href: 'obsidian://open?vault=' + encodeURIComponent(q('.l2vault').dataset.vname || '') + '&file=' + encodeURIComponent(vl.textContent.trim()) });
   }
   else if (v === 'catalog') { pr('Columns', 'columns', '[data-act="cat:cols"]'); pr('Views', 'views', '[data-act="cat:views"]'); }
@@ -489,7 +523,9 @@ function screenItems(){
   else if (v === 'review') { add('Review more', 'refresh', { go: '#review/more' }); add('Highlights per day', 'target', { go: '#prefs', card: 'reviewcard' }); }
   else if (v === 'stats') { add('Goals', 'target', { go: '#prefs/goals' }); add('Log paper', 'note', { act: 'paper' }); }
   else if (v === 'manga') add('AniList', 'external', { go: '#prefs/anilist' });
-  else if (v === 'podcasts') add('Follow a show', 'plus', { search: true });      // its search finds shows in the directory too
+  else if (v === 'podcasts') add('Follow a show', 'plus', { search: true });
+  else if (v === 'learn' && !r[1]) add('New area', 'plus', { press: '#main [data-ln="new"]' });
+  else if (v === 'learn') { add('Add', 'plus', { press: '#main [data-ln="add"]' }); add('Find more', 'refresh', { press: '#main [data-ln="more"]' }); }      // its search finds shows in the directory too
   return it;
 }
 // The places with no tab, small at the foot (on a phone, Search and Add as well, and Listen's pages).
@@ -528,6 +564,7 @@ function doItem(how, anchor){
   if (how.press) press(how.press, anchor);
   else if (how.go) { $('#pop').hidden = true; goCard(how.go, how.card); }
   else if (how.search) { $('#pop').hidden = true; setTimeout(L.search, 0); }
+  else if (how.fn) { $('#pop').hidden = true; setTimeout(how.fn, 0); }
 }
 document.addEventListener('click', e => {
   if (!L.on || !e.target.closest) return;
@@ -607,6 +644,11 @@ function mergeOwn(menu){
 }
 
 addEventListener('resize', () => { if (L.on) L.frame(); });
+document.addEventListener('click', e => {
+  const b = L.on && e.target.closest && e.target.closest('[data-act="l2fold"]'); if (!b) return;
+  C.lsSet('fold', !C.lsGet('fold', false)); L.frame(); dupTitle();
+  window.dispatchEvent(new Event('resize'));          // (a reader or a list laid out by the width redraws)
+});
 
 // Preferences: the switch, on this device.
 L.card = () => '<section class="card" id="lookcard"><h2>New look</h2><div class="prow"><div class="d"><b>On this device</b></div>' +

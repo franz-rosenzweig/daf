@@ -20,6 +20,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 - [Sound](sound.md) — rain, fire, the sea or a crowd under the book, following the scene, in Daf or beside the Kindle
 - [The Feed and the Library](feed-and-library.md) — FreshRSS, the Library and its tags, imports, the morning email, newsletters, Home, search and Send to Kindle
 - [Videos and podcasts](videos-and-podcasts.md) — transcripts, clips, episode pages, and AntennaPod
+- [Learn](learn.md) — areas: a subject each, with its books, articles, videos and feeds in order, and a helper that suggests more
 - [Highlights and review](highlights-and-review.md) — colors, tags, the daily review, flashcards and export
 - [Books and shelves](books-and-shelves.md) — the nightstand, shelves, Hardcover and a book's page
 - [Calibre in Daf](calibre.md) — All books as a spreadsheet, Calibre's search, editing one book or many, covers, files, conversions, Find details for one or many, tags/authors/series, details into the files, merging and the trash
