@@ -15,6 +15,11 @@ that block's units. Every block and stroke has the id the page made for it, so w
 offline and sent twice is kept once and undo takes it away by its id; the same id sent again
 replaces it (typed text edited, a block moved).
 
+It's the Notebook in the app now: a chapter's highlights show on its page as cards, in reading
+order, from the highlights themselves (they stay highlights, and aren't copied in here). A block
+written under a card keeps the highlight's id (hl) and its place in the book when it was written
+(hat), so it stays under that card, and where the card was if the highlight goes.
+
 A book's pages go to the Kindle as KOReader bookmarks at the chapter's start, their text (typed,
 and the handwriting as read) as the bookmark's note; the Daf plugin asks for them with
 /api/kindle/book and says which it has.
@@ -35,6 +40,7 @@ INK_W, LINE = 2000, 150                      # an Ink writing block's width and 
 ITEM = re.compile(r"^(book|doc|manga):[^\s/]{1,200}$")
 TAB = re.compile(r"^(|c:[^\n]{1,400}|v:[A-Za-z0-9_-]{1,64})$")
 MARK_ID = re.compile(r"^[ktib][0-9a-z]{8,40}$")
+HL_ID = re.compile(r"^[A-Za-z0-9:._-]{1,80}$")   # a highlight a block is written under
 COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 TOOLS = ("fountain", "calligraphy", "pen", "pencil", "brush", "marker", "highlighter")
 HL_COLORS = ("yellow", "green", "blue", "pink", "purple")
@@ -88,6 +94,10 @@ def _clean(m):
     d = {"ord": round(_num(m.get("ord") if m.get("ord") is not None else 0, -1e9, 1e9), 6)}
     if m.get("t") is not None:                    # a video's or an episode's time, in seconds
         d["t"] = _r1(_num(m["t"], 0, 10 ** 6))
+    if m.get("hl") and HL_ID.match(str(m["hl"])):  # under a highlight's card, and where that was
+        d["hl"] = str(m["hl"])
+        if isinstance(m.get("hat"), (int, float)):
+            d["hat"] = round(_num(m["hat"], -1e9, 1e9), 8)
     if kind == "text":
         d["text"] = str(m.get("text") or "").replace("\r\n", "\n").rstrip()[:20000]
         if not d["text"] and "t" not in d:
@@ -150,6 +160,24 @@ def marks(conn, item, tab):
         except ValueError:
             continue
         out.append({"id": r["id"], "kind": r["kind"], "updated": r["updated"], **d})
+    return out
+
+
+def everything(conn, item):
+    """Every page of an item, for the Notebook's list: [{tab, title, pos, blocks}] in reading order,
+    a block without its strokes (a handwriting block says how many, and what was read of it)."""
+    out = []
+    for t in tabs(conn, item):
+        bl = []
+        for b in blocks(marks(conn, item, t["tab"])):
+            n = len(b.pop("strokes"))
+            b.pop("updated", None)
+            if b["kind"] == "image":
+                b.pop("w", None)
+            if b["kind"] != "text":
+                b["n"] = n
+            bl.append(b)
+        out.append({"tab": t["tab"], "title": t["title"], "pos": t["pos"], "blocks": bl})
     return out
 
 
@@ -316,6 +344,13 @@ def router():
     def kindle_ack_route(b=Depends(json_body), name=Depends(device), c=Depends(conn)):
         """The Kindle's plugin has these pages as bookmarks now (or took away the ones emptied)."""
         return {"ok": True, "acked": kindle_ack(c, b.get("items") if isinstance(b, dict) else None)}
+
+    @r.get("/{item}/all", dependencies=[Depends(user)])
+    def get_all(item: str, c=Depends(conn)):
+        """Every page of the item, without the strokes (the Notebook's list)."""
+        if not item_ok(item):
+            raise HTTPException(400, "Bad item")
+        return {"item": item, "tabs": everything(c, item)}
 
     @r.get("/{item}", dependencies=[Depends(user)])
     def get_item(item: str, tab: str = "", c=Depends(conn)):

@@ -1,6 +1,6 @@
 /* Daf book reader: EPUB (and MOBI/AZW3/FB2) from Calibre, rendered by foliate-js, inside
-   Daf's reading view. Contents, bookmarks and search on the left, Info / Notebook / Ask on the
-   right, highlights anchored by CFI, the Kindle's highlights placed by KOReader's own position,
+   Daf's reading view. Contents, bookmarks and search on the left, Info / Ask on the right, the
+   Notebook beside it (sketchbook.js, its highlights on its pages), highlights anchored by CFI, the Kindle's highlights placed by KOReader's own position,
    the position kept on the server so phone and desktop agree, and time with a book open counting
    toward the hour. */
 import { makeBook } from './vendor/foliate-js/view.js';
@@ -171,7 +171,8 @@ async function openBook(id, at){
   applyBookType();
   drawToc();
   Pens.use(INKSURF);
-  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, resized: applyBookType });   // the Sketchbook beside it (sketchbook.js)
+  TOCAT.clear(); SECDOC.clear();
+  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, resized: applyBookType, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
   // Where to start: a highlight we were sent to, else the newest of here / this device / the Kindle.
   const local = store.get('bookpos.' + id, null);
   const server = d.position;
@@ -1093,7 +1094,7 @@ function openPhoneMenu(anchor){
   const p = $('#pop'), r = anchor.getBoundingClientRect(), n = allHighlights().length;
   const row = (a, label, icon, extra) => '<button data-pm="' + a + '"><span>' + label + '</span>' + (extra || '') + icon + '</button>';
   p.innerHTML = '<div class="menu pmenu">' +
-    row('toc', 'Contents', ICON.toc) + row('notebook', 'Notebook', ICON.pen, n ? '<span class="pmc">' + n + '</span>' : '') + row('search', 'Search Book', ICON.search) +
+    row('toc', 'Contents', ICON.toc) + row('notebook', 'Notebook', ICON.pen, n ? '<span class="pmc">' + n + '</span>' : '') + row('info', 'About this book', ICON.panel) + row('search', 'Search Book', ICON.search) +
     row('aa', 'Themes &amp; Settings', '<b class="pmaa">Aa</b>') + row('listen', listening() ? 'Stop listening' : 'Listen', ICON.listen) + (C.Sound ? row('sound', 'Sound', C.Sound.icon, C.Sound.mode === 'book' ? '<span class="pmc">✓</span>' : '') : '') + row('ask', 'Ask about this book', ICON.ask) +
     '<div class="pmrow"><button data-pm="mark" aria-label="' + (markHere() ? 'Remove the bookmark' : 'Bookmark this page') + '">' + ICON.mark(!!markHere()) + '</button>' +
     (C.Focus ? '<button data-pm="focus" aria-label="Focus mode">' + ICON.focus + '</button>' : '') + '<button data-pm="more" aria-label="More">' + ICON.more + '</button></div></div>';
@@ -1150,10 +1151,46 @@ function allHighlights(){
   for (const h of d.other_highlights) out.push(Object.assign(h, { open: href(h), _k: h.sec != null && fr[h.sec] != null ? fr[h.sec] + (h.page || 0) * 1e-7 : (h.page && d.kindle && d.kindle.total ? h.page / d.kindle.total : 2) }));
   return out.sort((a, b) => a._k - b._k);
 }
+// The highlights for the Notebook (sketchbook.js): each with the contents' entry it's under, so it's a
+// card on its chapter's page, in reading order (highlights on one page by their place on it).
+const TOCAT = new Map(), SECDOC = new Map();   // a highlight's id → its contents entry; a section → its document, made once
+async function tocItemOf(h){
+  if (TOCAT.has(h.id)) return TOCAT.get(h.id);
+  const v = B.view; let it = null;
+  try {
+    const cfi = (h.pos && h.pos.cfi) || h.cfi;
+    if (cfi) {
+      const at = v.resolveNavigation(cfi), shown = v.renderer.getContents().find(c => c.index === at.index);
+      let doc = shown && shown.doc;
+      if (!doc) { if (!SECDOC.has(at.index)) SECDOC.set(at.index, Promise.resolve(v.book.sections[at.index].createDocument())); doc = await SECDOC.get(at.index); }
+      const r = at.anchor(doc);
+      it = v.getProgressOf(at.index, r && r.comparePoint ? r : null).tocItem;
+    } else {
+      let i = h.sec;
+      if (i == null && h._k != null && h._k <= 1) { const fr = B.secFrac || []; i = 0; while (i + 1 < fr.length && fr[i + 1] <= h._k) i++; }
+      if (i != null) it = v.getProgressOf(i).tocItem;
+    }
+  } catch(e){}
+  TOCAT.set(h.id, it || null);
+  return it || null;
+}
+async function notebookHls(){
+  if (!B.d || !B.view) return [];
+  const cf = x => (x.pos && x.pos.cfi) || x.cfi;
+  const all = allHighlights().slice().sort((a, b) => (a._k - b._k) || (cf(a) && cf(b) ? CFI.compare(cf(a), cf(b)) : 0));
+  const out = [];
+  let prev = null, tie = 0;
+  for (const h of all) {
+    tie = prev != null && h._k === prev ? tie + 1 : 0; prev = h._k;
+    out.push({ id: h.id, text: h.text, color: h.color || 'yellow', key: (h._k || 0) + tie * 1e-7, where: H.where(h), note: h.user_note || '', raw: h, tocItem: await tocItemOf(h) });
+  }
+  return out;
+}
 function drawPanel(){
   const p = $('#bpanel'); if (!p || !B.d) return;
+  if (B.panel === 'notebook') B.panel = 'info';      // the Notebook is its own now (sketchbook.js)
   const d = B.d, all = allHighlights(), n = all.length;
-  p.innerHTML = '<div class="ptabs" role="tablist">' + [['info', 'Info'], ['notebook', 'Notebook <span class="c">' + n + '</span>'], ['ask', 'Ask']].map(t => '<button class="ptab' + (B.panel === t[0] ? ' on' : '') + '" data-bpt="' + t[0] + '" role="tab">' + t[1] + '</button>').join('') + '</div><div id="bpbody"></div>';
+  p.innerHTML = '<div class="ptabs" role="tablist">' + [['info', 'Info'], ['ask', 'Ask']].map(t => '<button class="ptab' + (B.panel === t[0] ? ' on' : '') + '" data-bpt="' + t[0] + '" role="tab">' + t[1] + '</button>').join('') + '</div><div id="bpbody"></div>';
   const b = $('#bpbody');
   if (B.panel === 'info') {
     b.innerHTML = '<div class="binfo">' + (d.has_cover ? '<img class="bcover" src="/api/cover/' + encodeURIComponent(d.id) + '" alt="">' : '') +
@@ -1165,25 +1202,11 @@ function drawPanel(){
       (d.language ? '<div class="mr"><span>Language</span><span>' + esc({ eng: 'English', heb: 'Hebrew', deu: 'German', fra: 'French' }[d.language] || d.language) + '</span></div>' : '') +
       '<div class="mr"><span>Progress</span><span id="bprog">—</span></div>' +
       '<div class="mr"><span>Read here</span><span>' + fmtMins(d.minutes_here) + '</span></div>' +
-      '<div class="mr"><span>Highlights</span><span>' + n + (n ? ' <button class="linkbtn" data-bpt="notebook">See them</button>' : '') + '</span></div>' +
+      '<div class="mr"><span>Highlights</span><span>' + n + (n ? ' <button class="linkbtn" data-bk="nblist">See them</button>' : '') + '</span></div>' +
       (d.series ? '<div class="mr"><span>Series</span><span>' + esc(d.series.name) + (d.series.index ? ' #' + (+d.series.index) : '') + (d.series.next ? '<br><a href="#ebook/' + encodeURIComponent(d.series.next.id) + '">Next: ' + esc(d.series.next.title) + '</a>' : '') + '</span></div>' : '') +
       (d.kindle ? '<div class="mr"><span>Kindle</span><span>p. ' + d.kindle.page + ' of ' + d.kindle.total + ' · ' + epochDate(d.kindle.at) + ' <button class="linkbtn" data-bk="kindle">Go there</button></span></div>' : '') +
       '</div>' + (d.vault_path ? '<span class="tiny mute">Highlights go to <code>' + esc(d.vault_path) + '</code></span>' : '<span class="tiny mute">Your first highlight here makes this book a vault note.</span>') + '</div>';
     drawPanelInfoProgress();
-  } else if (B.panel === 'notebook') {
-    let h = '<div class="nbhead"><span class="mute tiny">' + (n ? n + ' highlight' + (n === 1 ? '' : 's') + ', in reading order' : '') + '</span><span class="spacer"></span>' +
-      (n ? '<a class="linkbtn tiny" href="/api/highlights/export?fmt=md&book=' + encodeURIComponent(d.id) + '" download>Export</a>' : '') + '</div>';
-    if (!n) h += '<p class="mute">' + (H.auto() ? 'Select a passage and it’s highlighted. Hold Alt (⌥) to select without highlighting.' : 'Select text, then Highlight.') + ' Highlights here join your daily review and the book’s vault note.</p>';
-    let chapter = null;
-    H.rowOpts = { chapter: false, date: false };
-    for (const x of all) {
-      if (x.chapter && x.chapter !== chapter) { chapter = x.chapter; h += '<div class="nbch">' + esc(chapter) + '</div>'; }
-      h += H.row(x, H.rowOpts);
-    }
-    b.innerHTML = '<div class="nbook">' + h + '</div>';
-    // Open at the highlights near where you are.
-    const here = B.loc ? B.loc.fraction || 0 : 0, near = all.find(x => x._k >= here - 0.002);
-    if (near && here > 0.02) { const row = $('.hrow[data-h="' + CSS.escape(near.id) + '"]'); if (row) row.scrollIntoView({ block: 'start' }); }
   } else {
     const chips = (B.d && B.d.questions) || [];      // Preferences → AI
     b.innerHTML = '<div class="askbox">' + (chips.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + chips.map(q => '<button class="chip" data-bkq="' + esc(q) + '">' + esc(q) + '</button>').join('') + '</div>' : '') +
@@ -1256,29 +1279,28 @@ async function highlightSel(withNote, quiet){
     else {
       const rr = (() => { try { return rectFor(s.doc, range); } catch(e){ return s.rect; } })();
       if (!quiet) H.show(H.hlBar(h), rr, { h, cfi });
-      if (panelShown() && B.panel === 'notebook') drawPanel();
     }
-    const tab = $('[data-bpt="notebook"] .c'); if (tab) tab.textContent = allHighlights().length;
+    if (C.Sketch) C.Sketch.hlChanged(h.id);          // its card, on the Notebook's page
     return h;
   } catch(e){ toast(e.message); return null; }
 }
-function openNote(h){
-  B.panel = 'notebook'; openPanel();
-  setTimeout(() => { const row = $('.hrow[data-h="' + CSS.escape(h.id) + '"]'); if (!row) return; row.scrollIntoView({ block: 'center' }); const n = row.querySelector('[data-hra="note"]'); if (n) n.click(); }, 60);
-}
+// A note on a highlight: its row in the Notebook's list, typing in its note.
+function openNote(h){ if (C.Sketch) C.Sketch.reveal({ hl: h.id, note: true }); }
+// The Notebook (sketchbook.js), from the menus and the key: open or closed; at a highlight, its card.
+function notebook(id){ if (!C.Sketch) return; if (id) C.Sketch.reveal({ hl: id }); else C.Sketch.toggle(); }
 // quiet: no Undo toast (the pen's eraser has its own Undo); either way it answers with the way back.
 async function removeHighlight(id, quiet){
   const h = B.d.highlights.find(x => x.id === id); if (!h) return null;
   await api('/api/highlights/' + encodeURIComponent(id), { method: 'DELETE' });
   B.d.highlights = B.d.highlights.filter(x => x.id !== id); B.byCfi.delete(h.pos.cfi);
   try { await B.view.deleteAnnotation({ value: h.pos.cfi }); } catch(e){}
-  drawPanel();
+  drawPanel(); if (C.Sketch) C.Sketch.hlChanged();
   const back = async () => {
     await api('/api/highlights/' + encodeURIComponent(id) + '/restore', { method: 'POST' });
     if (!B.d) return;
     B.d.highlights.push(h); B.byCfi.set(h.pos.cfi, h);
     try { await B.view.addAnnotation({ value: h.pos.cfi }); } catch(e){}
-    drawPanel();
+    drawPanel(); if (C.Sketch) C.Sketch.hlChanged();
   };
   if (!quiet) H.undo('Highlight deleted', back);
   return back;
@@ -1575,7 +1597,7 @@ async function inkNote(list, text){
   await api('/api/highlights/' + encodeURIComponent(h.id) + '/note', { method: 'PUT', body: JSON.stringify({ note }) });
   h.user_note = note;
   try { await B.view.addAnnotation({ value: h.pos.cfi }); } catch(e){}
-  drawPanel();
+  drawPanel(); if (C.Sketch) C.Sketch.hlChanged();
 }
 const INKSURF = {
   live: () => !!(B.view && B.d && document.body.dataset.view === 'ebook'),
@@ -1638,8 +1660,8 @@ const ACT = {
   translate: () => { const s = B.sel; if (s && C.lookup) { H.hide(); C.lookup({ text: s.text, rect: s.rect }, s.sentence, true); } },
   ask: ctx => { H.hide(); ask('What does this passage mean here?', ctx.h ? ctx.h.text : ctx.text); },
   rm: ctx => { H.hide(); return removeHighlight(ctx.h.id); },
-  notebook: ctx => { H.hide(); B.panel = 'notebook'; openPanel(); setTimeout(() => H.flash($('.hrow[data-h="' + CSS.escape(ctx.h.id) + '"]')), 60); },
-  changed: h => { const cfi = h.pos && h.pos.cfi || h.cfi; if (cfi && B.view) B.view.addAnnotation({ value: cfi }).catch(() => {}); if (B.panel === 'notebook' && panelShown()) drawPanel(); },
+  notebook: ctx => { H.hide(); notebook(ctx.h.id); },
+  changed: h => { const cfi = h.pos && h.pos.cfi || h.cfi; if (cfi && B.view) B.view.addAnnotation({ value: cfi }).catch(() => {}); },
   deselect: () => { B.sel && B.sel.doc.getSelection()?.removeAllRanges(); },
   meta: () => ({ title: B.d && B.d.title, author: B.d && B.d.author }),
 };
@@ -1694,7 +1716,7 @@ function onKey(e){
   else if (is('listen')) toggleListen();          // (it's in the … menu, not a button on the bar)
   else if (k === '?') showKeys();
   else if (is('search')) { e.preventDefault(); openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
-  else if (is('panel')) click('panel');
+  else if (is('panel')) notebook();
   else if (is('focus') && C.Focus) C.Focus.toggle();
   else if (k === 'Escape' && C.Focus && C.Focus.escape()) {}
   else if (k === 'Escape') { if (H.visible()) H.hide(); else if (!$('#pop').hidden) $('#pop').hidden = true; else location.hash = '#book/' + encodeURIComponent(B.d.id); }
@@ -1731,6 +1753,7 @@ document.addEventListener('click', async e => {
     else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
     else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); } else if (panelShown()) document.body.classList.remove('bpanelsheet'); else openPanel(); }
     else if (a === 'closesheets') document.body.classList.remove('btocsheet', 'bpanelsheet');
+    else if (a === 'nblist') { if (C.Focus && C.Focus.on()) C.Focus.panel(false); document.body.classList.remove('bpanelsheet'); if (C.Sketch) C.Sketch.list(); }
     else if (a === 'pmenu') { if (!$('#pop').hidden && $('#pop .pmenu')) $('#pop').hidden = true; else openPhoneMenu(bk); }
     else if (a === 'aa') { showChrome(); B.aaFromBar = false; C.openAa && C.openAa(bk, { book: true }); }
     else if (a === 'status') tapStatus();
@@ -1757,7 +1780,8 @@ document.addEventListener('click', async e => {
     const a = pm.dataset.pm, anchor = $('[data-bk="pmenu"]'); $('#pop').hidden = true;
     if (a === 'toc') openToc();
     else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
-    else if (a === 'notebook' || a === 'ask') openPanel(a);
+    else if (a === 'notebook') notebook();
+    else if (a === 'info' || a === 'ask') openPanel(a);
     else if (a === 'aa') C.openAa && C.openAa(anchor || pm, { book: true });
     else if (a === 'listen') toggleListen();
     else if (a === 'mark') toggleMark();
@@ -1771,7 +1795,8 @@ document.addEventListener('click', async e => {
     $('#pop').hidden = true;
     const a = bm.dataset.bm;
     if (a === 'listen') toggleListen();
-    else if (a === 'notebook' || a === 'info' || a === 'ask') openPanel(a);
+    else if (a === 'notebook') notebook();
+    else if (a === 'info' || a === 'ask') openPanel(a);
     else if (a === 'focus' && C.Focus) C.Focus.toggle();
     else if (a === 'start') await B.view.goToTextStart().catch(() => {});
     else if (a === 'goto') openJump();

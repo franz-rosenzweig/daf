@@ -83,8 +83,8 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 
 <p align="center"><img src="docs/images/phones.webp" alt="Daf on a phone: Today, a book with a green highlight, and the daily review"></p>
 
-![A book in Daf's reader with a green highlight from the Kindle, and the Notebook listing the book's highlights in reading order](docs/images/reader.png)
-*A book in Daf, with the Kindle's highlights in their colors and the Notebook beside it.*
+![A book in Daf's reader with a green highlight, and the Notebook beside it with the chapter's highlights as cards on its page](docs/images/reader.png)
+*A book in Daf, with the Notebook beside it: the chapter's highlights on its page, with room to write under each.*
 
 ![The daily review: one highlight with Never, Flashcard, Less and Keep](docs/images/review.png)
 *The daily review: five highlights a day, one at a time.*

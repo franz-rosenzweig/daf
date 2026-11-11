@@ -961,7 +961,7 @@ function markRange(el, s, e, h){
 function visibleItems(){ const L = R.list; if (!L) return []; return R.tag ? L.items.filter(d => tagsOf(d).includes(R.tag)) : L.items; }
 function neighbor(id, dir){ const xs = visibleItems(), i = xs.findIndex(d => d.id === id); return i < 0 ? null : xs[i + dir] || null; }
 // The reader's bar: Back, Aa, the title once you're past it, Listen, Save (a Feed item or an episode of
-// its own), Done, … and the notebook. Everything else (Shortlist, Later, Open original, Focus, the next
+// its own), Done, …, the Notebook (sketchbook.js) and Info. Everything else (Shortlist, Later, Open original, Focus, the next
 // and previous in the list) is in the … menu with its key. While you read it slides away, and comes
 // back when you scroll up or the pointer nears the top (onScroll, chrome).
 function drawReaderTop(){
@@ -978,7 +978,7 @@ function drawReaderTop(){
     (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" data-swap title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
     '<button class="ib" data-ract="more" title="More actions (m)" aria-label="More actions"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg></button>' +
     (C.Sketch ? C.Sketch.button() : '') +
-    '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" title="Notebook and info' + K.tip('article', 'panel') + '" aria-label="Notebook and info">' + ICON.panel + '</button>';
+    '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" title="Info' + K.tip('article', 'panel') + '" aria-label="Info">' + ICON.panel + '</button>';
 }
 // The … menu (Readwise's "More actions"): everything the bar doesn't show, with its key.
 function openMore(anchor){
@@ -991,7 +991,7 @@ function openMore(anchor){
   const phone = matchMedia('(max-width:600px)').matches, pv = neighbor(d.id, -1), nx = neighbor(d.id, 1);
   p.innerHTML = '<div class="menu">' +
     (nx ? it('nextdoc', 'Next in the list', K.label('article', 'nextdoc')) : '') + (pv ? it('prevdoc', 'Previous in the list', K.label('article', 'prevdoc')) : '') +
-    (phone ? it('panel', R.panelOpen ? 'Hide the notebook' : 'Notebook and info', '') + (d.has_pdf && d.blocks.length ? it('pages', 'The PDF as printed', '') : '') : '') +
+    (phone ? it('panel', R.panelOpen ? 'Hide the info' : 'Info', '') + (d.has_pdf && d.blocks.length ? it('pages', 'The PDF as printed', '') : '') : '') +
     (!feed ? it('star', d.starred ? 'Off the Shortlist' : 'Shortlist', K.label('article', 'star')) : '') +
     (C.Focus ? it('focus', C.Focus.on() ? 'Leave focus mode' : 'Focus mode', K.label('article', 'focus')) : '') + '<hr>' +
     it('note', 'Add a document note', K.label('article', 'docnote')) +
@@ -1021,7 +1021,7 @@ function moreAct(a){
   else if (a === 'full') loadFull(d.id);
   else if (a === 'device') deviceList().then(on => keepOnDevice(d.id, !(on && on.pinned.has(d.id))));
   else if (a === 'pages') C.swap('#pdf/' + encodeURIComponent(d.id));
-  else if (a === 'note') { R.panel = 'notebook'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#docnote'); if (x) x.focus(); }, 40); }
+  else if (a === 'note') { R.panel = 'info'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#docnote'); if (x) x.focus(); }, 40); }
   else if (a === 'listen') { if (R.tts.on && R.tts.doc === d.id) stopTTS(); else startTTS(); }
   else if (a === 'kindle') sendToKindle([d.id]).then(r => { if (r) d.kindle_sent = { file: r.file, at: Date.now() / 1000 }; });
   else if (a === 'ask') { R.panel = 'ask'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#rpanel textarea'); if (x) x.focus(); }, 40); }
@@ -1098,9 +1098,16 @@ async function readView(id){
   markSpeaking();
   if (C.Ink) C.Ink.open(d);                           // what's written on it with a pen (ink.js)
   const timed = d.kind === 'video' || !!d.episode;   // the Sketchbook beside it (sketchbook.js), a video's with its time
-  if (C.Sketch) C.Sketch.attach({ item: 'doc:' + d.id, kind: 'doc', time: timed ? curTime : null, seek: timed ? seek : null });
+  if (C.Sketch) C.Sketch.attach({ item: 'doc:' + d.id, kind: 'doc', time: timed ? curTime : null, seek: timed ? seek : null, highlights: () => notebookHls(d), go: h => showHl(h.id) });
+}
+// The highlights for the Notebook (sketchbook.js): its one page's cards, in the order they're in the text.
+function notebookHls(d){
+  if (R.doc !== d) return [];
+  return d.highlights.map(h => ({ id: h.id, text: h.text, color: h.color || 'yellow', tab: '', where: H.where(h), note: h.user_note || '', raw: h,
+    key: h.pos && h.pos.b != null ? h.pos.b + (h.pos.s || 0) / 1e7 : h.pos && h.pos.t != null ? h.pos.t / 1e4 : 1e6 }));
 }
 function drawToc(){
+  if (C.Sketch) C.Sketch.hlChanged();                // the highlights changed: the Notebook's cards too
   const d = R.doc, t = $('#toc'); if (!t || !d) return;
   const heads = d.blocks.map((b, i) => [b, i]).filter(x => (x[0].t === 'h2' || x[0].t === 'h3') && !(R.junk && R.junk.has(x[1])));
   t.innerHTML = '<div class="lbl">Contents</div><button data-jump="0">' + esc(shortTitle(d.title)) + '</button>' + heads.map(x => '<button data-jump="' + x[1] + '"' + dirAttr(x[0].x) + '>' + esc(x[0].x.slice(0, 80)) + '</button>').join('') +
@@ -1108,15 +1115,13 @@ function drawToc(){
 }
 function drawPanel(){
   const p = $('#rpanel'), d = R.doc; if (!p || !d) return;
-  const tabs = [['info', 'Info'], ['notebook', 'Notebook <span class="c">' + d.highlights.length + '</span>'], ['ask', 'Ask']];
+  if (R.panel === 'notebook') R.panel = 'info';      // the Notebook is its own now (sketchbook.js)
+  const tabs = [['info', 'Info'], ['ask', 'Ask']];
   let h = '<div class="ptabs" role="tablist">' + tabs.map(t => '<button class="ptab' + (R.panel === t[0] ? ' on' : '') + '" data-ptab="' + t[0] + '" role="tab">' + t[1] + '</button>').join('') + '<button class="ib pclose" data-ract="panel" aria-label="Close">' + ICON.close + '</button></div>';
-  if (R.panel === 'info') h += infoHTML(d).replace(/<a class="btn primary"[^>]*>(Read|Watch)<\/a>/, '');
-  else if (R.panel === 'notebook') {
+  if (R.panel === 'info') {
     h += '<div class="pbody"><div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="docnote">Document note</label><input class="field" id="docnote" placeholder="Why you saved this, in a line" value="' + esc(d.note || '') + '"></div>' +
-      '<div class="nbook"><div class="nbhead"><span class="lbl">Highlights</span><span class="spacer"></span>' + (d.highlights.length ? '<a class="linkbtn tiny" href="/api/highlights/export?fmt=md&book=' + encodeURIComponent(d.id) + '" download>Export</a>' : '') + '</div>' +
-        (d.highlights.length ? sortedHls(d).map(x => H.row(Object.assign(x, { source: x.source || 'daf', open: '#read/' + encodeURIComponent(d.id) + '/hl:' + encodeURIComponent(x.id) }), (H.rowOpts = { chapter: false, date: false }))).join('')
-          : '<span class="mute tiny">' + (H.auto() ? 'Select a passage and it’s highlighted (hold Alt to select without), or press h on the paragraph with the bar.' : 'Select text and choose Highlight, or press h on the paragraph with the bar.') + '</span>') + '</div>' +
-      (d.vault_path ? '<div class="vault"><b>In your vault</b><code>' + esc(d.vault_path) + '</code><a class="tiny" href="obsidian://open?vault=' + encodeURIComponent(d.vault_name || 'vault') + '&file=' + encodeURIComponent(d.vault_path.replace(/\.md$/, '')) + '">Open in Obsidian</a></div>' : '<div class="vault"><span class="mute tiny">The first highlight creates a note in <code>Reference/clippings</code>.</span></div>') + '</div>';
+      (d.vault_path ? '<div class="vault"><b>In your vault</b><code>' + esc(d.vault_path) + '</code><a class="tiny" href="obsidian://open?vault=' + encodeURIComponent(d.vault_name || 'vault') + '&file=' + encodeURIComponent(d.vault_path.replace(/\.md$/, '')) + '">Open in Obsidian</a></div>' : '') + '</div>' +
+      infoHTML(d).replace(/<a class="btn primary"[^>]*>(Read|Watch)<\/a>/, '');
   } else {
     const chips = d.questions || ['Summarize this', 'What’s the main argument?', 'What should I remember from this?'];   // Preferences → AI
     h += '<div class="pbody"><span class="mute tiny">Answers come from this document and your highlights in it.</span>' +
@@ -1127,7 +1132,6 @@ function drawPanel(){
   }
   p.innerHTML = h;
 }
-function sortedHls(d){ return d.highlights.slice().sort((a, b) => ((a.pos && a.pos.b) ?? 1e9) - ((b.pos && b.pos.b) ?? 1e9) || ((a.pos && a.pos.s) || 0) - ((b.pos && b.pos.s) || 0)); }
 async function ask(q, quote){
   const d = R.doc; if (!d || R.asking) return;
   R.asking = q; R.panel = 'ask'; openPanel(); drawPanel();
@@ -1455,6 +1459,7 @@ async function highlight(info, withNote, quiet){
     drawToc();
     if (r.saved_as) movedToLibrary(d, r.saved_as);
     else if (r.save_error) toast('Highlighted, but the page wasn’t saved to the Library: ' + r.save_error);
+    if (C.Sketch) C.Sketch.hlChanged(h.id);          // its card, on the Notebook's page
     if (withNote) openNoteA(h);
     else { drawPanel(); if (!quiet) showHlBar(h); }
     return h;
@@ -1466,10 +1471,8 @@ function showHlBar(h){
   const rect = { left: Math.min(a.left, z.left), right: Math.max(a.right, z.right), top: a.top, bottom: z.bottom }; rect.width = rect.right - rect.left;
   H.show(H.hlBar(h, { kindle: h.source === 'kindle' }), rect, { h });   // one from the Kindle is removed there
 }
-function openNoteA(h){
-  H.hide(); R.panel = 'notebook'; openPanel(); drawPanel();
-  setTimeout(() => { const row = $('.hrow[data-h="' + CSS.escape(h.id) + '"]'); if (!row) return; row.scrollIntoView({ block:'center' }); const n = row.querySelector('[data-hra="note"]'); if (n) n.click(); }, 40);
-}
+// A note on a highlight: its row in the Notebook's list, typing in its note.
+function openNoteA(h){ H.hide(); if (C.Sketch) C.Sketch.reveal({ hl: h.id, note: true }); }
 function showHl(id){
   const ms = $$('mark.hl[data-h="' + CSS.escape(id) + '"], figure.hlimg[data-h="' + CSS.escape(id) + '"]');
   const hl = R.doc && R.doc.highlights.find(x => x.id === id);
@@ -1502,10 +1505,10 @@ const ACT = {
   translate: ctx => { H.hide(); const el = $('#docbody [data-i="' + ctx.info.b + '"]'); C.lookup && C.lookup(ctx.info, el ? el.textContent : '', true); },
   ask: ctx => { H.hide(); window.getSelection().removeAllRanges(); ask('What does this passage mean here?', ctx.h ? ctx.h.text : ctx.text); },
   rm: ctx => removeHl(ctx.h.id),
-  notebook: ctx => { H.hide(); R.panel = 'notebook'; openPanel(); drawPanel(); setTimeout(() => H.flash($('.hrow[data-h="' + CSS.escape(ctx.h.id) + '"]')), 40); },
+  notebook: ctx => { H.hide(); if (C.Sketch) C.Sketch.reveal({ hl: ctx.h.id }); },
   changed: h => {
     $$('mark.hl[data-h="' + CSS.escape(h.id) + '"], figure.hlimg[data-h="' + CSS.escape(h.id) + '"]').forEach(m => { m.dataset.color = h.color || 'yellow'; m.classList.toggle('has-note', !!(h.user_note || '').trim()); });
-    if (R.panel === 'notebook' && R.panelOpen && !document.activeElement.closest('.rpanel')) drawPanel();
+    if (C.Sketch) C.Sketch.hlChanged();
   },
   deselect: () => window.getSelection().removeAllRanges(),
   meta: () => ({ title: R.doc && R.doc.title, author: R.doc && (R.doc.author || R.doc.source) }),

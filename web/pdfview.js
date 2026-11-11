@@ -82,9 +82,9 @@ C.views.pdf = async args => {
   if (at > 1) P.page = Math.min(at, P.pdf.numPages);
   if (V.side && wide()) place(true);                 // the side panel beside the pages from the start, where there's room
   await layout();
-  // the Sketchbook beside it (sketchbook.js): its camera takes the page in view
+  // the Notebook beside it (sketchbook.js): its camera takes the page in view; the highlights are its cards
   if (C.Sketch) C.Sketch.attach({ item: (book ? 'book:' : 'doc:') + id, kind: 'pdf', shots: () => $$('#pdfpages .pdfpage canvas'),
-    resized: () => relayout() });
+    resized: () => relayout(), highlights: notebookHls, go: h => goToHl(h.id) });
   if (hl) goToHl(hl);
   else if (at > 1) scrollToPage(at);
   if (sideOn()) drawSide();
@@ -232,6 +232,14 @@ function rectsOf(range, el){
   }
   return merged;
 }
+// The highlights for the Notebook (sketchbook.js), in page order.
+function notebookHls(){
+  return (P.d && P.d.highlights || []).map(h => {
+    const pl = placeOf(h), y = pl && pl.r && pl.r[0] ? pl.r[0][1] || 0 : 0;
+    return { id: h.id, text: h.text, color: h.color || 'yellow', tab: '', where: pl ? 'p. ' + pl.pg : '', note: h.user_note || '', raw: h, key: pl ? pl.pg + y / 10 : 1e6 };
+  });
+}
+const nbChanged = id => { if (C.Sketch) C.Sketch.hlChanged(id); };
 function placeOf(h){
   const p = h.pos || {};
   if (p.pdf) return p.pdf;
@@ -321,6 +329,7 @@ async function highlight(info, withNote){
     P.d.highlights = (P.d.highlights || []).filter(x => x.id !== h.id).concat([h]);
     drawMarks(info.pg);
     if (sideOn() && V.tab === 'marks') drawTab();
+    nbChanged(h.id);
     if (withNote) editNote(h);
   } catch(e){ toast(e.message); }
 }
@@ -330,7 +339,7 @@ function editNote(h){
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="pnsave">Save</button></div>';
   const t = $('#pnote'); t.focus();
   $('#pnsave').onclick = async () => {
-    try { await api('/api/highlights/' + encodeURIComponent(h.id) + '/note', { method: 'PUT', body: JSON.stringify({ note: t.value }) }); h.user_note = t.value; C.closeModal(); toast('Saved'); const pl = placeOf(h); if (pl) drawMarks(pl.pg); }
+    try { await api('/api/highlights/' + encodeURIComponent(h.id) + '/note', { method: 'PUT', body: JSON.stringify({ note: t.value }) }); h.user_note = t.value; C.closeModal(); toast('Saved'); const pl = placeOf(h); if (pl) drawMarks(pl.pg); nbChanged(); }
     catch(e){ toast(e.message); }
   };
 }
@@ -341,9 +350,10 @@ async function removeHl(h){
   P.d.highlights = P.d.highlights.filter(x => x.id !== h.id); P.found.delete(h.id);
   if (pl) drawMarks(pl.pg);
   if (sideOn() && V.tab === 'marks') drawTab();
+  nbChanged();
   H.undo && H.undo('Highlight deleted', async () => {
     await api('/api/highlights/' + encodeURIComponent(h.id) + '/restore', { method: 'POST' });
-    P.d.highlights.push(h); if (pl) drawMarks(pl.pg);
+    P.d.highlights.push(h); if (pl) drawMarks(pl.pg); nbChanged();
   });
 }
 function goToHl(id){
@@ -374,7 +384,7 @@ const ACT = {
   define: ctx => { H.hide(); C.lookup && C.lookup({ text: ctx.text, rect: $('#selbar').getBoundingClientRect() }, ctx.text, false); },
   translate: ctx => { H.hide(); C.lookup && C.lookup({ text: ctx.text, rect: $('#selbar').getBoundingClientRect() }, ctx.text, true); },
   ask: () => { H.hide(); if (P.src.book) { toast('Ask works in a book’s text, not on a PDF’s pages'); return; } toast('Ask works in the text view'); location.hash = 'read/' + encodeURIComponent(P.id); },
-  notebook: () => { H.hide(); location.hash = P.src.book ? 'book/' + encodeURIComponent(P.id) : 'read/' + encodeURIComponent(P.id); },
+  notebook: ctx => { H.hide(); if (C.Sketch && ctx && ctx.h) C.Sketch.reveal({ hl: ctx.h.id }); },
   changed: h => { const pl = placeOf(h); if (pl) drawMarks(pl.pg); },
   deselect: () => window.getSelection().removeAllRanges(),
   meta: () => ({ title: P.d && P.d.title, author: P.d && (P.d.author || P.d.source) }),

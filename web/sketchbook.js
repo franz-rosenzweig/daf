@@ -1,7 +1,15 @@
-/* The Sketchbook: pages beside whatever is open (a book, an article, a video, a podcast episode, a
-   PDF, a manga volume) to write and draw on with the pen, type on, and say things into. Kept on the
-   server (daf/sketchbook.py), in the vault as a note of its own in the Ink plugin's format
+/* The Notebook: pages beside whatever is open (a book, an article, a video, a podcast episode, a
+   PDF, a manga volume) to write and draw on with the pen, type on, and say things into, with the
+   highlights on them. Kept on the server (daf/sketchbook.py: it was the Sketchbook, and is still
+   called that in the code), in the vault as a note of its own in the Ink plugin's format
    (sketchvault.py), and, for a book, on the Kindle.
+
+   One Notebook, two ways to look at it. Pages: a chapter's page, its highlights on it as cards in
+   reading order (from the highlights themselves, which stay highlights), and what's written, typed
+   and drawn above them and under each one; a highlight made while reading lands on the page in its
+   place, and a tap on a card goes to it in the book. List: everything in it, the highlights with
+   what's written under them (the handwriting as it was read), searchable. The head: General, the
+   chapter (it follows where you are; a tap picks another), Pages or List, and close.
 
    Sideways it's a panel on the right whose width you drag; upright, a sheet from the bottom you pull
    to the height you want, or flip to the top. The reader beside it gets the rest of the screen. The
@@ -17,8 +25,10 @@
    it). A tap with the pen is a dot. Handwriting is read as text a moment after the pen rests (pens.js's
    reader), for the note's search and the Kindle.
 
-   A book has a tab a chapter, following where you are, and General; a manga series a tab a volume;
-   anything else one page. A video's typed notes and new handwriting carry its time. The camera puts
+   A book has a page a chapter, following where you are, and General; a manga series a page a
+   volume; anything else one page. A block written under a card keeps the highlight's id (hl) and
+   where it was (hat), so it stays under it, and where the card was if the highlight goes; blocks
+   written before there were cards stay above them. A video's typed notes and new handwriting carry its time. The camera puts
    the manga page or the PDF page (or the part of it a box is dragged round) on the page, to write
    over. The microphone records, and the server writes down what was said.
 
@@ -54,6 +64,10 @@ const IC = {
   toBottom: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 15.5h12M10 4v8M6.5 8.5 10 12l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   close: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
   trash: '<svg width="17" height="17" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4.5h4V6M5.5 6l.8 10h7.4l.8-10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chev: '<svg width="12" height="12" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pen: '<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l1-4 8.5-8.5a1.8 1.8 0 0 1 2.5 2.5L7.5 14.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
+  mark: '<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 15.5h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6 12l1.5-5 6-3 1.5 3-4.5 5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  search: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12.5 12.5l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
 };
 
 const S = {
@@ -67,6 +81,11 @@ const S = {
   done: [], undone: [], q: null, prev: null,
   editing: null, editEnd: 0, picked: null, rec: null, timeOn: store.get('time', true),
   reading: new Map(),     // a handwriting block's id → when to read it again
+  view: store.get('view', 'pages') === 'list' ? 'list' : 'pages',
+  hls: [],                // the item's highlights: {id, text, color, key (reading order), tab, where, note, raw}
+  groups: [],             // the page as laid out: [{id ('' above the cards, else a highlight's), key, card, blocks}]
+  picking: false, focusHl: null, chs: null,
+  all: null, lq: '', chip: 'all',   // the list: every page's blocks, what's searched, which chip
 };
 const key = tab => S.ctx ? S.ctx.item + '\n' + (tab == null ? S.tab : tab) : '';
 const cur = () => S.pages.get(key()) || [];
@@ -81,11 +100,14 @@ const byId = id => cur().find(m => m.id === id);
 // Sideways (and wide enough): beside the reader on the right. Upright: a sheet below it, or above.
 // (While typing, the keyboard's shorter window doesn't count: the tablet hasn't turned.)
 const sideways = () => innerWidth > (S.editing && S.fullH && innerWidth === S.fullW ? Math.max(innerHeight, S.fullH) : innerHeight) && innerWidth >= 640;
+// A phone's sheet is most of the screen; a tablet's, a little over half of it, until it's pulled.
+const phone = () => Math.min(S.fullW || innerWidth, S.fullH || innerHeight) < 600;
+const sheetH = () => phone() ? 0.6 : 0.56;
 function sizes(){
   if (sideways()) { const m = paperW() + 2; return { mode: 'side', w: Math.round(clamp(innerWidth * store.get('w', 0.4), m, Math.max(m, innerWidth - 320))) }; }
   // the keyboard up while typing in it (the app's window shrinks): most of what's left
   const typing = S.editing && S.fullH && innerHeight < S.fullH * 0.8;
-  const h = typing ? innerHeight - 110 : Math.round(clamp(innerHeight * store.get('h', 0.42), 170, Math.max(170, innerHeight - 180)));
+  const h = typing ? innerHeight - 110 : Math.round(clamp(innerHeight * store.get('h', sheetH()), 170, Math.max(170, innerHeight - (phone() ? 90 : 180))));
   return { mode: store.get('top', false) ? 'top' : 'bottom', h };
 }
 function place(){
@@ -117,14 +139,21 @@ function relayout(){
 function build(){
   if (S.el) return;
   const el = S.el = document.createElement('aside');
-  el.className = 'skb'; el.id = 'skb'; el.setAttribute('aria-label', 'Sketchbook'); el.hidden = true;
-  el.innerHTML = '<div class="skgrip" role="separator" aria-label="Resize the Sketchbook"><i></i></div>' +
-    '<div class="skhead"><div class="sktabs" role="tablist" aria-label="Pages"></div><div class="sktools"><span class="skpens"></span><span class="skown"></span></div></div>' +
-    '<div class="skbody"><iframe class="skframe" title="Sketchbook page"></iframe></div>';
+  el.className = 'skb'; el.id = 'skb'; el.setAttribute('aria-label', 'Notebook'); el.hidden = true;
+  el.innerHTML = '<div class="skgrip" role="separator" aria-label="Resize the Notebook"><i></i></div>' +
+    '<div class="skhead"><div class="skwhere"></div><span class="spacer"></span>' +
+      '<div class="skseg" role="tablist" aria-label="Notebook"><button role="tab" data-skv="pages">Pages</button><button role="tab" data-skv="list">List</button></div>' +
+      '<span class="skhb"></span><div class="skpick" role="listbox" aria-label="Chapters" hidden></div></div>' +
+    '<div class="skbody"><iframe class="skframe" title="Notebook page"></iframe>' +
+      '<div class="sklist" hidden><div class="sklhead"><label class="sklq"><span class="ic">' + IC.search + '</span><input type="search" placeholder="Search" aria-label="Search the Notebook" autocomplete="off" dir="auto"></label><div class="sklchips"></div></div><div class="sklrows"></div></div>' +
+      '<div class="sktools"><span class="skpens"></span><span class="skown"></span></div></div>';
   document.body.appendChild(el);
   el.addEventListener('click', onHead);
   // the head's buttons leave the typing where it is (a tap there doesn't end it)
-  el.addEventListener('mousedown', e => { if (e.target.closest('.skhead button')) e.preventDefault(); });
+  el.addEventListener('mousedown', e => { if (e.target.closest('.skhead button, .sktools button')) e.preventDefault(); });
+  el.querySelector('.sklq input').addEventListener('input', e => { S.lq = e.target.value; drawRows(); });
+  el.querySelector('.sklist').addEventListener('click', onList);
+  document.addEventListener('pointerdown', e => { if (S.picking && !e.target.closest('.skpick, [data-skch]')) { S.picking = false; drawHead(); } }, true);
   grip(el.querySelector('.skgrip'));
   S.frame = el.querySelector('.skframe');
   frame();
@@ -186,32 +215,59 @@ function grip(g){
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag; drag = null;
     document.documentElement.classList.remove('skdrag');
-    if (d.gone) { if (S.mode !== 'side') store.set('h', 0.42); hide(); return; }
+    if (d.gone) { if (S.mode !== 'side') store.set('h', sheetH()); hide(); return; }
     if (d.moved) relayout();
   };
   g.addEventListener('pointerup', up);
   g.addEventListener('pointercancel', up);
 }
 
-/* ---------- the head: tabs and tools ---------- */
+/* ---------- the head: General, the chapter, Pages or List ---------- */
+const many = () => !!S.ctx && (S.ctx.kind === 'book' || S.ctx.kind === 'manga');
+const rtl = t => /[֐-׿]/.test(t || '') ? ' dir="rtl"' : '';
+// The pages there are: General, the chapters (a book's every one, from its contents; a manga series'
+// volumes with something on them), where you are, and the one open.
 function tabList(){
-  const ts = S.tabs.map(t => Object.assign({}, t));
-  const add = t => { if (t && !ts.some(x => x.tab === t.tab)) ts.push(Object.assign({ n: 0 }, t)); };
+  const ts = (S.ctx && S.ctx.kind === 'book' && S.ctx.view ? bookChapters(S.ctx.view) : []).map(t => Object.assign({}, t));
+  const add = t => { if (t && !ts.some(x => x.tab === t.tab)) ts.push(Object.assign({}, t)); };
+  for (const t of S.tabs) add(t);
   add({ tab: '', title: 'General' });
   add(S.here);
   add(S.tab ? { tab: S.tab, title: S.meta.title, pos: S.meta.pos } : null);
-  return ts.sort((a, b) => (a.tab !== '') - (b.tab !== '') || (a.pos != null ? a.pos : 2) - (b.pos != null ? b.pos : 2));
+  const n = new Map(S.tabs.map(t => [t.tab, t.n || 0])), h = new Map();
+  for (const x of S.hls) h.set(x.tab || '', (h.get(x.tab || '') || 0) + 1);
+  return ts.map(t => Object.assign(t, { n: n.get(t.tab) || 0, h: h.get(t.tab) || 0 }))
+    .sort((a, b) => (a.tab !== '') - (b.tab !== '') || (a.pos != null ? a.pos : 2) - (b.pos != null ? b.pos : 2));
 }
-function drawTabs(){
+// The chapter the second button names: the one open, else where you are.
+function chapterShown(){
+  if (S.tab) return { tab: S.tab, title: S.meta.title, pos: S.meta.pos };
+  if (S.here) return S.here;
+  return tabList().find(t => t.tab) || null;
+}
+function drawHead(){
   if (!S.el || !S.ctx) return;
-  const box = S.el.querySelector('.sktabs'), many = S.ctx.kind === 'book' || S.ctx.kind === 'manga';
-  box.hidden = !many;
-  if (!many) return;
-  box.innerHTML = tabList().map(t => '<button role="tab" class="sktab' + (S.here && t.tab === S.here.tab ? ' here' : '') + '" data-sktab="' + esc(t.tab) + '" aria-selected="' + (t.tab === S.tab) + '"' +
-    (t.tab && /[֐-׿]/.test(t.title || '') ? ' dir="rtl"' : '') + '>' + esc(t.tab ? (t.title || 'Chapter') : 'General') + '</button>').join('');
-  const on = box.querySelector('[aria-selected="true"]');
-  if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const w = S.el.querySelector('.skwhere'), pick = S.el.querySelector('.skpick');
+  w.hidden = !many();
+  if (many()) {
+    const ch = chapterShown(), gen = !S.tab;
+    w.innerHTML = '<button class="skwh' + (gen ? ' on' : '') + '" data-sktab="" aria-pressed="' + gen + '">General</button>' +
+      (ch ? '<button class="skwh skch' + (gen ? '' : ' on') + (S.here && ch.tab === S.here.tab ? ' here' : '') + '" data-skch aria-haspopup="listbox" aria-expanded="' + S.picking + '"' + rtl(ch.title) + '>' +
+        '<span class="t">' + esc(ch.title || 'Chapter') + '</span><i class="dot"></i>' + IC.chev + '</button>' : '');
+  }
+  S.el.querySelectorAll('[data-skv]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.skv === S.view)));
+  const b = (k, label, icon) => '<button class="ib" data-sk="' + k + '" title="' + label + '" aria-label="' + label + '">' + icon + '</button>';
+  S.el.querySelector('.skhb').innerHTML = (S.mode !== 'side' && !phone() ? b('flip', S.mode === 'top' ? 'Move to the bottom' : 'Move to the top', S.mode === 'top' ? IC.toBottom : IC.toTop) : '') + b('close', 'Close the Notebook', IC.close);
+  const was = !pick.hidden;
+  pick.hidden = !(S.picking && many());
+  if (!pick.hidden && !was) {                       // (drawn when it opens, not again while it's open)
+    pick.innerHTML = tabList().filter(t => t.tab).map(t => '<button role="option" data-sktab="' + esc(t.tab) + '" aria-selected="' + (t.tab === S.tab) + '"' + (S.here && t.tab === S.here.tab ? ' class="here"' : '') + '>' +
+      '<span class="t"' + rtl(t.title) + '>' + esc(t.title || 'Chapter') + '</span><i class="dot"></i><span class="n">' + (t.h ? '<span>' + IC.mark + t.h + '</span>' : '') + (t.n ? '<span>' + IC.pen + '</span>' : '') + '</span></button>').join('');
+    const on = pick.querySelector('[aria-selected="true"]') || pick.querySelector('.here');
+    if (on) on.scrollIntoView({ block: 'center' });
+  }
 }
+const drawTabs = drawHead;
 const canRecord = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 function drawTools(){
   if (!S.el || !S.ctx) return;
@@ -222,13 +278,24 @@ function drawTools(){
   S.el.querySelector('.skown').innerHTML = b('text', 'Type', IC.text) +
     (canRecord() ? b('mic', S.rec ? 'Stop' : S.hearing ? 'Writing it down' : 'Dictate', (S.rec ? IC.stop : IC.mic) + rec, !!S.rec, S.hearing, S.rec ? 'skon' : S.hearing ? 'skbusy' : '') : '') +
     (ctx.shots ? b('shot', 'Take the page', IC.shot) : '') + (ctx.time ? b('time', 'Time', IC.time, S.timeOn) : '') +
-    (mine ? b('undo', 'Undo', IC.undo, null, !S.done.length) + b('redo', 'Redo', IC.redo, null, !S.undone.length) : '') +
-    '<span class="spacer"></span>' + (S.mode !== 'side' ? b('flip', S.mode === 'top' ? 'Move to the bottom' : 'Move to the top', S.mode === 'top' ? IC.toBottom : IC.toTop) : '') +
-    b('close', 'Close the Sketchbook', IC.close);
+    (mine ? b('undo', 'Undo', IC.undo, null, !S.done.length) + b('redo', 'Redo', IC.redo, null, !S.undone.length) : '');
+  drawHead();
 }
 function onHead(e){
-  const t = e.target.closest('[data-sktab], [data-sk]'); if (!t) return;
-  if (t.dataset.sktab != null) { const tab = t.dataset.sktab, x = tabList().find(y => y.tab === tab); S.follow = !!(S.here && tab === S.here.tab); show1(tab, x); return; }
+  const t = e.target.closest('[data-sktab], [data-sk], [data-skch], [data-skv]'); if (!t) return;
+  if (t.dataset.skv) { setView(t.dataset.skv); return; }
+  if (t.dataset.skch != null) {
+    const ch = chapterShown();
+    if ((!S.tab || S.view === 'list') && ch && !S.picking) { S.picking = false; S.follow = !!(S.here && ch.tab === S.here.tab); if (S.view === 'list') setView('pages'); show1(ch.tab, ch); }
+    else { S.picking = !S.picking; drawHead(); }
+    return;
+  }
+  if (t.dataset.sktab != null) {
+    const tab = t.dataset.sktab, x = tabList().find(y => y.tab === tab);
+    S.picking = false; S.follow = !!(S.here && tab === S.here.tab);
+    if (S.view === 'list') { S.view = 'pages'; setView('pages'); }
+    show1(tab, x); return;
+  }
   const k = t.dataset.sk;
   if (k === 'close') hide();
   else if (k === 'text') typeAt(null);
@@ -239,11 +306,22 @@ function onHead(e){
   else if (k === 'redo') redo();
   else if (k === 'flip') { store.set('top', S.mode !== 'top'); place(); drawTools(); relayout(); }
 }
+// Pages or List.
+function setView(v){
+  v = v === 'list' ? 'list' : 'pages';
+  if (v === 'list') { stopEditing(); unpick(); }
+  S.view = v; store.set('view', v); S.picking = false;
+  if (!S.el) return;
+  S.el.classList.toggle('sklisting', v === 'list');
+  S.el.querySelector('.sklist').hidden = v !== 'list';
+  if (v === 'list') { S.all = S.all || []; drawList(); loadAll(); } else render();
+  drawHead();
+}
 
 /* ---------- a tab's page ---------- */
 async function show1(tab, meta){
   flush(); stopEditing(); unpick(); readNow();
-  S.tab = tab; S.meta = meta || {}; S.done = []; S.undone = [];
+  S.tab = tab; S.meta = meta || {}; S.done = []; S.undone = []; S.picking = false;
   drawTabs(); drawTools(); Pens.redraw();
   if (S.doc) S.doc.scrollingElement.scrollTop = 0;
   if (!S.pages.has(key())) { setCur([]); render(); await load(tab); }
@@ -306,30 +384,76 @@ function pageW(room){
   if (Math.min(w, h) < 600) return room;                 // a phone: all of its width
   return Math.min(room, paperW() - 20);
 }
+// The page's highlights, as cards: this chapter's (an article's, all of them), in reading order.
+const cardsHere = () => S.ctx && S.ctx.highlights ? S.hls.filter(h => (h.tab || '') === S.tab).sort((a, b) => a.key - b.key) : [];
+// The page's blocks with the cards: first what's above every card (written before there were any),
+// then each card with what's written under it. A block whose highlight is gone stays where its card was.
+function grouped(bl){
+  const top = { id: '', key: -Infinity, card: null, blocks: [] }, gs = [top], by = new Map();
+  for (const h of cardsHere()) { const g = { id: h.id, key: h.key, card: h, blocks: [] }; by.set(h.id, g); gs.push(g); }
+  for (const b of bl) {
+    let g = top;
+    if (b.hl) {
+      g = by.get(b.hl);
+      if (!g) { g = { id: b.hl, key: b.hat != null ? b.hat : Infinity, card: null, blocks: [] }; by.set(b.hl, g); gs.push(g); }
+    }
+    g.blocks.push(b);
+  }
+  return gs.sort((a, b) => (a.key - b.key) || 0);
+}
+// What a block written at the end of a group (or under a block in it) keeps of where it is.
+const anchorOf = g => !g || !g.id ? {} : Object.assign({ hl: g.id }, isFinite(g.key) ? { hat: g.key } : {});
+const real = b => !(S.editing && S.editing.fresh && S.editing.m.id === b.id);
+const seq = () => S.groups.flatMap(g => g.blocks.filter(real));
+const groupOf = id => S.groups.find(g => g.id === id) || null;
+const lastGroup = () => S.groups[S.groups.length - 1] || null;
+const ordBetween = (p, n) => { const a = p ? p.ord || 0 : null, z = n ? n.ord || 0 : null; return a != null && z != null ? (z > a ? (a + z) / 2 : a + 0.001) : a != null ? a + 1 : z != null ? z - 1 : 1; };
+// The place for a new block at the end of a group: after everything before it, before what's after.
+function ordEnd(g){
+  const gs = S.groups, i = Math.max(0, gs.indexOf(g));
+  let p = null, n = null;
+  for (let j = i; j >= 0 && !p; j--) { const bs = gs[j].blocks.filter(real); if (bs.length) p = bs[bs.length - 1]; }
+  for (let j = i + 1; j < gs.length && !n; j++) { const bs = gs[j].blocks.filter(real); if (bs.length) n = bs[0]; }
+  return ordBetween(p, n);
+}
+const quote = t => C.HL && C.HL.quote ? C.HL.quote(t) : esc(t);
+function cardHTML(h){
+  const t = String(h.text || '').replace(/[^\S\n]*\n(?:[^\S\n]*\n)+/g, '\n').trim();
+  return '<div class="skblk skcard" data-hl="' + esc(h.id) + '" data-color="' + esc(h.color || 'yellow') + '" role="link" tabindex="0">' +
+    '<div class="skcq"><span class="skq"' + rtl(t) + '>' + quote(t) + '</span>' + (h.note ? '<span class="sknote" dir="auto">' + esc(h.note) + '</span>' : '') +
+    (h.where ? '<span class="skwh2">' + esc(h.where) + '</span>' : '') + '</div></div>';
+}
 function render(){
-  if (!S.page || !S.shown) return;
+  if (!S.page || !S.shown || S.view !== 'pages') return;
   const room = S.doc.documentElement.clientWidth - 20; if (room < 50) return;
   const W = pageW(room);
-  const ms = cur(), bl = blocksOf(ms), last = bl[bl.length - 1];
+  const ms = cur(), bl = blocksOf(ms), ed = S.editing;
+  if (ed && ed.fresh && !bl.some(b => b.id === ed.m.id)) bl.push(ed.m);      // the text being typed, in its place
+  const gs = S.groups = grouped(blocksOf(bl)), cards = gs.some(g => g.card);
+  const shown = gs.filter(g => g.card || g.blocks.length || (!g.id && !cards));
+  const lastG = shown[shown.length - 1], last = lastG.blocks.filter(real).slice(-1)[0];
   S.W = W; S.page.style.width = W + 'px';
   S.page.classList.toggle('sheet', W < room - 24);
   S.page.style.setProperty('--skl', r2(LINE * W / INK_W) + 'px');
   let h = '';
-  const fr = new Map(), ed = S.editing, slot = '<div class="skslot"></div>';
-  let slotted = !ed;
-  for (const b of bl) {
-    if (!slotted && (ed.m.id === b.id || (ed.fresh && (ed.m.ord || 0) < (b.ord || 0)))) { h += slot; slotted = true; if (ed.m.id === b.id) continue; }
-    const st = strokesOf(ms, b.id), f = frameOf(b, W, st);
-    if (b.kind === 'ink' && b.type === 'writing' && b === last) f.h += LINE * f.k;     // the last one has room to go on
-    fr.set(b.id, f);
-    if (b.kind === 'text') h += '<div class="skblk sktext' + (b.text ? '' : ' stamp') + '" data-id="' + b.id + '" dir="auto">' + stampHTML(b) + esc(b.text || '') + '</div>';
-    else if (b.kind === 'image') h += '<div class="skblk skpic" data-id="' + b.id + '" style="height:' + r1(f.h) + 'px"><img alt="' + esc(b.cap || '') + '" draggable="false" src="' + esc(picSrc(b)) + '">' + (b.cap ? '<span class="skcap">' + esc(b.cap) + '</span>' : '') + '</div>';
-    else h += '<div class="skblk skink ' + (b.type === 'drawing' ? 'skdraw' : 'skwrite') + '" data-id="' + b.id + '" style="height:' + r1(f.h) + 'px">' + stampHTML(b) + '</div>';
+  const fr = new Map(), slot = '<div class="skslot"></div>', lh = LINE * W / INK_W;
+  for (const g of shown) {
+    if (g.card) h += cardHTML(g.card);
+    for (const b of g.blocks) {
+      if (ed && ed.m.id === b.id) { h += slot; continue; }
+      const st = strokesOf(ms, b.id), f = frameOf(b, W, st);
+      if (b.kind === 'ink' && b.type === 'writing' && b === last) f.h += LINE * f.k;     // the last one has room to go on
+      fr.set(b.id, f);
+      if (b.kind === 'text') h += '<div class="skblk sktext' + (b.text ? '' : ' stamp') + '" data-id="' + b.id + '" dir="auto">' + stampHTML(b) + esc(b.text || '') + '</div>';
+      else if (b.kind === 'image') h += '<div class="skblk skpic" data-id="' + b.id + '" style="height:' + r1(f.h) + 'px"><img alt="' + esc(b.cap || '') + '" draggable="false" src="' + esc(picSrc(b)) + '">' + (b.cap ? '<span class="skcap">' + esc(b.cap) + '</span>' : '') + '</div>';
+      else h += '<div class="skblk skink ' + (b.type === 'drawing' ? 'skdraw' : 'skwrite') + '" data-id="' + b.id + '" style="height:' + r1(f.h) + 'px">' + stampHTML(b) + '</div>';
+    }
+    // under each card's notes, a line or two to write on (writing there goes on with its last handwriting)
+    if (g !== lastG) { const wl = g.blocks.length && g.blocks[g.blocks.length - 1].kind === 'ink' && g.blocks[g.blocks.length - 1].type === 'writing'; h += '<div class="skblk skend skgap" data-g="' + esc(g.id) + '" style="height:' + r2((wl ? 1 : 2) * lh) + 'px"></div>'; }
   }
   // under everything: ruled paper, where writing starts a new handwriting block and a tap types
-  if (!slotted) h += slot;
-  const lh = LINE * W / INK_W, lines = Math.max(last && last.kind === 'ink' && last.type === 'writing' ? 1 : 3, Math.ceil((S.frame.clientHeight || 0) * 0.35 / lh));
-  h += '<div class="skblk skend" style="height:' + r2(lines * lh) + 'px"></div>';
+  const lines = Math.max(last && last.kind === 'ink' && last.type === 'writing' ? 1 : 3, Math.ceil((S.frame.clientHeight || 0) * 0.35 / lh));
+  h += '<div class="skblk skend" data-g="' + esc(lastG.id) + '" style="height:' + r2(lines * lh) + 'px"></div>';
   if (ed && ed.ta.parentNode === S.page) {
     // the text being typed stays put while the rest is laid out around it (taken out of the page,
     // it would lose the keyboard, which is what laying out again when the keyboard comes up did)
@@ -345,15 +469,16 @@ function render(){
     if (ed) { sl.replaceWith(ed.ta); S.page.appendChild(ed.bar); } else if (sl) sl.remove();
   }
   // the ruled paper goes down to the bottom of the panel
-  const endEl = S.page.lastElementChild && S.page.lastElementChild.classList.contains('skend') ? S.page.lastElementChild : S.page.querySelector('.skend');
+  const ends = S.page.querySelectorAll('.skend:not(.skgap)'), endEl = ends[ends.length - 1];
   const gap = (S.frame.clientHeight || 0) - 50 - S.page.offsetHeight;
   if (endEl && gap >= lh) endEl.style.height = r2((lines + Math.floor(gap / lh)) * lh) + 'px';
   S.boxes = []; S.geo.clear(); S.layers.clear();
   for (const el of S.page.children) {
     if (!el.classList.contains('skblk')) continue;
     const top = el.offsetTop, bh = el.offsetHeight;
-    if (el.classList.contains('skend')) { S.boxes.push({ end: true, el, top, h: bh, k: W / INK_W, ox: 0, oy: 0 }); continue; }
-    const b = bl.find(x => x.id === el.dataset.id), f = fr.get(b.id);
+    if (el.classList.contains('skend')) { S.boxes.push({ end: true, g: el.dataset.g || '', el, top, h: bh, k: W / INK_W, ox: 0, oy: 0 }); continue; }
+    if (el.classList.contains('skcard')) { S.boxes.push({ card: el.dataset.hl, el, top, h: bh }); continue; }
+    const b = bl.find(x => x.id === el.dataset.id), f = b && fr.get(b.id); if (!f) continue;
     const box = { b, el, top, h: bh, k: f.k, ox: f.ox, oy: f.oy };
     S.boxes.push(box);
     if (b.kind === 'text') continue;
@@ -369,6 +494,15 @@ function render(){
   }
   if (S.editing) placeEdit();
   if (S.picked) drawPicked();
+  if (S.focusHl) focusCard();
+}
+// A card gone to (from the book, the list, a highlight just made): in view, and lit a moment.
+function focusCard(){
+  const id = S.focusHl; if (!id || !S.page || S.view !== 'pages') return;
+  const el = [...S.page.querySelectorAll('.skcard')].find(x => x.dataset.hl === id); if (!el) return;
+  S.focusHl = null;
+  el.scrollIntoView({ block: 'center' });
+  el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800);
 }
 // The blocks moved (the text being typed grew): where they are now, and their strokes with them.
 function measure(){
@@ -395,7 +529,11 @@ const frameOff = () => { const r = S.frame.getBoundingClientRect(); return [r.le
 // A point in the window → on the page (px from its top left).
 function onPageAt(x, y){ const [fx, fy] = frameOff(), p = S.page.getBoundingClientRect(); return [x - fx - p.left, y - fy - p.top]; }
 // The block a point on the page is in (or the paper under everything).
-function boxAt(py){ return S.boxes.find(b => py >= b.top && py < b.top + b.h) || (py >= 0 && S.boxes[S.boxes.length - 1]) || null; }
+function boxAt(py){
+  const at = S.boxes.find(b => py >= b.top && py < b.top + b.h); if (at) return at;
+  const above = S.boxes.filter(b => b.top <= py);
+  return above.length ? (py >= 0 ? above[above.length - 1] : S.boxes[0]) : S.boxes[0] || null;
+}
 function near(pts, x, y, r){
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i], b = pts[i + 1] || a, dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy;
@@ -412,11 +550,12 @@ function inside(poly, x, y){
   }
   return c;
 }
-const lastOrd = () => { const bl = blocksOf(cur()); return bl.length ? (bl[bl.length - 1].ord || 0) : 0; };
+// The place right under a block (in its group, with what it keeps of where it is: anchor()).
 function ordAfter(b){
-  const bl = blocksOf(cur()), i = bl.findIndex(x => x.id === b.id), next = bl[i + 1];
-  return next ? ((b.ord || 0) + (next.ord || 0)) / 2 : (b.ord || 0) + 1;
+  const s = seq(), i = s.findIndex(x => x.id === b.id);
+  return i < 0 ? (b.ord || 0) + 1 : ordBetween(b, s[i + 1]);
 }
+const anchor = b => b && b.hl ? Object.assign({ hl: b.hl }, b.hat != null ? { hat: b.hat } : {}) : {};
 function timeNow(){
   const ctx = S.ctx; if (!S.timeOn || !ctx || !ctx.time) return null;
   let t = 0; try { t = ctx.time() || 0; } catch(e){}
@@ -425,17 +564,17 @@ function timeNow(){
 // Points on the page (px) into a block's units: the block the first one is in, or a new handwriting
 // block under everything. Returns [the block (new: not on the page yet), points].
 function intoBlock(pts){
-  const box = boxAt(pts[0][1]); if (!box) return null;
+  const box = boxAt(pts[0][1]); if (!box || box.card) return null;
   let b = box.b, fresh = null;
-  if (box.end) {
-    const bl = blocksOf(cur()), last = bl[bl.length - 1];
+  if (box.end) {                       // under a card's notes, or under everything: its last handwriting, or new
+    const g = groupOf(box.g) || lastGroup(), last = g ? g.blocks.filter(real).slice(-1)[0] : null;
     if (last && last.kind === 'ink' && last.type === 'writing') b = last;
     else {
-      fresh = b = { id: newId('b'), kind: 'ink', type: 'writing', ord: lastOrd() + 1 };
+      fresh = b = Object.assign({ id: newId('b'), kind: 'ink', type: 'writing', ord: ordEnd(g) }, anchorOf(g));
       const t = timeNow(); if (t != null) b.t = t;
     }
   }
-  if (b.kind === 'text') return null;
+  if (!b || b.kind === 'text') return null;
   const at = fresh ? { top: box.top, k: box.k, ox: 0, oy: 0 } : (S.boxes.find(x => x.b && x.b.id === b.id) || box);
   return [b, fresh, pts.map(p => [r1((p[0]) / at.k + at.ox), r1((p[1] - at.top) / at.k + at.oy), r2(p[2])]), at.k];
 }
@@ -460,7 +599,7 @@ function addStroke(s, fresh){
 }
 const surface = {
   live,
-  takes: (el, doc) => doc === S.doc && !!el.closest && !el.closest('.skbar, .sktext, textarea'),
+  takes: (el, doc) => doc === S.doc && !!el.closest && !el.closest('.skbar, .sktext, .skcard, textarea'),
   off: () => frameOff(),
   stroke(L){
     if (!L.pts.length || !L.brush) return;
@@ -523,7 +662,7 @@ function replaceWithText(list, text, instead){
   const ids = new Set(list.map(s => s.id));
   let ms = cur(), del = [];
   if (instead) { ms = ms.filter(m => !ids.has(m.id)); del = list.slice(); }
-  const left = strokesOf(ms, blk.id).length, t = { id: newId('t'), kind: 'text', text, ord: ordAfter(blk) };
+  const left = strokesOf(ms, blk.id).length, t = Object.assign({ id: newId('t'), kind: 'text', text, ord: ordAfter(blk) }, anchor(blk));
   if (instead && !left && blk.kind === 'ink') { t.ord = blk.ord; if (blk.t != null) t.t = blk.t; ms = ms.filter(m => m !== blk); del.push(blk); }
   setCur(ms.concat(t)); render(); act({ add: [t], del });
 }
@@ -626,6 +765,8 @@ function onPage(e){
   const st = t.closest('.skts');
   if (st) { e.preventDefault(); if (S.ctx && S.ctx.seek) S.ctx.seek(+st.dataset.t); return; }
   if (t.closest('.skbar, textarea')) return;
+  const card = t.closest('.skcard');
+  if (card) { goTo(card.dataset.hl); return; }   // a highlight's card: to it, in the book
   const el = t.closest('.skblk'), b = el && el.dataset.id ? byId(el.dataset.id) : null;
   if (!e.isTrusted) {                       // the pen's tap (pens.js): typed text to type in; anywhere else a dot
     if (b && b.kind === 'text') edit(b, e); else dot(e.clientX, e.clientY);
@@ -635,7 +776,13 @@ function onPage(e){
   if (b && b.kind === 'text') { edit(b, e); return; }
   if (b) { if (S.picked === b.id) unpick(); else pick(b.id); return; }
   if (S.picked) { unpick(); return; }
-  typeAt(null);                             // under everything: a new text there
+  typeAt(null, null, el && el.classList.contains('skend') ? groupOf(el.dataset.g || '') : null);   // a new text there
+}
+function goTo(id){
+  const ctx = S.ctx, h = S.hls.find(x => x.id === id); if (!ctx || !h || !ctx.go) return;
+  stopEditing(); unpick();
+  if (S.mode !== 'side' && phone()) hide(true);   // a phone's sheet covers the book: out of the way
+  ctx.go(h.raw || h);
 }
 function dot(cx, cy){
   const b = Pens.brush(); if (!b || !Pens.on()) return;
@@ -644,11 +791,12 @@ function dot(cx, cy){
   const [blk, fresh, pts, k] = got;
   addStroke({ id: newId('k'), kind: 'stroke', blk: blk.id, tool: b.pen, color: b.color, size: r1(b.w / k), o: r2(b.opacity), pts }, fresh);
 }
-// A new text: under a block (after), or at the end of the page.
-function typeAt(after, words){
-  if (S.editing && !after) { if (words) { putText(words); return; } S.editing.ta.focus(); return; }
+// A new text: under a block (after), at the end of a card's notes (g), or at the end of the page.
+function typeAt(after, words, g){
+  if (S.editing && !after && !g) { if (words) { putText(words); return; } S.editing.ta.focus(); return; }
   stopEditing(); unpick();
-  const m = { id: newId('t'), kind: 'text', text: words || '', ord: after ? ordAfter(after) : lastOrd() + 1 };
+  if (!after) g = g || lastGroup();
+  const m = Object.assign({ id: newId('t'), kind: 'text', text: words || '', ord: after ? ordAfter(after) : ordEnd(g) }, after ? anchor(after) : anchorOf(g));
   const t = timeNow(); if (t != null) m.t = t;
   edit(m, null, true);
 }
@@ -741,11 +889,18 @@ function barAct(k, id){
     setCur(cur().filter(m => !gone.includes(m))); render(); act({ del: gone });
     return;
   }
-  const bl = blocksOf(cur()), i = bl.indexOf(b), j = k === 'up' ? i - 1 : i + 1, o = bl[j];
-  if (!o) return;
-  const nb = Object.assign({}, b, { ord: o.ord }), no = Object.assign({}, o, { ord: b.ord });
-  if (nb.ord === no.ord) { nb.ord = k === 'up' ? o.ord - 0.5 : o.ord + 0.5; }
-  setCur(cur().map(m => m.id === b.id ? nb : m.id === o.id ? no : m)); render(); act({ add: [nb, no], del: [b, o] });
+  // within its group, past its neighbour; the first under a card up over the card, the last down under the next
+  const gs = S.groups, gi = gs.findIndex(g => g.blocks.some(x => x.id === b.id)), bs = gi < 0 ? [] : gs[gi].blocks.filter(real);
+  const i = bs.findIndex(x => x.id === b.id), o = bs[k === 'up' ? i - 1 : i + 1];
+  if (!o) {
+    const to = gs[gi + (k === 'up' ? -1 : 1)]; if (!to) return;
+    const nb = Object.assign({}, b); delete nb.hl; delete nb.hat; Object.assign(nb, anchorOf(to));
+    setCur(cur().map(m => m.id === b.id ? nb : m)); render(); act({ add: [nb], del: [b] });
+  } else {
+    const nb = Object.assign({}, b, { ord: o.ord }), no = Object.assign({}, o, { ord: b.ord });
+    if (nb.ord === no.ord) { nb.ord = k === 'up' ? o.ord - 0.5 : o.ord + 0.5; }
+    setCur(cur().map(m => m.id === b.id ? nb : m.id === o.id ? no : m)); render(); act({ add: [nb, no], del: [b, o] });
+  }
   if (b.kind !== 'text') pick(b.id);
   const box = S.boxes.find(x => x.b && x.b.id === b.id); if (box) box.el.scrollIntoView({ block: 'nearest' });
 }
@@ -859,7 +1014,8 @@ async function take(box){
   let src;
   try { src = cv.toDataURL('image/jpeg', 0.85); } catch(e){ toast('That page can’t be taken'); return; }
   const nums = [...new Set(parts.map(p => { const n = p.el.closest('[data-pg]'); return n ? +n.dataset.pg : p.el.dataset.n != null ? +p.el.dataset.n + 1 : null; }).filter(Boolean))].sort((a, b) => a - b);
-  const m = { id: newId('i'), kind: 'image', ord: lastOrd() + 1, h: r1(INK_W * box.height / box.width), src,
+  const g = lastGroup();
+  const m = { id: newId('i'), kind: 'image', ord: ordEnd(g), ...anchorOf(g), h: r1(INK_W * box.height / box.width), src,
               cap: nums.length ? (nums.length > 1 ? 'pp. ' + nums[0] + '–' + nums[nums.length - 1] : 'p. ' + nums[0]) : '' };
   setCur(cur().concat(m)); render(); act({ add: [m] });
   const el = S.page.querySelector('.skblk[data-id="' + m.id + '"]'); if (el) el.scrollIntoView({ block: 'center' });
@@ -868,17 +1024,30 @@ async function take(box){
 /* ---------- a book: the chapter where you are ---------- */
 // The chapter a place is in: the contents' entry at the top level, or one down when the top level is
 // a few parts holding the chapters.
+const tocLevel = toc => toc.length <= 8 && toc.filter(t => t.subitems && t.subitems.length).length >= toc.length / 2 ? 1 : 0;
 function chapterOf(view, tocItem){
   const toc = (view && view.book && view.book.toc) || [];
   if (!tocItem || !toc.length) return null;
-  const parts = toc.length <= 8 && toc.filter(t => t.subitems && t.subitems.length).length >= toc.length / 2;
-  const level = parts ? 1 : 0, path = [];
-  const find = (items, depth) => { for (const it of items) { path[depth] = it; if (it === tocItem || (it.href && it.href === tocItem.href)) { path.length = depth + 1; return true; } if (it.subitems && find(it.subitems, depth + 1)) return true; } return false; };
-  if (!find(toc, 0)) return null;
-  const it = path[Math.min(level, path.length - 1)];
+  const level = tocLevel(toc), path = [];
+  const find = (items, depth, same) => { for (const it of items) { path[depth] = it; if (same(it)) { path.length = depth + 1; return true; } if (it.subitems && find(it.subitems, depth + 1, same)) return true; } return false; };
+  if (!find(toc, 0, it => it === tocItem) && !find(toc, 0, it => it.href && it.href === tocItem.href)) return null;
+  return chapterEntry(view, path[Math.min(level, path.length - 1)]);
+}
+function chapterEntry(view, it){
   let pos = null;
   try { const at = view.resolveNavigation(it.href), fr = view.getSectionFractions(); if (at && fr) pos = r2(fr[at.index] || 0); } catch(e){}
   return { tab: 'c:' + String(it.href || it.label).slice(0, 400), title: String(it.label || '').trim() || 'A chapter', pos };
+}
+// Every chapter in the book, at the level chapterOf counts as one (once per book).
+function bookChapters(view){
+  if (S.chs && S.chs.view === view) return S.chs.list;
+  const toc = (view && view.book && view.book.toc) || [], level = tocLevel(toc);
+  const items = level ? toc.flatMap(t => t.subitems && t.subitems.length ? t.subitems : [t]) : toc;
+  const seen = new Set(), list = [];
+  // (two entries at one address are one page: it's named by the later, the chapter after a part's title)
+  for (const it of items) { const c = chapterEntry(view, it); if (!seen.has(c.tab)) { seen.add(c.tab); list.push(c); } else list.find(x => x.tab === c.tab).title = c.title; }
+  if (list.length) S.chs = { view, list };
+  return list;
 }
 function relocated(d){
   const ctx = S.ctx; if (!ctx || !ctx.view) return;
@@ -887,6 +1056,133 @@ function relocated(d){
   S.here = h;
   if (S.follow && S.tab !== h.tab && !S.editing) show1(h.tab, h); else drawTabs();
 }
+
+/* ---------- the highlights ---------- */
+// The reader's highlights (ctx.highlights(): {id, text, color, key, tab or tocItem, where, note, raw}),
+// a book's each on its chapter's page.
+async function loadHls(){
+  const ctx = S.ctx; if (!ctx) return;
+  let list = [];
+  if (ctx.highlights) { try { list = (await ctx.highlights()) || []; } catch(e){ list = S.hls; } }
+  if (S.ctx !== ctx) return;
+  for (const h of list) if (h.tab == null) { const c = h.tocItem && ctx.view ? chapterOf(ctx.view, h.tocItem) : null; h.tab = c ? c.tab : ''; }
+  S.hls = list;
+  if (!S.shown) return;
+  if (S.view === 'list') drawRows(); else if (!S.editing) render();
+  drawHead();
+}
+// A highlight made, changed or taken away in the reader: the cards again; one just made, shown on its page.
+let hlT = 0;
+function hlChanged(id){
+  clearTimeout(hlT);
+  hlT = setTimeout(async () => {
+    const had = new Set(S.hls.map(h => h.id));
+    await loadHls();
+    const h = id && !had.has(id) ? S.hls.find(x => x.id === id) : null;
+    if (h && S.shown && S.view === 'pages' && (h.tab || '') === S.tab) { S.focusHl = h.id; focusCard(); }
+  }, 120);
+}
+// Opened at a highlight: its card on its page (note: its row in the list, typing its note).
+async function reveal(o){
+  o = o || {};
+  if (!S.ctx) return;
+  if (!S.hls.some(h => h.id === o.hl)) await loadHls();
+  const h = S.hls.find(x => x.id === o.hl);
+  if (o.note || o.view === 'list') { S.view = 'list'; if (!S.shown) show(); else setView('list'); if (h) { S.lq = ''; S.chip = 'all'; listTo(h.id, o.note); } return; }
+  if (S.view !== 'pages') { S.view = 'pages'; if (S.shown) setView('pages'); }
+  if (!S.shown) show();
+  if (!h) return;
+  S.focusHl = h.id;
+  if ((h.tab || '') !== S.tab) { const m = tabList().find(t => t.tab === h.tab) || { tab: h.tab }; S.follow = !!(S.here && h.tab === S.here.tab); await show1(h.tab || '', m); S.focusHl = h.id; }
+  focusCard();
+}
+
+/* ---------- the list: everything in it ---------- */
+const words = b => b.kind === 'text' ? (b.text || '').trim() : (b.transcript || '').trim();
+async function loadAll(){
+  const ctx = S.ctx; if (!ctx) return;
+  flush();
+  let r = null;
+  try { r = await api('/api/sketchbook/' + encodeURIComponent(ctx.item) + '/all'); } catch(e){}
+  if (S.ctx !== ctx) return;
+  if (r) S.all = r.tabs || [];
+  drawRows();
+}
+// The pages, with what's here and not on the server yet on top.
+function pagesNow(){
+  const by = new Map((S.all || []).map(t => [t.tab, Object.assign({}, t)]));
+  for (const [k, list] of S.pages) {
+    const [item, tab] = k.split('\n'); if (!S.ctx || item !== S.ctx.item) continue;
+    const t = by.get(tab) || { tab, title: (tabList().find(x => x.tab === tab) || {}).title, pos: null };
+    t.blocks = blocksOf(list).map(b => b.kind === 'text' ? b : Object.assign({}, b, { n: strokesOf(list, b.id).length }));
+    by.set(tab, t);
+  }
+  return by;
+}
+function drawList(){
+  if (!S.el) return;
+  const chips = [['all', 'All'], ['hl', 'Highlights' + (S.hls.length ? ' ' + S.hls.length : '')], ['notes', 'With notes']];
+  S.el.querySelector('.sklchips').innerHTML = !S.ctx || !S.ctx.highlights ? '' : chips.map(c => '<button class="chip' + (S.chip === c[0] ? ' on' : '') + '" data-skchip="' + c[0] + '" aria-pressed="' + (S.chip === c[0]) + '">' + esc(c[1]) + '</button>').join('');
+  const q = S.el.querySelector('.sklq input'); if (q.value !== S.lq) q.value = S.lq;
+  drawRows();
+}
+function drawRows(){
+  const box = S.el && S.el.querySelector('.sklrows'); if (!box || S.view !== 'list' || !S.ctx) return;
+  const H = C.HL, pages = pagesNow(), q = S.lq.trim().toLowerCase(), chip = S.ctx.highlights ? S.chip : 'all';
+  const has = t => !q || t.toLowerCase().includes(q);
+  const known = new Map(tabList().map(t => [t.tab, t]));
+  // the sections: General, then the chapters in reading order (an article: one)
+  const tabs = new Map();
+  const sec = tab => { if (!tabs.has(tab)) { const k = known.get(tab) || pages.get(tab) || {}; tabs.set(tab, { tab, title: tab ? k.title || 'Chapter' : 'General', pos: k.pos, hls: [], blocks: [] }); } return tabs.get(tab); };
+  if (many()) sec('');
+  for (const h of S.hls) sec(many() ? h.tab || '' : '').hls.push(h);
+  for (const [tab, t] of pages) if ((t.blocks || []).length) sec(many() ? tab : '').blocks.push(...t.blocks);
+  const order = [...tabs.values()].sort((a, b) => (a.tab !== '') - (b.tab !== '') || ((a.pos != null ? a.pos : a.hls.length ? Math.min(...a.hls.map(h => h.key)) : 2) - (b.pos != null ? b.pos : b.hls.length ? Math.min(...b.hls.map(h => h.key)) : 2)) || 0);
+  const pen = b => b.kind === 'text' ? '<div class="sklt" dir="auto">' + esc(b.text || '') + '</div>' :
+    words(b) ? '<div class="sklw" dir="auto">' + IC.pen + '<span>' + esc(words(b)) + '</span></div>' :
+    '<div class="sklw mute">' + IC.pen + '<span>' + (b.kind === 'image' ? esc(b.cap || '') : '') + '</span></div>';
+  let html = '', n = 0;
+  H.rowOpts = { chapter: false, date: false };
+  for (const s of order) {
+    const ids = new Set(s.hls.map(h => h.id)), under = new Map();
+    const loose = s.blocks.filter(b => { if (b.hl && ids.has(b.hl)) { (under.get(b.hl) || under.set(b.hl, []).get(b.hl)).push(b); return false; } return true; });
+    let part = '';
+    // what's on the page by itself (above the cards, or under one that's gone)
+    if (chip !== 'hl' && loose.length && has(loose.map(words).join(' '))) {
+      part += '<article class="hrow skpg" data-sktab2="' + esc(s.tab) + '"><div class="sklpen">' + loose.map(pen).join('') + '</div></article>'; n++;
+    }
+    for (const h of s.hls.slice().sort((a, b) => a.key - b.key)) {
+      const notes = under.get(h.id) || [];
+      if (chip === 'notes' && !notes.length && !(h.note || '').trim()) continue;
+      if (!has([h.text, h.note || ''].concat(notes.map(words)).join(' '))) continue;
+      const x = Object.assign({}, h.raw || h); delete x.open;
+      let row = H.row(x, H.rowOpts);
+      if (notes.length) row = row.replace('<div class="hmeta">', '<div class="sklpen">' + notes.map(pen).join('') + '</div><div class="hmeta">');
+      part += row; n++;
+    }
+    if (part) html += (many() ? '<div class="sklsec"' + rtl(s.title) + '>' + esc(s.title) + '</div>' : '') + part;
+  }
+  box.innerHTML = html || '<p class="mute sklnone">' + (q ? 'Nothing found' : 'Nothing here yet') + '</p>';
+}
+// The list at a highlight's row (and its note open to type in).
+function listTo(id, note){
+  drawList();
+  const row = [...S.el.querySelectorAll('.sklrows .hrow')].find(r => r.dataset.h === id); if (!row) return;
+  row.scrollIntoView({ block: 'center' });
+  if (note) { const n = row.querySelector('[data-hra="note"]'); if (n) n.click(); }
+  else if (C.HL && C.HL.flash) C.HL.flash(row);
+}
+function onList(e){
+  const c = e.target.closest('[data-skchip]');
+  if (c) { S.chip = c.dataset.skchip; drawList(); return; }
+  if (e.target.closest('.hacts, .hnote, a, textarea, input')) return;
+  if (window.getSelection && String(window.getSelection())) return;
+  const pg = e.target.closest('.skpg');
+  if (pg) { const tab = pg.dataset.sktab2 || ''; S.follow = !!(S.here && tab === S.here.tab); setView('pages'); show1(tab, tabList().find(t => t.tab === tab)); return; }
+  const row = e.target.closest('.hrow[data-h]');
+  if (row) reveal({ hl: row.dataset.h });
+}
+window.addEventListener('daf-hl-changed', () => { if (S.shown && S.ctx) { if (S.view === 'list' && document.activeElement && document.activeElement.closest('.sklist')) return; hlChanged(); } });
 
 /* ---------- opening and closing ---------- */
 const openKey = () => 'open.' + (S.ctx ? S.ctx.kind : 'doc');
@@ -897,8 +1193,9 @@ function show(){
   place(); theme();
   const s = Pens.surface(); if (s && s !== surface) S.prev = s;
   Pens.use(surface);
-  drawTabs(); drawTools();
-  if (!S.pages.has(key())) { setCur([]); render(); load(S.tab); } else { render(); load(S.tab); }
+  drawTools();
+  if (!S.pages.has(key())) setCur([]);
+  setView(S.view); load(S.tab); loadHls();
   store.set(openKey(), true);
   buttons(); relayout();
 }
@@ -906,6 +1203,7 @@ function hide(keep){
   if (!S.shown) return;
   stopEditing(); unpick(); readNow(); flush();
   if (S.rec) S.rec.r.stop();
+  S.picking = false;
   S.shown = false; if (S.el) S.el.hidden = true;
   place();
   if (Pens.surface() === surface) Pens.use(S.prev && S.prev.live && S.prev.live() ? S.prev : null);
@@ -914,9 +1212,10 @@ function hide(keep){
 }
 function toggle(){ if (S.shown) hide(); else show(); }
 function buttons(){ document.querySelectorAll('[data-sketch]').forEach(b => { b.setAttribute('aria-pressed', String(S.shown)); b.classList.toggle('on', S.shown); }); }
-// A reader opened something: the Sketchbook is for that now, and comes up if it was up last time.
+// A reader opened something: the Notebook is for that now, and comes up if it was up last time.
 // ctx: {item, kind (book | doc | pdf | manga), here() (where you are: {tab, title, pos}), view (a book's
-// foliate view), shots() (what the camera can take), time() and seek(t) (a video's), resized()}.
+// foliate view), shots() (what the camera can take), time() and seek(t) (a video's), resized(),
+// highlights() (its highlights, for the cards: see loadHls) and go(highlight) (to one, in the reader)}.
 function attach(ctx){
   if (!ctx || !ctx.item) return;
   stopEditing(); unpick(); readNow(); flush();
@@ -924,7 +1223,7 @@ function attach(ctx){
   const same = S.ctx && S.ctx.item === ctx.item;
   S.ctx = ctx;
   const s = Pens.surface(); if (s && s !== surface) S.prev = s;
-  if (!same) { S.tabs = []; S.pages = new Map(); S.vault = null; }
+  if (!same) { S.tabs = []; S.pages = new Map(); S.vault = null; S.hls = []; S.all = null; S.chs = null; S.lq = ''; S.picking = false; }
   S.done = []; S.undone = []; S.follow = true;
   S.here = ctx.here ? ctx.here() : null;
   S.tab = S.here ? S.here.tab : ''; S.meta = S.here || {};
@@ -934,7 +1233,7 @@ function attach(ctx){
     try { for (const c of ctx.view.renderer.getContents()) watchDoc(c.doc); } catch(e){}
     S.off = () => { ctx.view.removeEventListener('relocate', on); ctx.view.removeEventListener('load', loaded); };
   }
-  if (store.get(openKey(), false)) { if (S.shown) { place(); show1(S.tab, S.meta); Pens.use(surface); drawTools(); relayout(); } else show(); }
+  if (store.get(openKey(), false)) { if (S.shown) { place(); show1(S.tab, S.meta); Pens.use(surface); drawTools(); relayout(); loadHls(); if (S.view === 'list') loadAll(); } else show(); }
   else if (S.shown) hide(true);
   buttons();
 }
@@ -946,7 +1245,7 @@ function detach(){
 }
 // The bar's button, in each reader's own kind of button.
 function button(kind){
-  const label = 'Sketchbook', on = S.shown;
+  const label = 'Notebook', on = S.shown;
   const cls = kind === 'manga' ? 'mic' : 'ib';
   return '<button class="' + cls + (on ? ' on' : '') + '" data-sketch aria-pressed="' + on + '" title="' + label + '" aria-label="' + label + '">' + IC.book + '</button>';
 }
@@ -960,8 +1259,10 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('pagehide', flush);
 window.addEventListener('online', () => { if (S.shown && S.ctx) setTimeout(() => load(S.tab), 3000); });
 
-C.Sketch = { attach, detach, button, toggle, show, hide, room, open: () => S.shown, flush,
-  state: () => ({ shown: S.shown, mode: S.mode, item: S.ctx && S.ctx.item, tab: S.tab, here: S.here, tabs: tabList().map(t => t.tab),
+C.Sketch = { attach, detach, button, toggle, show, hide, room, open: () => S.shown, flush, reveal, hlChanged,
+  list: () => reveal({ view: 'list' }),
+  state: () => ({ shown: S.shown, mode: S.mode, view: S.view, item: S.ctx && S.ctx.item, tab: S.tab, here: S.here, tabs: tabList().map(t => t.tab),
+    cards: cardsHere().map(h => h.id), groups: S.groups.map(g => (g.card ? 'card' : g.id ? 'gone' : 'top') + ':' + g.blocks.length), hls: S.hls.length,
     blocks: blocksOf(cur()).map(b => b.kind + (b.type ? ':' + b.type : '') + ':' + strokesOf(cur(), b.id).length + (b.transcript ? ':' + b.transcript : '')),
     editing: !!S.editing, picked: S.picked, queued: S.q ? S.q.add.size + S.q.remove.size : 0, done: S.done.length, surface: Pens.surface() === surface }) };
 })();

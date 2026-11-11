@@ -1,6 +1,6 @@
-/* The Sketchbook (sketchbook.js): the panel beside the reader or the sheet below (or above) it, the
-   room it takes from everything else, and its page, which is in a frame of its own (this file is
-   linked there too). --skr, --skb and --skt are its width on the right, its height at the bottom and
+/* The Notebook (sketchbook.js, once the Sketchbook): the panel beside the reader or the sheet below
+   (or above) it, the room it takes from everything else, its page, which is in a frame of its own
+   (this file is linked there too), with the highlights on it as cards, and its list. --skr, --skb and --skt are its width on the right, its height at the bottom and
    at the top: 0 when it's away. */
 
 /* ---------- the room it takes ---------- */
@@ -52,27 +52,44 @@ html.skside .skgrip{position:absolute;left:-7px;top:0;bottom:0;width:14px;cursor
 html.skside .skgrip i{width:4px;height:44px}
 html:not(.skside) .skgrip{height:20px;cursor:row-resize}
 html:not(.skside) .skgrip i{width:44px;height:4px}
-.skhead{flex:none;display:flex;flex-direction:column;gap:2px;padding:4px 8px 6px;border-bottom:1px solid var(--line);min-width:0}
-html.skside .skhead{padding-top:8px}
-html.sktop .skhead{border-bottom:0;border-top:1px solid var(--line)}
-.sktabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding:2px 0 4px;min-width:0}
-.sktabs::-webkit-scrollbar{display:none}
-.sktab{flex:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line-2);background:var(--bg);color:var(--fg-2);border-radius:999px;padding:5px 12px;font-size:13px;line-height:1.2;cursor:pointer}
-.sktab[aria-selected="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg);font-weight:600}
-.sktab.here{position:relative;padding-left:20px}
-.sktab.here::before{content:"";position:absolute;left:9px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--accent)}
-.sktab.here[aria-selected="true"]::before{background:var(--bg)}
-.sktools{display:flex;align-items:center;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.skhead{flex:none;position:relative;display:flex;align-items:center;gap:6px;padding:8px 8px 8px 10px;min-width:0}
+html.sktop .skhead{border-top:1px solid var(--line)}
+.skhead .spacer{flex:1;min-width:4px}
+.skwhere{display:flex;align-items:center;gap:2px;min-width:0;flex:0 1 auto}
+.skwhere[hidden]{display:none}
+.skwh{flex:none;height:36px;padding:0 12px;border:0;border-radius:9px;background:transparent;color:var(--fg-2);font:600 14px/1 var(--ui);display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.skwh.on{background:var(--bg);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.skwh.skch{flex:0 1 auto;min-width:0;max-width:min(300px,52vw)}
+.skwh.skch .t{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.skwh .dot,.skpick .dot{display:none;flex:none;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.skwh.here .dot,.skpick .here .dot{display:block}
+.skwh svg{flex:none}
+.skseg{flex:none;display:flex;padding:3px;border-radius:10px;background:color-mix(in srgb,var(--fg) 7%,transparent)}
+.skseg button{height:32px;padding:0 13px;border:0;border-radius:8px;background:transparent;color:var(--fg-2);font:600 13.5px/1 var(--ui);cursor:pointer}
+.skseg button[aria-selected="true"]{background:var(--bg);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.skhb{flex:none;display:flex;align-items:center}
+.skhb .ib{width:38px;height:38px;display:grid;place-items:center;color:var(--fg-2)}
+/* the chapters, picked from the head */
+.skpick{position:absolute;left:10px;top:calc(100% - 2px);z-index:6;width:min(320px,calc(100% - 20px));max-height:min(60vh,420px);overflow-y:auto;padding:6px;border-radius:14px;background:var(--bg);box-shadow:0 14px 40px rgba(0,0,0,.2),0 0 0 1px var(--line);overscroll-behavior:contain}
+html.sktop .skpick{top:auto;bottom:calc(100% - 2px)}
+.skpick[hidden]{display:none}
+.skpick button{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:6px 10px;border:0;border-radius:9px;background:transparent;color:var(--fg);font:500 14px/1.3 var(--ui);text-align:start;cursor:pointer}
+.skpick button[aria-selected="true"]{background:color-mix(in srgb,var(--fg) 8%,transparent);font-weight:600}
+.skpick .t{flex:1;min-width:0}
+.skpick .n{flex:none;display:flex;gap:8px;color:var(--fg-3);font-size:12px}
+.skpick .n span{display:inline-flex;align-items:center;gap:3px}
+/* the tools, floating at the foot of the page: the pens' and the Notebook's own */
+.sktools{position:absolute;left:50%;bottom:calc(12px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:2px;padding:4px;max-width:calc(100% - 16px);box-sizing:border-box;overflow-x:auto;scrollbar-width:none;border-radius:16px;background:var(--bg);box-shadow:0 10px 30px rgba(0,0,0,.18),0 0 0 1px var(--line)}
+html.sktop .sktools{bottom:12px}
 .sktools::-webkit-scrollbar{display:none}
-.skown{display:flex;align-items:center;gap:2px;flex:1;min-width:0}
-.skown .spacer{flex:1}
-.skown .ib{flex:none;width:40px;height:40px;display:grid;place-items:center;position:relative}
+.skb.sklisting .sktools{display:none}
+.skown{display:flex;align-items:center;gap:2px;flex:none}
+.skown .ib{flex:none;width:40px;height:40px;display:grid;place-items:center;position:relative;border-radius:11px}
 .skown .ib[aria-pressed="true"]{color:var(--accent);background:var(--accent-weak)}
 .skown .ib.skon{color:#fff;background:#d33b2f;width:auto;padding:0 10px;display:inline-flex;gap:6px;border-radius:20px}
 .skown .ib.skbusy{opacity:.55;animation:skpulse 1s ease-in-out infinite alternate}
 @keyframes skpulse{from{opacity:.35}to{opacity:.8}}
 .skrec{font-size:13px;font-variant-numeric:tabular-nums;font-weight:600}
-/* the pens' tools, in a row in the head */
 .skb .skpens:empty{display:none}
 .skb .skpens .inkpal{position:static;transform:none;flex-direction:row;box-shadow:none;background:none;padding:0;gap:0;border-radius:0}
 .skb .skpens .inkpal .sep{width:1px;height:24px;margin:0 3px}
@@ -83,6 +100,29 @@ html.focus .skb .inkpal{display:flex}
 .skpens:not(:empty) + .skown{border-left:1px solid var(--line);margin-left:4px;padding-left:4px}
 .skbody{flex:1;min-height:0;position:relative}
 .skframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:var(--bg)}
+/* the list: every highlight with what's written under it, and the pages' own words */
+.sklist{position:absolute;inset:0;z-index:3;overflow-y:auto;overscroll-behavior:contain;background:var(--panel);padding:2px 14px calc(24px + env(safe-area-inset-bottom,0px));box-sizing:border-box}
+.sklist[hidden]{display:none}
+.sklhead{position:sticky;top:0;z-index:1;display:flex;flex-direction:column;gap:8px;padding:2px 0 8px;background:var(--panel)}
+.sklq{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:999px;background:var(--bg);box-shadow:0 0 0 1px var(--line);color:var(--fg-3)}
+.sklq input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--fg);font:15px var(--ui)}
+.sklq input::-webkit-search-cancel-button{display:none}
+.sklchips{display:flex;gap:6px;flex-wrap:wrap}
+.sklchips:empty{display:none}
+.sklchips .chip{height:32px;padding:0 13px;border-radius:999px;font:600 13.5px/1 var(--ui)}
+.sklchips .chip.on{background:var(--accent);color:var(--on-accent,#fff);border-color:var(--accent)}
+.sklsec{padding:14px 4px 6px;color:var(--fg-3);font:700 11px/1.2 var(--ui);letter-spacing:1.1px;text-transform:uppercase}
+.sklrows .hrow{background:var(--bg);border:0;border-radius:12px;box-shadow:0 0 0 1px var(--line);margin:0 0 8px;padding:12px 10px 10px 20px}
+.sklrows .hrow::before{left:8px;top:14px;bottom:14px}
+.sklrows .hrow .hq{cursor:pointer}
+.sklrows .skpg::before{display:none}
+.sklrows .skpg{padding-left:14px;cursor:pointer}
+.sklpen{display:flex;flex-direction:column;gap:4px}
+.sklw{display:flex;align-items:baseline;gap:6px;color:var(--ink-blue,var(--accent));font:500 16px/1.4 var(--ui)}
+.sklw svg{flex:none;transform:translateY(2px);opacity:.7}
+.sklw.mute{color:var(--fg-3)}
+.sklt{font:14.5px/1.45 var(--ui);color:var(--fg-2);white-space:pre-wrap}
+.sklnone{padding:24px 4px;text-align:center}
 /* the bars' button while it's open */
 [data-sketch][aria-pressed="true"]{color:var(--accent);background:var(--accent-weak)}
 .mreader .mic[data-sketch][aria-pressed="true"]{color:var(--macc);background:rgba(87,179,215,.16)}
@@ -95,7 +135,7 @@ html.focus .skb .inkpal{display:flex}
 
 /* ---------- the page (in its frame) ---------- */
 html.skframe{background:var(--bg);height:auto;min-height:100%;scrollbar-width:thin}
-body.skdoc{margin:0;padding:10px 10px 40px;height:auto;min-height:100%;background:transparent;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+body.skdoc{margin:0;padding:10px 10px 84px;height:auto;min-height:100%;background:transparent;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
 .skpage{position:relative;margin:0 auto;--sk-rule:color-mix(in srgb,var(--fg) 13%,transparent)}
 /* a page narrower than the panel: a sheet on the desk */
 html.skframe:has(.skpage.sheet){background:color-mix(in srgb,var(--fg) 4%,var(--bg))}
@@ -112,6 +152,23 @@ html.skframe:has(.skpage.sheet){background:color-mix(in srgb,var(--fg) 4%,var(--
 .skpic img{display:block;width:100%;height:100%;object-fit:fill;border-radius:4px;user-select:none;-webkit-user-select:none}
 .skcap{position:absolute;right:6px;bottom:6px;font:12px/1 var(--ui);color:#fff;background:rgba(0,0,0,.45);padding:3px 6px;border-radius:6px}
 .skb-picked{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+/* a highlight, as a card on the page: its colour, its words, its note, where it is (a tap goes there) */
+.skcard{padding:8px 5% 6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.skcq{position:relative;display:block;padding:11px 14px 9px 20px;border-radius:12px;background:color-mix(in srgb,var(--fg) 3%,var(--bg));box-shadow:0 0 0 1px var(--line),0 2px 6px rgba(0,0,0,.05);transition:box-shadow .4s}
+.skcq::before{content:"";position:absolute;left:8px;top:11px;bottom:11px;width:4px;border-radius:2px;background:var(--hl-yellow-line)}
+.skcard[data-color="green"] .skcq::before{background:var(--hl-green-line)}
+.skcard[data-color="blue"] .skcq::before{background:var(--hl-blue-line)}
+.skcard[data-color="pink"] .skcq::before{background:var(--hl-pink-line)}
+.skcard[data-color="purple"] .skcq::before{background:var(--hl-purple-line)}
+.skq{display:block;font:16px/1.5 var(--serif);color:var(--fg);white-space:pre-line;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:9;overflow:hidden}
+.skq .hlpic{display:block;max-width:100%;max-height:260px;border-radius:6px}
+.sknote{display:block;margin-top:6px;font:14px/1.45 var(--ui);color:var(--fg-2);white-space:pre-line}
+.skwh2{display:block;margin-top:6px;font:600 12px/1.2 var(--ui);color:var(--fg-3)}
+.skcard.flash .skcq{box-shadow:0 0 0 3px var(--hl-yellow-line),0 8px 20px rgba(0,0,0,.12)}
+.skcard[data-color="green"].flash .skcq{box-shadow:0 0 0 3px var(--hl-green-line),0 8px 20px rgba(0,0,0,.12)}
+.skcard[data-color="blue"].flash .skcq{box-shadow:0 0 0 3px var(--hl-blue-line),0 8px 20px rgba(0,0,0,.12)}
+.skcard[data-color="pink"].flash .skcq{box-shadow:0 0 0 3px var(--hl-pink-line),0 8px 20px rgba(0,0,0,.12)}
+.skcard[data-color="purple"].flash .skcq{box-shadow:0 0 0 3px var(--hl-purple-line),0 8px 20px rgba(0,0,0,.12)}
 .skts{display:inline-block;margin-right:8px;padding:1px 7px;border:1px solid var(--line-2);border-radius:999px;background:var(--bg);color:var(--accent);font:600 12.5px/1.5 var(--ui);font-variant-numeric:tabular-nums;cursor:pointer;vertical-align:1px}
 .skink > .skts{position:absolute;left:0;top:2px;z-index:1}
 .skbar{position:absolute;right:4px;z-index:3;display:flex;gap:2px;padding:3px;border-radius:10px;background:var(--side);box-shadow:0 2px 12px rgba(0,0,0,.18),0 0 0 1px color-mix(in srgb,var(--fg) 10%,transparent);touch-action:manipulation}
