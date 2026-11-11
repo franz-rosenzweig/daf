@@ -161,4 +161,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - not yet: the lines where you left off in a book (GET /api/books/{id}/excerpt), for Today
 - not yet: themes and Rooms in the new look (themes.js T.vars2, the Rooms section at the end of look2.css): the backdrop is the room's frame, the sheet its wall
 - not yet: Preferences one page at a time, with Devices & extension as a page of its own (look2.js prefsPages)
+- not yet: Learn (web/learn.js, daf/areas.py, docs/learn.md): Areas (cards, Edit: rename, colour, move, delete; New area with name, goal, colour, suggestions), an area's page (Continue, Up next, its things with their state, Highlights, Feeds, the helper's suggestions with Add / set aside / Find more), Add (search Daf, a link, a site to follow), Add to Daf's Area, Add to an area on a book; all through /api/areas
+- not yet: the sideways side bar folding to its pictures, with the tab's pages in a row on the page (look2.js l2fold)
+- not yet: Listen's pages named for themselves (look2.js LISTEN)
 - not yet: the Sketchbook's edge stops at the page's width, and pushed well past it closes (sketchbook.js grip, sizes)

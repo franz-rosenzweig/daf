@@ -71,7 +71,8 @@
 .lnswrow{display:flex;gap:10px}
 .lnswrow button{width:32px;height:32px;border:3px solid transparent}
 .lnswrow button.on{border-color:var(--fg)}
-.lnbtns{display:flex;gap:8px;align-items:center}
+.lnbtns{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.lnbtns [data-ln="delete"],.lnbtns [data-ln="pnew"]{margin-right:auto}
 .lnres{display:flex;flex-direction:column;max-height:300px;overflow:auto}
 .lnpick{display:flex;flex-direction:column;gap:2px}
 .lndot{width:10px;height:10px;border-radius:3px;display:inline-block;margin:0 8px 0 2px}
