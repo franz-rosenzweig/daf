@@ -439,8 +439,8 @@ function bookRow(b, extra){
     (b.progress != null ? '<span class="tiny mute">' + bar(b.progress) + ' ' + Math.round(b.progress) + '% · ' + esc(b.progress_note || '') + '</span>' : '') +
     (b.audio_note ? '<span class="tiny mute">Audiobook · ' + esc(b.audio_note) + '</span>' : '') + (extra || '') + '</span></a>';
 }
-function renderToday(){
-  let d = S.data; if (!d) { $('#main').innerHTML = '<div class="page mute">Loading…</div>'; return; }
+function renderToday(dry){      // dry: only work out the week and year cards (the new look shows them on Stats)
+  let d = S.data; if (!d) { if (!dry) $('#main').innerHTML = '<div class="page mute">Loading…</div>'; return; }
   // Minutes read on this device that haven't reached the server yet (offline) count already.
   const pend = d.date === d.today ? outbox.pending(d.today) : { min: 0, by: {} };
   if (pend.min > 0.1) {
@@ -484,11 +484,14 @@ function renderToday(){
     d.on_this_day.map(x => '<div class="hlc"><q' + (x.open ? ' class="go" data-open="' + esc(x.open) + '" role="link" tabindex="0" title="Open at this spot"' : '') + '>' + window.DafCore.HL.quote(x.text) + '</q><div class="meta tiny mute">' + esc(shortTitle(x.title)) + ' · ' + x.year + '</div></div>').join('') + '</section>';
   const stand = d.nightstand.length ? d.nightstand : d.nightstand_suggested;
   if (stand.length && !L2) h += '<section class="card"><div class="cardh"><h2>Nightstand</h2><a class="tiny" href="#books">' + (d.nightstand.length ? 'Change' : 'Suggested from what you read lately · choose your three') + '</a></div><div class="brows">' + stand.map(b => bookRow(b)).join('') + '</div></section>';
+  const h0 = h; h = '';
   h += '<section class="card" aria-label="This week"><h2>This week</h2><div class="week">' + week + '</div></section>';
   h += '<section class="card" aria-label="Year 30"><div class="cardh"><h2>Year 30</h2><span class="mute tiny">October 9, 2026 to October 8, 2027</span></div>' +
     '<div class="stats"><span><b>' + y.total_hours + ' h</b><span class="mute tiny">of ' + Math.round((y.targets || []).reduce((a, b) => a + b, 0) / 60 || 365) + '</span></span><span><b>' + y.days_read + '</b><span class="mute tiny">days read</span></span><span><b>' + y.days_goal + '</b><span class="mute tiny">days ' + atWord(d.goal) + '</span></span><span><b>' + (dayN || 0) + '</b><span class="mute tiny">days in</span></span></div>' +
     yearGrid(y, 'Year 30') + legendFor(d.goal) + '</section>';
   h += '<section class="card" aria-label="Year 29" id="y29"><div class="cardh"><h2 style="color:var(--fg-2)">Year 29</h2><span class="mute tiny">October 9, 2025 to October 8, 2026</span></div>' + (S.y29 ? y29Body(S.y29) : '<span class="mute">Loading…</span>') + '</section>';
+  S.yearsHTML = h; h = h0 + (L2 ? '' : h);
+  if (dry) return;
   h += '<p class="mute tiny" style="margin:0">' + esc(freshLine) + '</p></div>';
   $('#main').innerHTML = h;
   if (GL) GL.celebrate(d);
@@ -1328,7 +1331,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest && e.target.closest('a[data-swap]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault(); swap(a.getAttribute('href'));
 });
-window.DafCore = { api, swr, outbox, keepOffline, errs: ERRS, esc, toast, $, $$, epochDate, ago, shortTitle, shortDate, cover, bar, ring, bookRow, I, S, renderSide, load, pinsOn, PINS, lsGet, lsSet, atWord, closeModal, hlCard, colorDots, HL_COLORS, drawHighlights: () => drawHighlights(), views: {}, navExtra: null, Voices, swap };
+window.DafCore = { api, swr, outbox, keepOffline, errs: ERRS, esc, toast, $, $$, epochDate, ago, shortTitle, shortDate, cover, bar, ring, bookRow, I, S, renderSide, load, yearCards: () => { if (S.data) renderToday(true); return S.yearsHTML || ''; }, pinsOn, PINS, lsGet, lsSet, atWord, closeModal, hlCard, colorDots, HL_COLORS, drawHighlights: () => drawHighlights(), views: {}, navExtra: null, Voices, swap };
 window.addEventListener('daf-hl-changed', () => { if (S.route[0] === 'review' && S.rev) drawReview(); });
 
 async function start(){

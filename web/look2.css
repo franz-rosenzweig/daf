@@ -200,3 +200,20 @@ html[data-look="2"] .brow .rowacts .btn{flex:none;width:auto}
 /* (a Read link inside a book's row lands beside the row, not in it: an anchor can't hold an anchor) */
 html[data-look="2"] .brows > .btn,html[data-look="2"] .brows > .linkbtn,html[data-look="2"] .brows > .rowacts{align-self:flex-start;margin:0 0 10px 56px}
 html[data-look="2"] .brows > .btn{min-width:120px}
+
+/* ---------- Daf's own panels: the Edition's lead, the parasha, the streak ---------- */
+/* Inside one, the page's colours are swapped for white on the panel, so whatever is in it follows. */
+html[data-look="2"] :is(.edlead,.tcard:first-child,.card:has(> .sbig)){
+  --fg:#ffffff; --fg-2:rgba(255,255,255,.78); --fg-3:rgba(255,255,255,.62); --line:rgba(255,255,255,.18); --line-2:rgba(255,255,255,.3);
+  --accent:#ffffff; --accent-2:#ffffff; --accent-weak:rgba(255,255,255,.16); --on-accent:#1d1d1f;
+  --hover:rgba(255,255,255,.12); --active:rgba(255,255,255,.18); --panel:rgba(255,255,255,.1); --l2-card:transparent; --side:rgba(255,255,255,.14);
+  color:#fff;border:0;border-radius:24px;background:linear-gradient(120deg,#1f2a44,#2b4c8c);box-shadow:0 18px 40px rgba(31,42,68,.3)}
+html[data-look="2"] .edlead{padding:30px 34px;margin-top:18px}
+html[data-look="2"] .edlead h2{letter-spacing:-.6px}
+html[data-look="2"] .tcard{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:18px;box-shadow:var(--l2-lift)}
+html[data-look="2"] .tcard:first-child{background:linear-gradient(120deg,#49391c,#725b30 80%);box-shadow:0 18px 40px rgba(73,57,28,.3);padding:28px 30px}
+html[data-look="2"] .tcard:first-child b{font-size:34px;letter-spacing:-.5px}
+html[data-look="2"] .card:has(> .sbig) .sbig b{font-size:64px;letter-spacing:-3px;line-height:1}
+html[data-look="2"] .card:has(> .sbig) h2{color:rgba(255,255,255,.72)}
+/* the daily review's card stands a little higher */
+html[data-look="2"] .review .rcard{box-shadow:0 2px 4px rgba(0,0,0,.04),0 30px 60px rgba(60,50,30,.16);border-radius:24px;border-color:rgba(0,0,0,.05);background:var(--l2-card)}

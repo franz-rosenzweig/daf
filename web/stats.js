@@ -58,6 +58,6 @@ function draw(){
   if (s.on_this_day.length) h += '<section class="card"><h2>On this day</h2>' + s.on_this_day.map(onThisDay).join('') + '</section>';
   if (s.finished.length) h += '<section class="card"><h2>Finished</h2><span class="mute tiny">Read to the end on the Kindle, last two years</span><div class="libgrid">' +
     s.finished.map(finished).join('') + '</div></section>';
-  page.innerHTML = h;
+  page.innerHTML = h + (document.documentElement.dataset.look === '2' && C.yearCards ? C.yearCards() : '');     // the new look keeps the week and the years here, not on Today
 }
 })();
