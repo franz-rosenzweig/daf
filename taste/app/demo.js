@@ -1017,6 +1017,9 @@ Object.defineProperty(window, 'DafCore', { configurable: true, get(){ return cor
   if (!v || typeof v !== 'object') return;
   let extra = v.navExtra;
   Object.defineProperty(v, 'navExtra', { configurable: true, enumerable: true, get(){ return extra && ((x, n) => navFilter(extra(x, n))); }, set(f){ extra = f; } });
+  // the new look's tabs come from the pinned places: Recovery never, and in the demo none it can't open
+  const pins = v.pinsOn;
+  if (typeof pins === 'function') v.pinsOn = () => pins().filter(p => p !== 'recovery' && (SEED.docs || !['manga', 'torah', 'podcasts', 'paper'].includes(p)));
   const views = v.views || (v.views = {}), fixed = Object.assign(SEED.docs ? {} : AWAY, { recovery: RECOVERY_VIEW });
   for (const [k, f] of Object.entries(fixed)) Object.defineProperty(views, k, { configurable: true, enumerable: true, get(){ return f; }, set(){} });
 } });
