@@ -14,6 +14,9 @@ html[data-look="2"]:root{
   --l2-well:rgba(0,0,0,.07); --l2-chip:#ffffff; --l2-track:#cfcfd6;
   --l2-sheet:0 1px 2px rgba(0,0,0,.05),0 18px 50px rgba(60,50,30,.10);
   --l2-lift:0 1px 2px rgba(0,0,0,.04),0 10px 28px rgba(60,50,30,.07);
+  --ok:#2f8a57; --bad:#b8392b; --hl:#fbeba8; --hl-2:#efd25c; --speak:#e6ecf7; --speak-line:#bccbe8;
+  --hl-yellow:#fdf0c0; --hl-green:#dcf1d5; --hl-blue:#d9e8fc; --hl-pink:#fbdee9; --hl-purple:#ebe1f9;
+  --hl-yellow-line:#efc83a; --hl-green-line:#72c46c; --hl-blue-line:#6ea7ee; --hl-pink-line:#ec84aa; --hl-purple-line:#ab8ae2;
   color-scheme:light;
 }
 html[data-look="2"][data-mode="dark"]:root{
@@ -117,3 +120,83 @@ html[data-look="2"] .pop{border-radius:14px;border-color:rgba(0,0,0,.06);backgro
   html.l2-top .l2subs{grid-area:3/1/4/3}
   html.l2-top .main{grid-area:4/1/5/3}
 }
+
+/* a page sits in the middle of the sheet, and its bar lines up with it */
+html[data-look="2"] .page{max-width:1180px;width:100%;margin-inline:auto;box-sizing:border-box}
+html[data-look="2"]:not(.l2-phone) .main > .top{padding-inline:max(34px,calc((100% - 1180px) / 2 + 34px))}
+
+/* ---------- the panel in a book's own colour ---------- */
+.l2hero{--t1:#1f2a44;--t2:#2b4c8c;position:relative;overflow:hidden;display:flex;align-items:center;gap:38px;min-height:340px;padding:34px 44px;box-sizing:border-box;border-radius:24px;color:#fff;
+  background:linear-gradient(115deg,var(--t1),var(--t2) 75%);box-shadow:0 24px 50px color-mix(in srgb,var(--t1) 35%,transparent)}
+.l2hero::before{content:"";position:absolute;right:-80px;top:-120px;width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.07);pointer-events:none}
+.l2hcover{flex:none;position:relative;transform:rotate(-2deg)}
+.l2hero .l2cv{display:block;width:180px;height:270px;object-fit:cover;border-radius:4px 7px 7px 4px;box-shadow:inset 3px 0 0 rgba(255,255,255,.2),0 30px 50px rgba(0,0,0,.5)}
+.l2htext{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:flex-start}
+.l2lab{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.l2hero h1{font-family:var(--serif);font-size:44px;font-weight:600;line-height:1.08;letter-spacing:-.8px;margin:6px 0 0;text-wrap:balance}
+.l2hsub{font-size:15px;color:rgba(255,255,255,.76);margin-top:8px}
+.l2hacts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+html[data-look="2"] .l2hero .btn{min-height:50px;padding:0 20px;background:rgba(255,255,255,.16);color:#fff;font-size:15px}
+html[data-look="2"] .l2hero .btn:hover{background:rgba(255,255,255,.24)}
+html[data-look="2"] .l2hero .btn.primary{background:#fff;border-color:#fff;color:#1d1d1f;padding:0 30px;font-weight:700;box-shadow:0 8px 20px rgba(0,0,0,.25)}
+.l2hring{flex:none;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+.l2hring > b{font-size:15px;font-weight:600;margin-top:12px}
+.l2hring > span{font-size:12px;color:rgba(255,255,255,.72)}
+.l2ring{position:relative;display:block}
+.l2ringn{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.l2ringn b{font-size:44px;font-weight:700;letter-spacing:-1.5px;line-height:1}
+.l2ringn i{font-style:normal;font-size:12px;color:rgba(255,255,255,.72)}
+.l2hero.small{min-height:0;padding:22px 28px;gap:24px}
+.l2hero.small .l2cv{width:96px;height:144px}
+.l2hero.small h1{font-size:28px}
+.l2hero.small .l2hacts{margin-top:14px}
+html[data-look="2"] .l2hero.small .btn{min-height:42px}
+.l2hero .cv.tile{display:flex;align-items:flex-end;width:180px;height:270px;box-sizing:border-box}
+.l2hero.small .cv.tile{width:96px;height:144px}
+
+html[data-look="2"] .page.l2today{padding-top:22px;gap:18px}
+.l2cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+.l2nxs{display:flex;flex-direction:column}
+.l2nx{display:flex;align-items:center;gap:12px;min-height:58px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--fg)}
+.l2nx:last-child{border-bottom:0}
+.l2nx > span:first-child{flex:1;min-width:0}
+.l2nx b{display:block;font-size:15px;font-weight:600}
+.l2nx i{display:block;font-style:normal;font-size:13px;color:var(--fg-2)}
+.l2chev{color:var(--fg-3);font-size:18px}
+.l2acts{display:flex;gap:14px}
+.l2src{margin-top:4px;padding-top:12px;border-top:1px solid var(--line);font-size:13.5px;color:var(--fg-2)}
+
+/* a book's page: its head is the panel */
+html[data-look="2"] .bookhead[data-tint]{--t1:#1f2a44;--t2:#2b4c8c;padding:30px 34px;border-radius:24px;color:#fff;background:linear-gradient(135deg,var(--t1),var(--t2) 80%);box-shadow:0 20px 44px color-mix(in srgb,var(--t1) 30%,transparent);align-items:center}
+html[data-look="2"] .bookhead[data-tint] .mute,html[data-look="2"] .bookhead[data-tint] code{color:rgba(255,255,255,.74)}
+html[data-look="2"] .bookhead[data-tint] .cv.lg{border-radius:4px 7px 7px 4px;box-shadow:0 24px 40px rgba(0,0,0,.45)}
+html[data-look="2"] .bookhead[data-tint] .btn{background:rgba(255,255,255,.16);color:#fff}
+html[data-look="2"] .bookhead[data-tint] .btn.primary{background:#fff;border-color:#fff;color:#1d1d1f}
+html[data-look="2"] .bookhead[data-tint] .pbar{background:rgba(255,255,255,.25)}
+html[data-look="2"] .bookhead[data-tint] .pbar i{background:#fff}
+html[data-look="2"] .btitle{font-weight:600;letter-spacing:-.4px}
+
+@media (max-width:900px){
+  .l2hero{gap:22px;padding:26px 24px;min-height:0;flex-wrap:wrap}
+  .l2hero .l2cv,.l2hero .cv.tile{width:120px;height:180px}
+  .l2hero h1{font-size:32px}
+  .l2hring{flex-direction:row;gap:14px;width:100%;text-align:left;align-items:center}
+  .l2hring .l2ring{width:64px!important;height:64px!important}
+  .l2hring .l2ring svg{width:64px;height:64px}
+  .l2ringn b{font-size:20px;letter-spacing:-.5px}.l2ringn i{display:none}
+  .l2hring > b{margin:0}
+}
+@media (max-width:520px){
+  .l2hero{padding:20px}
+  .l2hero .l2cv,.l2hero .cv.tile{width:92px;height:138px}
+  .l2hero h1{font-size:26px}
+  .l2hacts{width:100%}
+  html[data-look="2"] .l2hero .btn.primary{flex:1}
+}
+
+/* a row's own actions (Read, Take off the nightstand) sit side by side, at their own width */
+html[data-look="2"] .brow .rowacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:6px}
+html[data-look="2"] .brow .rowacts .btn{flex:none;width:auto}
+/* (a Read link inside a book's row lands beside the row, not in it: an anchor can't hold an anchor) */
+html[data-look="2"] .brows > .btn,html[data-look="2"] .brows > .linkbtn,html[data-look="2"] .brows > .rowacts{align-self:flex-start;margin:0 0 10px 56px}
+html[data-look="2"] .brows > .btn{min-width:120px}

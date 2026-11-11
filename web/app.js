@@ -460,16 +460,18 @@ function renderToday(){
   const y = d.year30, fresh = d.fresh || {}, kin = (fresh.kindle && fresh.kindle.last) || {};
   const freshLine = 'Kindle: newest page ' + ago(kin.plugin || kin.koinsight) + (kin.plugin ? ' (Daf plugin)' : ' (KoInsight)') + ' · Audiobookshelf checked ' + ago(fresh.audiobookshelf && fresh.audiobookshelf.checked) + ' · updates every five minutes';
   const rv = d.review || {};
-  let h = '<div class="top"><h1>Today</h1><span class="spacer"></span><button class="btn sm" data-act="refresh" aria-label="Sync now">' + I.sync + '</button><button class="btn sm primary" data-act="paper">Log paper</button></div><div class="page">';
-  h += '<div class="hello"><h1><span style="color:var(--accent)">' + I.today.replace('width="18" height="18"', 'width="30" height="30"') + '</span>' + (isToday ? 'Today' : esc(longDate(d.date))) + '</h1><p class="mute">' + esc(longDate(d.date)) + (dayN && isToday ? ' · Year 30, day ' + dayN : '') + (isToday && d.streak && d.streak.any > 1 ? ' · ' + (d.streak.goal > 1 ? d.streak.goal + ' days in a row ' + atWord(d.goal) : d.streak.any + ' days in a row reading') : '') + '</p></div>';
+  const L2 = LOOK2 && window.DafCore.Look;      // the new look's Today: one panel for the book being read, then three cards (look2.js)
+  let h = L2 ? '<div class="page l2today">' + L2.hero(d, isToday, dayN) : '<div class="top"><h1>Today</h1><span class="spacer"></span><button class="btn sm" data-act="refresh" aria-label="Sync now">' + I.sync + '</button><button class="btn sm primary" data-act="paper">Log paper</button></div><div class="page">';
+  if (!L2) h += '<div class="hello"><h1><span style="color:var(--accent)">' + I.today.replace('width="18" height="18"', 'width="30" height="30"') + '</span>' + (isToday ? 'Today' : esc(longDate(d.date))) + '</h1><p class="mute">' + esc(longDate(d.date)) + (dayN && isToday ? ' · Year 30, day ' + dayN : '') + (isToday && d.streak && d.streak.any > 1 ? ' · ' + (d.streak.goal > 1 ? d.streak.goal + ' days in a row ' + atWord(d.goal) : d.streak.any + ' days in a row reading') : '') + '</p></div>';
   if (d.shabbat && isToday) h += '<div class="notice"><span style="color:var(--accent)">' + I.moon + '</span><span>' + (new Date().getDay() === 5 ? 'Shabbat is coming. <a href="#torah">This week’s parasha</a> is on the Torah shelf. ' : 'Shabbat. ') + 'Paper counts: log it here after havdalah, or send Ezer <b>shabbat 60</b>.</span></div>';
   if (isToday && window.DafCore.HC) h += window.DafCore.HC.todayNotice(d);
   if (isToday && window.DafCore.Sound) h += window.DafCore.Sound.todayNotice();   // Sound beside the Kindle (sound.js)
   if (d.offstand) h += '<div class="notice"><span style="color:var(--accent)">' + I.books + '</span><span style="flex:1">You’ve been reading <b>' + esc(shortTitle(d.offstand.title)) + '</b>, and it isn’t on the nightstand.</span><span style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn sm" href="#books">Swap it in</a><button class="btn sm" data-act="notstand" data-id="' + esc(d.offstand.id) + '">Just browsing</button></span></div>';
   const GL = window.DafCore.Goals;
-  h += '<div class="todaygrid">' + (GL ? GL.ringCard(d, ring, srcRows) : '<section class="card" aria-label="Minutes"><div class="ringrow">' + ring(118, 11, d.counted, d.goal) + '<div><div style="font-size:20px;font-weight:700">of ' + d.goal + ' minutes</div><div class="mute tiny">' + (d.counted >= d.goal ? 'That’s the hour.' : Math.ceil(d.goal - d.counted) + ' to go') + '</div></div></div><div class="rows">' + srcRows + '</div></section>') +
+  if (L2) h += L2.todayCards(d, sessHTML, srcRows, rv);
+  else h += '<div class="todaygrid">' + (GL ? GL.ringCard(d, ring, srcRows) : '<section class="card" aria-label="Minutes"><div class="ringrow">' + ring(118, 11, d.counted, d.goal) + '<div><div style="font-size:20px;font-weight:700">of ' + d.goal + ' minutes</div><div class="mute tiny">' + (d.counted >= d.goal ? 'That’s the hour.' : Math.ceil(d.goal - d.counted) + ' to go') + '</div></div></div><div class="rows">' + srcRows + '</div></section>') +
     '<section class="card" aria-label="Sittings"><h2>Sittings</h2><div class="sess">' + sessHTML + '</div></section></div>';
-  if (rv.total) {
+  if (rv.total && !L2) {
     // The day's review, up top on a phone like Readwise's: the first book's cover, how many, and one button.
     const f = rv.first, left = rv.total - rv.done, cards = d.cards_due || 0, done = left <= 0 && !cards;
     const books = (rv.books || []).map(t => shortTitle(t));
@@ -481,7 +483,7 @@ function renderToday(){
   if (isToday && d.on_this_day && d.on_this_day.length) h += '<section class="card"><div class="cardh"><h2>On this day</h2><a class="tiny" href="#stats">Stats</a></div>' +
     d.on_this_day.map(x => '<div class="hlc"><q' + (x.open ? ' class="go" data-open="' + esc(x.open) + '" role="link" tabindex="0" title="Open at this spot"' : '') + '>' + window.DafCore.HL.quote(x.text) + '</q><div class="meta tiny mute">' + esc(shortTitle(x.title)) + ' · ' + x.year + '</div></div>').join('') + '</section>';
   const stand = d.nightstand.length ? d.nightstand : d.nightstand_suggested;
-  if (stand.length) h += '<section class="card"><div class="cardh"><h2>Nightstand</h2><a class="tiny" href="#books">' + (d.nightstand.length ? 'Change' : 'Suggested from what you read lately · choose your three') + '</a></div><div class="brows">' + stand.map(b => bookRow(b)).join('') + '</div></section>';
+  if (stand.length && !L2) h += '<section class="card"><div class="cardh"><h2>Nightstand</h2><a class="tiny" href="#books">' + (d.nightstand.length ? 'Change' : 'Suggested from what you read lately · choose your three') + '</a></div><div class="brows">' + stand.map(b => bookRow(b)).join('') + '</div></section>';
   h += '<section class="card" aria-label="This week"><h2>This week</h2><div class="week">' + week + '</div></section>';
   h += '<section class="card" aria-label="Year 30"><div class="cardh"><h2>Year 30</h2><span class="mute tiny">October 9, 2026 to October 8, 2027</span></div>' +
     '<div class="stats"><span><b>' + y.total_hours + ' h</b><span class="mute tiny">of ' + Math.round((y.targets || []).reduce((a, b) => a + b, 0) / 60 || 365) + '</span></span><span><b>' + y.days_read + '</b><span class="mute tiny">days read</span></span><span><b>' + y.days_goal + '</b><span class="mute tiny">days ' + atWord(d.goal) + '</span></span><span><b>' + (dayN || 0) + '</b><span class="mute tiny">days in</span></span></div>' +
@@ -677,7 +679,7 @@ async function renderBooks(){
   const r = await swr('/api/books');
   S.books = r;
   const stand = r.nightstand.length ? r.nightstand : [];
-  let h = '<section class="card"><div class="cardh"><h2>Nightstand</h2><span class="mute tiny">Three books. ' + r.marked_reading + ' notes in the vault say “reading”.</span></div>';
+  let h = (LOOK2 && window.DafCore.Look && stand.length ? window.DafCore.Look.readingNow(stand[0]) : '') + '<section class="card"><div class="cardh"><h2>Nightstand</h2><span class="mute tiny">Three books. ' + r.marked_reading + ' notes in the vault say “reading”.</span></div>';
   const readBtn = b => b.readable ? '<a class="btn sm primary" href="#ebook/' + encodeURIComponent(b.id) + '">Read</a> ' : '';
   if (stand.length) h += '<div class="brows">' + stand.map(b => bookRow(b, '<span class="tiny rowacts">' + readBtn(b) + '<button class="linkbtn" data-act="standoff" data-id="' + esc(b.id) + '">Take off the nightstand</button></span>')).join('') + '</div>';
   else h += '<p class="mute" style="margin:0">Nothing chosen yet. Suggested from what you read lately:</p><div class="brows">' + r.suggested.map(b => bookRow(b)).join('') + '</div><button class="btn primary" data-act="standuse" style="align-self:flex-start">Use these three</button>';
@@ -744,7 +746,7 @@ function bookStats(st){
 async function renderBook(id, hl){
   $('#main').innerHTML = '<div class="top"><a class="btn sm" href="#books">' + I.back + '</a><h1>Book</h1></div><div class="page"><span class="mute">Loading…</span></div>';
   const b = await api('/api/books/' + encodeURIComponent(id));
-  let h = '<div class="bookhead">' + cover(b, 'cv lg') + '<div style="display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 280px"><h1 class="btitle">' + esc(b.title) + '</h1><span class="mute">' + esc(b.author || '') + '</span>' +
+  let h = '<div class="bookhead"' + (b.has_cover ? ' data-tint="' + esc(b.id) + '"' : '') + '>' + cover(b, 'cv lg') + '<div style="display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 280px"><h1 class="btitle">' + esc(b.title) + '</h1><span class="mute">' + esc(b.author || '') + '</span>' +
     (b.progress != null ? '<span>' + bar(b.progress) + ' ' + Math.round(b.progress) + '% on the Kindle · ' + esc(b.progress_note || '') + '</span>' : '') +
     (b.audio_note ? '<span class="mute">Audiobook: ' + esc(b.audio_note) + '</span>' : '') +
     '<span class="mute tiny">' + [b.minutes_kindle && !b.stats ? Math.round(b.minutes_kindle / 60 * 10) / 10 + ' h read on the Kindle' : '', b.last_read ? 'last opened ' + epochDate(b.last_read) : ''].filter(Boolean).join(' · ') + '</span>' +
