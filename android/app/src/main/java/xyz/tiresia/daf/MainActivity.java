@@ -135,6 +135,7 @@ public class MainActivity extends Activity {
                 try {
                     Server.setToken(this, Server.connect(this));
                     Widget.fetch(this);
+                    Board.refresh(this);
                     runOnUiThread(() -> Toast.makeText(this, "This phone is connected to Daf", Toast.LENGTH_SHORT).show());
                 } catch (Exception e) {
                     connecting = false;

@@ -143,6 +143,32 @@ final class Server {
         return json(request(c, "GET", "/api/phone/widget", null, null, true));
     }
 
+    /** GET /api/phone/widgets: what the home-screen widgets show (widgets/Board.kt). */
+    static JSONObject widgets(Context c) throws IOException {
+        return json(request(c, "GET", "/api/phone/widgets", null, null, true));
+    }
+
+    /** GET /api/phone/widget-feed?src=…: a Feed widget's headlines ("" the whole Feed, "folder:…", "feed:…"). */
+    static JSONObject widgetFeed(Context c, String src) throws IOException {
+        return json(request(c, "GET", "/api/phone/widget-feed?limit=25&src=" + Uri.encode(src == null ? "" : src), null, null, true));
+    }
+
+    /** A picture for a widget: Daf's own (a cover, a thumbnail) with the token, or one on the web as it is. */
+    static byte[] picture(Context c, String where) throws IOException {
+        if (where.startsWith("/")) return request(c, "GET", where, null, null, true);
+        HttpURLConnection h = (HttpURLConnection) new URL(where).openConnection();
+        h.setConnectTimeout(15000);
+        h.setReadTimeout(30000);
+        h.setRequestProperty("User-Agent", "Daf/" + Daf.version(c) + " (Android shell)");
+        try {
+            int status = h.getResponseCode();
+            if (status < 200 || status >= 300) throw new Failure(status, "The picture's site answered " + status + ".");
+            return read(h.getInputStream());
+        } finally {
+            h.disconnect();
+        }
+    }
+
     /** GET /api/phone/feed-news?cursor=…: new posts in the feeds set to notify (FeedNews). */
     static JSONObject feedNews(Context c, long cursor) throws IOException {
         return json(request(c, "GET", "/api/phone/feed-news" + (cursor >= 0 ? "?cursor=" + cursor : ""), null, null, true));

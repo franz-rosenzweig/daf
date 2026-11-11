@@ -83,6 +83,73 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
         </receiver>
 
+        <!-- the other widgets (widgets/, Glance): what they show comes from /api/phone/widgets (Board.kt) -->
+        <receiver
+            android:name=".KeepReadingReceiver"
+            android:exported="true"
+            android:label="Keep reading">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_keep_reading" />
+        </receiver>
+        <receiver
+            android:name=".HighlightReceiver"
+            android:exported="true"
+            android:label="Highlight">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_highlight" />
+        </receiver>
+        <receiver
+            android:name=".SpotlightReceiver"
+            android:exported="true"
+            android:label="Spotlight">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_spotlight" />
+        </receiver>
+        <receiver
+            android:name=".EditionReceiver"
+            android:exported="true"
+            android:label="Edition">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_edition" />
+        </receiver>
+        <receiver
+            android:name=".FeedReceiver"
+            android:exported="true"
+            android:label="Feed">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_feed" />
+        </receiver>
+        <receiver
+            android:name=".ListenReceiver"
+            android:exported="true"
+            android:label="Listen">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/w_listen" />
+        </receiver>
+
+        <!-- a Feed widget's part of the Feed, when it's placed and from its settings -->
+        <activity
+            android:name=".FeedPick"
+            android:exported="true"
+            android:label="Feed"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- the evening nudge's check, every 15 minutes while it's on -->
         <!-- new posts from the feeds set to notify, every 15 minutes (FeedNews) -->
         <service

@@ -22,6 +22,17 @@ page and app is `docs/SHELL.md`; the brief is `docs/NATIVE.md`, round 2.
   every half hour (Android's own refresh), when the phone is unlocked (at most every 10 minutes,
   while Daf's process is alive), and when you leave the app; if Daf can't be reached it keeps the
   last numbers, dimmed.
+- **Six more widgets** (`widgets/`, Jetpack Glance, as Capy Reader, Read You and Feeder make theirs):
+  Keep reading (the nightstand and the books read lately, with covers and how far along; a book
+  opens in the reader), Highlight (with shuffle), Spotlight (one piece with its picture), Edition
+  (today's pieces ticked off), Feed (the whole Feed, a folder or a feed, picked by `FeedPick` when
+  it's placed; a refresh button) and Listen (the player's back, play/pause and ahead through
+  `Listen`; with nothing playing, the last episode, and Play opens Daf with `listen:resume`). One
+  answer from `/api/phone/widgets` serves them all, a Feed widget's headlines come from
+  `/api/phone/widget-feed?src=`, and the pictures (covers through `/api/cover/…` with the token)
+  are made small and kept in the app's files (`Board.kt`). They refresh with the widget above, and
+  every half hour themselves. On Android 15 and later they draw their own pictures for the
+  widget picker from the phone's last answer, once a day (`setWidgetPreviews`).
 - **Share into Daf**, in any app's share sheet as "Save to Daf": a link, or text with a link in
   it, goes to the Library (`/api/save`); a photo of a marked page goes to `/share`, becomes a
   paper page, and Daf opens on it while the lines are read.
@@ -99,6 +110,12 @@ lock screen, the media keys pausing and playing the page (sent as key events, th
 send them: Android 12's `cmd media_session dispatch` never reaches an app), and reading on with
 the screen off. With two devices plugged in, choose one with `ANDROID_SERIAL`.
 
+The test build has **WidgetLab**, the widgets on a page of their own at any size, without putting
+anything on the home screen (`adb shell appwidget grantbind --package xyz.tiresia.daf.debug` first;
+`am start -n xyz.tiresia.daf.debug/xyz.tiresia.daf.WidgetLab --es w KeepReadingReceiver --es sizes
+110x110,300x130,300x300`, with `--ez dark true` for the dark theme and `--es feed folder:Name` for a
+Feed widget's source).
+
 By hand, after that: put the 4×2 widget on the first screen and see it fill in, share a link from
 Chrome and a photo of a marked page, and switch on the nudge and press Show one now.
 
@@ -112,6 +129,10 @@ Chrome and a photo of a marked page, and switch on the nudge and press Show one 
 | `Server.java` | the base URL, the token in the keystore, and the endpoints |
 | `ShareActivity.java` | Save to Daf in the share sheet: links and photos |
 | `Widget.java` | the widget in both sizes, its refresh, and the long-press shortcuts |
+| `widgets/Board.kt` | the other widgets' data: `/api/phone/widgets`, each Feed widget's headlines, the pictures kept small, the refresh, the picker's previews |
+| `widgets/Look.kt` | what the widgets share: the frame, a cover, the progress line, the words |
+| `widgets/KeepReading.kt`, `Highlight.kt`, `Spotlight.kt`, `Edition.kt`, `Feed.kt`, `ListenWidget.kt` | one widget each, with its receiver; `Feed.kt` has `FeedPick`, the part of the Feed a Feed widget shows |
+| `src/debug/…/WidgetLab.java` | the test build only: the widgets on a page of their own |
 | `NudgeJob.java` | the evening nudge |
 | `SettingsActivity.java` | the address, Connect this phone, the nudge and its permissions |
 | `Daf.java` | the nudge's notification channel, and the widget asking again on unlock |

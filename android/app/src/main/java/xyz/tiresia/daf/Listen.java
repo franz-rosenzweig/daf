@@ -30,8 +30,12 @@ public class Listen extends Service {
     private PowerManager.WakeLock lock;
     private String state = "stopped", title = "", sub = "";
 
+    /** Whether the service is up (the Listen widget's buttons go through it then). */
+    static boolean isRunning() { return running != null; }
+
     /** The page's player changed: playing, paused or stopped. */
     static void update(Context c, String state, String title, String sub) {
+        ListenWidget.tell(c, state, title, sub);
         if ("stopped".equals(state)) {
             if (running != null) c.stopService(new Intent(c, Listen.class));
         } else if (running != null) {
@@ -123,6 +127,7 @@ public class Listen extends Service {
     @Override
     public void onDestroy() {
         if (running == this) running = null;
+        ListenWidget.tell(this, "stopped", null, null);
         if (lock != null && lock.isHeld()) lock.release();
         if (session != null) session.release();
         stopForeground(STOP_FOREGROUND_REMOVE);

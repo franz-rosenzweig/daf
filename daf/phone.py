@@ -104,3 +104,137 @@ def save_shared(conn, url, title, text):
     conn.execute("INSERT INTO inbox (url, title, text, created, status) VALUES (?, ?, ?, ?, 'new')",
                  (url, (title or "").strip()[:300], (text or "").strip()[:2000], now))
     return url
+
+
+# ---- the home-screen widgets (android/…/widgets): one answer for all of them ----------------------
+# Keep reading, the Edition, Spotlight, a highlight, Listen and the Feed list's sources come in one
+# answer (/api/phone/widgets); a Feed widget's own headlines come from widget_feed. Pictures are
+# Daf's own addresses (/api/cover/…, /api/thumb/…, which take the phone's token) or a page's picture
+# on the web. A private book is never named outside Daf's own pages, and has no cover here.
+
+def _short(title):
+    return (title or "").split(":")[0].strip()
+
+
+def _book(b, readable):
+    priv = bool(b.get("private"))
+    route = ("#ebook/" if b["id"] in readable else "#book/") + b["id"]
+    return {"id": b["id"], "title": "A private book" if priv else _short(b["title"]),
+            "author": "" if priv else (b.get("author") or ""),
+            "progress": b.get("progress"), "note": b.get("progress_note") or "",
+            "audio": b.get("audio_pct"), "audio_note": b.get("audio_note") or "",
+            "cover": None if priv or not b.get("calibre_path") else "/api/cover/" + b["id"],
+            "route": route}
+
+
+def _reading(conn, settings, n=6):
+    """The nightstand first (or what Daf suggests for it), then the other books read lately."""
+    from . import ebooks
+    try:
+        readable = ebooks.readable_ids(conn)
+    except Exception:  # noqa: BLE001 - Calibre's database away: the book's page instead of the reader
+        readable = set()
+    stand = library.nightstand(conn, settings) or library.suggest_nightstand(conn)
+    ids = {b["id"] for b in stand}
+    more = [dict(r) for r in conn.execute(
+        "SELECT * FROM books WHERE kind = 'book' AND private = 0 AND (last_read IS NOT NULL OR audio_pct IS NOT NULL) "
+        "AND id NOT IN (SELECT book_id FROM manga_books) ORDER BY COALESCE(last_read, 0) DESC LIMIT ?", (n + 3,))]
+    books = stand + [b for b in more if b["id"] not in ids]
+    return [_book(b, readable) for b in books[:n]]
+
+
+def _piece(it, label=None):
+    return {"id": it["id"], "title": it.get("title") or "", "source": it.get("publication") or it.get("source") or "",
+            "kind": it.get("kind") or "article", "minutes": it.get("minutes") or it.get("mins"),
+            "thumb": it.get("thumb") or None, "label": label,
+            "route": "#read/" + it["id"] if it.get("exists", True) else "#edition"}
+
+
+def _edition(conn, settings):
+    from . import edition
+    e = edition.public(conn, T.today(settings)).get("edition")
+    if not e:
+        return None
+    items = [_piece(it) | {"done": bool(it.get("done") or it.get("opened"))} for it in e["items"]]
+    return {"day": e["day"], "number": e.get("number"), "done": e.get("done", 0), "total": len(items), "items": items}
+
+
+def _spotlight(conn, settings, ed, n=10):
+    """Pieces with a picture, for the Spotlight: what's left in the Edition, then the Feed's newest."""
+    out = [p | {"label": "Edition"} for p in (ed or {}).get("items", []) if p.get("thumb") and not p.get("done")]
+    seen = {p["id"] for p in out}
+    for d in reader.list_docs(conn, settings, "feed", "unseen", None, None, 60, 0, "new", None, {}, ""):    # the Feed as it shows
+        if len(out) >= n:
+            break
+        if d.get("thumb") and d["id"] not in seen and d.get("title"):
+            out.append(_piece(d, d.get("source")))
+    return out[:n]
+
+
+def _highlights(conn, settings, n=20):
+    """The day's review first, then highlights kept in Review, shuffled; none from a private book."""
+    out, seen = [], set()
+    for i in review.day_items(conn, settings)["items"]:
+        if i.get("action") or i["id"] in seen or i.get("private"):
+            continue
+        seen.add(i["id"])
+        out.append({"id": i["id"], "text": clip(reader.plain(i["text"]), 400), "title": _short(i.get("title")), "route": "#review"})
+    kept = [dict(r) for r in conn.execute(
+        "SELECT h.id, h.text, b.title FROM highlights h JOIN books b ON b.id = h.book_id "
+        "JOIN review_state s ON s.hl_id = h.id WHERE s.status = 'kept' AND h.deleted = 0 AND b.private = 0 "
+        "AND length(h.text) BETWEEN 30 AND 400 ORDER BY RANDOM() LIMIT ?", (n,))]
+    for h in kept:
+        if len(out) >= n:
+            break
+        if h["id"] not in seen:
+            seen.add(h["id"])
+            out.append({"id": h["id"], "text": reader.plain(h["text"]), "title": _short(h["title"]), "route": "#review"})
+    return out
+
+
+def _listen(conn):
+    """The episode last played and not finished."""
+    from . import podcasts
+    try:
+        going = podcasts.listening(conn)["going"]
+    except Exception:  # noqa: BLE001
+        return None
+    if not going:
+        return None
+    e = going[0]
+    return {"audio": e["audio"], "title": e["title"], "show": e["show"], "image": e.get("image"),
+            "at": e.get("at"), "duration": e.get("duration"), "doc": e.get("doc"),
+            "route": "#read/" + e["doc"] if e.get("doc") else "#podcasts"}
+
+
+def _feed_sources(conn, settings):
+    try:
+        src = reader.feed_sources(conn, settings)
+    except Exception:  # noqa: BLE001
+        return []
+    out = []
+    for f in src.get("folders") or []:
+        if f.get("show") == "hidden":
+            continue
+        if f.get("name"):
+            out.append({"key": "folder:" + f["name"], "name": f["name"], "count": f.get("count", 0)})
+        for x in f.get("feeds") or []:
+            out.append({"key": "feed:" + x["id"], "name": x["title"], "folder": f.get("name") or "", "count": x.get("count", 0)})
+    return out
+
+
+def widgets(conn, settings):
+    ed = _edition(conn, settings)
+    return {"at": int(time.time()), "reading": _reading(conn, settings), "edition": ed,
+            "spotlight": _spotlight(conn, settings, ed), "highlights": _highlights(conn, settings),
+            "listen": _listen(conn), "feeds": _feed_sources(conn, settings)}
+
+
+def widget_feed(conn, settings, src="", limit=20):
+    """A Feed widget's headlines: what's unseen in the whole Feed, a folder ("folder:Name") or a feed ("feed:id")."""
+    cat = src[7:] if src.startswith("folder:") else None
+    feed = src[5:] if src.startswith("feed:") else None
+    items = reader.list_docs(conn, settings, "feed", "unseen", None, cat, max(1, min(limit, 40)), 0, "new", feed, {}, "")
+    return {"src": src, "items": [{"id": d["id"], "title": d["title"] or "", "source": d.get("source") or "",
+                                   "published": d.get("published") or d.get("added"), "thumb": d.get("thumb") or None,
+                                   "kind": d.get("kind") or "article", "route": "#read/" + d["id"]} for d in items]}

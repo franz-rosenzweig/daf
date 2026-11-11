@@ -2128,7 +2128,7 @@ async def put_book_review(book_id: str, request: Request, c=Depends(conn)):
     return {"freq": f}
 
 
-@app.get("/api/cover/{book_id}", dependencies=[Depends(user)])
+@app.get("/api/cover/{book_id}", dependencies=[Depends(user_or_device)])     # the widgets show covers too
 def get_cover(book_id: str, c=Depends(conn)):
     p = library.cover_path(c, book_id)
     if not p:
@@ -3708,6 +3708,19 @@ def phone_nudge(app_name: str = "", force: int = 0, name=Depends(device), c=Depe
 @app.get("/api/phone/widget")
 def phone_widget(name=Depends(device), c=Depends(conn)):
     return phone.widget(c, config.load_settings())
+
+
+@app.get("/api/phone/widgets")
+def phone_widgets(name=Depends(device), c=Depends(conn)):
+    """Everything the home-screen widgets show but a Feed widget's headlines: Keep reading, the
+    Edition, Spotlight, highlights, Listen, and the Feed's folders and feeds to pick from."""
+    return phone.widgets(c, config.load_settings())
+
+
+@app.get("/api/phone/widget-feed")
+def phone_widget_feed(src: str = "", limit: int = 20, name=Depends(device), c=Depends(conn)):
+    """A Feed widget's headlines: the whole Feed, "folder:Name" or "feed:id"."""
+    return phone.widget_feed(c, config.load_settings(), src, limit)
 
 
 @app.get("/api/phone/feed-news")

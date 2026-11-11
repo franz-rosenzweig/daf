@@ -22,11 +22,25 @@ With an S Pen you can write on articles and books, highlight with the pen and ta
 ![A book on a tablet-sized screen](images/tablet.webp)
 *A book in Pages layout and the Paper theme, at tablet size.*
 
-## The widget
+## The widgets
 
-The widget comes in two sizes from the same widget. The small one is a ring of today's minutes with the number in it and "Year 30 · day N" under it. The wide one adds the day's highlight in a serif face with its book, or "That's the hour." once you're done. It follows the phone's light or dark theme and its Material You colors.
+Daf has seven widgets for the home screen, all of them in the phone's light or dark theme and its Material You colors, and all of them can be made bigger or smaller, showing more as they grow. Long-press an empty spot on the home screen, choose **Widgets**, and they're under Daf, each with a picture of what it will show.
 
-Tap the ring for Today and the highlight for Review. It refreshes every half hour, when you unlock the phone, and when you leave the app, and if Daf can't be reached it keeps the last numbers, dimmed.
+**Today's hour** is a ring of today's minutes with the number in it and "Year 30 · day N" under it. Wider, it adds the day's highlight in a serif face with its book, or "That's the hour." once you're done. Tap the ring for Today and the highlight for Review.
+
+**Keep reading** shows the books you're in the middle of, the nightstand first and then the others you've read lately, each with its cover and a line for how far along you are. Small, it's the first book's cover; wider, a row of covers; taller, a list with the author and where you are, the way Today says it. Tapping a book opens it in Daf's reader right where you left off, or its page when Daf has no file of it.
+
+**Highlight** is one highlight on its own, in a serif face with its book: the day's review first, then the ones you kept in Review. The shuffle button goes on to another one, and that works without a signal too, since twenty come with each refresh. Tapping the words opens Review.
+
+**Spotlight** is one piece with its picture filling the widget and its title over it: what's left in today's Edition first, then the Feed's newest. It moves on every two hours, and two Spotlights side by side show different pieces.
+
+**Edition** is today's Edition as a list, each piece with its source and how long it is, ticked off once you've read it, and how many are done at the top. A piece opens in Daf, and the title opens the Edition.
+
+**Feed** lists the newest unseen headlines with their source, how long ago they were posted and their picture. When you put one on the home screen it asks which part of the Feed to show: everything, a folder, or one feed. Its own settings (long-press it) change that later, so one Feed widget can be the Craft folder and another the whole Feed. The refresh button asks Daf right away.
+
+**Listen** is what Daf's player is playing (an episode, an audiobook or read-aloud) with back, play or pause, and ahead, the same buttons as the lock screen. With nothing in the player it shows the episode you played last, and Play opens Daf and carries on from where you stopped.
+
+The widgets refresh every half hour, when you unlock the phone and when you leave the app, and if Daf can't be reached they keep what they last showed. Their pictures are kept small on the phone. A private book is never named on a widget and never shows its cover.
 
 ## Save to Daf
 
@@ -63,6 +77,6 @@ If a feed is set to **Notify me of new posts**, the app checks every 15 minutes 
 
 The app's own **Settings** has **Daf's address** with **Use**, **Connect this phone** and **Forget the token**, **Open Reading Goals**, the books on the phone, and the evening nudge. Everything else is in Daf's **Preferences**, inside the app like in a browser.
 
-If you install the app, put the wide widget on your first screen, which is exactly where it does its job.
+If you install the app, put Today's hour or Keep reading on your first screen, which is exactly where they do their job.
 
 <sub>Next: [The browser extension](browser-extension.md) →</sub>

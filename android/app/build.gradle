@@ -3,6 +3,8 @@
 // server-first, and the window is https://daf.tiresia.xyz (a setting).
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'     // the home-screen widgets are Glance (widgets/)
 }
 
 android {
@@ -14,8 +16,8 @@ android {
         // 31: the widget's wallpaper colours and its two sizes from one provider
         minSdk 31
         targetSdk 36
-        versionCode 24
-        versionName '0.5.6'
+        versionCode 25
+        versionName '0.6.0'
         resValue 'string', 'app_name', 'Daf'
         manifestPlaceholders = [shareAuthority: 'xyz.tiresia.daf.share']
         // 64-bit ARM only (every phone and tablet on Android 12 and up): the handwriting reader's
@@ -62,6 +64,8 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    buildFeatures { compose true }
+
     lint {
         checkReleaseBuilds false
     }
@@ -71,6 +75,9 @@ dependencies {
     // Hebrew handwriting read as text, on the device (InkReader), as Moshe reads it. Not free
     // software: the licence's additional permission for it is in README.md
     implementation 'com.google.mlkit:digital-ink-recognition:18.1.0'
+    // the widgets: Glance (Compose for home-screen widgets), as Capy Reader, Read You and Feeder use it
+    implementation 'androidx.glance:glance-appwidget:1.2.0'
+    implementation 'androidx.glance:glance-material3:1.2.0'
 }
 
 // say which deprecated call it is, rather than "uses or overrides a deprecated API"

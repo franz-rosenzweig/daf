@@ -203,6 +203,14 @@ const CMD = {
   'listen:next': () => press('#player [data-tts="next"]'),
   'listen:prev': () => press('#player [data-tts="prev"]'),
   'listen:stop': () => press('#player [data-tts="close"]'),
+  // the Listen widget's Play: the player's own item, or the episode last played
+  'listen:resume': () => {
+    const P = C() && C().Player;
+    if (P && P.cur) { if (!P.playing()) P.toggle(); return true; }
+    const Pc = C() && C().Podcasts;
+    if (Pc && Pc.resume) { Pc.resume().catch(() => {}); return true; }
+    return false;
+  },
   export: () => {
     closeAll();
     if (view() !== 'highlights') location.hash = 'highlights';
