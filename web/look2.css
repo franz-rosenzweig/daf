@@ -316,7 +316,7 @@ html[data-look="2"] #main :is(
 html[data-look="2"] #main .lvmain > .top .srcpick{pointer-events:none}
 html[data-look="2"] #main .lvmain > .top .srcpick svg{display:none}
 /* the small explaining lines under titles and in sheets */
-html[data-look="2"] #main :is(.cardh > span.mute, .cardh > span.tiny.mute, .shelfh > .mute.tiny, .top > .mute:not(.num), .top > span.tiny.mute:not(.num), .tabs > .mute.tiny, .dots + .tiny.mute, .page.l2today > p.mute.tiny){display:none}
+html[data-look="2"] #main :is(.cardh > span.mute, .cardh > span.tiny.mute, .shelfh > .mute.tiny, .top > .mute:not(.num):not(.btitle-top), .top > span.tiny.mute:not(.num), .tabs > .mute.tiny, .dots + .tiny.mute, .page.l2today > p.mute.tiny){display:none}
 html[data-look="2"] #modal :is(#addlink + .mute.tiny, .adddrop .mute.tiny, > span.mute.tiny:last-child){display:none}
 
 /* Highlights: one Filter button opens the colours, the tag, Favorites, the order and private books */
@@ -438,3 +438,15 @@ html.l2-side.l2-fold .l2subs:empty{display:none}
 html.l2-side.l2-fold .main,html.l2-side.l2-fold .app.hassubs .main{grid-area:3/2;margin:0 16px 16px 0;border-radius:22px}
 html.l2-side.l2-fold .app.hassubs .main{border-radius:0 0 22px 22px}
 html[data-look="2"].l2-side.l2-fold{--plleft:72px}
+
+/* ---------- the reader's own bars (a book, an article, a PDF): back and Contents to the left, the title in
+   the middle, the tools to the right as round buttons; the page line under the book, quieter ---------- */
+html[data-look="2"] :is(.rv, .pdfv) > .top{min-height:56px;padding-inline:12px;gap:4px;align-items:center}
+html[data-look="2"] :is(.rv, .pdfv) > .top .ib{width:40px;height:40px;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+html[data-look="2"] :is(.rv, .pdfv) > .top .ib:hover{background:var(--hover)}
+html[data-look="2"] :is(.rv, .pdfv) > .top .ib.on{background:var(--accent-weak);color:var(--accent)}
+html[data-look="2"] :is(.rv, .pdfv) > .top .ib.aa{font-family:var(--display,var(--serif));font-size:17px;font-weight:600}
+html[data-look="2"] .rv.ebook .btitle-top,html[data-look="2"] .rv .rtitle{flex:1;min-width:0;max-width:none;padding:0 14px;text-align:center;font-family:var(--display,var(--serif));font-size:16.5px;font-weight:600;color:var(--fg);letter-spacing:-.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-look="2"] .rv.ebook .btitle-top{display:block}
+@media (max-width:700px){ html[data-look="2"] .rv.ebook .btitle-top{display:none} }
+html[data-look="2"] .rv.ebook .bookfoot{color:var(--fg-3)}
