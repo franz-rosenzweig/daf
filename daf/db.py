@@ -320,6 +320,14 @@ CREATE TABLE IF NOT EXISTS inbox (           -- links shared to Daf from the pho
   created INTEGER NOT NULL,
   status TEXT NOT NULL                      -- new | saved | failed
 );
+CREATE TABLE IF NOT EXISTS areas (          -- Learn's areas (areas.py): a subject, its goal and colour, and whether the helper suggests
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, goal TEXT, color TEXT, ord INTEGER NOT NULL DEFAULT 0, suggest INTEGER NOT NULL DEFAULT 1,
+  created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS area_items (     -- what's in an area, in the order to go through it: book:<id> | doc:<id> | feed:<id> | url:<address> | want:<title>|<by>
+  area_id TEXT NOT NULL, ref TEXT NOT NULL, ord INTEGER NOT NULL DEFAULT 0, added INTEGER NOT NULL, PRIMARY KEY (area_id, ref));
+CREATE TABLE IF NOT EXISTS area_suggest (   -- the helper's suggestions for an area: new until added or set aside
+  id TEXT PRIMARY KEY, area_id TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, by TEXT, url TEXT,
+  state TEXT NOT NULL DEFAULT 'new', made INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS editions (        -- the Edition, one a day (edition.py): the pieces chosen, in order, with why
   day TEXT PRIMARY KEY, made INTEGER NOT NULL, items TEXT NOT NULL, how TEXT, kindle TEXT);
 CREATE TABLE IF NOT EXISTS edition_votes (   -- thumbs on an Edition's pieces: +1 / -1, with what the piece was, for the taste
