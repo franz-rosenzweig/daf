@@ -1807,6 +1807,18 @@ def cancel_kindle(book_id: str, c=Depends(conn)):
     return {"ok": True}
 
 
+@app.get("/api/books/{book_id}/excerpt", dependencies=[Depends(user)])
+def get_book_excerpt(book_id: str, c=Depends(conn)):
+    """The lines where you left off (excerpt.py), for the new look's Today: {text}, empty when there are none."""
+    from . import excerpt
+    try:
+        t = excerpt.at(c, book_id)
+    except Exception:  # noqa: BLE001 - a book Daf can't read here just has no lines
+        logging.getLogger(__name__).exception("excerpt for %s", book_id)
+        t = None
+    return {"text": t or ""}
+
+
 @app.get("/api/books/{book_id}", dependencies=[Depends(user)])
 def get_book(book_id: str, c=Depends(conn)):
     b = c.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()

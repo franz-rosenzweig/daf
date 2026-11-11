@@ -6,8 +6,10 @@
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
 <title>Daf</title>
-<script>/* the theme, before anything paints (web/themes.js keeps daf.themeVars) */
-try{var t=JSON.parse(localStorage.getItem('daf.themeVars')||'null');if(t){var a=t.a||{},d=a.mode==='dark'||(a.mode!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches),v=d?t.dark:t.light,r=document.documentElement;for(var k in v)r.style.setProperty(k,v[k]);r.dataset.mode=d?'dark':'light';var m=(t.room||{})[d?'dark':'light'];if(m)r.dataset.room=m;}}catch(e){}</script>
+<script>/* the new look, if this device has it on (Preferences, or ?look=2 and ?look=1); web/look2.js and look2.css */
+try{var q=/[?&]look=(\d)/.exec(location.search);if(q)localStorage.setItem('daf.look',q[1]);if(/2/.test(localStorage.getItem('daf.look')||''))document.documentElement.dataset.look='2';}catch(e){}
+/* the theme, before anything paints (web/themes.js keeps daf.themeVars); the new look has its own colours */
+try{var r=document.documentElement,L2=r.dataset.look==='2',t=JSON.parse(localStorage.getItem('daf.themeVars')||'null'),a=(t||{}).a||{},d=a.mode==='dark'||(a.mode!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);if(t&&!L2){var v=d?t.dark:t.light;for(var k in v)r.style.setProperty(k,v[k]);var m=(t.room||{})[d?'dark':'light'];if(m)r.dataset.room=m;}if(t||L2)r.dataset.mode=d?'dark':'light';}catch(e){}</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -15,6 +17,7 @@ try{var t=JSON.parse(localStorage.getItem('daf.themeVars')||'null');if(t){var a=
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/sketchbook.css">
+<link rel="stylesheet" href="/look2.css">
 </head>
 <body>
 <div class="app" id="app">
@@ -30,6 +33,7 @@ try{var t=JSON.parse(localStorage.getItem('daf.themeVars')||'null');if(t){var a=
 <div class="player" id="player" hidden></div>
 <script src="/shell.js"></script>
 <script src="/app.js"></script>
+<script src="/look2.js"></script>
 <script src="/player.js"></script>
 <script src="/sound.js"></script>
 <script src="/find.js"></script>

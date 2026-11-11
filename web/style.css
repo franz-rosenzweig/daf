@@ -1722,6 +1722,7 @@ html.shell-mac{--plleft:var(--daf-sidew,232px)} html.shell-mac.shell-noside,html
 .pmx{color:var(--fg-2)}
 .pline{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);border-radius:0 2px 2px 0;transition:width .5s linear}
 body.playing .main{padding-bottom:92px}
+body.playing .rleft{bottom:-92px;padding-bottom:104px}   /* the strip at an article's foot reaches down behind the player: sticky stops at the padding */
 body.playing .page{scroll-padding-bottom:92px}
 /* the whole player */
 .pbig{position:fixed;inset:auto 0 0 0;z-index:48;max-height:calc(100% - 24px - env(safe-area-inset-top,0px));overflow:auto;overscroll-behavior:contain;
@@ -1757,6 +1758,7 @@ body.playerbig::after{content:"";position:fixed;inset:0;background:rgba(10,12,16
   .pmini .pbtn[data-tts="prev"]{display:none}
   .pbtn{width:40px;height:40px}
   body.playing .main{padding-bottom:80px}
+  body.playing .rleft{bottom:-80px;padding-bottom:92px}
 }
 /* reading screens: it goes when the reader's bars go (a book's bare page, focus mode), and above a book's footer */
 body[data-view="ebook"] .player{bottom:calc(52px + env(safe-area-inset-bottom,0px))}

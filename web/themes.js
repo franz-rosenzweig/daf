@@ -161,18 +161,22 @@ T.isDark = a => { a = a || T.get(); return a.mode === 'dark' || (a.mode === 'sys
 T.apply = a => {
   a = Object.assign({}, DEFAULT, a || T.get()); cur = a;
   const dark = T.isDark(a), fam = byId(dark ? a.dark : a.light), vars = T.vars(dark ? fam.dark : fam.light, dark), r = document.documentElement;
+  const L2 = r.dataset.look === '2';        // the new look has its own colours (look2.css): the theme's stand down
+  if (L2) { for (const k of Object.keys(vars).concat(ROOM_KEYS)) r.style.removeProperty(k); const cs = getComputedStyle(r); for (const k of ['--bg', '--side', '--fg', '--accent']) vars[k] = cs.getPropertyValue(k).trim() || vars[k]; delete vars['--frame']; }
+  else {
   for (const k of ROOM_KEYS) if (!(k in vars)) r.style.removeProperty(k);
   for (const [k, v] of Object.entries(vars)) r.style.setProperty(k, v);
+  }
   delete r.dataset.theme;                    // the old fixed themes in style.css stand down
   r.dataset.mode = dark ? 'dark' : 'light'; r.dataset.palette = fam.id;
-  if (fam.room) r.dataset.room = fam.room; else delete r.dataset.room;
+  if (fam.room && !L2) r.dataset.room = fam.room; else delete r.dataset.room;
   // the browser's and the Android app's bars: in a room the frame's colour (the top bar is made of it)
   let m = document.querySelector('meta[name="theme-color"]'); if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
   m.content = vars['--frame'] || vars['--side'];
   // For index.html's first paint: both versions, so the system's mode can pick before any script.
   const lf = byId(a.light), df = byId(a.dark);
   try { localStorage.setItem('daf.themeVars', JSON.stringify({ a, light: T.vars(lf.light, false), dark: T.vars(df.dark, true), room: { light: lf.room || '', dark: df.room || '' } })); } catch(e){}
-  window.dispatchEvent(new CustomEvent('daf-theme', { detail: { name: fam.id, dark, bg: vars['--bg'], side: vars['--side'], fg: vars['--fg'], accent: vars['--accent'], room: fam.room || '',
+  window.dispatchEvent(new CustomEvent('daf-theme', { detail: { name: fam.id, dark, bg: vars['--bg'], side: vars['--side'], fg: vars['--fg'], accent: vars['--accent'], room: L2 ? '' : fam.room || '',
     bars: vars['--frame'], barsDark: !!vars['--frame'] && lum(vars['--frame']) < .2 } }));
   window.dispatchEvent(new Event('daf-type'));     // the book's pages take the new colours
 };

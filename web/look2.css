@@ -1,0 +1,344 @@
+/* The new look: html[data-look="2"] (index.html sets it before anything paints; web/look2.js draws its frame).
+   Everything here is under that attribute, so with the switch off this file changes nothing.
+
+   The idea: a gray backdrop, the page as one cream sheet on it, white cards with soft shadows on the
+   sheet, serif titles, and one accent colour. A theme's colours stand down while it's on. */
+
+html[data-look="2"]:root{
+  --bg:#fbfaf7; --side:#efeeea; --panel:#f4f3ef; --hover:#f1f0ec; --active:#e9e8e4; --line:#e9e8e4; --line-2:#d9d8d3;
+  --fg:#1d1d1f; --fg-2:#5c5c63; --fg-3:#8a8a90;
+  --accent:#2b4c8c; --accent-2:#1f3a70; --accent-weak:#e6ecf7; --on-accent:#ffffff;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 14px 36px rgba(60,50,30,.14);
+  --serif:'Literata','Source Serif 4',Georgia,serif;
+  --l2-back:linear-gradient(180deg,#ecebe8,#e2e2e8); --l2-card:#ffffff; --l2-ink:#1d1d1f; --l2-on-ink:#ffffff;
+  --l2-well:rgba(0,0,0,.07); --l2-chip:#ffffff; --l2-tab:#ffffff; --l2-track:#cfcfd6;
+  --l2-sheet:0 1px 2px rgba(0,0,0,.05),0 18px 50px rgba(60,50,30,.10);
+  --l2-lift:0 1px 2px rgba(0,0,0,.04),0 10px 28px rgba(60,50,30,.07);
+  --ok:#2f8a57; --bad:#b8392b; --hl:#fbeba8; --hl-2:#efd25c; --speak:#e6ecf7; --speak-line:#bccbe8;
+  --hl-yellow:#fdf0c0; --hl-green:#dcf1d5; --hl-blue:#d9e8fc; --hl-pink:#fbdee9; --hl-purple:#ebe1f9;
+  --hl-yellow-line:#efc83a; --hl-green-line:#72c46c; --hl-blue-line:#6ea7ee; --hl-pink-line:#ec84aa; --hl-purple-line:#ab8ae2;
+  color-scheme:light;
+}
+html[data-look="2"][data-mode="dark"]:root{
+  --bg:#1e1f22; --side:#17181a; --panel:#232428; --hover:#2a2b30; --active:#32343a; --line:#2e3035; --line-2:#3d4047;
+  --fg:#ececef; --fg-2:#a9abb3; --fg-3:#7c7f88;
+  --accent:#8fb0ee; --accent-2:#b3c9f5; --accent-weak:#243352; --on-accent:#0d1626;
+  --ok:#58b07e; --bad:#e07a6c; --hl:#5a4912; --hl-2:#8a711c; --speak:#243352; --speak-line:#3a5488;
+  --hl-yellow:#3b3213; --hl-green:#1a3522; --hl-blue:#182c44; --hl-pink:#3e1c2a; --hl-purple:#2b2240;
+  --hl-yellow-line:#a4832a; --hl-green-line:#468c50; --hl-blue-line:#4378b6; --hl-pink-line:#ad5277; --hl-purple-line:#7d62b8;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px rgba(0,0,0,.5);
+  --l2-back:linear-gradient(180deg,#131416,#0e0f11); --l2-card:#27282c; --l2-ink:#ececef; --l2-on-ink:#1d1d1f;
+  --l2-well:rgba(255,255,255,.07); --l2-chip:#2a2b30; --l2-tab:#4b4d55; --l2-track:#3d4047;
+  --l2-sheet:0 1px 2px rgba(0,0,0,.4),0 18px 50px rgba(0,0,0,.45);
+  --l2-lift:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+
+/* ---------- the frame ---------- */
+html[data-look="2"] body{background:var(--l2-back);background-attachment:fixed}
+html[data-look="2"] .app:not(.loggedout){display:grid;height:100%;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);grid-template-rows:calc(60px + env(safe-area-inset-top,0px)) auto minmax(0,1fr)}
+html[data-look="2"] .side{display:contents}
+html[data-look="2"] .main{grid-area:3/1/4/4;margin:0 16px 16px;background:var(--bg);border-radius:22px;box-shadow:var(--l2-sheet)}
+html[data-look="2"] .app.hassubs .main{border-radius:0 0 22px 22px}
+
+.l2brand{grid-area:1/1;display:flex;align-items:center;gap:12px;padding:env(safe-area-inset-top,0px) 0 0 20px;min-width:0}
+.l2pill{height:40px;padding:0 16px;border-radius:999px;border:0;background:var(--l2-ink);color:var(--l2-on-ink);font-size:15px;font-weight:700}
+.l2date{font-size:14px;font-weight:500;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.l2tabs{grid-area:1/2;align-self:center;display:flex;background:var(--l2-well);border-radius:12px;padding:3px;margin-top:env(safe-area-inset-top,0px)}
+.l2tab{height:38px;padding:0 15px;border-radius:9px;border:0;background:transparent;color:var(--fg);font-size:14px;font-weight:600;white-space:nowrap}
+.l2tab.on{background:var(--l2-tab);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.l2corner{grid-area:1/3;justify-self:end;display:flex;align-items:center;gap:10px;padding:env(safe-area-inset-top,0px) 20px 0 0}
+.l2round{width:40px;height:40px;flex:none;border-radius:50%;border:0;background:var(--l2-chip);color:var(--fg);display:inline-flex;align-items:center;justify-content:center}
+.l2search{width:130px;height:36px;border-radius:10px;border:0;background:var(--l2-chip);color:var(--fg-3);padding:0 12px;font-size:15px;text-align:left}
+.l2mins{height:40px;display:inline-flex;align-items:center;gap:8px;border:0;background:none;color:var(--fg);font-size:14px;font-weight:600;white-space:nowrap;padding:0}
+.l2subs{grid-area:2/1/3/4;display:flex;align-items:center;justify-content:center;gap:2px;height:46px;margin:0 16px;padding:0 12px;background:var(--bg);border-radius:22px 22px 0 0;position:relative;z-index:1;overflow-x:auto;scrollbar-width:none}
+.l2subs:empty{display:none}
+.l2sub{flex:none;height:40px;padding:0 14px;border:0;background:none;color:var(--fg-3);font-size:15px;font-weight:600;white-space:nowrap}
+.l2sub.on{color:var(--fg)}
+.l2sub.folder{font-size:14px;font-weight:500}
+.l2sub.folder.on{font-weight:600}
+.l2sub.nested{display:none}
+html[data-look="2"] .mobbar{display:none}
+.l2menu button{min-height:40px}
+
+/* a tablet held sideways: the tabs down the left, the tab's pages under it */
+html.l2-side .app:not(.loggedout){grid-template-columns:204px minmax(0,1fr);grid-template-rows:calc(60px + env(safe-area-inset-top,0px)) minmax(0,1fr)}
+html.l2-side .l2brand{grid-area:1/1;padding-left:16px}
+html.l2-side .l2date{display:none}
+html.l2-side .l2tabs{grid-area:2/1;align-self:start;flex-direction:column;gap:2px;background:none;border-radius:0;padding:0 6px 20px 16px;margin:0;max-height:100%;overflow-y:auto;box-sizing:border-box}
+html.l2-side .l2tab{height:44px;padding:0 12px;text-align:left;font-size:15px}
+html.l2-side .l2tab.on{box-shadow:none;background:transparent}
+html.l2-side .l2tab.on:only-child,html.l2-side .l2tab.on:not(:has(+ .nested)){background:var(--l2-tab)}
+html.l2-side .l2sub.nested{display:block;height:40px;padding:0 12px 0 28px;border-radius:9px;text-align:left;font-size:15px;font-weight:500;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis}
+html.l2-side .l2sub.nested.on{background:var(--l2-tab);color:var(--fg);font-weight:600}
+html.l2-side .l2sub.nested.folder{padding-left:40px;font-size:14px}
+html.l2-side .l2corner{grid-area:1/2}
+html.l2-side .l2subs{display:none}
+html.l2-side .main,html.l2-side .app.hassubs .main{grid-area:2/2;margin:0 16px 16px 0;border-radius:22px}
+
+/* a phone: the page edge to edge, five tabs along the bottom */
+html.l2-phone .app:not(.loggedout){grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
+html.l2-phone .l2brand,html.l2-phone .l2tabs,html.l2-phone .l2corner{display:none}
+html.l2-phone .l2subs{grid-area:1/1;margin:0;border-radius:0;justify-content:flex-start;height:calc(44px + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) 6px 0}
+html.l2-phone .app.hassubs .top{padding-top:10px}
+html.l2-phone .main,html.l2-phone .app.hassubs .main{grid-area:2/1;margin:0;border-radius:0;box-shadow:none}
+html.l2-phone .mobbar{grid-area:3/1;display:flex;gap:2px;margin:0 10px calc(10px + env(safe-area-inset-bottom,0px));padding:4px;background:var(--side);border-radius:16px;box-sizing:border-box}
+html.l2-phone body{background:var(--bg)}
+html.l2-phone .mb{min-height:48px;padding:0 2px;border-radius:12px;font-size:12px;font-weight:600;color:var(--fg-2)}
+html.l2-phone .mb.on{background:var(--l2-tab);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+html.l2-phone .mb.l2more{flex:0 0 44px}
+
+/* reading: the frame steps away, as the sidebar always did */
+html[data-look="2"].reading .app:not(.loggedout){display:block}
+html[data-look="2"].reading .l2brand,html[data-look="2"].reading .l2tabs,html[data-look="2"].reading .l2corner,html[data-look="2"].reading .l2subs,html[data-look="2"].reading .mobbar{display:none!important}
+html[data-look="2"].reading .main{margin:0;border-radius:0;box-shadow:none;height:100%}
+html[data-look="2"].focus .main{margin:0;border-radius:0;box-shadow:none}
+html[data-look="2"]{--plleft:0px}
+html[data-look="2"].l2-side{--plleft:204px}
+
+/* ---------- inside the page: type and cards ---------- */
+html[data-look="2"] .top{background:color-mix(in srgb,var(--bg) 94%,transparent);border-bottom-color:transparent}
+html[data-look="2"]:not(.l2-phone) .main > .top:first-child,html[data-look="2"]:not(.l2-phone) .main > :first-child > .top:first-child{border-radius:22px 22px 0 0}
+html[data-look="2"]:not(.l2-phone) .app.hassubs .main .top{border-radius:0}
+html[data-look="2"]:not(.reading) .top h1{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.3px}   /* a reader's own bar (a book, a PDF) keeps its title as it was */
+html[data-look="2"] .card{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:18px;box-shadow:var(--l2-lift)}
+html[data-look="2"][data-mode="dark"] .card{border-color:rgba(255,255,255,.06)}
+html[data-look="2"] .card h2{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--fg-3)}
+html[data-look="2"] .btn{border-radius:999px;border-color:transparent;background:var(--active);font-weight:600}
+html[data-look="2"] .btn:hover{background:var(--line-2)}
+html[data-look="2"] .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+html[data-look="2"] .btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+html[data-look="2"] .pop{border-radius:14px;border-color:rgba(0,0,0,.06);background:var(--l2-card)}
+
+/* the top shape on a narrower screen (a tablet held upright, a small window): the tabs get a row of their own */
+@media (max-width:1100px){
+  html.l2-top .app:not(.loggedout){grid-template-columns:minmax(0,1fr) auto;grid-template-rows:calc(60px + env(safe-area-inset-top,0px)) 52px auto minmax(0,1fr)}
+  html.l2-top .l2brand{grid-area:1/1}
+  html.l2-top .l2corner{grid-area:1/2}
+  html.l2-top .l2tabs{grid-area:2/1/3/3;justify-self:center;align-self:start;margin-top:0}
+  html.l2-top .l2tab{height:42px;padding:0 20px;font-size:15px}
+  html.l2-top .l2subs{grid-area:3/1/4/3}
+  html.l2-top .main{grid-area:4/1/5/3}
+}
+
+/* a page sits in the middle of the sheet, and its bar lines up with it */
+html[data-look="2"] .page{max-width:1180px;width:100%;margin-inline:auto;box-sizing:border-box}
+html[data-look="2"]:not(.l2-phone) .main > .top{padding-inline:max(34px,calc((100% - 1180px) / 2 + 34px))}
+
+/* ---------- the panel in a book's own colour ---------- */
+.l2hero{--t1:#1f2a44;--t2:#2b4c8c;position:relative;overflow:hidden;display:flex;align-items:center;gap:38px;min-height:340px;padding:34px 44px;box-sizing:border-box;border-radius:24px;color:#fff;
+  background:linear-gradient(115deg,var(--t1),var(--t2) 75%);box-shadow:0 24px 50px color-mix(in srgb,var(--t1) 35%,transparent)}
+.l2hero::before{content:"";position:absolute;right:-80px;top:-120px;width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.07);pointer-events:none}
+.l2hcover{flex:none;position:relative;transform:rotate(-2deg)}
+.l2hero .l2cv{display:block;width:180px;height:270px;object-fit:cover;border-radius:4px 7px 7px 4px;box-shadow:inset 3px 0 0 rgba(255,255,255,.2),0 30px 50px rgba(0,0,0,.5)}
+.l2htext{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:flex-start}
+.l2lab{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.l2hero h1{font-family:var(--serif);font-size:44px;font-weight:600;line-height:1.08;letter-spacing:-.8px;margin:6px 0 0;text-wrap:balance}
+.l2hsub{font-size:15px;color:rgba(255,255,255,.76);margin-top:8px}
+.l2hacts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+html[data-look="2"] .l2hero .btn{min-height:50px;padding:0 20px;background:rgba(255,255,255,.16);color:#fff;font-size:15px}
+html[data-look="2"] .l2hero .btn:hover{background:rgba(255,255,255,.24)}
+html[data-look="2"] .l2hero .btn.primary{background:#fff;border-color:#fff;color:#1d1d1f;padding:0 30px;font-weight:700;box-shadow:0 8px 20px rgba(0,0,0,.25)}
+.l2hring{flex:none;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+.l2hring > b{font-size:15px;font-weight:600;margin-top:12px}
+.l2hring > span{font-size:12px;color:rgba(255,255,255,.72)}
+.l2ring{position:relative;display:block}
+.l2ringn{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.l2ringn b{font-size:44px;font-weight:700;letter-spacing:-1.5px;line-height:1}
+.l2ringn i{font-style:normal;font-size:12px;color:rgba(255,255,255,.72)}
+.l2hero.small{min-height:0;padding:22px 28px;gap:24px}
+.l2hero.small .l2cv{width:96px;height:144px}
+.l2hero.small h1{font-size:28px}
+.l2hero.small .l2hacts{margin-top:14px}
+html[data-look="2"] .l2hero.small .btn{min-height:42px}
+.l2hero .cv.tile{display:flex;align-items:flex-end;width:180px;height:270px;box-sizing:border-box}
+.l2hero.small .cv.tile{width:96px;height:144px}
+
+html[data-look="2"] .page.l2today{padding-top:22px;gap:18px}
+.l2cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+.l2nxs{display:flex;flex-direction:column}
+.l2nx{display:flex;align-items:center;gap:12px;min-height:58px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--fg)}
+.l2nx:last-child{border-bottom:0}
+.l2nx > span:first-child{flex:1;min-width:0}
+.l2nx b{display:block;font-size:15px;font-weight:600}
+.l2nx i{display:block;font-style:normal;font-size:13px;color:var(--fg-2)}
+.l2chev{color:var(--fg-3);font-size:18px}
+.l2acts{display:flex;gap:14px}
+.l2src{margin-top:4px;padding-top:12px;border-top:1px solid var(--line);font-size:13.5px;color:var(--fg-2)}
+
+/* a book's page: its head is the panel */
+html[data-look="2"] .bookhead[data-tint]{--t1:#1f2a44;--t2:#2b4c8c;padding:30px 34px;border-radius:24px;color:#fff;background:linear-gradient(135deg,var(--t1),var(--t2) 80%);box-shadow:0 20px 44px color-mix(in srgb,var(--t1) 30%,transparent);align-items:center}
+html[data-look="2"] .bookhead[data-tint] .mute,html[data-look="2"] .bookhead[data-tint] code{color:rgba(255,255,255,.74)}
+html[data-look="2"] .bookhead[data-tint] .cv.lg{border-radius:4px 7px 7px 4px;box-shadow:0 24px 40px rgba(0,0,0,.45)}
+html[data-look="2"] .bookhead[data-tint] .btn{background:rgba(255,255,255,.16);color:#fff}
+html[data-look="2"] .bookhead[data-tint] .btn.primary{background:#fff;border-color:#fff;color:#1d1d1f}
+html[data-look="2"] .bookhead[data-tint] .pbar{background:rgba(255,255,255,.25)}
+html[data-look="2"] .bookhead[data-tint] .pbar i{background:#fff}
+html[data-look="2"] .btitle{font-weight:600;letter-spacing:-.4px}
+
+@media (max-width:900px){
+  .l2hero{gap:22px;padding:26px 24px;min-height:0;flex-wrap:wrap}
+  .l2hero .l2cv,.l2hero .cv.tile{width:120px;height:180px}
+  .l2hero h1{font-size:32px}
+  .l2hring{flex-direction:row;gap:14px;width:100%;text-align:left;align-items:center}
+  .l2hring .l2ring{width:64px!important;height:64px!important}
+  .l2hring .l2ring svg{width:64px;height:64px}
+  .l2ringn b{font-size:20px;letter-spacing:-.5px}.l2ringn i{display:none}
+  .l2hring > b{margin:0}
+}
+@media (max-width:520px){
+  .l2hero{padding:20px}
+  .l2hero .l2cv,.l2hero .cv.tile{width:92px;height:138px}
+  .l2hero h1{font-size:26px}
+  .l2hacts{width:100%}
+  html[data-look="2"] .l2hero .btn.primary{flex:1}
+}
+
+/* a row's own actions (Read, Take off the nightstand) sit side by side, at their own width */
+html[data-look="2"] .brow .rowacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:6px}
+html[data-look="2"] .brow .rowacts .btn{flex:none;width:auto}
+/* (a Read link inside a book's row lands beside the row, not in it: an anchor can't hold an anchor) */
+html[data-look="2"] .brows > .btn,html[data-look="2"] .brows > .linkbtn,html[data-look="2"] .brows > .rowacts{align-self:flex-start;margin:0 0 10px 56px}
+html[data-look="2"] .brows > .btn{min-width:120px}
+
+/* ---------- Daf's own panels: the Edition's lead, the parasha, the streak ---------- */
+/* Inside one, the page's colours are swapped for white on the panel, so whatever is in it follows. */
+html[data-look="2"] :is(.edlead,.tcard:first-child,.card:has(> .sbig)){
+  --fg:#ffffff; --fg-2:rgba(255,255,255,.78); --fg-3:rgba(255,255,255,.62); --line:rgba(255,255,255,.18); --line-2:rgba(255,255,255,.3);
+  --accent:#ffffff; --accent-2:#ffffff; --accent-weak:rgba(255,255,255,.16); --on-accent:#1d1d1f;
+  --hover:rgba(255,255,255,.12); --active:rgba(255,255,255,.18); --panel:rgba(255,255,255,.1); --l2-card:transparent; --side:rgba(255,255,255,.14);
+  color:#fff;border:0;border-radius:24px;background:linear-gradient(120deg,#1f2a44,#2b4c8c);box-shadow:0 18px 40px rgba(31,42,68,.3)}
+html[data-look="2"] .edlead{padding:30px 34px;margin-top:18px}
+html[data-look="2"] .edlead h2{letter-spacing:-.6px}
+html[data-look="2"] .tcard{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:18px;box-shadow:var(--l2-lift)}
+html[data-look="2"] .tcard:first-child{background:linear-gradient(120deg,#49391c,#725b30 80%);box-shadow:0 18px 40px rgba(73,57,28,.3);padding:28px 30px}
+html[data-look="2"] .tcard:first-child b{font-size:34px;letter-spacing:-.5px}
+html[data-look="2"] .card:has(> .sbig) .sbig b{font-size:64px;letter-spacing:-3px;line-height:1}
+html[data-look="2"] .card:has(> .sbig) h2{color:rgba(255,255,255,.72)}
+/* the daily review's card stands a little higher */
+html[data-look="2"] .review .rcard{box-shadow:0 2px 4px rgba(0,0,0,.04),0 30px 60px rgba(60,50,30,.16);border-radius:24px;border-color:rgba(0,0,0,.05);background:var(--l2-card)}
+
+/* ---------- the reader's … menu, tidied (look2.js tidyMenu) ---------- */
+.pop .menu.l2m{margin:-4px;gap:10px}
+.pop .menu.l2m button,.pop .menu.l2m a{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin:0;padding:0 10px;min-height:40px;border-radius:10px;font-size:14.5px;color:var(--fg);text-decoration:none}
+.pop .menu.l2m svg{flex:none;color:var(--fg-2)}
+.pop .menu.l2m .on,.pop .menu.l2m .on svg{color:var(--accent)}
+.pop .menu.l2m button[disabled]{opacity:.4}
+.pop:has(.l2m){width:320px;box-sizing:border-box}
+.l2m-tiles{display:flex;gap:6px}
+.pop .menu.l2m .l2m-tiles button{flex:1 1 0;flex-direction:column;justify-content:center;gap:5px;min-height:62px;padding:0 2px;background:var(--panel);border-radius:12px;font-size:11.5px;font-weight:600;min-width:0}
+.pop .menu.l2m .l2m-tiles button:hover{background:var(--hover)}
+.pop .menu.l2m .l2m-tiles button.on{background:var(--accent-weak)}
+.l2m-tiles .l2ml{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l2m-chips{display:flex;align-items:center;gap:6px}
+.l2m-h{flex:none;padding:0 6px 0 10px;white-space:nowrap;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--fg-3)}
+.pop .menu.l2m .l2m-chips button{flex:1;justify-content:center;min-height:36px;padding:0 6px;background:var(--panel);font-size:13.5px;font-weight:600;white-space:nowrap}
+.l2m-rows{display:flex;flex-direction:column;border-top:1px solid var(--line);padding-top:6px}
+.l2m-foot{display:flex;flex-wrap:wrap;gap:0 4px;border-top:1px solid var(--line);padding-top:6px}
+.pop .menu.l2m .l2m-foot button{min-height:32px;padding:0 8px;font-size:12.5px;color:var(--fg-2)}
+.pop .menu.l2m .l2m-foot button.on{color:var(--accent)}
+.pop .menu.l2m .l2m-foot button.on::before{content:"✓";margin-right:-4px}
+.pop .menu.l2m .l2m-foot [data-more="delete"]{color:var(--bad);margin-left:auto}
+
+/* ---------- a screen's name that the row above already says ---------- */
+html[data-look="2"] .top h1.l2same{display:none}
+html[data-look="2"] .top.l2bare{display:none}
+
+/* ---------- sheets, the search, messages, signing in ---------- */
+html[data-look="2"] .scrim{background:rgba(20,20,24,.32)}
+html[data-look="2"] .modal{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:22px;padding:24px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+html[data-look="2"] .modal h2{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:-.3px}
+html[data-look="2"] .modal.sheet{padding:12px 12px 16px}
+html[data-look="2"] .field{border-color:transparent;border-radius:10px;background:var(--panel)}
+html[data-look="2"] .field:focus{outline:2px solid var(--accent);outline-offset:0;background:var(--l2-card)}
+html[data-look="2"] select.field,html[data-look="2"] .top select{border-radius:999px}
+html[data-look="2"] .palette{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+html[data-look="2"] .palette input{padding:18px 20px;font-size:17px}
+html[data-look="2"] .toast{border-radius:999px;padding:10px 18px;background:var(--l2-ink);color:var(--l2-on-ink)}
+html[data-look="2"] .app.loggedout{display:flex;align-items:center;justify-content:center;height:100%}
+html[data-look="2"] .app.loggedout .side{display:none}
+html[data-look="2"] .app.loggedout .main{margin:16px;overflow:visible;border-radius:24px;width:min(440px,calc(100% - 32px))}
+html[data-look="2"] .login{min-height:0;padding:36px 34px}
+html[data-look="2"] .login h1{font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.5px}
+html[data-look="2"] .login .btn{min-height:46px}
+
+/* ---------- the player takes the colour of what's playing ---------- */
+html[data-look="2"] .player{--t1:#1f2a44;--t2:#2b4c8c}
+html[data-look="2"] .pmini{
+  --fg:#ffffff; --fg-2:rgba(255,255,255,.78); --fg-3:rgba(255,255,255,.62); --line:rgba(255,255,255,.18); --accent:#ffffff; --on-accent:#1d1d1f; --hover:rgba(255,255,255,.14); --active:rgba(255,255,255,.2);
+  color:#fff;border:0;border-radius:18px;background:linear-gradient(120deg,var(--t1),var(--t2));box-shadow:0 14px 34px color-mix(in srgb,var(--t1) 40%,transparent)}
+html[data-look="2"] .pmini .mute{color:rgba(255,255,255,.76)}
+html[data-look="2"] .pmini .pline{background:rgba(255,255,255,.85)}
+html[data-look="2"] .plart{box-shadow:0 4px 12px rgba(0,0,0,.3)}
+
+/* ---------- manga: what you're in the middle of, in each series' colour ---------- */
+html[data-look="2"] .mcont{--t1:#2c303a;--t2:#565c6b;padding:14px;border-radius:18px;color:#fff;background:linear-gradient(130deg,var(--t1),var(--t2));box-shadow:0 12px 26px color-mix(in srgb,var(--t1) 30%,transparent);
+  --fg-2:rgba(255,255,255,.78); --fg-3:rgba(255,255,255,.62); --active:rgba(255,255,255,.25); --accent:#ffffff}
+html[data-look="2"] .mcont:hover{background:linear-gradient(130deg,var(--t1),var(--t2))}
+html[data-look="2"] .mcont .mute{color:rgba(255,255,255,.76)}
+html[data-look="2"] .mcont img{border-radius:3px 5px 5px 3px;box-shadow:0 8px 18px rgba(0,0,0,.4)}
+html[data-look="2"] .mconts{gap:14px;padding:2px 2px 20px}
+
+/* ---------- highlights: a book's card carries its spine ---------- */
+html[data-look="2"] .hlgroup{border-left:5px solid var(--t2,var(--line-2))}
+
+/* the streak's dots, on its panel */
+html[data-look="2"] .card:has(> .sbig) .dot2{border-color:rgba(255,255,255,.35)}
+html[data-look="2"] .card:has(> .sbig) .dot2.some{border-color:#ffffff}
+html[data-look="2"] .card:has(> .sbig) .dot2.full{background:#ffffff;border-color:#ffffff}
+
+/* the menu's tiles: with a pointer that hovers, a picture and its name as a tooltip; on a touch screen the name stays under it */
+.pop .menu.l2m .l2m-tiles .l2ml{font-size:10.5px;letter-spacing:-.1px;overflow:visible;text-overflow:clip}
+html.l2-hover .pop .menu.l2m .l2m-tiles button{min-height:50px;position:relative}
+html.l2-hover .pop .menu.l2m .l2m-tiles .l2ml{display:none}
+html.l2-hover .pop .menu.l2m .l2m-tiles svg{width:22px;height:22px}
+html.l2-hover .pop .menu.l2m .l2m-tiles [data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--l2-ink);color:var(--l2-on-ink);font-size:12px;font-weight:500;padding:5px 9px;border-radius:7px;pointer-events:none;z-index:3}
+/* Preferences: its search */
+html[data-look="2"] .top .l2psearch{width:min(260px,40vw);flex:none;min-height:36px;border-radius:999px;padding:0 14px;background:var(--panel)}
+html[data-look="2"] .l2finding .prefsnav{visibility:hidden}
+html[data-look="2"] [hidden].prow,html[data-look="2"] [hidden].aaline,html[data-look="2"] [hidden].card,html[data-look="2"] [hidden].pgroup{display:none!important}
+
+/* ---------- what moved to the corner's … menu, and the small explaining lines ---------- */
+/* hidden, not removed: the menu presses these */
+html[data-look="2"] #main :is(
+  .top .find:not(.open),
+  .top a[href="#catalog"], .top [data-act="addbook"], #shelfsec [data-shelf="new"], .bcell [data-act="standon"],
+  #bacts [data-abk="here"], #bacts [data-act="bookedit"], #bacts a[target="_blank"], .bookhead .l2vault, .bookhead .tiny.mute:has(code),
+  [data-act="cat:cols"], [data-act="cat:views"], [data-act="cat:more"],
+  .top [data-home="config"],
+  .lvmain > .top [data-ract="saveview"], .lvmain > .top [data-ract="rmview"], .lvmain > .top [data-ract="selmode"]:not(.on), .lvmain > .top #lsort, .lvmain > .top #tagf, .lvmain > .top [data-ract="lmore"],
+  .top a[href="#edition/taste"], .top [data-ed="kindle"], .top [data-ed="again"],
+  .top [data-act="hlexport"],
+  .rkeys,
+  .l2acts [data-act="refresh"]
+){display:none!important}
+html[data-look="2"] #main .lvmain > .top .srcpick{pointer-events:none}
+html[data-look="2"] #main .lvmain > .top .srcpick svg{display:none}
+/* the small explaining lines under titles and in sheets */
+html[data-look="2"] #main :is(.cardh > span.mute, .cardh > span.tiny.mute, .shelfh > .mute.tiny, .top > .mute:not(.num), .top > span.tiny.mute:not(.num), .tabs > .mute.tiny, .dots + .tiny.mute, .page.l2today > p.mute.tiny){display:none}
+html[data-look="2"] #modal :is(#addlink + .mute.tiny, .adddrop .mute.tiny, > span.mute.tiny:last-child){display:none}
+
+/* Highlights: one Filter button opens the colours, the tag, Favorites, the order and private books */
+html[data-look="2"]:not(.l2-hlf) #hlbody .hlf2, html[data-look="2"]:not(.l2-hlf) #hlbody label:has(#hlpriv){display:none}
+html[data-look="2"] .btn.l2hlf.on{background:var(--accent-weak);color:var(--accent)}
+
+/* the search that's open in a bar: Everywhere beside it */
+html[data-look="2"] .find.open .l2every{flex:none;margin-left:6px}
+
+/* the corner's menu: its lines with a picture, the places at the foot */
+.pop .menu.l2m .l2mi0{width:20px;flex:none}
+.pop .menu.l2menu{min-width:260px}
+.pop .menu.l2m .l2m-chips button{font-size:13px}
+.pop .menu.l2m.l2cat > button,.pop .menu.l2m.l2cat > a{padding-left:40px}
+.pop .menu.l2m > hr{border:0;border-top:1px solid var(--line);margin:2px 0}
+.pop .menu.l2m .l2m-rows:first-child{border-top:0;padding-top:0}
+
+/* Today's panel: the lines where you left off, fading out */
+.l2hex{font-family:var(--serif);font-size:18px;line-height:1.55;margin:16px 0 0;color:rgba(255,255,255,.9);max-height:calc(1.55em * 3);overflow:hidden;
+  -webkit-mask-image:linear-gradient(180deg,#000 45%,transparent);mask-image:linear-gradient(180deg,#000 45%,transparent);text-wrap:pretty}
+.l2hex + .l2hacts{margin-top:14px}
+@media (max-width:900px){ .l2hex{font-size:16px} }
+@media (max-width:520px){ .l2hex{font-size:15px;max-height:calc(1.55em * 4)} }
+/* a notice's buttons go under its words on a phone */
+html.l2-phone .notice{flex-wrap:wrap}
+html.l2-phone .notice > span:last-child:not(:first-child){flex-basis:100%;padding-left:28px}
