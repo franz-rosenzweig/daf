@@ -4,7 +4,7 @@
 
 Daf has a second look that I'm trying out, and it's off until I turn it on. **Preferences → New look** turns it on or off for the device I'm on, so I can have it on the tablet and keep the old one on the phone while I get used to it. Adding `?look=2` to the address does the same, and `?look=1` turns it off again.
 
-The idea behind it is that each screen has one main thing on it, and everything else waits until I ask for it. The page sits as one cream sheet on a gray background, with white cards on it, serif titles and one blue for the buttons that matter. My theme's colours step aside while it's on, the Rooms included; dark mode still follows my setting.
+The idea behind it is that each screen has one main thing on it, and everything else waits until I ask for it. With Daf's own theme the page sits as one cream sheet on a gray background, with white cards on it, serif titles and one blue for the buttons that matter. Any other theme in Preferences → Appearance colours it instead: the backdrop a shade darker than the theme, the sheet the theme's page, and Daf's own panels in its accent. The Rooms keep their materials. In the Rustic library the backdrop where the tabs are is the oxblood leather, the sheet is parchment, the cards keep their brass rule, the books stand on their shelves, and a book's bars are stitched leather as they always were; the Wood bookshelf, the Gothic and the Cyberpunk libraries work the same way. Dark mode follows my setting.
 
 ## Getting around
 
@@ -33,3 +33,9 @@ Today opens on one big panel for the book I opened last, in two shades taken fro
 The same colour shows up on Books, on a book's page, on the player while something plays, on the manga I'm partway through, and as a spine on each book's card in Highlights. The Edition's lead story, the parasha and the streak have panels of their own.
 
 The lines from where I left off come from Daf's own place in the book when I've read it here, and otherwise from the Kindle's percent. They only show for EPUBs, and never for a private book.
+
+## Preferences
+
+Preferences is a list of pages down the left, and the one I pick opens beside it, so I'm never scrolling through all of it at once. On the phone it's the list first, and a page opens over it with **‹ Preferences** at the top to go back. The search box still finds a setting anywhere, across every page.
+
+The connected devices and the browser extension have a page of their own under Connections, **Devices & extension**. That's where the downloads for Chrome or Arc and Firefox or Zen are, and where I make the extension's token.

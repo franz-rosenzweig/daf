@@ -22,8 +22,9 @@ L.shape = () => {
   return coarse && w > h ? 'side' : 'top';
 };
 L.frame = () => {
-  const s = L.shape();
+  const s = L.shape(), wasPhone = root.classList.contains('l2-phone');
   for (const k of ['top', 'side', 'phone']) root.classList.toggle('l2-' + k, k === s);
+  if (wasPhone !== (s === 'phone') && C.Themes) C.Themes.apply();     // the Android bars: the page's colour on a phone, the backdrop's elsewhere
   root.classList.toggle('l2-hover', matchMedia('(hover: hover) and (pointer: fine)').matches);     // a pointer that hovers: names can be tooltips
 };
 
@@ -171,7 +172,7 @@ function scan(){
   document.querySelectorAll('#main .hlgroup, #main .mcont').forEach(el => { const im = el.querySelector('img'); if (im) L.tintFrom(el, im.getAttribute('src')); });
   const pl = document.getElementById('player'), art = pl && pl.querySelector('img.plart');
   if (pl && art) L.tintFrom(pl, art.getAttribute('src'));
-  dupTitle(); prefsSearch(); everywhere(); hlFilter(); excerpt();
+  dupTitle(); prefsSearch(); prefsPages(); everywhere(); hlFilter(); excerpt();
 }
 // Preferences: a box that finds a setting by its name. Cards that don't have the words step away, and in a
 // card that does, so do the rows without them (unless it's the card's own name that matched).
@@ -192,6 +193,58 @@ function prefsSearch(){
     page.querySelectorAll(':scope > .pgroup').forEach(g => { let n = g.nextElementSibling, any = false; while (n && !n.classList.contains('pgroup')) { if (n.classList.contains('card') && !n.hidden) any = true; n = n.nextElementSibling; } g.hidden = !any; });
   });
 }
+// Preferences one page at a time: the list of pages down the left, the one
+// that's open beside it; on a phone the list, and a page over it with the way back. #prefs/<name> opens a
+// page; while the search box has words in it, every card with them shows, as before. The connected devices
+// and the browser extension get a page of their own (out of Account, where they were hard to find).
+const PNAME = { goals: 'goalscard', appearance: 'appearcard', keys: 'keyscard', ai: 'aicard', digest: 'digestcard', import: 'importcard', feedback: 'fbcard',
+  tags: 'tagscard', tips: 'tipscard', anilist: 'alcard', readerapps: 'gracard', podcasts: 'podcard', devices: 'l2devcard', look: 'lookcard' };
+const pname = id => Object.keys(PNAME).find(k => PNAME[k] === id) || id.replace(/card$/, '');
+function prefsPages(){
+  const grid = document.querySelector('#main .prefsgrid'); if (!grid) return;
+  const page = grid.querySelector('.prefspage'), nav = grid.querySelector('.prefsnav'); if (!page || !nav) return;
+  if (!document.getElementById('l2devcard') && document.getElementById('devlist')) {
+    const conn = ['gracard', 'alcard', 'digestcard', 'nlcard', 'hccard', 'podcard', 'phonecard'].find(id => document.getElementById(id) && nav.querySelector('[data-pjump="' + id + '"]'));
+    if (conn) {
+      const card = document.createElement('section'); card.className = 'card'; card.id = 'l2devcard'; card.innerHTML = '<h2>Devices &amp; extension</h2>';
+      card.appendChild(document.getElementById('devlist'));
+      document.getElementById(conn).after(card);
+      nav.querySelector('[data-pjump="' + conn + '"]').insertAdjacentHTML('afterend', '<button data-pjump="l2devcard">Devices &amp; extension</button>');
+    }
+  }
+  const phone = L.shape() === 'phone';
+  if (!grid.classList.contains('l2pp')) {
+    grid.classList.add('l2pp');
+    nav.addEventListener('click', e => {
+      const b = e.target.closest('[data-pjump]'); if (!b) return;
+      e.stopImmediatePropagation();                 // (app.js would scroll to the card)
+      const url = '#prefs/' + pname(b.dataset.pjump);
+      if (L.shape() === 'phone') { history.pushState(null, '', url); grid.dataset.pushed = '1'; } else history.replaceState(null, '', url);
+      open(b.dataset.pjump);
+    }, true);
+    const top = document.querySelector('#main > .top h1');
+    if (phone && top) top.insertAdjacentHTML('beforebegin', '<button class="l2pback" data-l2pback>‹ Preferences</button>');
+  }
+  const open = id => {
+    const card = document.getElementById(id); if (!card) return;
+    page.querySelectorAll(':scope > .card').forEach(c => c.classList.toggle('l2cur', c === card));
+    nav.querySelectorAll('[data-pjump]').forEach(b => b.classList.toggle('l2on', b.dataset.pjump === id));
+    grid.classList.add('l2open');
+    C.lsSet('prefpage', id);
+    document.getElementById('main').scrollTop = 0;
+  };
+  if (grid.dataset.l2pp) return;                    // opened once per drawing of Preferences
+  grid.dataset.l2pp = '1';
+  const asked = (S.route || [])[1], id = asked ? PNAME[asked] || asked + 'card' : (!phone && C.lsGet('prefpage', '')) || '';
+  const first = nav.querySelector('[data-pjump]');
+  if (id && document.getElementById(id)) open(id);
+  else if (!phone && first) open(first.dataset.pjump);
+}
+document.addEventListener('click', e => {
+  if (!L.on || !e.target.closest || !e.target.closest('[data-l2pback]')) return;
+  const g = document.querySelector('#main .prefsgrid');
+  if (g && g.dataset.pushed) history.back(); else location.hash = '#prefs';
+});
 // A screen's own name, when the row of pages just above already says it ("Highlights" under Highlights ·
 // Review): the name steps back, and so does its bar if nothing else is in it.
 function dupTitle(){

@@ -2,7 +2,8 @@
    Everything here is under that attribute, so with the switch off this file changes nothing.
 
    The idea: a gray backdrop, the page as one cream sheet on it, white cards with soft shadows on the
-   sheet, serif titles, and one accent colour. A theme's colours stand down while it's on. */
+   sheet, serif titles, and one accent colour. These are the new look's own colours, for Daf's own theme;
+   any other theme gives its own (themes.js T.vars2), and a Room its materials (at the end here). */
 
 html[data-look="2"]:root{
   --bg:#fbfaf7; --side:#efeeea; --panel:#f4f3ef; --hover:#f1f0ec; --active:#e9e8e4; --line:#e9e8e4; --line-2:#d9d8d3;
@@ -10,7 +11,7 @@ html[data-look="2"]:root{
   --accent:#2b4c8c; --accent-2:#1f3a70; --accent-weak:#e6ecf7; --on-accent:#ffffff;
   --shadow:0 1px 2px rgba(0,0,0,.05),0 14px 36px rgba(60,50,30,.14);
   --serif:'Literata','Source Serif 4',Georgia,serif;
-  --l2-back:linear-gradient(180deg,#ecebe8,#e2e2e8); --l2-card:#ffffff; --l2-ink:#1d1d1f; --l2-on-ink:#ffffff;
+  --l2-back:linear-gradient(180deg,#ecebe8,#e2e2e8); --l2-p1:#1f2a44; --l2-p2:#2b4c8c; --l2-card:#ffffff; --l2-ink:#1d1d1f; --l2-on-ink:#ffffff;
   --l2-well:rgba(0,0,0,.07); --l2-chip:#ffffff; --l2-tab:#ffffff; --l2-track:#cfcfd6;
   --l2-sheet:0 1px 2px rgba(0,0,0,.05),0 18px 50px rgba(60,50,30,.10);
   --l2-lift:0 1px 2px rgba(0,0,0,.04),0 10px 28px rgba(60,50,30,.07);
@@ -103,7 +104,7 @@ html[data-look="2"]:not(.l2-phone) .app.hassubs .main .top{border-radius:0}
 html[data-look="2"]:not(.reading) .top h1{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.3px}   /* a reader's own bar (a book, a PDF) keeps its title as it was */
 html[data-look="2"] .card{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:18px;box-shadow:var(--l2-lift)}
 html[data-look="2"][data-mode="dark"] .card{border-color:rgba(255,255,255,.06)}
-html[data-look="2"] .card h2{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--fg-3)}
+html[data-look="2"]:not([data-room]) .card h2{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--fg-3)}
 html[data-look="2"] .btn{border-radius:999px;border-color:transparent;background:var(--active);font-weight:600}
 html[data-look="2"] .btn:hover{background:var(--line-2)}
 html[data-look="2"] .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
@@ -126,7 +127,7 @@ html[data-look="2"] .page{max-width:1180px;width:100%;margin-inline:auto;box-siz
 html[data-look="2"]:not(.l2-phone) .main > .top{padding-inline:max(34px,calc((100% - 1180px) / 2 + 34px))}
 
 /* ---------- the panel in a book's own colour ---------- */
-.l2hero{--t1:#1f2a44;--t2:#2b4c8c;position:relative;overflow:hidden;display:flex;align-items:center;gap:38px;min-height:340px;padding:34px 44px;box-sizing:border-box;border-radius:24px;color:#fff;
+.l2hero{--t1:var(--l2-p1);--t2:var(--l2-p2);position:relative;overflow:hidden;display:flex;align-items:center;gap:38px;min-height:340px;padding:34px 44px;box-sizing:border-box;border-radius:24px;color:#fff;
   background:linear-gradient(115deg,var(--t1),var(--t2) 75%);box-shadow:0 24px 50px color-mix(in srgb,var(--t1) 35%,transparent)}
 .l2hero::before{content:"";position:absolute;right:-80px;top:-120px;width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.07);pointer-events:none}
 .l2hcover{flex:none;position:relative;transform:rotate(-2deg)}
@@ -167,7 +168,7 @@ html[data-look="2"] .page.l2today{padding-top:22px;gap:18px}
 .l2src{margin-top:4px;padding-top:12px;border-top:1px solid var(--line);font-size:13.5px;color:var(--fg-2)}
 
 /* a book's page: its head is the panel */
-html[data-look="2"] .bookhead[data-tint]{--t1:#1f2a44;--t2:#2b4c8c;padding:30px 34px;border-radius:24px;color:#fff;background:linear-gradient(135deg,var(--t1),var(--t2) 80%);box-shadow:0 20px 44px color-mix(in srgb,var(--t1) 30%,transparent);align-items:center}
+html[data-look="2"] .bookhead[data-tint]{--t1:var(--l2-p1);--t2:var(--l2-p2);padding:30px 34px;border-radius:24px;color:#fff;background:linear-gradient(135deg,var(--t1),var(--t2) 80%);box-shadow:0 20px 44px color-mix(in srgb,var(--t1) 30%,transparent);align-items:center}
 html[data-look="2"] .bookhead[data-tint] .mute,html[data-look="2"] .bookhead[data-tint] code{color:rgba(255,255,255,.74)}
 html[data-look="2"] .bookhead[data-tint] .cv.lg{border-radius:4px 7px 7px 4px;box-shadow:0 24px 40px rgba(0,0,0,.45)}
 html[data-look="2"] .bookhead[data-tint] .btn{background:rgba(255,255,255,.16);color:#fff}
@@ -207,7 +208,7 @@ html[data-look="2"] :is(.edlead,.tcard:first-child,.card:has(> .sbig)){
   --fg:#ffffff; --fg-2:rgba(255,255,255,.78); --fg-3:rgba(255,255,255,.62); --line:rgba(255,255,255,.18); --line-2:rgba(255,255,255,.3);
   --accent:#ffffff; --accent-2:#ffffff; --accent-weak:rgba(255,255,255,.16); --on-accent:#1d1d1f;
   --hover:rgba(255,255,255,.12); --active:rgba(255,255,255,.18); --panel:rgba(255,255,255,.1); --l2-card:transparent; --side:rgba(255,255,255,.14);
-  color:#fff;border:0;border-radius:24px;background:linear-gradient(120deg,#1f2a44,#2b4c8c);box-shadow:0 18px 40px rgba(31,42,68,.3)}
+  color:#fff;border:0;border-radius:24px;background:linear-gradient(120deg,var(--l2-p1),var(--l2-p2));box-shadow:0 18px 40px color-mix(in srgb,var(--l2-p1) 30%,transparent)}
 html[data-look="2"] .edlead{padding:30px 34px;margin-top:18px}
 html[data-look="2"] .edlead h2{letter-spacing:-.6px}
 html[data-look="2"] .tcard{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:18px;box-shadow:var(--l2-lift)}
@@ -263,7 +264,7 @@ html[data-look="2"] .login h1{font-family:var(--serif);font-size:34px;font-weigh
 html[data-look="2"] .login .btn{min-height:46px}
 
 /* ---------- the player takes the colour of what's playing ---------- */
-html[data-look="2"] .player{--t1:#1f2a44;--t2:#2b4c8c}
+html[data-look="2"] .player{--t1:var(--l2-p1);--t2:var(--l2-p2)}
 html[data-look="2"] .pmini{
   --fg:#ffffff; --fg-2:rgba(255,255,255,.78); --fg-3:rgba(255,255,255,.62); --line:rgba(255,255,255,.18); --accent:#ffffff; --on-accent:#1d1d1f; --hover:rgba(255,255,255,.14); --active:rgba(255,255,255,.2);
   color:#fff;border:0;border-radius:18px;background:linear-gradient(120deg,var(--t1),var(--t2));box-shadow:0 14px 34px color-mix(in srgb,var(--t1) 40%,transparent)}
@@ -342,3 +343,74 @@ html[data-look="2"] .find.open .l2every{flex:none;margin-left:6px}
 /* a notice's buttons go under its words on a phone */
 html.l2-phone .notice{flex-wrap:wrap}
 html.l2-phone .notice > span:last-child:not(:first-child){flex-basis:100%;padding-left:28px}
+
+/* ---------- a theme's Room: Wood bookshelf, Rustic library, Gothic library, Cyberpunk library ----------
+   The backdrop, where the tabs are, is the room's frame (leather, walnut, crimson, night); the sheet is
+   its wall; the cards, the shelves under the books and the titles' face are style.css's, as before. A
+   reader's bars, and a phone's bars top and bottom, are made of the frame as they always were. */
+html[data-look="2"][data-room="wood"]{--l2-tx-back:var(--t-grain-h) 0 0/640px 220px,linear-gradient(rgba(255,230,190,.06),rgba(0,0,0,.22))}
+html[data-look="2"][data-room="wood"][data-mode="dark"]{--l2-tx-back:var(--t-grain-h-lt) 0 0/640px 220px,linear-gradient(rgba(255,230,190,.03),rgba(0,0,0,.3))}
+html[data-look="2"][data-room="rustic"]{--l2-tx-back:var(--t-leather) 0 0/220px 220px,linear-gradient(rgba(255,220,180,.05),rgba(0,0,0,.24))}
+html[data-look="2"][data-room="gothic"]{--l2-tx-back:linear-gradient(rgba(255,255,255,.04),rgba(0,0,0,.28)),var(--t-grit) 0 0/160px 160px}
+html[data-look="2"][data-room="cyber"]{--l2-tx-back:radial-gradient(ellipse 80% 50% at 50% 0,color-mix(in srgb,var(--neon-2) 16%,transparent),transparent),var(--scan)}
+html[data-look="2"][data-room] body{background:var(--l2-tx-back),var(--frame);background-attachment:fixed}
+html[data-look="2"][data-room] :is(.l2brand,.l2tabs,.l2corner),html.l2-phone[data-room] :is(.l2subs,.mobbar){
+  --fg:var(--frame-fg);--fg-2:var(--frame-fg-2);--fg-3:var(--frame-fg-3);--hover:var(--frame-hover);--active:var(--frame-active);
+  --line:var(--frame-line);--line-2:var(--frame-line-2);--accent:var(--frame-accent);--accent-2:var(--frame-accent);
+  --accent-weak:var(--frame-accent-weak);--on-accent:var(--frame-on-accent);--bg:var(--frame);--side:var(--frame);--panel:var(--frame-hover);
+  --l2-well:rgba(0,0,0,.24);--l2-chip:var(--frame-hover);--l2-tab:var(--frame-accent-weak);--l2-track:var(--frame-line-2);--l2-ink:var(--frame-accent);--l2-on-ink:var(--frame);
+  color:var(--fg)}
+html[data-look="2"][data-room] .l2pill{font-family:var(--display);font-weight:var(--display-w,700);font-size:17px}
+html[data-look="2"][data-room]:not(.l2-side) .l2tab.on{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--frame-accent) 35%,transparent)}
+/* the sheet is the wall, and a screen's own bar is part of it (the textures line up across the seams) */
+html[data-look="2"][data-room] :is(.main,.l2subs){background:var(--tx-wall),var(--wall)}
+html[data-look="2"][data-room]:not(.l2-phone) .l2subs{background-position:0 100%}
+html[data-look="2"][data-room]:not(.reading):not(.l2-phone) .main .top{background:var(--tx-wall),var(--wall);border-bottom-color:transparent}
+html[data-look="2"][data-room] :is(.l2hero h1,.modal h2,.login h1,.edlead h2){font-family:var(--display);font-weight:var(--display-w,700);letter-spacing:var(--display-ls,normal)}
+/* a phone: the frame's bars above and below the page */
+html.l2-phone[data-room] body{background:var(--tx-wall),var(--wall)}
+html.l2-phone[data-room] .l2subs{background:var(--l2-tx-back),var(--frame)}
+html.l2-phone[data-room] .mobbar{background:var(--tx-bar-b),var(--frame);box-shadow:0 6px 18px rgba(0,0,0,.3)}
+/* Daf's own panels (the Edition's lead, the parasha, the streak) are made of the frame */
+html[data-look="2"][data-room] :is(.edlead,.tcard:first-child,.card:has(> .sbig)){
+  --fg:var(--frame-fg);--fg-2:var(--frame-fg-2);--fg-3:var(--frame-fg-3);--line:var(--frame-line);--line-2:var(--frame-line-2);
+  --accent:var(--frame-accent);--accent-2:var(--frame-accent);--accent-weak:var(--frame-accent-weak);--on-accent:var(--frame-on-accent);
+  --hover:var(--frame-hover);--active:var(--frame-active);--panel:var(--frame-hover);
+  color:var(--frame-fg);background:var(--l2-tx-back),var(--frame);box-shadow:var(--card-shadow)}
+html[data-look="2"][data-room] .card:has(> .sbig) h2{color:var(--frame-fg-3)}
+html[data-look="2"][data-room] .card:has(> .sbig) .dot2.full{background:var(--frame-accent);border-color:var(--frame-accent)}
+html[data-look="2"][data-room] .card:has(> .sbig) .dot2.some{border-color:var(--frame-accent)}
+/* the Rustic library: the panels stitched at their edge, and a book's own colour bound in leather */
+html[data-look="2"][data-room="rustic"] :is(.edlead,.tcard:first-child,.card:has(> .sbig),.l2hero,.bookhead[data-tint]){outline:1.5px dashed var(--stitch);outline-offset:-7px}
+html[data-look="2"][data-room="rustic"] .l2hero{background:var(--t-leather) 0 0/220px 220px,linear-gradient(115deg,var(--t1),var(--t2) 75%)}
+html[data-look="2"][data-room="rustic"] .bookhead[data-tint]{background:var(--t-leather) 0 0/220px 220px,linear-gradient(135deg,var(--t1),var(--t2) 80%)}
+/* (a wall that shades from top to bottom would shade a screen's bar too: in the new look only the texture) */
+html[data-look="2"][data-room="rustic"][data-mode="dark"]{--tx-wall:var(--t-leather) 0 0/220px 220px}
+html[data-look="2"][data-room="cyber"]{--tx-wall:linear-gradient(color-mix(in srgb,var(--neon) 9%,transparent) 1px,transparent 1px) 0 0/32px 32px,linear-gradient(90deg,color-mix(in srgb,var(--neon) 9%,transparent) 1px,transparent 1px) 0 0/32px 32px}
+
+/* ---------- Preferences, one page at a time (look2.js prefsPages) ---------- */
+html[data-look="2"] .prefsgrid.l2pp{grid-template-columns:230px minmax(0,1fr);gap:0 8px}
+html[data-look="2"] .l2pp .prefsnav{position:sticky;top:0;flex-direction:column;gap:1px;max-height:100%;overflow-y:auto;padding:22px 10px 26px 18px;background:none;border:0;backdrop-filter:none;visibility:visible}
+html[data-look="2"] .l2pp .prefsnav .pnavg{display:block;padding:16px 10px 5px}
+html[data-look="2"] .l2pp .prefsnav .pnavg:first-child{padding-top:0}
+html[data-look="2"] .l2pp .prefsnav button{flex:none;border:0;border-radius:9px;min-height:38px;padding:0 12px;font-size:14.5px;font-weight:500;color:var(--fg-2);white-space:normal;text-align:left}
+html[data-look="2"] .l2pp .prefsnav button.on{background:none;color:var(--fg-2);font-weight:500}
+html[data-look="2"] .l2pp .prefsnav button:hover{background:var(--hover);color:var(--fg)}
+html[data-look="2"] .l2pp .prefsnav button.l2on{background:var(--l2-card);color:var(--fg);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+html[data-look="2"] .l2pp:not(.l2finding) .prefspage > .card:not(.l2cur),html[data-look="2"] .l2pp:not(.l2finding) .prefspage > .pgroup{display:none}
+html[data-look="2"] .l2pp .prefspage{padding-top:22px}
+html[data-look="2"] .l2pp:not(.l2finding) .prefspage > .card > h2,html[data-look="2"] .l2pp:not(.l2finding) .prefspage > .card > .cardh > h2{font-family:var(--display,var(--serif));font-size:24px;font-weight:600;letter-spacing:-.3px;text-transform:none;color:var(--fg)}
+.l2pback{display:none}
+/* a phone: the list, then the page with the way back */
+html.l2-phone .prefsgrid.l2pp{grid-template-columns:minmax(0,1fr)}
+html.l2-phone .l2pp:not(.l2open):not(.l2finding) .prefspage,html.l2-phone .l2pp.l2open .prefsnav,html.l2-phone .l2pp.l2finding .prefsnav{display:none}
+html.l2-phone .l2pp .prefsnav{position:static;max-height:none;padding:8px 16px 24px}
+html.l2-phone .l2pp .prefsnav button{min-height:50px;font-size:16px;border-radius:12px}
+html.l2-phone .l2pp .prefsnav button.l2on{background:none;box-shadow:none;font-weight:500}
+html.l2-phone #main:has(.l2pp.l2open:not(.l2finding)) > .top .l2pback{display:inline-flex;align-items:center;flex:none;min-height:40px;padding:0 2px;border:0;background:none;color:var(--accent);font-size:16px;font-weight:600}
+html.l2-phone #main:has(.l2pp.l2open:not(.l2finding)) > .top h1{display:none}
+/* a row's words above its buttons when they don't fit beside them */
+html[data-look="2"] .l2pp .prow{flex-wrap:wrap}
+html[data-look="2"] .l2pp .prow > .d{flex:1 1 240px}
+@media (max-width:1100px){ html[data-look="2"]:not(.l2-phone) .prefsgrid.l2pp{grid-template-columns:190px minmax(0,1fr)} html[data-look="2"]:not(.l2-phone) .l2pp .prefsnav{padding-left:10px} }
+html.l2-phone .l2pp .prefspage{padding-top:8px}
