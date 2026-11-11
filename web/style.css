@@ -2053,7 +2053,7 @@ body.playerbig .pmini{visibility:hidden}
 .abgroup:hover b{color:var(--accent)}
 .abfan{display:flex;align-items:flex-end;height:136px;padding:0 4px}
 .abfanimg{width:108px;height:108px;flex:none;object-fit:cover;border-radius:6px;background:var(--active);box-shadow:0 8px 18px rgba(0,0,0,.28)}
-.abfan .abfanimg + .abfanimg{margin-left:-58px}
+.abfan .abfanimg + .abfanimg{margin-left:-66px}
 .abfan .abfanimg:nth-child(1){transform:rotate(-5deg)}
 .abfan .abfanimg:nth-child(2){transform:translateY(-8px) rotate(1deg)}
 .abfan .abfanimg:nth-child(3){transform:rotate(6deg)}
@@ -2128,7 +2128,7 @@ button.abrowb:hover b{color:var(--accent)}
   .abgroup{padding:12px}
   .abfan{height:104px}
   .abfanimg{width:80px;height:80px}
-  .abfan .abfanimg + .abfanimg{margin-left:-44px}
+  .abfan .abfanimg + .abfanimg{margin-left:-48px}
   .abgroup b{font-size:15px}
   .abhead{align-items:flex-start}
   .abcover{width:112px;height:112px}
