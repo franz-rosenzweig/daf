@@ -1627,6 +1627,7 @@ body.btocsheet .bscrim,body.bpanelsheet .bscrim{display:block;position:fixed;ins
 .sbset .seg button{padding:7px 2px;font-size:13px}
 .sbset .stepper{gap:14px}
 .sbset .stepper .seg{display:grid;flex:1}
+.blisten{border-top:1px solid var(--line);padding-top:10px}   /* Themes & Settings → Listen: the audiobook or the voice (book.js) */
 .sbchips{display:flex;flex-wrap:wrap;gap:6px}
 .sbchips .chip{background:var(--bg);color:var(--fg-2);border:1px solid var(--line-2);padding:4px 11px;border-radius:999px;font-size:13px;cursor:pointer;min-height:30px}
 .sbchips .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}

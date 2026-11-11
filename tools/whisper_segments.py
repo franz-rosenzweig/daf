@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""whisper_segments.py FILE [--start S] [--duration D] [--model small]
+"""whisper_segments.py FILE [--start S] [--duration D] [--model small] [--threads 8]
 
 Transcribe with faster-whisper (in Daf's own environment: media.py runs this with Daf's Python) and
 print JSON: {"language": "en", "segments": [{"start": s, "end": e, "text": "..."}]}.
@@ -18,6 +18,7 @@ ap.add_argument("file")
 ap.add_argument("--start", type=float, default=None)
 ap.add_argument("--duration", type=float, default=None)
 ap.add_argument("--model", default=os.environ.get("DAF_WHISPER_MODEL", "small"))
+ap.add_argument("--threads", type=int, default=8)
 a = ap.parse_args()
 
 src, tmp = a.file, None
@@ -36,7 +37,7 @@ if a.start is not None or a.duration is not None:
         sys.exit(1)
     src = tmp
 try:
-    model = WhisperModel(a.model, device="cpu", compute_type="int8", cpu_threads=8)
+    model = WhisperModel(a.model, device="cpu", compute_type="int8", cpu_threads=a.threads)
     segments, info = model.transcribe(src, vad_filter=True)
     out = [{"start": round(s.start + (a.start or 0), 2), "end": round(s.end + (a.start or 0), 2), "text": s.text.strip()} for s in segments]
     print(json.dumps({"language": info.language, "segments": out}))

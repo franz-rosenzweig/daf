@@ -228,25 +228,47 @@ document.addEventListener('click', e => {
 });
 
 /* ---------- read aloud: the sentence being spoken ---------- */
-// Marks the sentence Kokoro is on with the CSS Custom Highlight API: no change to the page's DOM,
-// so highlight marks and the shells' buttons stay as they are. Kokoro speaks at an even pace, so
-// the place in the audio maps to a place in the text by characters (plus a pause per sentence).
-// Returns a function that stops following. Works in the article view and in the book's iframe.
-H.follow = (audio, el, opts) => {
-  opts = opts || {};
+// Marks the sentence being read with the CSS Custom Highlight API: no change to the page's DOM, so
+// highlight marks and the shells' buttons stay as they are. Works in the article view and in the
+// book's iframe.
+// A paragraph's sentences: n of them, mark(k) marks one (→ its range), of(node, offset) is the one a
+// place in its text is in, first(k) where one starts, clear() takes the mark away. null where the
+// browser has no CSS highlights.
+H.sentences = el => {
   const doc = el && el.ownerDocument, win = doc && doc.defaultView;
-  if (!audio || !win || !win.CSS || !win.CSS.highlights || typeof win.Highlight !== 'function') return () => {};
+  if (!win || !win.CSS || !win.CSS.highlights || typeof win.Highlight !== 'function') return null;
   const nodes = []; let total = 0;
   const w = doc.createTreeWalker(el, win.NodeFilter.SHOW_TEXT);
   for (let n = w.nextNode(); n; n = w.nextNode()) { nodes.push([n, total]); total += n.data.length; }
+  if (!nodes.length) return null;
   const text = nodes.map(x => x[0].data).join('');
   const ends = [], re = /[.!?…׃]+["'”’»)\]]*\s+/g;
   for (let m = re.exec(text); m; m = re.exec(text)) ends.push(m.index + m[0].length);
   if (!ends.length || ends[ends.length - 1] < text.length) ends.push(text.length);
-  if (ends.length < 2) return () => {};                 // one sentence: the paragraph's own mark says it
   const starts = [0].concat(ends.slice(0, -1));
-  const weights = starts.map((s0, i) => ends[i] - s0 + 14), W = weights.reduce((a, b) => a + b, 0);
   const at = off => { for (let i = nodes.length - 1; i >= 0; i--) if (nodes[i][1] <= off) return [nodes[i][0], Math.min(off - nodes[i][1], nodes[i][0].data.length)]; return [nodes[0][0], 0]; };
+  const range = k => {
+    let s0 = starts[k], e0 = ends[k];
+    while (s0 < e0 && /\s/.test(text[s0])) s0++;
+    while (e0 > s0 && /\s/.test(text[e0 - 1])) e0--;
+    const r = doc.createRange(), a = at(s0), b = at(e0);
+    try { r.setStart(a[0], a[1]); r.setEnd(b[0], b[1]); } catch(e){ return null; }
+    return r;
+  };
+  return { n: ends.length, starts, ends, range,
+    mark(k){ const r = range(k); if (r) win.CSS.highlights.set('daf-speaking', new win.Highlight(r)); return r; },
+    of(node, offset){ const x = nodes.find(y => y[0] === node); if (!x) return -1; const o = x[1] + offset; let k = 0; while (k < ends.length - 1 && o >= ends[k]) k++; return k; },
+    first(k){ let s0 = starts[k]; while (s0 < ends[k] && /\s/.test(text[s0])) s0++; return at(s0); },
+    clear(){ try { win.CSS.highlights.delete('daf-speaking'); } catch(e){} } };
+};
+// Kokoro speaks at an even pace, so the place in its audio maps to a place in the paragraph by
+// characters (plus a pause per sentence). Returns a function that stops following.
+H.follow = (audio, el, opts) => {
+  opts = opts || {};
+  const S = audio && H.sentences(el);
+  if (!S || S.n < 2) return () => {};                   // one sentence: the paragraph's own mark says it
+  const doc = el.ownerDocument, win = doc.defaultView;
+  const weights = S.starts.map((s0, i) => S.ends[i] - s0 + 14), W = weights.reduce((a, b) => a + b, 0);
   let cur = -1;
   const show = () => {
     if (!audio.duration || !isFinite(audio.duration)) return;
@@ -254,12 +276,7 @@ H.follow = (audio, el, opts) => {
     while (k < weights.length - 1 && t > weights[k]) { t -= weights[k]; k++; }
     if (k === cur) return;
     cur = k;
-    let s0 = starts[k], e0 = ends[k];
-    while (s0 < e0 && /\s/.test(text[s0])) s0++;
-    while (e0 > s0 && /\s/.test(text[e0 - 1])) e0--;
-    const r = doc.createRange(), a = at(s0), b = at(e0);
-    try { r.setStart(a[0], a[1]); r.setEnd(b[0], b[1]); } catch(e){ return; }
-    win.CSS.highlights.set('daf-speaking', new win.Highlight(r));
+    const r = S.mark(k); if (!r) return;
     if (opts.scroll) {
       // Long paragraphs: keep the sentence on screen.
       const rc = r.getBoundingClientRect();
@@ -272,7 +289,7 @@ H.follow = (audio, el, opts) => {
   };
   audio.addEventListener('timeupdate', show);
   show();
-  return () => { audio.removeEventListener('timeupdate', show); try { win.CSS.highlights.delete('daf-speaking'); } catch(e){} };
+  return () => { audio.removeEventListener('timeupdate', show); S.clear(); };
 };
 
 /* ---------- share as image ---------- */

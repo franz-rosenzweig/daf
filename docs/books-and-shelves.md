@@ -94,6 +94,18 @@ To find the place, Daf first goes by the book's chapters, taking the front matte
 
 When the two don't line up, like an audiobook of a different translation than my EPUB, the words aren't in the book and Daf goes with the chapter guess. That can be a few minutes out, so I listen for a moment and skip. The audiobook's own chapter numbers don't count for much, because they're often its own: the credits or a prologue as "Chapter 1", or a long chapter split in two.
 
+### Reading along with the audiobook
+
+The book's page also has **Prepare the audiobook**. Pressing it has Daf listen to the whole recording once, in the background, and write down where every sentence is in the book. It runs at the lowest priority so nothing else on the server waits for it, one book at a time, and it takes about seven or eight minutes for every hour of audio, so a long novel is ready in a couple of hours. The button shows how far along it is, and if the server restarts in the middle it picks up where it stopped.
+
+Once it's done, **Listen** in the book itself plays the real audiobook instead of the generated voice. It starts from the page I'm on, the sentence the narrator is reading is marked the same way the voice marks it, and the page turns with the narrator, into the next chapter too. The timing is within about half a second of the narrator, which is close enough that the mark moves with the voice. If I tap a sentence while it plays, the audiobook jumps there. If I turn back a page to look at something, Daf leaves me there for a few seconds and then catches up again. Pausing and closing keep my place in the book and in Audiobookshelf, the same way **The audiobook from here** does, and when I open the book again while it's still playing, the page follows it without asking.
+
+The listening time counts once, as Audiobookshelf's listening time, so Daf doesn't also count those minutes as reading.
+
+If I'd rather have the voice for a book even though its audiobook is ready, **Themes & Settings** has **Listen** with **Audiobook** and **Voice**.
+
+Bits of the recording that aren't in the book, like the opening credits, music or a foreword the EPUB doesn't have, simply get no mark, and Daf goes back to marking as soon as the narrator is back in the text. An abridged recording works too: when the narrator skips ahead, Daf finds where they went on and keeps going from there. A recording of a different translation is the one thing it can't do, because the sentences aren't the same words. Daf checks for that first, by listening to a few places across the recording, and then the button says **The audiobook is another text** instead of spending hours on it. Listen stays the voice for that book, and the chapter guess above still works for finding my place.
+
 ## Hardcover
 
 The **Hardcover** card shows the book's status there: **Want to read**, **Reading**, **Read**, **Paused** or **Did not finish**, and the stars once it's read. **Finished** opens a small dialog with **Your rating** (or **No rating**) and **Finished on**, then **Mark it read**. **Open on Hardcover** opens the book there, and a book Daf can't match gets **Find it on Hardcover** instead.
