@@ -23,8 +23,8 @@ const fmt = t => { t = Math.max(0, Math.floor(t || 0)); const h = Math.floor(t /
 const ICON = {
   play: '<svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.8v12.4L16 10z" fill="currentColor"/></svg>',
   pause: '<svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><rect x="4.6" y="3.6" width="3.6" height="12.8" rx="1.1" fill="currentColor"/><rect x="11.8" y="3.6" width="3.6" height="12.8" rx="1.1" fill="currentColor"/></svg>',
-  back: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.1-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M6.5 2.8v4.4h4.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.2" font-size="6.6" font-weight="700" text-anchor="middle" fill="currentColor" font-family="system-ui,sans-serif">15</text></svg>',
-  fwd: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.1-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M17.5 2.8v4.4h-4.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.2" font-size="6.6" font-weight="700" text-anchor="middle" fill="currentColor" font-family="system-ui,sans-serif">30</text></svg>',
+  back: n => '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.1-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M6.5 2.8v4.4h4.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.2" font-size="6.6" font-weight="700" text-anchor="middle" fill="currentColor" font-family="system-ui,sans-serif">' + n + '</text></svg>',
+  fwd: n => '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.1-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M17.5 2.8v4.4h-4.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="15.2" font-size="6.6" font-weight="700" text-anchor="middle" fill="currentColor" font-family="system-ui,sans-serif">' + n + '</text></svg>',
   prevp: '<svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M15.5 4.5v11L7.5 10z" fill="currentColor"/></svg>',
   nextp: '<svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><path d="M15 4v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 4.5v11l8-5.5z" fill="currentColor"/></svg>',
   close: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
@@ -73,9 +73,11 @@ Pl.play = (item, opts) => {
   }
   if (Pl.cur && Pl.cur.driven) { const old = Pl.cur; Pl.cur = null; if (old.act && old.act.close) old.act.close(); }   // read-aloud stops for it
   else Pl.stop(true);
-  if (item.back == null) item.back = 15;
-  if (item.fwd == null) item.fwd = 30;
+  const sk = +store.get('podSkip', 0) || 0;            // Skip, on an audiobook's page: both ways alike
+  if (item.back == null) item.back = sk || 15;
+  if (item.fwd == null) item.fwd = sk || 30;
   Pl.cur = item; track = -1; sleepAt = 0; sleepEnd = false;
+  if (nextSleep) { setSleep(nextSleep); nextSleep = 0; }   // a sleep timer chosen before it played
   audio.playbackRate = +store.get('podRate', 1) || 1;
   load(opts.at || 0, opts.play !== false);
   session(); draw();
@@ -96,6 +98,17 @@ Pl.toggle = () => {
 };
 Pl.pause = () => { if (media() && !audio.paused) audio.pause(); else if (Pl.cur && Pl.cur.driven && Pl.cur.playing) Pl.toggle(); };
 Pl.time = time; Pl.total = total;
+// The speed, the sleep timer and the skip, from an audiobook's page (abshelf.js) as from the whole player.
+// The speed and the skip are kept for everything that plays; a sleep timer chosen with nothing playing
+// starts with the next thing that does.
+let nextSleep = 0;
+function setSleep(v){ sleepEnd = v === -1; sleepAt = v > 0 ? Date.now() + v * 60000 : 0; }
+Pl.setSleep = v => { v = +v || 0; if (media()) { setSleep(v); nextSleep = 0; draw(); } else nextSleep = v; };
+Pl.sleep = () => media() ? (sleepEnd ? -1 : sleepAt ? Math.max(1, Math.round((sleepAt - Date.now()) / 60000)) : 0) : nextSleep;
+Pl.rate = () => media() ? audio.playbackRate || 1 : +store.get('podRate', 1) || 1;
+Pl.setRate = r => { r = Math.max(0.5, Math.min(3, Math.round(r * 100) / 100)); store.set('podRate', r); if (media()) audio.playbackRate = r; return r; };
+Pl.skipLen = () => +store.get('podSkip', 0) || 0;
+Pl.setSkip = n => { store.set('podSkip', n); if (media()) { Pl.cur.back = Pl.cur.fwd = n; draw(); session(); } };
 Pl.playing = () => !!Pl.cur && (Pl.cur.driven ? !!Pl.cur.playing : !audio.paused);
 Pl.is = id => !!Pl.cur && Pl.cur.id === id;
 // Stopped: the media's last place told, the bar gone. quiet: another is about to take its place.
@@ -171,9 +184,9 @@ function draw(){
   p.hidden = false; document.body.classList.add('playing'); document.body.classList.toggle('playerbig', Pl.big);
   const on = Pl.playing(), d = it.driven;
   const prev = d ? '<button class="pbtn" data-tts="prev" aria-label="Previous paragraph">' + ICON.prevp + '</button>'
-    : '<button class="pbtn" data-tts="prev" aria-label="Back ' + it.back + ' seconds">' + ICON.back + '</button>';
+    : '<button class="pbtn" data-tts="prev" aria-label="Back ' + it.back + ' seconds">' + ICON.back(it.back) + '</button>';
   const next = d ? '<button class="pbtn" data-tts="next" aria-label="Next paragraph">' + ICON.nextp + '</button>'
-    : '<button class="pbtn" data-tts="next" aria-label="Ahead ' + it.fwd + ' seconds">' + ICON.fwd + '</button>';
+    : '<button class="pbtn" data-tts="next" aria-label="Ahead ' + it.fwd + ' seconds">' + ICON.fwd(it.fwd) + '</button>';
   const play = '<button class="pround" data-tts="play" aria-label="' + (on ? 'Pause' : 'Play') + '">' + (on ? ICON.pause : ICON.play) + '</button>';
   const frac = d ? (it.of ? Math.min(1, (it.at || 0) / it.of) : 0) : (total() ? time() / total() : 0);
   let h = '<div class="pmini" data-pl="open" role="button" aria-label="Open the player">' + art(it, 'plart') +
@@ -243,7 +256,7 @@ document.addEventListener('click', e => {
     const steps = (it.chapters || []).length ? SLEEP : SLEEP.slice(0, -1);
     const k = cur === -1 ? steps.length - 1 : steps.findIndex(m => m > cur + 1 || m === -1);
     const nx = steps[(k < 0 ? 0 : k + (cur === -1 ? 1 : 0)) % steps.length];
-    sleepEnd = nx === -1; sleepAt = nx > 0 ? Date.now() + nx * 60000 : 0; draw(); return;
+    setSleep(nx); draw(); window.dispatchEvent(new CustomEvent('daf-player-sleep')); return;
   }
 }, true);
 document.addEventListener('change', e => {

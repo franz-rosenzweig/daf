@@ -6,8 +6,11 @@
 
    #podcasts                  Listening: what you're in the middle of, and what's new
    #podcasts/<category>       shows, episodes, recordings, audiobooks, clips
-   #podcasts/<feed>           a show: its picture, what it's about, Follow, and its episodes
+   #podcasts/add              Add a podcast: the directory's shows and episodes, and a feed by its address
+   #podcasts/<feed>           a show: its picture, what it's about, Follow, Download, Mark all played,
+                              and its episodes (each with its download)
    #podcasts/abs/<item>       one of Audiobookshelf's recordings, and its episodes
+   #podcasts/audiobooks/…     an audiobook, or a series, author, narrator or collection (abshelf.js)
 
    A row's round button plays it in the player (player.js) without leaving the list; the row opens the
    episode's page (its transcript, chapters and clips). Recordings and audiobooks play from their row. */
@@ -24,11 +27,22 @@ const ICON = {
   pause: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1" fill="currentColor"/><rect x="11.6" y="4" width="3.4" height="12" rx="1" fill="currentColor"/></svg>',
   wave: '<svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h1.5M6.2 7v6M9.4 4.5v11M12.6 7v6M15.8 9v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   ext: '<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4.5v11.5H16V12M11 4h5v5M16 4l-7 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  plus: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  lens: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m12.6 12.6 3.6 3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  rss: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 9a6.5 6.5 0 0 1 6.5 6.5M4.5 4.5a11 11 0 0 1 11 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="5" cy="15" r="1.5" fill="currentColor"/></svg>',
+  dl: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v9M6 9.5l4 4 4-4M5 16h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  dlon: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10.5l3.2 3.2L15 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  dlwait: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 2.6"/><path d="M10 6.8v4.2l2.4 1.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  dlgo: '<svg class="pcspin" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="2"/><path d="M10 3.5a6.5 6.5 0 0 1 6.5 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
 };
 const CATS = [['', 'Listening'], ['shows', 'Shows'], ['episodes', 'Episodes'], ['recordings', 'Recordings'], ['audiobooks', 'Audiobooks'], ['clips', 'Clips']];
 const EP_FILTERS = [['', 'All'], ['unplayed', 'Unplayed'], ['progress', 'In progress'], ['played', 'Played'], ['transcribed', 'Transcribed'], ['clipped', 'Clipped']];
 const ABS_FILTERS = EP_FILTERS.slice(0, 4);
 const EP_SORTS = [['newest', 'Newest'], ['oldest', 'Oldest'], ['longest', 'Longest']];
+// A show's own: Unplayed, All, Downloaded first; the rest only when it has some.
+const FEED_FILTERS = [['unplayed', 'Unplayed'], ['', 'All'], ['downloaded', 'Downloaded'], ['progress', 'In progress'], ['played', 'Played'], ['transcribed', 'Transcribed'], ['clipped', 'Clipped']];
+const DL_MODES = [['off', 'Off'], ['new', 'New episodes'], ['all', 'All']];
+const ADD_SCOPES = [['shows', 'Shows'], ['episodes', 'Episodes']];
 const SHOW_SORTS = [['recent', 'Recent'], ['az', 'A–Z'], ['unplayed', 'Unplayed']];
 const P = { eps: new Map(), abs: null, kept: {} };
 const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -61,8 +75,12 @@ function epRow(e, o){
   return '<div class="pcrow' + (e.done ? ' done' : '') + '"><button class="pcmain" data-pcopen="' + esc(e.audio) + '">' + (o.art === false ? '' : art(e.image, 'pcart')) +
     '<span class="pctext"><b dir="auto">' + esc(e.title || 'Episode') + '</b><span class="pcmeta">' + meta + badges + '</span>' +
     (e.snip ? '<span class="pcsnip" dir="auto">' + mark(e.snip) + '</span>' : '') + prog(e.at, e.duration, e.done) + '</span></button>' +
-    playBtn(id, 'data-pcplay="' + esc(e.audio) + '"') + '</div>';
+    (o.dl ? dlBtn(e) : '') + playBtn(id, 'data-pcplay="' + esc(e.audio) + '"') + '</div>';
 }
+// An episode's download (downloads.py): kept on the server, on its way, waiting, or not.
+const DL = { done: ['dlon', 'Downloaded'], going: ['dlgo', 'Downloading'], queued: ['dlwait', 'Waiting to download'], failed: ['dl', 'Download again'] };
+const dlBtn = e => { const d = DL[e.kept] || ['dl', 'Download'];
+  return '<button class="ib pcdl' + (e.kept ? ' ' + e.kept : '') + '" data-pcdl="' + esc(e.audio) + '" data-st="' + esc(e.kept || '') + '" aria-label="' + d[1] + '" title="' + d[1] + '">' + ICON[d[0]] + '</button>'; };
 // A recording's or an audiobook's row (Audiobookshelf): all of it plays.
 function absRow(e, o){
   o = o || {};
@@ -103,9 +121,12 @@ const absData = () => P.abs || (P.abs = api('/api/abs').catch(e => { P.abs = nul
 C.views.podcasts = async args => {
   const a = (args || []).map(decodeURIComponent);
   if (a[0] === 'abs' && a[1]) return absShow(a[1]);
+  if (a[0] === 'add') return addPage();
+  if (a[0] === 'audiobooks' && a[1]) return a[1] === 'in' ? C.AbShelf.group(a[2], a[3]) : C.AbShelf.book(a[1]);
   if (a[0] && !CATS.some(c => c[0] === a[0])) return showPage(a[0]);
   P.cat = a[0] || '';
-  $('#main').innerHTML = '<div class="top"><h1>Podcasts</h1><span class="spacer"></span>' + C.Find.html('podcasts', 'Search podcasts', found, 350) + '</div>' +
+  const add = ['', 'shows', 'episodes'].includes(P.cat) ? '<a class="btn primary pcadd" href="#podcasts/add" aria-label="Add a podcast">' + ICON.plus + '<span>Add a podcast</span></a>' : '';
+  $('#main').innerHTML = '<div class="top"><h1>Podcasts</h1><span class="spacer"></span>' + C.Find.html('podcasts', 'Search podcasts', found, 350) + add + '</div>' +
     '<div class="page pcpage"><nav class="pccats" aria-label="Podcasts">' + CATS.map(c => '<a class="pccat' + (c[0] === P.cat ? ' on' : '') + '" href="#podcasts' + (c[0] ? '/' + c[0] : '') + '"' + (c[0] === P.cat ? ' aria-current="page"' : '') + '>' + c[1] + '</a>').join('') + '</nav>' +
     '<div id="pcbody">' + loading + '</div></div>';
   P.abs = null;
@@ -177,18 +198,11 @@ async function recordingsCat(){
       tile('#podcasts/abs/' + enc(s.item), art(absArt(s.item), 'pctimg'), s.title, esc([s.author, s.count + (s.count === 1 ? ' episode' : ' episodes'), s.played ? s.played + ' played' : ''].filter(Boolean).join(' · ')))).join('') + '</div>').join('');
 }
 
-// Audiobooks: Audiobookshelf's, with where you are; one with its book in Daf opens the book's page (Listen, Read).
+// Audiobooks: Audiobookshelf's, all of them or by series, author, narrator or collection (abshelf.js).
 async function audiobooksCat(){
   const x = await absData(); if (!body() || P.cat !== 'audiobooks') return;
-  const sort = pref('bookSort', 'recent');
   if (x.error) { body().innerHTML = '<p class="mute">Audiobookshelf: ' + esc(x.error) + '</p>'; return; }
-  const list = x.audiobooks.slice().sort(sort === 'az' ? (a, b) => a.title.localeCompare(b.title) : (a, b) => (b.last || 0) - (a.last || 0));
-  body().innerHTML = '<div class="pctools">' + segHTML('bookSort', SHOW_SORTS.slice(0, 2), sort) + '</div>' + (list.length ? '<div class="pctiles books">' + list.map(b => {
-    const id = C.Audiobooks.key(b.item), sub = b.done ? 'Finished' : b.at > 30 ? C.Audiobooks.hm(b.duration - b.at) + ' left' : C.Audiobooks.hm(b.duration);
-    return tile(b.book ? '#book/' + enc(b.book) : 'data-abplay="' + esc(b.item) + '" data-abep=""', '<span class="pctimgw">' + art(absArt(b.item), 'pctimg') + (b.pct ? '<span class="pcbar on"><i style="width:' + b.pct + '%"></i></span>' : '') + '</span>', b.title,
-      esc([b.author, sub].filter(Boolean).join(' · ')),
-      '<div class="pctacts">' + playBtn(id, 'data-abplay="' + esc(b.item) + '" data-abep=""', 'Listen') + (b.book && b.readable ? '<a class="btn sm" href="#ebook/' + enc(b.book) + '">Read</a>' : '') + '</div>');
-  }).join('') + '</div>' : empty('No audiobooks in Audiobookshelf'));
+  C.AbShelf.cat(body(), x);
 }
 
 // Clips: highlights on episodes (and the older clip-only ones).
@@ -233,6 +247,40 @@ async function found(q){
 }
 const followBtn = (feed, on, size) => '<button class="btn' + (size ? ' ' + size : '') + (on ? '' : ' primary') + '" data-pcfollow="' + esc(feed) + '" data-on="' + (on ? 1 : 0) + '">' + (on ? 'Following' : 'Follow') + '</button>';
 
+/* ---------- Add a podcast ---------- */
+// The directory's shows (Follow from the card) or episodes (play from the row); RSS link adds a feed by its address.
+function addPage(){
+  const scope = pref('addScope', 'shows');
+  $('#main').innerHTML = '<div class="top"><button class="ib" data-pcback aria-label="Back">' + I.back + '</button><h1>Add a podcast</h1><span class="spacer"></span>' +
+    '<button class="btn pcaddrss" data-pcrss aria-label="RSS link">' + ICON.rss + '<span>RSS link</span></button></div>' +
+    '<div class="page pcpage pcaddpage"><label class="pcbigsearch">' + ICON.lens + '<input type="search" id="pcaddq" placeholder="Search podcasts" autocomplete="off" enterkeyhint="search" value="' + esc(P.addQ || '') + '"></label>' +
+    chipsHTML('addScope', ADD_SCOPES, scope) + '<div id="pcaddres"></div></div>';
+  const inp = $('#pcaddq');
+  inp.addEventListener('input', () => { clearTimeout(P.addT); P.addT = setTimeout(() => addFind(inp.value.trim()), 400); });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(P.addT); addFind(inp.value.trim()); inp.blur(); } });
+  if (!P.addQ && !matchMedia('(pointer:coarse)').matches) inp.focus();
+  return addFind(P.addQ || '');
+}
+async function addFind(q){
+  P.addQ = q;
+  const res = $('#pcaddres'); if (!res) return;
+  if (q.length < 2) { res.innerHTML = ''; return; }
+  const scope = pref('addScope', 'shows');
+  res.innerHTML = loading;
+  let list, subs;
+  try {
+    [list, subs] = await Promise.all([api('/api/podcasts/directory?kind=' + scope + '&q=' + enc(q)).then(r => r.results),
+      P.kept['/api/podcasts/shows'] ? Promise.resolve(P.kept['/api/podcasts/shows']) : api('/api/podcasts/shows').then(d => (P.kept['/api/podcasts/shows'] = d))]);
+  } catch(e){ if ($('#pcaddres')) $('#pcaddres').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
+  if (P.addQ !== q || pref('addScope', 'shows') !== scope || !$('#pcaddres')) return;
+  const mine = new Set(subs.shows.map(s => s.feed));
+  if (!list.length) { res.innerHTML = C.Find.none(); return; }
+  res.innerHTML = scope === 'episodes' ? '<div class="card pcrows pclist">' + list.map(e => { e.found = true; return epRow(e); }).join('') + '</div>'
+    : '<div class="pcfinds">' + list.map(s => '<div class="card pcfind"><a class="pcfinda" href="#podcasts/' + enc(s.feed) + '">' + art(s.image, 'pctimg') +
+        '<b dir="auto">' + esc(s.title) + '</b><span class="mute" dir="auto">' + esc(s.author || '') + '</span>' +
+        (s.count ? '<span class="mute tiny">' + s.count + (s.count === 1 ? ' episode' : ' episodes') + '</span>' : '') + '</a>' + followBtn(s.feed, mine.has(s.feed)) + '</div>').join('') + '</div>';
+}
+
 /* ---------- a show ---------- */
 // What its feed says of it, Follow, and its episodes filtered and sorted; its own search filters them.
 async function showPage(feed){
@@ -248,18 +296,35 @@ async function showPage(feed){
 }
 function drawShow(){
   const x = P.show, page = $('#pcshow'); if (!x || !page) return;
-  const flt = pref('feedFilter', ''), sort = pref('feedSort', 'newest'), q = C.Find.q(P.showKey);
-  let eps = x.episodes.filter(e => ({ unplayed: e.at == null, progress: e.started, played: e.done, transcribed: e.transcript, clipped: e.clips > 0 }[flt] !== false));
+  const sort = pref('feedSort', 'newest'), q = C.Find.q(P.showKey);
+  const test = { unplayed: e => e.at == null, progress: e => e.started, played: e => e.done, transcribed: e => e.transcript, clipped: e => e.clips > 0, downloaded: e => e.kept === 'done' };
+  const n = k => k ? x.episodes.filter(test[k]).length : x.episodes.length;
+  const chips = FEED_FILTERS.filter(f => ['unplayed', '', 'downloaded'].includes(f[0]) || n(f[0])).map(f => [f[0], f[0] ? f[1] : 'All ' + x.episodes.length]);
+  let flt = pref('feedFilter', 'unplayed'); if (!chips.some(c => c[0] === flt)) flt = '';
+  let eps = flt ? x.episodes.filter(test[flt]) : x.episodes.slice();
   if (q) eps = eps.filter(e => C.Find.match(q, e.title, e.notes));
   eps.sort(sort === 'oldest' ? (a, b) => (a.published || 0) - (b.published || 0) : sort === 'longest' ? (a, b) => (b.duration || 0) - (a.duration || 0) : (a, b) => (b.published || 0) - (a.published || 0));
   const site = x.link && /^https?:\/\//.test(x.link) ? '<a class="btn" href="' + esc(x.link) + '" target="_blank" rel="noopener">' + ICON.ext + 'Website</a>' : '';
   const head = '<div class="pchead">' + art(x.image, 'pcbig') + '<div class="pcabout"><h2 dir="auto">' + esc(x.title) + '</h2>' + (x.author ? '<span class="mute" dir="auto">' + esc(x.author) + '</span>' : '') +
     '<span class="mute tiny">' + [x.count + (x.count === 1 ? ' episode' : ' episodes'), x.updated ? 'updated ' + epochDate(x.updated) : ''].filter(Boolean).join(' · ') + '</span>' +
-    '<div class="pcacts">' + followBtn(x.feed, x.following) + site + '</div>' +
+    '<div class="pcacts">' + followBtn(x.feed, x.following) +
+      '<span class="pcdlset"><span class="pclab">Download</span>' + segHTML('feedDl', DL_MODES, x.download || 'off') + '</span>' +
+      (x.episodes.some(e => !e.done) ? '<button class="btn" data-pcplayed>Mark all played</button>' : '') + site + '</div>' +
     (x.description ? '<p class="pcdesc" dir="auto">' + esc(x.description) + '</p>' + (x.description.length > 240 ? '<button class="linkbtn pcdmore" data-pcdesc>More</button>' : '') : '') + '</div></div>';
   const shown = eps.slice(0, P.showN || 80);
-  page.innerHTML = head + '<div class="pctools">' + chipsHTML('feedFilter', EP_FILTERS, flt) + '<span class="spacer"></span>' + segHTML('feedSort', EP_SORTS, sort) + '</div>' +
-    (shown.length ? '<div class="pcrows">' + shown.map(e => epRow(e, { show: false, art: false })).join('') + '</div>' + (eps.length > shown.length ? '<button class="btn pcmore" data-pcshown>More</button>' : '') : q ? C.Find.none() : empty(x.error && !x.episodes.length ? 'The feed didn’t come: ' + esc(x.error) : 'None'));
+  page.innerHTML = head + '<div class="pctools">' + chipsHTML('feedFilter', chips, flt) + '<span class="spacer"></span>' + segHTML('feedSort', EP_SORTS, sort) + '</div>' +
+    (shown.length ? '<div class="card pcrows pclist">' + shown.map(e => epRow(e, { show: false, art: false, dl: true })).join('') + '</div>' + (eps.length > shown.length ? '<button class="btn pcmore" data-pcshown>More</button>' : '') : q ? C.Find.none() : empty(x.error && !x.episodes.length ? 'The feed didn’t come: ' + esc(x.error) : 'None'));
+  watchDl();
+}
+// While a show's downloads are on their way, the page asks how they're doing every few seconds.
+function watchDl(){
+  clearTimeout(P.dlT);
+  const x = P.show; if (!x || !x.episodes.some(e => e.kept === 'queued' || e.kept === 'going')) return;
+  const fk = P.showKey;
+  P.dlT = setTimeout(async () => {
+    if (P.showKey !== fk || !$('#pcshow')) return;
+    try { const y = await api('/api/podcasts/show?known=1&feed=' + enc(x.feed)); if (P.showKey === fk && P.show) { P.show.episodes = y.episodes; drawShow(); } } catch(e){}
+  }, 5000);
 }
 
 // One of Audiobookshelf's recordings: its episodes, filtered and sorted, each played from its row.
@@ -319,13 +384,35 @@ window.addEventListener('daf-player', e => {
   marks();
 });
 
+// Download on a show: Off, New episodes, All. All of a long show asks first.
+async function setDownload(m){
+  const x = P.show; if (!x) return;
+  const missing = x.episodes.filter(e => !e.kept).length;
+  if (m === 'all' && missing > 40 && !confirm('Download all ' + missing + ' episodes of ' + x.title + ' to the server?')) return;
+  const r = await api('/api/podcasts/download', { method: 'POST', body: JSON.stringify({ feed: x.feed, mode: m }) });
+  x.download = r.mode;
+  const y = await api('/api/podcasts/show?known=1&feed=' + enc(x.feed));
+  if (P.show === x) { x.episodes = y.episodes; drawShow(); }
+  if (r.queued) toast(r.queued === 1 ? '1 episode on its way' : r.queued + ' episodes on their way');
+}
+// One episode's download: keep it, or let go of it (a kept one asks first).
+async function keepEp(b){
+  const audio = b.dataset.pcdl, st = b.dataset.st, keep = !st || st === 'failed';
+  if (st === 'done' && !confirm('Remove the download?')) return;
+  const r = await api('/api/podcasts/keep', { method: 'POST', body: JSON.stringify({ audio, keep }) });
+  const e = P.show && P.show.episodes.find(x => x.audio === audio);
+  if (e) { e.kept = r.kept; drawShow(); } else b.outerHTML = dlBtn(Object.assign(P.eps.get(audio) || { audio }, { kept: r.kept }));
+}
+
 document.addEventListener('click', async e => {
-  const t = e.target.closest && e.target.closest('[data-pcplay],[data-pcopen],[data-abplay],[data-pcset],[data-pcfollow],[data-pcmore],[data-pcshown],[data-pcrest],[data-pcdesc],[data-pcback]');
+  const t = e.target.closest && e.target.closest('[data-pcplay],[data-pcopen],[data-abplay],[data-pcset],[data-pcfollow],[data-pcmore],[data-pcshown],[data-pcrest],[data-pcdesc],[data-pcback],[data-pcdl],[data-pcplayed],[data-pcrss]');
   if (!t) return;
   try {
     if (t.dataset.pcplay) await playEp(t.dataset.pcplay);
     else if (t.dataset.pcopen) await openEp(t.dataset.pcopen);
     else if (t.dataset.abplay) await C.Audiobooks.play(t.dataset.abplay, t.dataset.abep || null);
+    else if (t.dataset.pcset === 'feedDl') await setDownload(t.dataset.v);
+    else if (t.dataset.pcset === 'addScope') { setPref('addScope', t.dataset.v); $$('[data-pcset="addScope"]').forEach(b => { const on = b === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); await addFind(P.addQ || ''); }
     else if (t.dataset.pcset) {
       setPref(t.dataset.pcset, t.dataset.v);
       if (/^feed/.test(t.dataset.pcset)) { P.showN = 80; drawShow(); }
@@ -338,6 +425,7 @@ document.addEventListener('click', async e => {
       t.outerHTML = followBtn(t.dataset.pcfollow, on, t.classList.contains('sm') ? 'sm' : '');
       delete P.kept['/api/podcasts/shows'];
       if (P.show && P.show.feed === t.dataset.pcfollow) P.show.following = on;
+      if (on && P.show && P.show.feed === t.dataset.pcfollow && !P.show.episodes.length) showPage(P.show.feed);   // a feed added by its address: its episodes now
       toast(on ? 'Following. AntennaPod gets it at its next sync.' : 'Not following. AntennaPod drops it at its next sync.');
     }
     else if (t.dataset.pcmore) await moreEpisodes(t);
@@ -345,10 +433,22 @@ document.addEventListener('click', async e => {
     else if (t.dataset.pcrest) { const box = $('#' + t.dataset.pcrest); if (box) box.insertAdjacentHTML('beforeend', P.rest[t.dataset.pcrest] || ''); t.remove(); }
     else if ('pcdesc' in t.dataset) { const d = t.previousElementSibling; d.classList.toggle('open'); t.textContent = d.classList.contains('open') ? 'Less' : 'More'; }
     else if ('pcback' in t.dataset) { if ((C.S.navs || 0) > 1) history.back(); else location.hash = 'podcasts/shows'; }
+    else if (t.dataset.pcdl) await keepEp(t);
+    else if ('pcplayed' in t.dataset) {
+      const x = P.show; if (!x || !confirm('Mark every episode of ' + x.title + ' played?')) return;
+      const r = await api('/api/podcasts/played', { method: 'POST', body: JSON.stringify({ feed: x.feed }) });
+      toast(r.marked === 1 ? '1 episode marked played' : r.marked + ' episodes marked played');
+      showPage(x.feed);
+    }
+    else if ('pcrss' in t.dataset) {
+      const u = (prompt('The feed’s address') || '').trim(); if (!u) return;
+      if (!/^https?:\/\/\S+$/.test(u)) { toast('That isn’t a feed’s address'); return; }
+      location.hash = 'podcasts/' + enc(u);
+    }
   } catch(err){ toast(err.message); }
 });
 // A show's list starts again at its top on a new show.
-window.addEventListener('hashchange', () => { if (!/^#podcasts\/(?!shows|episodes|recordings|audiobooks|clips)/.test(location.hash)) { P.show = null; P.absShow = null; P.showN = 80; } });
+window.addEventListener('hashchange', () => { if (!/^#podcasts\/(?!shows|episodes|recordings|audiobooks|clips|add)/.test(location.hash)) { P.show = null; P.absShow = null; P.showN = 80; clearTimeout(P.dlT); } });
 // Where you are in a recording or an audiobook changes its row: the lists ask again next time.
 window.addEventListener('daf-abs-place', () => { P.abs = null; });
 })();

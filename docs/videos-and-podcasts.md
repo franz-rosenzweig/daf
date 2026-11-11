@@ -34,7 +34,7 @@ Listening shows up among the day's sittings, but it never counts toward the hour
 
 ## The Podcasts tab
 
-Along the top are the tab's parts:
+Along the top are the tab's parts, and on Listening, Shows and Episodes there's an **Add a podcast** button in the corner (just a + on the phone):
 
 - **Listening** is what I'm in the middle of, the last one I played first, whether it's an AntennaPod show, one of my recordings or an audiobook, and then **New**: the latest episodes from the shows I follow that I haven't played yet.
 - **Shows** are the ones I follow, with how many episodes I haven't played. They sort by **Recent** (the newest episode first), **A–Z** or **Unplayed**.
@@ -44,7 +44,25 @@ Along the top are the tab's parts:
 
 Every episode row has its date and length, a bar for how far I got (or **Played**), and a tag when it has a transcript or clips. Tapping the row opens the episode's page, and the round button on the right plays it right there, without leaving the list.
 
-A show's page has its picture, what it's about (**More** shows the rest), its website, how many episodes it has and when it last had a new one, and **Follow** or **Following**. Its episodes have the same chips and sorts, and the magnifying glass searches just that show.
+## Adding a podcast
+
+![Add a podcast, searching the directory for history](images/listen-add.webp)
+
+**Add a podcast** opens a page that's just for that: a big search box for Apple's podcast directory, and **Shows** or **Episodes** under it. With Shows, every show comes as a card with its picture, who makes it and how many episodes it has, and a **Follow** button right on the card, which turns into **Following** once I have it. With Episodes, each one plays from its round button like any other episode, so I can try one before I follow anything.
+
+If a show isn't in the directory (a private feed, or something small), **RSS link** at the top takes the feed's address. It opens the show's page from the feed itself, and **Follow** there adds it the same way. Either way, AntennaPod gets it the next time it syncs.
+
+## A show's page
+
+A show's page has its picture, what it's about (**More** shows the rest), its website, how many episodes it has and when it last had a new one, and **Follow** or **Following**.
+
+Next to that is **Download**: **Off**, **New episodes** or **All**. This is Daf keeping a copy of the episodes on my server, not on the phone. With **New episodes**, every episode that comes out from now on is downloaded the day it shows up in the feed, and with **All**, every episode the feed has comes down, one at a time (Daf asks first when that's more than forty). Off stops the ones still waiting but keeps what's already there. Each episode row also has its own download button, so I can keep just one: an arrow when it isn't kept, a little clock while it waits, a spinning circle while it comes down, and a check mark once it's there. Tapping the check mark removes it, after asking.
+
+The reason I wanted this is that a kept episode plays from Daf's own copy, so it starts and skips around right away, it's still there when a show drops old episodes from its feed (a lot of them only keep the last hundred or so), and the transcript is made from that copy instead of downloading the whole thing again. Daf won't download anything when the server's disk has less than 20 GB free.
+
+**Mark all played** marks every episode I haven't played as played, after asking. It goes to AntennaPod as a play to the end, so AntennaPod marks them too when it syncs, and none of it counts as listening time.
+
+The episodes have chips along the top: **Unplayed** (where it starts), **All**, with the number, and **Downloaded**, and then **In progress**, **Played**, **Transcribed** and **Clipped** when the show has any of those. **Newest**, **Oldest** and **Longest** sort them, and the magnifying glass searches just that show.
 
 ## Finding things
 
@@ -54,9 +72,30 @@ Any episode in the results plays with its round button, and opens to its page li
 
 ## Recordings and audiobooks
 
-The things I've put in Audiobookshelf myself are in the tab too, and they never mix with AntennaPod's shows. **Recordings** is Audiobookshelf's podcast library: each set of recordings is a tile, and it opens to its episodes, which sort and filter like a show's (when a recording has no date, **Oldest** goes by its number and then its title). **Audiobooks** is every audiobook, with how much is left; one that's also a book in Daf opens the book's page, and **Read** opens the book itself.
+The things I've put in Audiobookshelf myself are in the tab too, and they never mix with AntennaPod's shows. **Recordings** is Audiobookshelf's podcast library: each set of recordings is a tile, and it opens to its episodes, which sort and filter like a show's (when a recording has no date, **Oldest** goes by its number and then its title).
+
+**Audiobooks** has chips along the top: **All**, **Series**, **Authors**, **Narrators** and **Collections**. All starts with **Continue**, the ones I'm in the middle of, and then every audiobook, by **Recent** or **A–Z**, each with how much is left and a play button under it. The other chips turn the books into cards, one for each series, author, narrator or collection, with three of the covers fanned out on it and how many books it holds. A card opens to just those books, and a series is in its order, Book 1 first. Collections also get an **Other** card for the books that aren't in any.
+
+![Audiobooks by collection](images/listen-collections.webp)
 
 They play in Daf's player the same way an episode does, and an audiobook's files play as one, with its chapters in the player. Where I stop goes back to Audiobookshelf as I listen, the same way its own app does it, so Audiobookshelf and its apps carry on from there, and the time counts the way it always has: audiobooks toward the hour, the recordings not at all.
+
+## An audiobook's page
+
+![An audiobook's page](images/listen-audiobook.webp)
+
+Every audiobook opens to its own page now, which is where I wanted the things Audiobookshelf can do without having to go to Audiobookshelf. On top it has the cover, who wrote it and who reads it, the series and which book it is, and a bar for how far I am with how much is left. Under that are **Play**, **Read along** (when the audiobook is matched to a book in Daf, it starts playing and opens the book, which follows the narrator if it's prepared), **Bookmark**, and **⋯** for **Mark as finished** and the book's own page.
+
+Under those are four tabs:
+
+- **Chapters**, each with its length, the ones I've finished marked **Done** and the one I'm in highlighted with how far into it I am. Tapping a chapter plays from its start.
+- **Bookmarks**. **Bookmark** marks where I am right now (the player's place if it's playing, otherwise where Audiobookshelf has me), named after the chapter, and the pencil renames it and the bin deletes it. These are Audiobookshelf's own bookmarks, so they're the same ones its app shows, and they still turn into highlights the way the next section says.
+- **Details**: what Audiobookshelf knows about the book, and **Find details**, which asks one of Audiobookshelf's own match providers (Audible, Google Books, Open Library, iTunes and the rest) and lists what it finds. **Use** on one of them, after asking, writes its details and its cover into Audiobookshelf, the same as Match does there.
+- **Files**: every file in the book's folder, with its size.
+
+On the side (under everything on the phone) are three small cards. **Player** has the speed with − and +, a **Sleep timer** (Off, 15 min, 30 min or End of chapter, and if nothing's playing yet it starts with the next thing I play), and **Skip**, 10, 15 or 30 seconds, which sets both skip buttons in the player for everything. **This week** is a little bar chart of how long I listened to this book on each of the last seven days. **Collections** has my Audiobookshelf collections as chips, with a check on the ones the book is in; tapping one puts it in or takes it out, and **+ New** makes a new collection with this book in it.
+
+Everything on this page that changes something (bookmarks, collections, finished, details) is saved in Audiobookshelf itself, through the same API its apps use, so nothing lives only in Daf.
 
 ## An episode's page
 
