@@ -53,13 +53,14 @@ def job_status(conn, kind, ref):
 
 QUICK = ("page",)                 # reading a saved page: its own worker, never behind a long transcript
 LONG = ("podtr",)                 # a whole podcast episode through whisper: its own worker too, so a reel doesn't wait an hour
+BOOK = ("bookmap",)               # a whole audiobook through whisper (readalong.py), hours of it: its own worker, one book at a time
 
 
 TEXT_JOBS = ("reel", "captions", "whisper", "pdf", "page")     # jobs that bring a document's text
 
 
 def _run_one(lane="main"):
-    kinds = QUICK if lane == "quick" else LONG if lane == "long" else QUICK + LONG
+    kinds = {"quick": QUICK, "long": LONG, "book": BOOK}.get(lane, QUICK + LONG + BOOK)
     with db.session() as conn:
         j = conn.execute(f"SELECT * FROM jobs WHERE status = 'queued' AND kind {'NOT ' if lane == 'main' else ''}IN ({','.join('?' * len(kinds))}) "
                          "ORDER BY id LIMIT 1", kinds).fetchone()
@@ -106,6 +107,9 @@ def _run_one(lane="main"):
         elif j["kind"] == "ocr":
             from . import paper_pages
             paper_pages.read_page(j["ref"])
+        elif j["kind"] == "bookmap":
+            from . import readalong
+            readalong.build(j["ref"])
         status, err = "done", None
     except Exception as e:  # noqa: BLE001
         log.exception("job %s", j["id"])
@@ -140,12 +144,15 @@ def start_worker():
     threading.Thread(target=worker, args=(stop,), name="daf-media", daemon=True).start()
     threading.Thread(target=worker, args=(stop, "quick"), name="daf-pages", daemon=True).start()
     threading.Thread(target=worker, args=(stop, "long"), name="daf-podcasts", daemon=True).start()
+    threading.Thread(target=worker, args=(stop, "book"), name="daf-audiobooks", daemon=True).start()
     return stop
 
 
-def whisper(path, start=None, duration=None, model=None, timeout=7200):
-    """model: another faster-whisper model than the default (audiomap.py asks for the quick base.en)."""
-    cmd = WHISPER + [path]
+def whisper(path, start=None, duration=None, model=None, timeout=7200, low=False):
+    """model: another faster-whisper model than the default (audiomap.py asks for the quick base.en).
+    low: at the lowest priority and on half the threads (readalong.py's hours of audiobook), so whatever
+    else the server is doing goes first."""
+    cmd = (["nice", "-n", "19"] if low else []) + WHISPER + [path] + (["--threads", "4"] if low else [])
     if start is not None:
         cmd += ["--start", str(start)]
     if duration is not None:

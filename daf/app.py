@@ -3385,9 +3385,10 @@ def get_abs_book(book_id: str, offer: int = 0, since: int = 0, fraction: float =
         return {"item": None}
     p = _abs(absapi.playable, item)
     pos = c.execute("SELECT fraction, chapter, updated FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
+    from . import readalong
     out = {"item": item, "title": p["title"], "duration": p["duration"], "at": p["at"], "done": p["done"], "last": p["last"],
            "chapter": audiomap.audio_chapter([{"start": x["t"], "title": x["title"]} for x in p["chapters"]], p["at"] or 0),
-           "reading": dict(pos) if pos else None}
+           "reading": dict(pos) if pos else None, "along": readalong.status(c, book_id)}
     if offer and p["at"] and p["at"] > 30 and not p["done"] and (p["last"] or 0) > since:
         try:
             m = audiomap.to_book(c, book_id, p["at"], exact=True)
@@ -3397,6 +3398,32 @@ def get_abs_book(book_id: str, offer: int = 0, since: int = 0, fraction: float =
         if m and (fraction < 0 or abs(m["fraction"] - fraction) > 0.004):
             out["offer"] = m
     return out
+
+
+@app.get("/api/abs/book/{book_id}/along", dependencies=[Depends(user)])
+def get_abs_book_along(book_id: str, status: int = 0, c=Depends(conn)):
+    """The whole audiobook matched to the book (readalong.py), for the reader to follow by: {item, duration,
+    secs, t, w}. 404 until it's been prepared. With `status`, how far preparing it is: {state, done}."""
+    from . import readalong
+    if status:
+        return readalong.status(c, book_id) or {"state": None}
+    r = readalong.for_reader(c, book_id)
+    if not r:
+        raise HTTPException(404, "The audiobook isn't prepared for this book")
+    return r
+
+
+@app.post("/api/abs/book/{book_id}/along", dependencies=[Depends(user)])
+def post_abs_book_along(book_id: str, c=Depends(conn)):
+    """Prepare the audiobook: the job that hears all of it and finds it in the book. → its status."""
+    from . import readalong
+    s = readalong.status(c, book_id)
+    if not s:
+        raise HTTPException(404, "No audiobook and EPUB for this book")
+    if s["state"] in ("none", "failed"):
+        media.queue(c, "bookmap", book_id)
+        s = readalong.status(c, book_id)
+    return s
 
 
 @app.get("/api/abs/book/{book_id}/place", dependencies=[Depends(user)])

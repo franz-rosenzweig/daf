@@ -138,6 +138,7 @@ async function openBook(id, at){
   if (B.scans) B.scans.attach(view);
   view.addEventListener('load', onSectionLoad);
   view.addEventListener('relocate', onRelocate);
+  view.renderer.addEventListener('relocate', e => alongMoved(e.detail.reason));
   C.PageTurn && C.PageTurn.attach(view);    // Aa → Page turn: None, Slide or Curl (pageturn.js)
   view.addEventListener('create-overlay', e => {
     const { index } = e.detail;
@@ -459,8 +460,187 @@ function goToSpeaking(){
   if (onPage(el)) { try { const rg = el.ownerDocument.createRange(); rg.selectNodeContents(el); B.view.renderer.scrollToAnchor?.(rg); } catch(e){} }
   else B.view.goTo(T.index).catch(() => {});
 }
+/* ---------- Listen with the real audiobook (readalong.py) ---------- */
+// A book whose audiobook has been prepared (its page: Prepare the audiobook) is read by its own
+// narrator instead of Kokoro: Listen plays the audiobook in Daf's player from the page, the sentence
+// being read is marked the way Kokoro's is, and the page turns with it. A tap on a sentence while it
+// plays takes the audiobook there.
+// The server's map (GET /api/abs/book/<id>/along) is a point every few seconds, (second, word of the
+// book), and each section's first word. The page counts a section's words the way the server does
+// (secWords), so a point is a word in the chapter on screen; the sentence around it is hl.js's.
+// It's the player's audiobook all along (audiobooks.js): pausing, the speed, the sleep timer and
+// Audiobookshelf's place work as for any audiobook, it plays on when the book is closed, and the
+// page follows again when the book is opened while it plays. Its time is Audiobookshelf's listening
+// time, so the reading beat (below) stops while it reads.
+const AL = B.along = { on: false, book: null, item: null, map: null, el: null, S: null, k: -1, w: -1, hold: 0, mine: 0, busy: false };
+const alongMaps = {};
+const ub = (a, x) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] <= x) lo = m + 1; else hi = m; } return lo; };   // how many are ≤ x
+const alongOn = () => AL.on && C.Player.is('abs:' + AL.item);
+const alongHere = () => alongOn() && !!B.view && B.id === AL.book;
+const alongReady = id => { const x = C.Audiobooks && C.Audiobooks.book[id || B.id]; return !!(x && x.item && x.along && x.along.state === 'ready'); };
+const listening = () => B.tts.on || (alongOn() && B.id === AL.book);
+function alongMap(id){
+  if (!alongMaps[id]) alongMaps[id] = api('/api/abs/book/' + encodeURIComponent(id) + '/along').then(m => { m.s0 = m.secs.map(x => x[0]); return m; }).catch(e => { delete alongMaps[id]; throw e; });
+  return alongMaps[id];
+}
+// A section's words, counted as audiomap.py counts them: the body's text in order (not scripts or
+// styles), a block's end ending a word, and a word any run of letters, digits and apostrophes.
+const SECW = new WeakMap(), BREAKS = /^(p|div|li|h[1-6]|br|blockquote|tr)$/;
+function secWords(doc){
+  let s = SECW.get(doc); if (s) return s;
+  const nodes = [], at = []; let text = '';
+  (function walk(el){
+    const skip = el.localName === 'script' || el.localName === 'style';
+    for (let n = el.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType === 3) { if (!skip) { nodes.push(n); at.push(text.length); text += n.data; } }
+      else if (n.nodeType === 1) walk(n);
+    }
+    if (BREAKS.test(el.localName)) text += ' ';
+  })(doc.body);
+  const ws = []; for (const m of text.matchAll(/[\p{L}\p{N}_’']+/gu)) ws.push(m.index);
+  s = { nodes, at, ws, n: ws.length }; SECW.set(doc, s); return s;
+}
+const wordPlace = (s, w) => { const c = s.ws[Math.max(0, Math.min(s.n - 1, w))], i = Math.max(0, ub(s.at, c) - 1); return [s.nodes[i], c - s.at[i]]; };
+const placeWord = (s, node, off) => { const i = s.nodes.indexOf(node); return i < 0 ? -1 : Math.max(0, ub(s.ws, s.at[i] + off) - 1); };
+// The word being read at a second: between two points, as far into the words as into the time. -1
+// where the recording isn't the book (credits, music, a part that wasn't found): nothing is marked.
+function alongWord(M, t){
+  const k = ub(M.t, t) - 1; if (k < 0) return -1;
+  const dt = k + 1 < M.t.length ? M.t[k + 1] - M.t[k] : 1e9, dw = k + 1 < M.t.length ? M.w[k + 1] - M.w[k] : 0;
+  if (dw > 0 && dt < 30 && dw / dt < 8) return M.w[k] + Math.floor((t - M.t[k]) / dt * dw);
+  return t - M.t[k] < 8 ? M.w[k] : -1;
+}
+// The second a word is read at; a word the recording doesn't have: the next one it does (null if that's far).
+function alongTime(M, w){
+  if (!M.byW) { M.byW = M.w.map((_, i) => i).sort((a, b) => M.w[a] - M.w[b] || a - b); M.ws = M.byW.map(i => M.w[i]); }
+  const j = ub(M.ws, w) - 1, next = i => (i < M.byW.length && M.ws[i] - w < 4000 ? M.t[M.byW[i]] : null);
+  if (j < 0) return next(0);
+  const k = M.byW[j], dw = k + 1 < M.w.length ? M.w[k + 1] - M.w[k] : 0, dt = dw > 0 ? M.t[k + 1] - M.t[k] : 0;
+  if (dw > 0 && w < M.w[k + 1] && dt < 30 && dw / dt < 8) return M.t[k] + (w - M.w[k]) / dw * dt;
+  return w - M.w[k] < 30 ? M.t[k] + (w - M.w[k]) / 2.6 : next(j + 1);
+}
+// A place in a chapter on screen → the audiobook's second.
+function alongAt(doc, index, node, off){
+  const M = AL.map, s = secWords(doc), sec = M && M.secs[index]; if (!sec || !sec[1] || !s.n) return null;
+  let w = placeWord(s, node, off); if (w < 0) return null;
+  if (s.n !== sec[1]) w = Math.round(w * sec[1] / s.n);          // (the browser read the file a little differently)
+  return alongTime(M, sec[0] + Math.min(w, sec[1] - 1));
+}
+// Is a place in the chapter on the page being shown? (Pages: its column. Scroll: its lines, clear of the bar below.)
+function onScreen(r){
+  const rc = [...r.getClientRects()].find(x => x.width > 0 && x.height > 0), f = r.startContainer.ownerDocument.defaultView.frameElement;
+  if (!rc || !f || !B.view) return true;
+  const fr = f.getBoundingClientRect(), st = B.view.getBoundingClientRect(), x = fr.left + rc.left + rc.width / 2, y = fr.top + rc.top;
+  return x >= st.left && x <= st.right && y >= st.top && y + rc.height <= st.bottom - (document.body.dataset.flow === 'scrolled' ? 70 : 0);
+}
+function alongUnmark(){
+  if (AL.el) AL.el.classList.remove('daf-speaking');
+  if (AL.S) AL.S.clear();
+  AL.el = null; AL.S = null; AL.k = -1; AL.w = -1;
+}
+// Every quarter second while it plays (player.js's daf-player-time): mark the sentence, turn the page.
+async function alongTick(t){
+  if (!alongHere() || AL.busy) return;
+  const M = AL.map, w = alongWord(M, t + 0.25);                  // a touch ahead: the eye leads the voice
+  if (w < 0) { alongUnmark(); return; }
+  if (w === AL.w) return;
+  const si = Math.max(0, ub(M.s0, w) - 1), c = B.view.renderer.getContents()[0]; if (!c) return;
+  const follow = Date.now() > AL.hold;
+  if (c.index !== si) {                                          // it's in another chapter now
+    alongUnmark(); if (!follow) return;
+    AL.busy = true; AL.mine = Date.now();
+    try { await B.view.goTo(si); } catch(e){} finally { AL.busy = false; AL.mine = Date.now(); }
+    return;
+  }
+  const s = secWords(c.doc), sec = M.secs[si]; if (!s.n) return;
+  const [node, off] = wordPlace(s, s.n === sec[1] ? w - sec[0] : Math.round((w - sec[0]) * s.n / Math.max(1, sec[1])));
+  const el = (node.parentElement && node.parentElement.closest(BLOCKS)) || node.parentElement;
+  AL.w = w;
+  if (el !== AL.el) { alongUnmark(); AL.w = w; AL.el = el; el.classList.add('daf-speaking'); AL.S = H.sentences(el); }
+  const k = AL.S ? AL.S.of(node, off) : -1;
+  if (k !== AL.k) { AL.k = k; if (AL.S) { if (AL.S.n > 1 && k >= 0) AL.S.mark(k); else AL.S.clear(); } }
+  if (!follow) return;
+  const r = c.doc.createRange(); r.setStart(node, off); r.setEnd(node, Math.min(node.data.length, off + 1));
+  if (!onScreen(r)) { AL.mine = Date.now(); try { await B.view.renderer.scrollToAnchor?.(r); centerIt(); } catch(e){} AL.mine = Date.now(); }
+}
+// A page turned by hand while it reads: the page stays where it was put for a while (to look back, or to
+// tap a sentence there), then follows again. foliate says why it moved; "anchor" is a page put somewhere,
+// as this does.
+function alongMoved(reason){
+  if (!alongHere() || AL.busy || reason === 'anchor' || Date.now() - AL.mine < 1500) return;
+  AL.hold = Date.now() + 12000;
+}
+// Listen, with the audiobook: from the page's first words. False when it can't (then Kokoro reads).
+// fromPage false (the reader's Listen, and opening the book): when the audiobook is playing already,
+// the page goes to the narrator instead of the narrator to the page.
+async function startAlong(fromPage = true){
+  const id = B.id, x = C.Audiobooks && C.Audiobooks.book[id]; if (!id || !x || !x.item) return false;
+  let M; try { M = await alongMap(id); } catch(e){ return false; }
+  if (B.id !== id || !B.view) return true;
+  if (B.tts.on) stopListen();
+  alongUnmark();
+  Object.assign(AL, { on: true, book: id, item: x.item, map: M, hold: 0, busy: false });
+  showChrome();                                                  // the player comes up with the bar
+  if (!fromPage && C.Player.is('abs:' + x.item) && C.Player.playing()) { alongTick(C.Player.time()); if (B.loc) onRelocate({ detail: B.loc }); return true; }
+  $$('#bnotice .abnotice').forEach(n => n.remove());             // ("Go there?": it's where it'll be)
+  let t = null; const c = B.view.renderer.getContents()[0], vis = B.loc && B.loc.range;
+  if (c && vis && vis.startContainer.ownerDocument === c.doc) {
+    let n = vis.startContainer, o = vis.startOffset;
+    if (n.nodeType !== 3) { const tw = c.doc.createTreeWalker(c.doc.body, 4); tw.currentNode = n.childNodes[o] || n; n = tw.currentNode.nodeType === 3 ? tw.currentNode : tw.nextNode(); o = 0; }
+    if (n) t = alongAt(c.doc, c.index, n, o);
+  }
+  const was = C.Player.is('abs:' + x.item);
+  try {
+    if (t == null) t = (await api('/api/abs/book/' + encodeURIComponent(id) + '/start', { method: 'POST', body: JSON.stringify(Object.assign({ exact: true }, C.BookPlace.here() || {})) })).t;
+    await C.Audiobooks.play(x.item, null, Math.max(0, t - 0.3));
+    if (was && !C.Player.playing()) C.Player.toggle();
+  } catch(e){ AL.on = false; toast(e.message); return true; }
+  if (B.loc) onRelocate({ detail: B.loc });
+  return true;
+}
+function stopAlong(){
+  const mine = alongOn();
+  alongUnmark(); AL.on = false;
+  if (mine) C.Player.stop();
+  if (B.loc && B.view) onRelocate({ detail: B.loc });
+}
+// A tap on a sentence while it plays: the audiobook goes there. → true when the tap was that.
+function alongTap(doc, index, ev){
+  if (!alongHere() || !C.Player.playing()) return false;
+  let node, off;
+  if (doc.caretPositionFromPoint) { const p = doc.caretPositionFromPoint(ev.clientX, ev.clientY); if (p) { node = p.offsetNode; off = p.offset; } }
+  else if (doc.caretRangeFromPoint) { const r = doc.caretRangeFromPoint(ev.clientX, ev.clientY); if (r) { node = r.startContainer; off = r.startOffset; } }
+  if (!node || node.nodeType !== 3 || !node.data.trim()) return false;
+  const r = doc.createRange(); r.setStart(node, Math.max(0, off - 1)); r.setEnd(node, Math.min(node.data.length, off + 1));
+  const rc = r.getBoundingClientRect();                          // on the words, not the margin beside them
+  if (ev.clientX < rc.left - 24 || ev.clientX > rc.right + 24 || ev.clientY < rc.top - 6 || ev.clientY > rc.bottom + 6) return false;
+  const el = node.parentElement && node.parentElement.closest(BLOCKS), S = el && H.sentences(el), k = S ? S.of(node, off) : -1;
+  if (k >= 0) [node, off] = S.first(k);                          // from the sentence's first word
+  const t = alongAt(doc, index, node, off); if (t == null) return false;
+  setTimeout(() => { if (H.visible()) return; AL.hold = 0; C.Player.seek(Math.max(0, t - 0.3)); }, 0);   // (not when the tap opened a highlight's bar)
+  return true;
+}
+window.addEventListener('daf-player-time', e => { if (AL.on && e.detail.id === 'abs:' + AL.item) alongTick(e.detail.t); });
+window.addEventListener('daf-player', e => { if (AL.on && e.detail.id !== 'abs:' + AL.item) { alongUnmark(); AL.on = false; if (B.loc && B.view) onRelocate({ detail: B.loc }); } });
+// Listen: the audiobook when it's prepared (unless the voice is preferred: Themes & Settings), else Kokoro.
+async function toggleListen(){
+  if (alongOn() && B.id === AL.book) { stopAlong(); return; }
+  if (B.tts.on) { stopListen(); return; }
+  if (alongReady() && store.get('bookListen', 'audiobook') !== 'voice' && await startAlong(false)) return;
+  startListen();
+}
+C.BookAlong = {
+  on: id => alongOn() && AL.book === id,
+  start: () => startAlong(true),                                 // The audiobook from here
+  follow: () => startAlong(false),                               // the book opened while its audiobook plays
+  // Themes & Settings (reader.js openAa): what Listen reads with, for a book whose audiobook is prepared
+  aa: () => { if (!alongReady()) return ''; const v = store.get('bookListen', 'audiobook');
+    return '<div class="sbset blisten"><div class="stepper"><span>Listen</span><div class="seg">' + [['audiobook', 'Audiobook'], ['voice', 'Voice']].map(o => '<button class="' + (v === o[0] ? 'on' : '') + '" data-blisten="' + o[0] + '">' + o[1] + '</button>').join('') + '</div></div></div>'; },
+};
+
 function cleanup(){
   inkFlush();
+  alongUnmark();
   if (B.tts && B.tts.on && B.tts.unfollow) { B.tts.unfollow(); B.tts.unfollow = null; }   // it reads on, off the page
   closeNote(); wake(false); H.hide(); pagesStop();
   if (C.Sound) C.Sound.closed();
@@ -482,6 +662,7 @@ function offerKindle(mine){
 function onSectionLoad(e){
   const { doc, index } = e.detail;
   Pens.listen(doc, INKSURF);
+  if (alongHere()) { alongUnmark(); setTimeout(() => alongTick(C.Player.time()), 80); }    // the audiobook's sentence, in this chapter
   const T = B.tts;
   if (T.on && T.bookId === B.id && index === T.index && !onPage(T.els[0])) {   // back in the book it's reading: mark its paragraph here
     T.els = paragraphs(doc); const el = T.els[T.i];
@@ -515,6 +696,7 @@ function onSectionLoad(e){
     if (ev.target.closest('a[href]') || !doc.getSelection()?.isCollapsed) return;
     // (foliate shows a tapped highlight's bar from its own click: a new bar stays)
     if (bar !== undefined || sel) { setTimeout(() => { if (H.ctx === bar) H.hide(); }, 0); return; }
+    if (alongTap(doc, index, ev)) return;                // the audiobook goes to the sentence tapped
     if (room().w >= 1000 && !(C.Focus && C.Focus.on())) return;
     // the sides turn the page, in Scroll too (a screen at a time, then on into the next chapter);
     // not when the tap was on a highlight and opened its bar
@@ -912,7 +1094,7 @@ function openPhoneMenu(anchor){
   const row = (a, label, icon, extra) => '<button data-pm="' + a + '"><span>' + label + '</span>' + (extra || '') + icon + '</button>';
   p.innerHTML = '<div class="menu pmenu">' +
     row('toc', 'Contents', ICON.toc) + row('notebook', 'Notebook', ICON.pen, n ? '<span class="pmc">' + n + '</span>' : '') + row('search', 'Search Book', ICON.search) +
-    row('aa', 'Themes &amp; Settings', '<b class="pmaa">Aa</b>') + row('listen', B.tts.on ? 'Stop listening' : 'Listen', ICON.listen) + (C.Sound ? row('sound', 'Sound', C.Sound.icon, C.Sound.mode === 'book' ? '<span class="pmc">✓</span>' : '') : '') + row('ask', 'Ask about this book', ICON.ask) +
+    row('aa', 'Themes &amp; Settings', '<b class="pmaa">Aa</b>') + row('listen', listening() ? 'Stop listening' : 'Listen', ICON.listen) + (C.Sound ? row('sound', 'Sound', C.Sound.icon, C.Sound.mode === 'book' ? '<span class="pmc">✓</span>' : '') : '') + row('ask', 'Ask about this book', ICON.ask) +
     '<div class="pmrow"><button data-pm="mark" aria-label="' + (markHere() ? 'Remove the bookmark' : 'Bookmark this page') + '">' + ICON.mark(!!markHere()) + '</button>' +
     (C.Focus ? '<button data-pm="focus" aria-label="Focus mode">' + ICON.focus + '</button>' : '') + '<button data-pm="more" aria-label="More">' + ICON.more + '</button></div></div>';
   p.hidden = false; p.style.left = Math.max(8, window.innerWidth - 272) + 'px'; p.style.top = Math.max(8, r.top - p.offsetHeight - 12) + 'px';
@@ -923,7 +1105,7 @@ function openPhoneMenu(anchor){
 function showChrome(){ B.chrome = true; document.body.classList.remove('bookbare'); }
 function hideChrome(){
   if ((C.Focus && C.Focus.on()) || !B.view) return;
-  if (!$('#pop').hidden || document.body.classList.contains('btocsheet') || panelShown() || H.visible() || (B.tts && B.tts.on) || $('#bjump')) return;
+  if (!$('#pop').hidden || document.body.classList.contains('btocsheet') || panelShown() || H.visible() || (B.tts && B.tts.on) || (alongOn() && B.id === AL.book) || $('#bjump')) return;
   B.chrome = false; document.body.classList.add('bookbare');
 }
 document.addEventListener('mousemove', e => {
@@ -1467,7 +1649,7 @@ window.addEventListener('daf-hl-changed', e => { if (C.S.route[0] === 'ebook' &&
 function openMore(anchor){
   const p = $('#pop'), r = anchor.getBoundingClientRect();
   p.innerHTML = '<div class="menu">' +
-    '<button data-bm="listen">' + (B.tts.on ? 'Stop listening' : 'Listen from here') + '<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'listen') : 'l') + '</span></button>' +
+    '<button data-bm="listen">' + (listening() ? 'Stop listening' : 'Listen from here') + '<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'listen') : 'l') + '</span></button>' +
     (C.Audiobooks ? C.Audiobooks.menu(B.d.id) : '') +
     '<button data-bm="notebook">Notebook<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'panel') : ']') + '</span></button>' +
     '<button data-bm="info">About this book</button>' +
@@ -1509,7 +1691,7 @@ function onKey(e){
   else if (is('note') && B.sel && H.ctx && H.ctx.kind === 'sel') highlightSel(true);
   else if (is('bookmark')) toggleMark();
   else if (is('toc')) click('toc');
-  else if (is('listen')) click('listen');
+  else if (is('listen')) toggleListen();          // (it's in the … menu, not a button on the bar)
   else if (k === '?') showKeys();
   else if (is('search')) { e.preventDefault(); openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
   else if (is('panel')) click('panel');
@@ -1535,6 +1717,12 @@ document.addEventListener('click', async e => {
     if (C.openAa) C.openAa((B.aaFromBar && ($('#bfoot .bsitems') || $('#bfoot .bsrow'))) || $('[data-bk="aa"]') || sb, { book: true });
     return;
   }
+  const bl = t.closest('[data-blisten]');
+  if (bl) {          // Themes & Settings → Listen: the audiobook, or the voice
+    store.set('bookListen', bl.dataset.blisten);
+    if (C.openAa) C.openAa((B.aaFromBar && ($('#bfoot .bsitems') || $('#bfoot .bsrow'))) || $('[data-bk="aa"]') || bl, { book: true });
+    return;
+  }
   const bk = t.closest('[data-bk]');
   if (bk) {
     const a = bk.dataset.bk;
@@ -1553,7 +1741,7 @@ document.addEventListener('click', async e => {
     else if (a === 'nokindle') $('#bnotice').innerHTML = '';
     else if (a === 'hcdone') { bk.closest('.bnotice').remove(); C.HC.finish(B.d.id, B.d.title); }
     else if (a === 'hcno') bk.closest('.bnotice').remove();
-    else if (a === 'listen') { if (B.tts.on) stopListen(); else startListen(); }
+    else if (a === 'listen') toggleListen();
     else if (a === 'closenote') closeNote();
     else if (a === 'jumpcancel') closeJump();
     else if (a === 'ask') { const q = $('#bask').value.trim(); if (q) { $('#bask').value = ''; ask(q, null); } }
@@ -1571,7 +1759,7 @@ document.addEventListener('click', async e => {
     else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
     else if (a === 'notebook' || a === 'ask') openPanel(a);
     else if (a === 'aa') C.openAa && C.openAa(anchor || pm, { book: true });
-    else if (a === 'listen') { if (B.tts.on) stopListen(); else startListen(); }
+    else if (a === 'listen') toggleListen();
     else if (a === 'mark') toggleMark();
     else if (a === 'focus' && C.Focus) C.Focus.toggle();
     else if (a === 'sound' && C.Sound) C.Sound.menu(anchor || pm);
@@ -1582,7 +1770,7 @@ document.addEventListener('click', async e => {
   if (bm) {
     $('#pop').hidden = true;
     const a = bm.dataset.bm;
-    if (a === 'listen') { if (B.tts.on) stopListen(); else startListen(); }
+    if (a === 'listen') toggleListen();
     else if (a === 'notebook' || a === 'info' || a === 'ask') openPanel(a);
     else if (a === 'focus' && C.Focus) C.Focus.toggle();
     else if (a === 'start') await B.view.goToTextStart().catch(() => {});
@@ -1615,7 +1803,8 @@ document.addEventListener('input', e => { if (e.target.id === 'bq') { clearTimeo
 
 /* ---------- reading time ---------- */
 setInterval(() => {
-  const reading = C.S.route[0] === 'ebook' && B.view && B.d && !document.hidden && Date.now() - B.lastActive < 120000;
+  // (not while the audiobook reads it: that hour is Audiobookshelf's listening time already)
+  const reading = C.S.route[0] === 'ebook' && B.view && B.d && !document.hidden && Date.now() - B.lastActive < 120000 && !(alongHere() && C.Player.playing());
   if (reading) C.sendBeat({ book_id: B.d.id, seconds: 15, at: Math.floor(Date.now() / 1000) });
   const c = $('#bcounting'); if (c) c.classList.toggle('off', !reading);
 }, 15000);
