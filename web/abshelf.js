@@ -73,7 +73,7 @@ function groups(x, by){
   });
   const out = [...m.entries()].map(([name, books]) => ({ name, books: by === 'series' ? books.sort((a, b) => (parseFloat(a.seq) || 0) - (parseFloat(b.seq) || 0)) : books }))
     .sort((a, b) => coll.compare(a.name, b.name));
-  if (other.length && by === 'collections') out.push({ name: 'Other', other: true, books: other });
+  if (other.length && by === 'collections' && out.length) out.push({ name: 'Other', other: true, books: other });   // none at all: no cards, not one of everything
   return out;
 }
 function groupCard(by, g){

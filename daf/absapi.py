@@ -534,6 +534,8 @@ def find_details(item_id, provider, title=None, author=None):
     res = get("/api/search/books?" + q, timeout=40) or []
     out = []
     for x in res if isinstance(res, list) else []:
+        if not isinstance(x, dict) or x.get("errorCode") or x.get("errorMsg") or not x.get("title"):
+            continue                                 # a provider's own error, given as a result (Open Library does)
         ser = x.get("series") or []
         out.append({"title": x.get("title") or "", "subtitle": x.get("subtitle") or "", "author": x.get("author") or "",
                     "narrator": x.get("narrator") or "", "publisher": x.get("publisher") or "", "year": str(x.get("publishedYear") or ""),
