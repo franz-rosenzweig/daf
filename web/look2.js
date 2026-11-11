@@ -397,7 +397,7 @@ if (L.on) new MutationObserver(() => { const m = document.querySelector('#pop .m
 
 // ---------- the corner's … menu: this screen's own things, then the places that have no tab ----------
 // A screen keeps on its page the one thing done most there and what changes what its list shows; the rest
-// of its bar moves here (BUTTONS.md, approved 2026-11-10). The buttons that moved stay in the page,
+// of its bar moves here. The buttons that moved stay in the page,
 // hidden (look2.css), and a line here presses the real one, so each still does exactly what it did; a
 // menu the button opens appears by the corner, where it was asked for.
 let anchorAt = null;

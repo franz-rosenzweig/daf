@@ -11,6 +11,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 
 ### Using Daf
 - [Today and goals](today-and-goals.md) — the ring, the sittings, the year grid, and the goals behind them
+- [The new look](new-look.md) — the look I'm trying out: one main thing a screen, the tabs, the corner's ⋯ and one search
 - [Where the minutes come from](reading-time.md) — the Kindle, audiobooks, paper and Daf, and what counts
 - [Paper books](paper-books.md) — logging minutes, Shabbat, and photos of marked pages
 - [The reader](reader.md) — books, articles and PDFs, themes and typefaces, writing with a pen, focus mode, Listen, lookup, Ask, and the keys

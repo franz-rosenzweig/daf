@@ -298,7 +298,7 @@ html[data-look="2"] .top .l2psearch{width:min(260px,40vw);flex:none;min-height:3
 html[data-look="2"] .l2finding .prefsnav{visibility:hidden}
 html[data-look="2"] [hidden].prow,html[data-look="2"] [hidden].aaline,html[data-look="2"] [hidden].card,html[data-look="2"] [hidden].pgroup{display:none!important}
 
-/* ---------- what moved to the corner's … menu (BUTTONS.md), and the explaining lines (B) ---------- */
+/* ---------- what moved to the corner's … menu, and the small explaining lines ---------- */
 /* hidden, not removed: the menu presses these */
 html[data-look="2"] #main :is(
   .top .find:not(.open),
@@ -314,7 +314,7 @@ html[data-look="2"] #main :is(
 ){display:none!important}
 html[data-look="2"] #main .lvmain > .top .srcpick{pointer-events:none}
 html[data-look="2"] #main .lvmain > .top .srcpick svg{display:none}
-/* B: the small explaining lines */
+/* the small explaining lines under titles and in sheets */
 html[data-look="2"] #main :is(.cardh > span.mute, .cardh > span.tiny.mute, .shelfh > .mute.tiny, .top > .mute:not(.num), .top > span.tiny.mute:not(.num), .tabs > .mute.tiny, .dots + .tiny.mute, .page.l2today > p.mute.tiny){display:none}
 html[data-look="2"] #modal :is(#addlink + .mute.tiny, .adddrop .mute.tiny, > span.mute.tiny:last-child){display:none}
 
