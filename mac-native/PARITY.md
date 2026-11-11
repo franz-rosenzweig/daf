@@ -84,6 +84,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: a book's page: a note on the book, audiobook bookmarks, how often its highlights come back in review, export, review these, a fourth book on the nightstand asks which one steps off
 - here: Books: the nightstand, Want to read (from Hardcover), Opened lately, the whole library, a search by title, author, series or shelf (/api/books/search)
 - here: a book's audiobook (audiobooks.js, audiomap.py): Listen and Listen from Here on its page, "In the audiobook you're at …" on opening it, The Audiobook from Here in its More menu
+- not yet: reading along with the audiobook (readalong.py, book.js `B.along`): Prepare the audiobook on the book's page and its progress (`POST /api/abs/book/<id>/along`, `GET …/along?status=1`); once prepared, the reader's Listen plays the audiobook from the page with the sentence being read marked and the page turning with it (`GET /api/abs/book/<id>/along`: points as words of each spine section), a tap on a sentence takes the audiobook there, and Themes & Settings → Listen: Audiobook or Voice
 - here: Hardcover (link a book, its status and rating, finished)
 - here: Torah's essays from the vault (Reference/torah/<parasha>/), opened in the reader, the time counted and the highlights back in the same note
 

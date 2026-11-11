@@ -1624,6 +1624,7 @@ function openAa(anchor, opts){
       (opts.book ? '<label class="aaline"><input type="checkbox" data-type="justify"' + (t.justify ? ' checked' : '') + '> Justify the text</label>' +
         '<label class="aaline"><input type="checkbox" data-type="own"' + (own ? ' checked' : '') + '> Just for this book</label>' : '') + '</details>' +
     (opts.book && C.StatusBar ? C.StatusBar.aa(R.aaOpen === 'bar') : '') +
+    (opts.book && C.BookAlong ? C.BookAlong.aa() : '') +
     '<a class="aamore" href="#prefs/appearance">All themes</a>';
   p.classList.add('aapop');
   p.hidden = false;

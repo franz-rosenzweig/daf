@@ -7,7 +7,11 @@
    - opening the book after listening offers "In the audiobook you're at <chapter>. Go there?", and
      its … menu has Listen from here too.
    The server finds the one's place in the other: by the chapters that agree, then by hearing a few
-   seconds of the audiobook and finding the words in the book, so it lands within a sentence or two. */
+   seconds of the audiobook and finding the words in the book, so it lands within a sentence or two.
+
+   Prepare the audiobook (readalong.py), on the book's page, has the server hear the whole recording
+   once and keep where every sentence is. From then on the book's own Listen plays the audiobook, marks
+   the sentence being read and turns the page with it (book.js), and none of the above needs hearing. */
 (() => {
 'use strict';
 const C = window.DafCore, { api, esc, toast, $ } = C;
@@ -60,9 +64,31 @@ A.forBook = async b => {
   const on = Pl.is(key(x.item)) && Pl.playing();
   row.insertAdjacentHTML('beforeend', '<button class="btn" data-abk="listen" data-book="' + esc(b.id) + '" data-item="' + esc(x.item) + '">' +
     (on ? 'Pause' : x.at > 30 && !x.done ? 'Listen · ' + hm(x.at) + ' of ' + hm(x.duration) : 'Listen') + '</button>' +
-    (b.readable && x.reading ? '<button class="btn" data-abk="here" data-book="' + esc(b.id) + '" data-item="' + esc(x.item) + '">Listen from here</button>' : ''));
+    (b.readable && x.reading ? '<button class="btn" data-abk="here" data-book="' + esc(b.id) + '" data-item="' + esc(x.item) + '">Listen from here</button>' : '') +
+    (b.readable ? prepare(b.id, x.along) : ''));
   if (b.readable && x.reading) start(b.id);          // finding the place takes a few seconds: start before the tap
+  if (b.readable && x.along && /queued|going/.test(x.along.state)) watch(b.id);
 };
+// Prepare the audiobook: the button, then how far the work is, then nothing (the book's Listen is the audiobook).
+function prepare(bookId, al){
+  if (!al || al.state === 'ready') return '';
+  const at = ' data-abprep="' + esc(bookId) + '"';
+  if (al.state === 'other') return '<button class="btn"' + at + ' disabled>The audiobook is another text</button>';
+  if (al.state === 'queued' || al.state === 'going') return '<button class="btn"' + at + ' disabled>Preparing the audiobook · ' + Math.round((al.done || 0) * 100) + '%</button>';
+  return '<button class="btn"' + at + ' data-abk="prepare" data-book="' + esc(bookId) + '"' + (al.error ? ' title="' + esc(al.error) + '"' : '') + '>Prepare the audiobook</button>';
+}
+const watching = {};
+function watch(bookId){
+  if (watching[bookId]) return;
+  watching[bookId] = setInterval(async () => {
+    const b = $('[data-abprep="' + CSS.escape(bookId) + '"]');
+    if (!b) { clearInterval(watching[bookId]); delete watching[bookId]; return; }      // the page was left: it goes on without being watched
+    let al; try { al = await api('/api/abs/book/' + encodeURIComponent(bookId) + '/along?status=1'); } catch(e){ return; }
+    if (A.book[bookId]) A.book[bookId].along = al;
+    if (!/queued|going/.test(al.state)) { clearInterval(watching[bookId]); delete watching[bookId]; }
+    if (b.isConnected) b.outerHTML = prepare(bookId, al);
+  }, 10000);
+}
 // Where in the audiobook a place in the book is (the server hears it to be sure); one ask a place.
 const starts = {};
 function start(bookId, place){
@@ -90,7 +116,11 @@ window.addEventListener('daf-book-open', async e => {
   try { x = await api('/api/abs/book/' + encodeURIComponent(id) + (at ? '' : '?offer=1&since=' + since + '&fraction=' + frac)); } catch(err){ return; }
   if (!x.item) return;
   A.book[id] = x;
+  // playing already (from its page, or the player): the page follows the narrator, as Listen does
+  if (x.along && x.along.state === 'ready' && Pl.is(key(x.item)) && Pl.playing() && C.BookAlong && !C.BookAlong.on(id) && C.curBook && C.curBook() === id &&
+      localStorage.getItem('daf.bookListen') !== '"voice"') { await C.BookAlong.follow(); return; }
   const box = $('#bnotice'); if (!x.offer || !box || !C.curBook || C.curBook() !== id) return;
+  if (C.BookAlong && C.BookAlong.on(id)) return;        // the page is following it already (book.js)
   const n = document.createElement('div'); n.className = 'bnotice abnotice';
   n.innerHTML = 'In the audiobook you’re at ' + esc(x.offer.chapter || Math.round(x.offer.fraction * 100) + '%') + '. Go there?' +
     ' <button class="btn sm" data-abk="go">Go there</button><button class="btn sm" data-abk="stay">Stay here</button>';
@@ -108,9 +138,18 @@ document.addEventListener('click', async e => {
     if (Pl.is(id)) { Pl.toggle(); b.textContent = Pl.playing() ? 'Pause' : 'Listen'; return; }
     try { await A.play(b.dataset.item); b.textContent = 'Pause'; } catch(err){ toast(err.message); }
   } else if (a === 'here') listenFrom(b.dataset.book, b.dataset.item);
+  else if (a === 'prepare') {
+    b.disabled = true;
+    try {
+      const al = await api('/api/abs/book/' + encodeURIComponent(b.dataset.book) + '/along', { method: 'POST' });
+      if (A.book[b.dataset.book]) A.book[b.dataset.book].along = al;
+      b.outerHTML = prepare(b.dataset.book, al); watch(b.dataset.book);
+    } catch(err){ b.disabled = false; toast(err.message); }
+  }
   else if (a === 'herebook') {
     $('#pop').hidden = true;
     const id = C.curBook && C.curBook(), x = id && A.book[id], here = C.BookPlace && C.BookPlace.here();
+    if (x && x.along && x.along.state === 'ready' && C.BookAlong && await C.BookAlong.start()) return;   // prepared: the page follows it
     if (x && here) listenFrom(id, x.item, here);
   } else if (a === 'go') {
     const n = b.closest('.abnotice'); n.remove();

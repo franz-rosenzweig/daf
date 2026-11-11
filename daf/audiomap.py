@@ -19,6 +19,8 @@ here" starts the audiobook at the page.
    seconds. Every place found this way is kept for the book (kv "audiomap:<book>") as an anchor, so
    the map is surer there from then on.
    When what's heard isn't in this text (another translation, music, credits), the map's guess stands.
+3. A book whose whole audiobook has been matched (readalong.py: a point every few seconds) needs none
+   of that: its points say where a place is, and steps 1 and 2 are only for where they don't reach.
 
 A place in the book is a character in its text: the linear spine sections' text, one after another.
 From the reader it comes as the words on the page (found in the book), else its CFI (resolved in the
@@ -588,7 +590,8 @@ def _setup(conn, book_id):
     chs = [{"start": c.get("start"), "end": c.get("end"), "title": c.get("title") or ""} for c in med.get("chapters") or []]
     dur = med.get("duration") or 0
     A, how = anchors(B, chs, dur, _learned(conn, book_id, B))
-    return {"item": item_id, "B": B, "A": A, "how": how, "duration": dur, "chapters": chs}
+    from . import readalong
+    return {"item": item_id, "B": B, "A": A, "how": how, "duration": dur, "chapters": chs, "full": readalong.points(conn, book_id)}
 
 
 def audio_chapter(chs, t):
@@ -608,6 +611,11 @@ def from_book(conn, book_id, place, exact=False):
     B, A = S["B"], S["A"]
     c = char_of(B, place)
     t, how = to_time(A, c), S["how"]
+    if S["full"]:                                     # the whole audiobook is matched: its points say
+        from . import readalong
+        tt = readalong.time_at(S["full"], c)
+        if tt is not None:
+            t, how, exact = tt, "words", False
     if exact and S["duration"]:
         try:
             for _ in range(2):
@@ -633,6 +641,11 @@ def to_book(conn, book_id, t, exact=False):
         return None
     B, A = S["B"], S["A"]
     c, how = to_char(A, t), S["how"]
+    if S["full"]:
+        from . import readalong
+        cc = readalong.char_at(S["full"], t)
+        if cc is not None:
+            c, how, exact = cc, "words", False
     if exact and S["duration"]:
         try:
             got = _found(B, S["item"], max(0.0, t - WINDOW + 4))
