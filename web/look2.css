@@ -297,3 +297,38 @@ html.l2-hover .pop .menu.l2m .l2m-tiles [data-tip]:hover::after{content:attr(dat
 html[data-look="2"] .top .l2psearch{width:min(260px,40vw);flex:none;min-height:36px;border-radius:999px;padding:0 14px;background:var(--panel)}
 html[data-look="2"] .l2finding .prefsnav{visibility:hidden}
 html[data-look="2"] [hidden].prow,html[data-look="2"] [hidden].aaline,html[data-look="2"] [hidden].card,html[data-look="2"] [hidden].pgroup{display:none!important}
+
+/* ---------- what moved to the corner's … menu (BUTTONS.md), and the explaining lines (B) ---------- */
+/* hidden, not removed: the menu presses these */
+html[data-look="2"] #main :is(
+  .top .find:not(.open),
+  .top a[href="#catalog"], .top [data-act="addbook"], #shelfsec [data-shelf="new"], .bcell [data-act="standon"],
+  #bacts [data-abk="here"], #bacts [data-act="bookedit"], #bacts a[target="_blank"], .bookhead .l2vault, .bookhead .tiny.mute:has(code),
+  [data-act="cat:cols"], [data-act="cat:views"], [data-act="cat:more"],
+  .top [data-home="config"],
+  .lvmain > .top [data-ract="saveview"], .lvmain > .top [data-ract="rmview"], .lvmain > .top [data-ract="selmode"]:not(.on), .lvmain > .top #lsort, .lvmain > .top #tagf, .lvmain > .top [data-ract="lmore"],
+  .top a[href="#edition/taste"], .top [data-ed="kindle"], .top [data-ed="again"],
+  .top [data-act="hlexport"],
+  .rkeys,
+  .l2acts [data-act="refresh"]
+){display:none!important}
+html[data-look="2"] #main .lvmain > .top .srcpick{pointer-events:none}
+html[data-look="2"] #main .lvmain > .top .srcpick svg{display:none}
+/* B: the small explaining lines */
+html[data-look="2"] #main :is(.cardh > span.mute, .cardh > span.tiny.mute, .shelfh > .mute.tiny, .top > .mute:not(.num), .top > span.tiny.mute:not(.num), .tabs > .mute.tiny, .dots + .tiny.mute, .page.l2today > p.mute.tiny){display:none}
+html[data-look="2"] #modal :is(#addlink + .mute.tiny, .adddrop .mute.tiny, > span.mute.tiny:last-child){display:none}
+
+/* Highlights: one Filter button opens the colours, the tag, Favorites, the order and private books */
+html[data-look="2"]:not(.l2-hlf) #hlbody .hlf2, html[data-look="2"]:not(.l2-hlf) #hlbody label:has(#hlpriv){display:none}
+html[data-look="2"] .btn.l2hlf.on{background:var(--accent-weak);color:var(--accent)}
+
+/* the search that's open in a bar: Everywhere beside it */
+html[data-look="2"] .find.open .l2every{flex:none;margin-left:6px}
+
+/* the corner's menu: its lines with a picture, the places at the foot */
+.pop .menu.l2m .l2mi0{width:20px;flex:none}
+.pop .menu.l2menu{min-width:260px}
+.pop .menu.l2m .l2m-chips button{font-size:13px}
+.pop .menu.l2m.l2cat > button,.pop .menu.l2m.l2cat > a{padding-left:40px}
+.pop .menu.l2m > hr{border:0;border-top:1px solid var(--line);margin:2px 0}
+.pop .menu.l2m .l2m-rows:first-child{border-top:0;padding-top:0}

@@ -158,7 +158,7 @@ function scan(){
   document.querySelectorAll('#main .hlgroup, #main .mcont').forEach(el => { const im = el.querySelector('img'); if (im) L.tintFrom(el, im.getAttribute('src')); });
   const pl = document.getElementById('player'), art = pl && pl.querySelector('img.plart');
   if (pl && art) L.tintFrom(pl, art.getAttribute('src'));
-  dupTitle(); prefsSearch();
+  dupTitle(); prefsSearch(); everywhere(); hlFilter();
 }
 // Preferences: a box that finds a setting by its name. Cards that don't have the words step away, and in a
 // card that does, so do the rows without them (unless it's the card's own name that matched).
@@ -182,11 +182,12 @@ function prefsSearch(){
 // A screen's own name, when the row of pages just above already says it ("Highlights" under Highlights ·
 // Review): the name steps back, and so does its bar if nothing else is in it.
 function dupTitle(){
-  const sub = document.querySelector('.l2subs .l2sub.on:not(.folder)'), h = document.querySelector('#main .top h1');
+  const sub = document.querySelector('.l2subs .l2sub.on'), h = document.querySelector('#main .top h1');
   if (!h) return;
-  const same = !!sub && L.shape() !== 'side' && !h.querySelector('button,select,a,svg') && h.textContent.trim().toLowerCase() === sub.textContent.trim().toLowerCase();
+  const same = !!sub && L.shape() !== 'side' && !h.querySelector('select,a,svg:not(.srcpick svg),button:not(.srcpick)') && h.textContent.trim().toLowerCase() === sub.textContent.trim().toLowerCase();
   h.classList.toggle('l2same', same);
-  const top = h.closest('.top'); if (top) top.classList.toggle('l2bare', same && ![...top.children].some(c => c !== h && !c.classList.contains('spacer') && c.offsetParent));
+  // (a child's own computed display, not whether it shows: the bar itself may be the hidden one)
+  const top = h.closest('.top'); if (top) top.classList.toggle('l2bare', same && ![...top.children].some(c => c !== h && !c.classList.contains('spacer') && getComputedStyle(c).display !== 'none'));
 }
 if (L.on) {
   let t = 0; const later = () => { clearTimeout(t); t = setTimeout(scan, 30); };
@@ -273,6 +274,16 @@ const MICON = {
   refresh: MI('M15 10a5 5 0 1 1-1.5-3.6|M15 4.5v3h-3'),
   file: MI('M6 3.5h5l3 3v10H6z|M11 3.5v3h3'),
   pairs: MI('M5 7h10l-2.5-2.5|M15 13H5l2.5 2.5'),
+  target: MI('', '<circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3.5"/>'),
+  list: MI('M7 6h9|M7 10h9|M7 14h9|M4 6h.01|M4 10h.01|M4 14h.01'),
+  plus: MI('M10 4.5v11|M4.5 10h11'),
+  shelf: MI('M3.5 16h13|M5 16V5h3v11|M9.5 16V7h3v9|M13.5 16l1.6-8.6 2.4.5-1.6 8.1'),
+  edit: MI('M4 16h3l8.5-8.5-3-3L4 13v3z'),
+  columns: MI('M4 4h12v12H4z|M8 4v12|M12 4v12'),
+  views: MI('M4 5h12|M4 10h8|M4 15h5'),
+  grid: MI('M4 4h5v5H4z|M11 4h5v5h-5z|M4 11h5v5H4z|M11 11h5v5h-5z'),
+  taste: MI('M10 16.5s-6-3.6-6-8A3.5 3.5 0 0 1 10 6a3.5 3.5 0 0 1 6 2.5c0 4.4-6 8-6 8z'),
+  select: MI('M4.5 10.5l3.5 3.5 7.5-8'),
 };
 const MSEL = k => { const [t, v] = k.split(':'); return t === 'a' ? (v === 'export' ? 'a[href*="/highlights/export"]' : 'a[href$="/file"]') : '[data-' + t + '="' + v + '"]'; };
 // [button, short label, icon, the words that mean it's on now, the bar's own button for the same thing]
@@ -295,9 +306,50 @@ const MENUS = {
   },
 };
 const shown = el => !!(el && el.offsetParent);
+// A list's … (reader.js openListMore) with the corner's: Mark seen as one row of chips, Select and Save view
+// from the bar, the order (it's in Filter now) left out.
+function tidyList(menu){
+  const lm = k => menu.querySelector('[data-lm="' + k + '"]');
+  [...menu.querySelectorAll('[data-lm^="sort:"]')].forEach(b => b.remove());
+  [...menu.querySelectorAll('.mh')].forEach(h => { if (/Order/.test(h.textContent)) h.remove(); });
+  const seen = [...menu.querySelectorAll('[data-lm^="seen:"]')];
+  const parts = [];
+  if (seen.length) {
+    const chips = document.createElement('div'); chips.className = 'l2m-chips';
+    chips.innerHTML = '<span class="l2m-h">Mark seen</span>';
+    const short = { '': 'All', '86400': 'A day', '259200': '3 days', '604800': 'A week' };
+    seen.forEach(b => { const k = b.dataset.lm.slice(5); b.title = b.textContent.trim(); b.innerHTML = '<span class="l2ml">' + (short[k] || b.textContent) + '</span>'; chips.appendChild(b); });
+    parts.push(chips);
+  }
+  const rows = document.createElement('div'); rows.className = 'l2m-rows';
+  const row = (b, label, icon) => { if (!b) return; b.innerHTML = (MICON[icon] || '<span class="l2mi0"></span>') + '<span class="l2ml">' + label + '</span>'; rows.appendChild(b); };
+  const bar = k => document.querySelector('#main .lvmain > .top [data-ract="' + k + '"]');
+  const proxy = (k, label, icon) => { if (!bar(k)) return; const b = document.createElement('button'); b.dataset.lm = k === 'selmode' ? 'select' : k; row(b, label, icon); };
+  if (lm('select')) row(lm('select'), /Stop/.test(lm('select').textContent) ? 'Stop selecting' : 'Select', 'select'); else proxy('selmode', bar('selmode') && bar('selmode').classList.contains('on') ? 'Stop selecting' : 'Select', 'select');
+  const view = lm('saveview') || lm('rmview');
+  if (view) row(view, view.dataset.lm === 'rmview' ? 'Remove this view' : 'Save as a view', 'views');
+  else if (bar('rmview')) proxy('rmview', 'Remove this view', 'views'); else proxy('saveview', 'Save as a view', 'views');
+  row(lm('refresh'), /Check/.test((lm('refresh') || {}).textContent || '') ? 'Check for new posts' : 'Sync now', 'refresh');
+  row(lm('editfeed'), 'Rename or move this feed', 'edit');
+  if (S.route[0] === 'feed') {
+    const f1 = document.createElement('button'); f1.dataset.act = 'add'; row(f1, 'Follow a site', 'plus');
+    const f2 = document.createElement('button'); f2.dataset.go = 'feeds'; row(f2, 'What shows where', 'list');
+  }
+  [...menu.children].forEach(c => { if (!c.closest('.l2m-rows,.l2m-chips') && c.tagName === 'BUTTON') rows.appendChild(c); });
+  if (rows.children.length) parts.push(rows);
+  menu.textContent = ''; parts.forEach(p => menu.appendChild(p));
+  menu.classList.add('l2m');
+}
+function tidyCat(menu){
+  [...menu.querySelectorAll('button,a')].forEach(b => { const i = b.querySelector('i'); if (i && !i.textContent.trim()) i.remove(); });
+  menu.classList.add('l2m', 'l2cat');
+}
 function tidyMenu(menu){
+  if (menu.classList.contains('l2m')) return;
+  if (menu.querySelector('[data-lm]')) { tidyList(menu); mergeOwn(menu); fit(menu); return; }
+  if (menu.querySelector('[data-catm]')) { tidyCat(menu); mergeOwn(menu); fit(menu); return; }
   const spec = menu.querySelector('[data-bm]') ? MENUS.bm : menu.querySelector('[data-more]') ? MENUS.more : null;
-  if (!spec || menu.classList.contains('l2m')) return;
+  if (!spec) return;
   menu.classList.add('l2m');
   const used = new Set();
   const take = ([key, label, icon, onRe, bar], withIcon, tile) => {
@@ -321,30 +373,171 @@ function tidyMenu(menu){
   const rest = box('l2m-rows'); [...menu.children].forEach(el => { if (!used.has(el) && el.tagName !== 'HR') rest.appendChild(el); }); if (rest.children.length) parts.push(rest);
   if (foot.children.length) parts.push(foot);
   menu.textContent = ''; parts.forEach(p => menu.appendChild(p));
-  // it was placed for its old height: keep it on the screen
-  const p = menu.closest('.pop'); if (p && !p.hidden) { const r = p.getBoundingClientRect(); if (r.bottom > innerHeight - 8) p.style.top = Math.max(8, innerHeight - 8 - r.height) + 'px'; if (r.right > innerWidth - 8) p.style.left = Math.max(8, innerWidth - 8 - r.width) + 'px'; }
+  fit(menu);
 }
-if (L.on) new MutationObserver(() => { const m = document.querySelector('#pop .menu:not(.l2m)'); if (m) tidyMenu(m); }).observe(document.getElementById('pop'), { childList: true });
+// it was placed for its old size: keep it on the screen
+function fit(menu){
+  const p = menu.closest('.pop'); if (!p || p.hidden || !p.style.top) return;
+  const r = p.getBoundingClientRect(); if (r.bottom > innerHeight - 8) p.style.top = Math.max(8, innerHeight - 8 - r.height) + 'px'; if (r.right > innerWidth - 8) p.style.left = Math.max(8, innerWidth - 8 - r.width) + 'px';
+}
+if (L.on) new MutationObserver(() => { const m = document.querySelector('#pop .menu:not(.l2m)'); if (m) tidyMenu(m); const fp = document.querySelector('#pop .fpop'); if (fp) filterExtras(fp); }).observe(document.getElementById('pop'), { childList: true });
 
-// The … menu: for now the places that have no tab. Each screen's own actions come to it in a later round.
-function menu(anchor){
-  const p = $('#pop'), phone = L.shape() === 'phone', all = tabs();
-  const row = (go, label, act) => '<button ' + (act ? 'data-act="' + act + '"' : 'data-go="' + go + '"') + '>' + label + '</button>';
-  const listen = (all.find(t => t[0] === 'Listen') || [0, []])[1];
-  p.innerHTML = '<div class="menu l2menu">' +
-    (phone ? row('', 'Search', 'palette') + row('', 'Add to Daf', 'add') + listen.map(x => row(x[0], x[1])).join('') + '<hr>' : '') +
-    row('stats', 'Stats') + row('sources', 'Sources') + row('prefs', 'Preferences') + (C.Tips ? row('tips', 'What’s new') : '') + '</div>';
-  p.hidden = false; p.style.right = 'auto'; p.style.bottom = 'auto';
-  const r = anchor.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+// ---------- the corner's … menu: this screen's own things, then the places that have no tab ----------
+// A screen keeps on its page the one thing done most there and what changes what its list shows; the rest
+// of its bar moves here (BUTTONS.md, approved 2026-11-10). The buttons that moved stay in the page,
+// hidden (look2.css), and a line here presses the real one, so each still does exactly what it did; a
+// menu the button opens appears by the corner, where it was asked for.
+let anchorAt = null;
+function press(sel, anchor){
+  const b = document.querySelector(sel); if (!b) return false;
+  $('#pop').hidden = true;
+  const r = anchor ? anchor.getBoundingClientRect() : null;
+  setTimeout(() => {
+    if (r) { b.getBoundingClientRect = () => r; clearTimeout(anchorAt); anchorAt = setTimeout(() => { delete b.getBoundingClientRect; }, 4000); }
+    b.click();
+  }, 0);
+  return true;
+}
+const goCard = (hash, card) => {
+  location.hash = hash;
+  if (!card) return;
+  let n = 0; const t = setInterval(() => { const c = document.getElementById(card); if (c || ++n > 40) { clearInterval(t); if (c) c.scrollIntoView({ block: 'start' }); } }, 100);
+};
+// [label, icon, what it does: {press: selector} | {go: hash, card} | {act: data-act} | {href}]
+function screenItems(){
+  const r = S.route || [], v = r[0], q = sel => document.querySelector('#main ' + sel);
+  const it = [];
+  const add = (label, icon, how) => it.push([label, icon, how]);
+  const pr = (label, icon, sel) => { if (q(sel)) add(label, icon, { press: '#main ' + sel }); };
+  if (v === 'today' || !v) { add('Log paper', 'note', { act: 'paper' }); add('Sync now', 'refresh', { act: 'refresh' }); add('Goals', 'target', { go: '#prefs/goals' }); }
+  else if (v === 'books') { pr('Add a book', 'plus', '[data-act="addbook"]'); pr('New shelf', 'shelf', '#shelfsec [data-shelf="new"]'); }
+  else if (v === 'book') {
+    pr('Listen from here', 'headphones', '[data-abk="here"]'); pr('Edit details', 'edit', '[data-act="bookedit"]');
+    const o = q('.bookhead a[target="_blank"]'); if (o) add('Open the original', 'external', { href: o.href, blank: true });
+    const vl = q('.l2vault code'); if (vl) add('Open the note in Obsidian', 'external', { href: 'obsidian://open?vault=' + encodeURIComponent(q('.l2vault').dataset.vname || '') + '&file=' + encodeURIComponent(vl.textContent.trim()) });
+  }
+  else if (v === 'catalog') { pr('Columns', 'columns', '[data-act="cat:cols"]'); pr('Views', 'views', '[data-act="cat:views"]'); }
+  else if (v === 'library' && !r[1]) pr('Arrange Home', 'grid', '[data-home="config"]');
+  else if (v === 'edition') { pr('Taste', 'taste', '.top a[href="#edition/taste"]'); pr('Send to the Kindle', 'kindle', '[data-ed="kindle"]'); pr('Make it again', 'refresh', '[data-ed="again"]'); }
+  else if (v === 'highlights') pr('Export', 'export', '[data-act="hlexport"]');
+  else if (v === 'review') { add('Review more', 'refresh', { go: '#review/more' }); add('Highlights per day', 'target', { go: '#prefs', card: 'reviewcard' }); }
+  else if (v === 'stats') { add('Goals', 'target', { go: '#prefs/goals' }); add('Log paper', 'note', { act: 'paper' }); }
+  else if (v === 'manga') add('AniList', 'external', { go: '#prefs/anilist' });
+  return it;
+}
+// The places with no tab, small at the foot (on a phone, Search and Add as well, and Listen's pages).
+function footRows(){
+  const phone = L.shape() === 'phone', listen = (tabs().find(t => t[0] === 'Listen') || [0, []])[1];
+  const f = (label, how) => '<button ' + how + '>' + label + '</button>';
+  return (phone ? f('Search', 'data-l2search') + f('Add to Daf', 'data-act="add"') + listen.map(x => f(x[1], 'data-go="' + x[0] + '"')).join('') : '') +
+    [['stats', 'Stats'], ['sources', 'Sources'], ['prefs', 'Preferences']].filter(x => x[0] !== (S.route || [])[0]).map(x => f(x[1], 'data-go="' + x[0] + '"')).join('') + (C.Tips ? f('What’s new', 'data-go="tips"') : '');
+}
+function rowHTML([label, icon, how], i){
+  const ic = MICON[icon] || '<span class="l2mi0"></span>';
+  if (how.href) return '<a href="' + esc(how.href) + '"' + (how.blank ? ' target="_blank" rel="noopener"' : '') + '>' + ic + '<span class="l2ml">' + esc(label) + '</span></a>';
+  const attr = how.act ? 'data-act="' + how.act + '"' : 'data-l2do="' + i + '"';
+  return '<button ' + attr + '>' + ic + '<span class="l2ml">' + esc(label) + '</span></button>';
+}
+let items = [];
+function place(anchor){
+  const p = $('#pop'), r = anchor.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+  p.style.right = 'auto'; p.style.bottom = 'auto';
   p.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
   p.style.top = (r.bottom + 8 + h > innerHeight ? Math.max(8, r.top - h - 8) : r.bottom + 8) + 'px';
+}
+// Screens with a menu of their own (a list's, All Books') open that one by the corner, and it gets this
+// screen's other things and the foot added (tidyMenu).
+function menu(anchor){
+  const own = document.querySelector('#main [data-ract="lmore"]') || document.querySelector('#main [data-act="cat:more"]');
+  items = screenItems();
+  if (own) { L.extra = { items, anchor }; press('#main ' + (own.dataset.ract ? '[data-ract="lmore"]' : '[data-act="cat:more"]'), anchor); return; }
+  const p = $('#pop');
+  p.onclick = p.oninput = p.onkeydown = p.onchange = null;
+  p.innerHTML = '<div class="menu l2menu l2m">' + (items.length ? '<div class="l2m-rows">' + items.map(rowHTML).join('') + '</div>' : '') + '<div class="l2m-foot">' + footRows() + '</div></div>';
+  p.hidden = false; place(anchor);
+}
+L.extraRows = () => { const x = L.extra; L.extra = null; return x; };
+function doItem(how, anchor){
+  if (how.press) press(how.press, anchor);
+  else if (how.go) { $('#pop').hidden = true; goCard(how.go, how.card); }
 }
 document.addEventListener('click', e => {
   if (!L.on || !e.target.closest) return;
   const m = e.target.closest('[data-act="l2menu"]');
-  if (m) { e.stopPropagation(); if ($('#pop').hidden || !$('#pop .l2menu')) menu(m); else $('#pop').hidden = true; return; }
-  if (e.target.closest('#pop .l2menu button')) setTimeout(() => { $('#pop').hidden = true; }, 0);
+  if (m) { e.stopPropagation(); if ($('#pop').hidden || !$('#pop .l2m')) menu(m); else $('#pop').hidden = true; return; }
+  const d = e.target.closest('#pop [data-l2do]');
+  if (d) { e.stopPropagation(); const how = (items[+d.dataset.l2do] || [])[2]; if (how) doItem(how, [...document.querySelectorAll('[data-act="l2menu"]')].find(x => x.offsetParent)); return; }
+  const sr = e.target.closest('[data-l2search]');
+  if (sr) { e.stopPropagation(); $('#pop').hidden = true; L.search(); return; }
+  if (e.target.closest('#pop .l2menu button, #pop .l2menu a')) setTimeout(() => { $('#pop').hidden = true; }, 0);
 }, true);
+
+// ---------- one search: the corner's looks on this screen first, and everywhere after ----------
+// A screen with its own search (Books, a list, Highlights, …) opens that one in its bar, with Everywhere
+// beside it for the rest of Daf; All Books and Preferences have their box already; anywhere else it's
+// the search over everything (the palette, also ⌘K).
+function palette(words){
+  const b = document.createElement('button'); b.dataset.act = 'palette'; b.hidden = true; document.body.appendChild(b); b.click(); b.remove();
+  if (words) setTimeout(() => { const i = $('#palq'); if (i) { i.value = words; i.dispatchEvent(new Event('input', { bubbles: true })); } }, 0);
+}
+L.search = () => {
+  const go = document.querySelector('#main .find:not(.open) [data-findgo]');
+  if (go) { go.click(); return; }
+  const open = document.querySelector('#main .find.open .findq'); if (open) { open.focus(); return; }
+  const box = document.querySelector('#main #catq, #main .l2psearch'); if (box) { box.focus(); box.select && box.select(); return; }
+  palette('');
+};
+document.addEventListener('click', e => {
+  if (!L.on || !e.target.closest) return;
+  if (e.target.closest('.l2search')) { e.preventDefault(); e.stopPropagation(); L.search(); return; }
+  const ev = e.target.closest('.l2every');
+  if (ev) { e.stopPropagation(); const i = ev.closest('.find') && ev.closest('.find').querySelector('.findq'); palette(i ? i.value.trim() : ''); }
+}, true);
+function everywhere(){
+  const f = document.querySelector('#main .find.open'); if (!f || f.querySelector('.l2every')) return;
+  f.insertAdjacentHTML('beforeend', '<button class="btn sm l2every" type="button">Everywhere</button>');
+}
+
+// ---------- Filter holds Order and Tag (a list), and Highlights' colour, tag, favourites, order ----------
+function filterExtras(fp){
+  if (fp.querySelector('.l2fx')) return;
+  const mk = (orig, label, id) => {
+    if (!orig || orig.tagName !== 'SELECT') return '';
+    return '<span class="lbl">' + label + '</span><select class="field sm l2fx" data-l2for="' + id + '">' + orig.innerHTML + '</select>';
+  };
+  const tag = document.querySelector('#main select#tagf') || document.querySelector('#main #tagf select'), sort = document.querySelector('#main #lsort');
+  const h = mk(sort, 'Order', 'lsort') + mk(tag, 'Tag', 'tagf');
+  if (!h) return;
+  fp.insertAdjacentHTML('afterbegin', h);
+  fp.querySelectorAll('.l2fx').forEach(c => {
+    const o = c.dataset.l2for === 'lsort' ? sort : tag; c.value = o.value;
+    c.addEventListener('change', ev => { ev.stopPropagation(); o.value = c.value; o.dispatchEvent(new Event('change', { bubbles: true })); });
+  });
+}
+function hlFilter(){
+  const top = document.querySelector('#main .top'), body = document.querySelector('#hlbody .hlfilters');
+  if (!top || !body || S.route[0] !== 'highlights') return;
+  const n = document.querySelectorAll('#hlbody .hlf2 .cdot.on, #hlbody .hlf2 [data-act="hlfav"].on').length + (($('#hltag') || {}).value ? 1 : 0) +
+    ((($('#hlsort') || {}).value || 'recent') !== 'recent' ? 1 : 0) + (($('#hlpriv') || {}).checked ? 1 : 0);
+  let b = top.querySelector('.l2hlf');
+  if (!b) { const rv = top.querySelector('[data-act="hlreview"]'); if (!rv) return; rv.insertAdjacentHTML('beforebegin', '<button class="btn sm l2hlf" type="button">Filter</button>'); b = top.querySelector('.l2hlf'); }
+  const label = n ? 'Filter · ' + n : 'Filter';
+  if (b.textContent !== label) b.textContent = label;
+  b.classList.toggle('on', root.classList.contains('l2-hlf') || n > 0);
+}
+document.addEventListener('click', e => {
+  if (!L.on || !e.target.closest || !e.target.closest('.l2hlf')) return;
+  root.classList.toggle('l2-hlf'); hlFilter();
+});
+
+// what the corner's own lines add to a screen's menu, and its foot
+function mergeOwn(menu){
+  const x = L.extraRows(); if (!x) return;
+  if (x.items.length) { const rows = document.createElement('div'); rows.className = 'l2m-rows'; rows.innerHTML = x.items.map(rowHTML).join(''); menu.prepend(rows); }
+  const foot = document.createElement('div'); foot.className = 'l2m-foot'; foot.innerHTML = footRows(); menu.appendChild(foot);
+  menu.classList.add('l2menu');
+}
+
 addEventListener('resize', () => { if (L.on) L.frame(); });
 
 // Preferences: the switch, on this device.
