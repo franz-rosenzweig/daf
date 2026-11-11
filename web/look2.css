@@ -217,3 +217,25 @@ html[data-look="2"] .card:has(> .sbig) .sbig b{font-size:64px;letter-spacing:-3p
 html[data-look="2"] .card:has(> .sbig) h2{color:rgba(255,255,255,.72)}
 /* the daily review's card stands a little higher */
 html[data-look="2"] .review .rcard{box-shadow:0 2px 4px rgba(0,0,0,.04),0 30px 60px rgba(60,50,30,.16);border-radius:24px;border-color:rgba(0,0,0,.05);background:var(--l2-card)}
+
+/* ---------- the reader's … menu, tidied (look2.js tidyMenu) ---------- */
+.pop .menu.l2m{margin:-4px;gap:10px}
+.pop .menu.l2m button,.pop .menu.l2m a{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin:0;padding:0 10px;min-height:40px;border-radius:10px;font-size:14.5px;color:var(--fg);text-decoration:none}
+.pop .menu.l2m svg{flex:none;color:var(--fg-2)}
+.pop .menu.l2m .on,.pop .menu.l2m .on svg{color:var(--accent)}
+.pop .menu.l2m button[disabled]{opacity:.4}
+.pop:has(.l2m){width:320px;box-sizing:border-box}
+.l2m-tiles{display:flex;gap:6px}
+.pop .menu.l2m .l2m-tiles button{flex:1 1 0;flex-direction:column;justify-content:center;gap:5px;min-height:62px;padding:0 2px;background:var(--panel);border-radius:12px;font-size:11.5px;font-weight:600;min-width:0}
+.pop .menu.l2m .l2m-tiles button:hover{background:var(--hover)}
+.pop .menu.l2m .l2m-tiles button.on{background:var(--accent-weak)}
+.l2m-tiles .l2ml{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l2m-chips{display:flex;align-items:center;gap:6px}
+.l2m-h{flex:none;padding:0 6px 0 10px;white-space:nowrap;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--fg-3)}
+.pop .menu.l2m .l2m-chips button{flex:1;justify-content:center;min-height:36px;padding:0 6px;background:var(--panel);font-size:13.5px;font-weight:600;white-space:nowrap}
+.l2m-rows{display:flex;flex-direction:column;border-top:1px solid var(--line);padding-top:6px}
+.l2m-foot{display:flex;flex-wrap:wrap;gap:0 4px;border-top:1px solid var(--line);padding-top:6px}
+.pop .menu.l2m .l2m-foot button{min-height:32px;padding:0 8px;font-size:12.5px;color:var(--fg-2)}
+.pop .menu.l2m .l2m-foot button.on{color:var(--accent)}
+.pop .menu.l2m .l2m-foot button.on::before{content:"✓";margin-right:-4px}
+.pop .menu.l2m .l2m-foot [data-more="delete"]{color:var(--bad);margin-left:auto}

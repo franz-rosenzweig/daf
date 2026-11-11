@@ -41,11 +41,11 @@ function tabs(){
   const ed = d && d.edition && (d.edition.on || d.edition.total);
   return [
     ['Today', [['today', 'Today']]],
-    ['Books', [['books', 'Books'], ['catalog', 'All Books'], pin('manga') && ['manga', 'Manga'], pin('torah') && ['torah', 'Torah']]],
+    ['Books', [['books', 'Books'], ['catalog', 'All Books'], pin('manga') && ['manga', 'Manga'], pin('torah') && ['torah', 'Torah'], pin('recovery') && ['recovery', 'Recovery']]],
     ['Library', [['library', 'Library'], pin('shortlist') && ['library/starred', 'Shortlist']]],
     ['Feed', [ed && ['edition', 'Edition'], ['feed', 'Feed']]],
     ['Highlights', [['highlights', 'Highlights'], ['review', 'Review'], pin('paper') && ['paper', 'Paper pages']]],
-    ['Listen', [pin('podcasts') && ['podcasts', 'Podcasts'], pin('recovery') && ['recovery', 'Recovery']]],
+    ['Listen', [pin('podcasts') && ['podcasts', 'Podcasts']]],
   ].map(([label, pages]) => [label, pages.filter(Boolean)]).filter(t => t[1].length);
 }
 // The Feed's pinned folders and feeds, from the old sidebar's own rows (reader.js navFeed).
@@ -176,6 +176,88 @@ L.readingNow = b => '<section class="l2hero small"' + (b.has_cover ? ' data-tint
   '<div class="l2htext"><span class="l2lab">Reading now</span><h1>' + esc(C.shortTitle(b.title)) + '</h1>' +
   '<span class="l2hsub">' + esc([b.author, b.progress != null ? Math.round(b.progress) + '%' : '', b.progress_note].filter(Boolean).join(' · ')) + '</span>' +
   '<div class="l2hacts">' + (b.readable ? '<a class="btn primary" href="#ebook/' + encodeURIComponent(b.id) + '">Continue reading</a>' : '') + '<a class="btn" href="#book/' + encodeURIComponent(b.id) + '">Book</a></div></div></section>';
+
+// ---------- the reader's … menu, tidied ----------
+// book.js and reader.js build their menus as before (the same buttons, so every click and every key still
+// lands where it did, and the apps' menus that press them too). With the new look on, the menu is then
+// rearranged here: a row of tiles with a picture each for the things done most, one short row of "go to"
+// chips, a few short lines, and the rare ones small at the foot. What already has a button in the bar
+// above isn't repeated. Anything this doesn't know stays as it was, at the end.
+const MI = (d, extra) => '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + d.split('|').map(p => '<path d="' + p + '"/>').join('') + (extra || '') + '</svg>';
+const MICON = {
+  speaker: MI('M4 8v4h3l4 3V5L7 8H4z|M14 7.5a3.5 3.5 0 0 1 0 5'),
+  headphones: MI('M4 12v-2a6 6 0 0 1 12 0v2|M4 12h2.5v4H5a1 1 0 0 1-1-1v-3z|M16 12h-2.5v4H15a1 1 0 0 0 1-1v-3z'),
+  note: MI('M4 16h3l8.5-8.5-3-3L4 13v3z|M11.5 5.5l3 3'),
+  ask: MI('M4 5h12v8H9l-3.5 3v-3H4V5z'),
+  focus: MI('M4 8V4h4|M12 4h4v4|M16 12v4h-4|M8 16H4v-4'),
+  star: MI('m10 3.3 2 4.3 4.6.6-3.4 3.2.9 4.6L10 13.7 5.9 16l.9-4.6-3.4-3.2 4.6-.6z'),
+  info: MI('M10 9.2v4.6|M10 6.3v.1', '<circle cx="10" cy="10" r="7"/>'),
+  book: MI('M10 6.5C8.5 5 6.5 4.5 4 4.5v10c2.5 0 4.5.5 6 2 1.5-1.5 3.5-2 6-2v-10c-2.5 0-4.5.5-6 2z|M10 6.5v10'),
+  bookmark: MI('M6 4h8v12l-4-3-4 3V4z'),
+  export: MI('M10 13V4|M6.5 7.5 10 4l3.5 3.5|M4 12v4h12v-4'),
+  download: MI('M10 4v9|M6.5 9.5 10 13l3.5-3.5|M4 16h12'),
+  kindle: MI('M8.5 14h3', '<rect x="5" y="3" width="10" height="14" rx="1.5"/>'),
+  link: MI('M8.5 11.5l3-3|M9 6.5l1.5-1.5a2.8 2.8 0 0 1 4 4L13 10.5|M11 13.5 9.5 15a2.8 2.8 0 0 1-4-4L7 9.5'),
+  external: MI('M8 5H5v10h10v-3|M11 4h5v5|M16 4l-7 7'),
+  clock: MI('M10 6v4l2.5 2', '<circle cx="10" cy="10" r="7"/>'),
+  archive: MI('M4 5h12v3H4z|M5 8v7h10V8|M8.5 11h3'),
+  eye: MI('M2.5 10s3-5 7.5-5 7.5 5 7.5 5-3 5-7.5 5-7.5-5-7.5-5z', '<circle cx="10" cy="10" r="2"/>'),
+  save: MI('M6 4h8v12l-4-3-4 3V4z|M10 6.5v4|M8 8.5h4'),
+  refresh: MI('M15 10a5 5 0 1 1-1.5-3.6|M15 4.5v3h-3'),
+  file: MI('M6 3.5h5l3 3v10H6z|M11 3.5v3h3'),
+  pairs: MI('M5 7h10l-2.5-2.5|M15 13H5l2.5 2.5'),
+};
+const MSEL = k => { const [t, v] = k.split(':'); return t === 'a' ? (v === 'export' ? 'a[href*="/highlights/export"]' : 'a[href$="/file"]') : '[data-' + t + '="' + v + '"]'; };
+// [button, short label, icon, the words that mean it's on now, the bar's own button for the same thing]
+const MENUS = {
+  bm: {
+    tiles: [['bm:listen', 'Listen', 'speaker', /^Stop/], ['abk:herebook', 'Audiobook', 'headphones'], ['bm:notebook', 'Notebook', 'note'], ['bm:ask', 'Ask', 'ask'], ['bm:focus', 'Focus', 'focus', /^Leave/]],
+    chips: ['Go to', [['bm:start', 'Start'], ['bm:goto', 'Page…'], ['bm:kindle', 'Kindle']]],
+    rows: [[['bm:info', 'About', 'info'], ['bm:book', 'Book page', 'book'], ['bm:mark', 'Bookmark', 'bookmark', /^Remove/, '[data-bk="bookmark"]'], ['bm:pairs', 'Swap the page pairs', 'pairs']],
+      [['a:export', 'Export highlights', 'export'], ['a:file', 'Download', 'download'], ['bm:offline', null, 'download']]],
+    foot: [['bm:auto', 'Auto highlight'], ['bm:keys', 'Shortcuts'], ['bm:reset', 'Forget my place']],
+  },
+  more: {
+    tiles: [['more:listen', 'Listen', 'speaker', /^Stop/], ['more:ask', 'Ask', 'ask'], ['more:note', 'Note', 'note'], ['more:star', 'Shortlist', 'star', /^Off/], ['more:focus', 'Focus', 'focus', /^Leave/]],
+    chips: ['List', [['more:prevdoc', '‹ Previous'], ['more:nextdoc', 'Next ›']]],
+    rows: [[['more:save', 'Save to Library', 'save', null, '#rtop [data-dact="save"]'], ['more:seen', 'Seen', 'eye', /^Back/, '#rtop [data-dact="seen"]'], ['more:later', 'Later', 'clock', /^Back/], ['more:archive', 'Archive', 'archive', /^Back/, '#rtop [data-dact="archive"]'],
+        ['more:panel', 'Notebook', 'note', /^Hide/, '#rtop [data-ract="panel"]'], ['more:pages', 'PDF pages', 'file']],
+      [['more:kindle', 'Send to Kindle', 'kindle'], ['more:full', 'Load the full article', 'refresh'], ['more:device', null, 'download']],
+      [['more:open', 'Open original', 'external'], ['more:copy', 'Copy link', 'link'], ['more:vault', 'Open in Obsidian', 'external']]],
+    foot: [['more:meta', 'Edit title'], ['more:reset', 'Reset progress'], ['more:keys', 'Shortcuts'], ['more:delete', 'Delete']],
+  },
+};
+const shown = el => !!(el && el.offsetParent);
+function tidyMenu(menu){
+  const spec = menu.querySelector('[data-bm]') ? MENUS.bm : menu.querySelector('[data-more]') ? MENUS.more : null;
+  if (!spec || menu.classList.contains('l2m')) return;
+  menu.classList.add('l2m');
+  const used = new Set();
+  const take = ([key, label, icon, onRe, bar], withIcon) => {
+    const b = menu.querySelector(MSEL(key)); if (!b || used.has(b)) return null;
+    used.add(b);
+    if (bar && shown(document.querySelector(bar))) { b.remove(); return null; }       // the bar above has it
+    const ck = b.querySelector('.ck'), c = b.cloneNode(true); c.querySelectorAll('kbd,.kbd').forEach(x => x.remove());
+    const was = c.textContent.trim(), on = ck ? !!ck.textContent.trim() : !!(onRe && onRe.test(was));
+    b.classList.toggle('on', on); if (on) b.setAttribute('aria-pressed', 'true');
+    b.title = was;
+    b.innerHTML = (withIcon && icon ? MICON[icon] : '') + '<span class="l2ml">' + esc(label || was) + '</span>';
+    return b;
+  };
+  const box = cls => { const d = document.createElement('div'); d.className = cls; return d; };
+  const parts = [];
+  const tiles = box('l2m-tiles'); spec.tiles.forEach(x => { const b = take(x, true); if (b) tiles.appendChild(b); }); if (tiles.children.length) parts.push(tiles);
+  const chips = box('l2m-chips'); spec.chips[1].forEach(x => { const b = take(x, false); if (b) chips.appendChild(b); });
+  if (chips.children.length) { chips.insertAdjacentHTML('afterbegin', '<span class="l2m-h">' + spec.chips[0] + '</span>'); parts.push(chips); }
+  spec.rows.forEach(g => { const rows = box('l2m-rows'); g.forEach(x => { const b = take(x, true); if (b) rows.appendChild(b); }); if (rows.children.length) parts.push(rows); });
+  const foot = box('l2m-foot'); spec.foot.forEach(x => { const b = take(x, false); if (b) foot.appendChild(b); });
+  const rest = box('l2m-rows'); [...menu.children].forEach(el => { if (!used.has(el) && el.tagName !== 'HR') rest.appendChild(el); }); if (rest.children.length) parts.push(rest);
+  if (foot.children.length) parts.push(foot);
+  menu.textContent = ''; parts.forEach(p => menu.appendChild(p));
+  // it was placed for its old height: keep it on the screen
+  const p = menu.closest('.pop'); if (p && !p.hidden) { const r = p.getBoundingClientRect(); if (r.bottom > innerHeight - 8) p.style.top = Math.max(8, innerHeight - 8 - r.height) + 'px'; if (r.right > innerWidth - 8) p.style.left = Math.max(8, innerWidth - 8 - r.width) + 'px'; }
+}
+if (L.on) new MutationObserver(() => { const m = document.querySelector('#pop .menu:not(.l2m)'); if (m) tidyMenu(m); }).observe(document.getElementById('pop'), { childList: true });
 
 // The … menu: for now the places that have no tab. Each screen's own actions come to it in a later round.
 function menu(anchor){
