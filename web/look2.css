@@ -11,7 +11,7 @@ html[data-look="2"]:root{
   --shadow:0 1px 2px rgba(0,0,0,.05),0 14px 36px rgba(60,50,30,.14);
   --serif:'Literata','Source Serif 4',Georgia,serif;
   --l2-back:linear-gradient(180deg,#ecebe8,#e2e2e8); --l2-card:#ffffff; --l2-ink:#1d1d1f; --l2-on-ink:#ffffff;
-  --l2-well:rgba(0,0,0,.07); --l2-chip:#ffffff; --l2-track:#cfcfd6;
+  --l2-well:rgba(0,0,0,.07); --l2-chip:#ffffff; --l2-tab:#ffffff; --l2-track:#cfcfd6;
   --l2-sheet:0 1px 2px rgba(0,0,0,.05),0 18px 50px rgba(60,50,30,.10);
   --l2-lift:0 1px 2px rgba(0,0,0,.04),0 10px 28px rgba(60,50,30,.07);
   --ok:#2f8a57; --bad:#b8392b; --hl:#fbeba8; --hl-2:#efd25c; --speak:#e6ecf7; --speak-line:#bccbe8;
@@ -28,7 +28,7 @@ html[data-look="2"][data-mode="dark"]:root{
   --hl-yellow-line:#a4832a; --hl-green-line:#468c50; --hl-blue-line:#4378b6; --hl-pink-line:#ad5277; --hl-purple-line:#7d62b8;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px rgba(0,0,0,.5);
   --l2-back:linear-gradient(180deg,#131416,#0e0f11); --l2-card:#27282c; --l2-ink:#ececef; --l2-on-ink:#1d1d1f;
-  --l2-well:rgba(255,255,255,.08); --l2-chip:#2a2b30; --l2-track:#3d4047;
+  --l2-well:rgba(255,255,255,.07); --l2-chip:#2a2b30; --l2-tab:#4b4d55; --l2-track:#3d4047;
   --l2-sheet:0 1px 2px rgba(0,0,0,.4),0 18px 50px rgba(0,0,0,.45);
   --l2-lift:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.3);
   color-scheme:dark;
@@ -46,7 +46,7 @@ html[data-look="2"] .app.hassubs .main{border-radius:0 0 22px 22px}
 .l2date{font-size:14px;font-weight:500;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .l2tabs{grid-area:1/2;align-self:center;display:flex;background:var(--l2-well);border-radius:12px;padding:3px;margin-top:env(safe-area-inset-top,0px)}
 .l2tab{height:38px;padding:0 15px;border-radius:9px;border:0;background:transparent;color:var(--fg);font-size:14px;font-weight:600;white-space:nowrap}
-.l2tab.on{background:var(--l2-chip);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.l2tab.on{background:var(--l2-tab);box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .l2corner{grid-area:1/3;justify-self:end;display:flex;align-items:center;gap:10px;padding:env(safe-area-inset-top,0px) 20px 0 0}
 .l2round{width:40px;height:40px;flex:none;border-radius:50%;border:0;background:var(--l2-chip);color:var(--fg);display:inline-flex;align-items:center;justify-content:center}
 .l2search{width:130px;height:36px;border-radius:10px;border:0;background:var(--l2-chip);color:var(--fg-3);padding:0 12px;font-size:15px;text-align:left}
@@ -68,9 +68,9 @@ html.l2-side .l2date{display:none}
 html.l2-side .l2tabs{grid-area:2/1;align-self:start;flex-direction:column;gap:2px;background:none;border-radius:0;padding:0 6px 20px 16px;margin:0;max-height:100%;overflow-y:auto;box-sizing:border-box}
 html.l2-side .l2tab{height:44px;padding:0 12px;text-align:left;font-size:15px}
 html.l2-side .l2tab.on{box-shadow:none;background:transparent}
-html.l2-side .l2tab.on:only-child,html.l2-side .l2tab.on:not(:has(+ .nested)){background:var(--l2-chip)}
+html.l2-side .l2tab.on:only-child,html.l2-side .l2tab.on:not(:has(+ .nested)){background:var(--l2-tab)}
 html.l2-side .l2sub.nested{display:block;height:40px;padding:0 12px 0 28px;border-radius:9px;text-align:left;font-size:15px;font-weight:500;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis}
-html.l2-side .l2sub.nested.on{background:var(--l2-chip);color:var(--fg);font-weight:600}
+html.l2-side .l2sub.nested.on{background:var(--l2-tab);color:var(--fg);font-weight:600}
 html.l2-side .l2sub.nested.folder{padding-left:40px;font-size:14px}
 html.l2-side .l2corner{grid-area:1/2}
 html.l2-side .l2subs{display:none}
@@ -85,7 +85,7 @@ html.l2-phone .main,html.l2-phone .app.hassubs .main{grid-area:2/1;margin:0;bord
 html.l2-phone .mobbar{grid-area:3/1;display:flex;gap:2px;margin:0 10px calc(10px + env(safe-area-inset-bottom,0px));padding:4px;background:var(--side);border-radius:16px;box-sizing:border-box}
 html.l2-phone body{background:var(--bg)}
 html.l2-phone .mb{min-height:48px;padding:0 2px;border-radius:12px;font-size:12px;font-weight:600;color:var(--fg-2)}
-html.l2-phone .mb.on{background:var(--l2-card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+html.l2-phone .mb.on{background:var(--l2-tab);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.15)}
 html.l2-phone .mb.l2more{flex:0 0 44px}
 
 /* reading: the frame steps away, as the sidebar always did */
@@ -239,3 +239,61 @@ html[data-look="2"] .review .rcard{box-shadow:0 2px 4px rgba(0,0,0,.04),0 30px 6
 .pop .menu.l2m .l2m-foot button.on{color:var(--accent)}
 .pop .menu.l2m .l2m-foot button.on::before{content:"✓";margin-right:-4px}
 .pop .menu.l2m .l2m-foot [data-more="delete"]{color:var(--bad);margin-left:auto}
+
+/* ---------- a screen's name that the row above already says ---------- */
+html[data-look="2"] .top h1.l2same{display:none}
+html[data-look="2"] .top.l2bare{display:none}
+
+/* ---------- sheets, the search, messages, signing in ---------- */
+html[data-look="2"] .scrim{background:rgba(20,20,24,.32)}
+html[data-look="2"] .modal{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:22px;padding:24px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+html[data-look="2"] .modal h2{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:-.3px}
+html[data-look="2"] .modal.sheet{padding:12px 12px 16px}
+html[data-look="2"] .field{border-color:transparent;border-radius:10px;background:var(--panel)}
+html[data-look="2"] .field:focus{outline:2px solid var(--accent);outline-offset:0;background:var(--l2-card)}
+html[data-look="2"] select.field,html[data-look="2"] .top select{border-radius:999px}
+html[data-look="2"] .palette{background:var(--l2-card);border-color:rgba(0,0,0,.05);border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+html[data-look="2"] .palette input{padding:18px 20px;font-size:17px}
+html[data-look="2"] .toast{border-radius:999px;padding:10px 18px;background:var(--l2-ink);color:var(--l2-on-ink)}
+html[data-look="2"] .app.loggedout{display:flex;align-items:center;justify-content:center;height:100%}
+html[data-look="2"] .app.loggedout .side{display:none}
+html[data-look="2"] .app.loggedout .main{margin:16px;overflow:visible;border-radius:24px;width:min(440px,calc(100% - 32px))}
+html[data-look="2"] .login{min-height:0;padding:36px 34px}
+html[data-look="2"] .login h1{font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.5px}
+html[data-look="2"] .login .btn{min-height:46px}
+
+/* ---------- the player takes the colour of what's playing ---------- */
+html[data-look="2"] .player{--t1:#1f2a44;--t2:#2b4c8c}
+html[data-look="2"] .pmini{
+  --fg:#ffffff; --fg-2:rgba(255,255,255,.78); --fg-3:rgba(255,255,255,.62); --line:rgba(255,255,255,.18); --accent:#ffffff; --on-accent:#1d1d1f; --hover:rgba(255,255,255,.14); --active:rgba(255,255,255,.2);
+  color:#fff;border:0;border-radius:18px;background:linear-gradient(120deg,var(--t1),var(--t2));box-shadow:0 14px 34px color-mix(in srgb,var(--t1) 40%,transparent)}
+html[data-look="2"] .pmini .mute{color:rgba(255,255,255,.76)}
+html[data-look="2"] .pmini .pline{background:rgba(255,255,255,.85)}
+html[data-look="2"] .plart{box-shadow:0 4px 12px rgba(0,0,0,.3)}
+
+/* ---------- manga: what you're in the middle of, in each series' colour ---------- */
+html[data-look="2"] .mcont{--t1:#2c303a;--t2:#565c6b;padding:14px;border-radius:18px;color:#fff;background:linear-gradient(130deg,var(--t1),var(--t2));box-shadow:0 12px 26px color-mix(in srgb,var(--t1) 30%,transparent);
+  --fg-2:rgba(255,255,255,.78); --fg-3:rgba(255,255,255,.62); --active:rgba(255,255,255,.25); --accent:#ffffff}
+html[data-look="2"] .mcont:hover{background:linear-gradient(130deg,var(--t1),var(--t2))}
+html[data-look="2"] .mcont .mute{color:rgba(255,255,255,.76)}
+html[data-look="2"] .mcont img{border-radius:3px 5px 5px 3px;box-shadow:0 8px 18px rgba(0,0,0,.4)}
+html[data-look="2"] .mconts{gap:14px;padding:2px 2px 20px}
+
+/* ---------- highlights: a book's card carries its spine ---------- */
+html[data-look="2"] .hlgroup{border-left:5px solid var(--t2,var(--line-2))}
+
+/* the streak's dots, on its panel */
+html[data-look="2"] .card:has(> .sbig) .dot2{border-color:rgba(255,255,255,.35)}
+html[data-look="2"] .card:has(> .sbig) .dot2.some{border-color:#ffffff}
+html[data-look="2"] .card:has(> .sbig) .dot2.full{background:#ffffff;border-color:#ffffff}
+
+/* the menu's tiles: with a pointer that hovers, a picture and its name as a tooltip; on a touch screen the name stays under it */
+.pop .menu.l2m .l2m-tiles .l2ml{font-size:10.5px;letter-spacing:-.1px;overflow:visible;text-overflow:clip}
+html.l2-hover .pop .menu.l2m .l2m-tiles button{min-height:50px;position:relative}
+html.l2-hover .pop .menu.l2m .l2m-tiles .l2ml{display:none}
+html.l2-hover .pop .menu.l2m .l2m-tiles svg{width:22px;height:22px}
+html.l2-hover .pop .menu.l2m .l2m-tiles [data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--l2-ink);color:var(--l2-on-ink);font-size:12px;font-weight:500;padding:5px 9px;border-radius:7px;pointer-events:none;z-index:3}
+/* Preferences: its search */
+html[data-look="2"] .top .l2psearch{width:min(260px,40vw);flex:none;min-height:36px;border-radius:999px;padding:0 14px;background:var(--panel)}
+html[data-look="2"] .l2finding .prefsnav{visibility:hidden}
+html[data-look="2"] [hidden].prow,html[data-look="2"] [hidden].aaline,html[data-look="2"] [hidden].card,html[data-look="2"] [hidden].pgroup{display:none!important}

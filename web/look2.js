@@ -24,6 +24,7 @@ L.shape = () => {
 L.frame = () => {
   const s = L.shape();
   for (const k of ['top', 'side', 'phone']) root.classList.toggle('l2-' + k, k === s);
+  root.classList.toggle('l2-hover', matchMedia('(hover: hover) and (pointer: fine)').matches);     // a pointer that hovers: names can be tooltips
 };
 
 // The tabs and each one's pages: [label, [[hash, label], …]]. A page that can be pinned shows only while
@@ -55,6 +56,16 @@ function feedFolders(){
   return [...box.querySelectorAll('.nv.sub')].map(b => ({ go: b.dataset.go, name: (b.querySelector('span:not(.ct)') || b).textContent.trim(), on: b.classList.contains('on') }));
 }
 
+// Library's kinds (Articles, Videos, …) and saved views, from the old sidebar's own rows (reader.js
+// navLibrary, which only lists them while its arrow is open: so it's opened for the asking, then put back).
+function libraryKinds(){
+  if (!C.navLibrary) return [];
+  let was = null; try { was = localStorage.getItem('daf.libOpen'); localStorage.setItem('daf.libOpen', 'true'); } catch(e){}
+  const box = document.createElement('div'); box.innerHTML = C.navLibrary();
+  try { if (was == null) localStorage.removeItem('daf.libOpen'); else localStorage.setItem('daf.libOpen', was); } catch(e){}
+  return [...box.querySelectorAll('.nv.sub')].map(b => ({ go: b.dataset.go, name: (b.querySelector('span:not(.ct)') || b).textContent.trim(), on: b.classList.contains('on') }));
+}
+
 const PLUS = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
 const DOTS = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="currentColor"><circle cx="4.5" cy="10" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="15.5" cy="10" r="1.7"/></svg>';
 function ringSvg(frac){
@@ -69,7 +80,7 @@ L.side = () => {
   const day = d && d.main && !(d.main.kind === 'minutes' && d.main.period === 'day');
   const done = d ? (day ? d.main.done : Math.floor(d.counted)) : 0, goal = d ? (day ? d.main.target : Math.round(d.goal || 60)) : 0;
   const sub = (p, cls) => '<button class="l2sub' + (cls || '') + (isOn(p[0]) ? ' on' : '') + '" data-go="' + p[0] + '">' + p[1] + '</button>';
-  const folders = cur && cur[0] === 'Feed' ? feedFolders() : [];
+  const folders = cur && cur[0] === 'Feed' ? feedFolders() : cur && cur[0] === 'Library' ? libraryKinds() : [];
   const fsub = f => '<button class="l2sub folder' + (f.on ? ' on' : '') + '" data-go="' + esc(f.go) + '">' + esc(f.name) + '</button>';
   const pages = cur && (cur[1].length > 1 || folders.length) ? cur[1] : [];
   const onFolder = folders.some(f => f.on);
@@ -86,7 +97,8 @@ L.side = () => {
       '<button class="l2mins" data-go="stats" aria-label="Stats">' + ringSvg(goal ? done / goal : 0) + (d ? '<span>' + done + ' of ' + goal + '</span>' : '') + '</button>' +
       '<button class="l2round" data-act="l2menu" aria-label="More">' + DOTS + '</button>' +
     '</div>' +
-    '<div class="l2subs">' + pages.map(p => sub(p, onFolder && p[0] === 'feed' ? ' off' : '')).join('') + folders.map(fsub).join('') + '</div>' +
+    '<div class="l2subs">' + (cur && cur[0] === 'Library' ? sub(pages[0], onFolder ? ' off' : '') + folders.map(fsub).join('') + pages.slice(1).map(p => sub(p)).join('')
+      : pages.map(p => sub(p, onFolder && p[0] === 'feed' ? ' off' : '')).join('') + folders.map(fsub).join('')) + '</div>' +
     '<div class="mobbar l2bar">' + phone.map(t => '<button class="mb' + (t === cur ? ' on' : '') + '" data-go="' + t[1][0][0] + '"><span>' + t[0] + '</span></button>').join('') +
       '<button class="mb l2more" data-act="l2menu" aria-label="More">' + DOTS + '</button></div>';
   if (onFolder) sd.querySelectorAll('.l2sub.off').forEach(b => b.classList.remove('on'));
@@ -126,7 +138,62 @@ L.tint = el => {
   im.onload = () => { try { const t = tintOf(im); C.lsSet('tint.' + id, t); if (el.dataset.tint === id) put(t); } catch(e){} };
   im.src = '/api/cover/' + encodeURIComponent(id);
 };
-if (L.on) new MutationObserver(() => document.querySelectorAll('#main [data-tint]').forEach(L.tint)).observe(document.getElementById('main'), { childList: true, subtree: true });
+// A colour from a picture that's already on the page, where there's no book to ask by: the player's art, a
+// manga series, a book's card on Highlights. A picture from another site only lends its colour if that site
+// allows it; otherwise the element keeps Daf's blue.
+const tintMemo = new Map();
+L.tintFrom = (el, src) => {
+  if (!src || el.dataset.tintsrc === src) return;
+  el.dataset.tintsrc = src; el.classList.remove('l2tinted'); el.style.removeProperty('--t1'); el.style.removeProperty('--t2');
+  const put = t => { if (el.dataset.tintsrc !== src) return; el.style.setProperty('--t1', t[0]); el.style.setProperty('--t2', t[1]); el.classList.add('l2tinted'); };
+  if (tintMemo.has(src)) { const t = tintMemo.get(src); if (t) put(t); return; }
+  const im = new Image();
+  if (/^https?:/.test(src) && !src.startsWith(location.origin)) im.crossOrigin = 'anonymous';
+  im.onload = () => { try { const t = tintOf(im); tintMemo.set(src, t); put(t); } catch(e){ tintMemo.set(src, null); } };
+  im.onerror = () => tintMemo.set(src, null);
+  im.src = src;
+};
+function scan(){
+  document.querySelectorAll('#main [data-tint]').forEach(L.tint);
+  document.querySelectorAll('#main .hlgroup, #main .mcont').forEach(el => { const im = el.querySelector('img'); if (im) L.tintFrom(el, im.getAttribute('src')); });
+  const pl = document.getElementById('player'), art = pl && pl.querySelector('img.plart');
+  if (pl && art) L.tintFrom(pl, art.getAttribute('src'));
+  dupTitle(); prefsSearch();
+}
+// Preferences: a box that finds a setting by its name. Cards that don't have the words step away, and in a
+// card that does, so do the rows without them (unless it's the card's own name that matched).
+function prefsSearch(){
+  const page = document.querySelector('#main .prefspage'), top = document.querySelector('#main > .top');
+  if (!page || !top || top.querySelector('.l2psearch')) return;
+  top.insertAdjacentHTML('beforeend', '<span class="spacer"></span><input class="field l2psearch" type="search" placeholder="Search" aria-label="Search Preferences" autocomplete="off">');
+  const box = top.querySelector('.l2psearch'), low = x => (x || '').toLowerCase();
+  box.addEventListener('input', () => {
+    const q = low(box.value).trim(), grid = page.closest('.prefsgrid') || page;
+    grid.classList.toggle('l2finding', !!q);
+    page.querySelectorAll(':scope > .card').forEach(card => {
+      const h2 = card.querySelector('h2'), inName = !q || low(h2 && h2.textContent).includes(q), rows = [...card.querySelectorAll('.prow, .aaline')];
+      const hits = rows.filter(r => low(r.textContent).includes(q));
+      card.hidden = !!q && !inName && !hits.length;
+      rows.forEach(r => { r.hidden = !!q && !inName && hits.length > 0 && !hits.includes(r); });
+    });
+    page.querySelectorAll(':scope > .pgroup').forEach(g => { let n = g.nextElementSibling, any = false; while (n && !n.classList.contains('pgroup')) { if (n.classList.contains('card') && !n.hidden) any = true; n = n.nextElementSibling; } g.hidden = !any; });
+  });
+}
+// A screen's own name, when the row of pages just above already says it ("Highlights" under Highlights ·
+// Review): the name steps back, and so does its bar if nothing else is in it.
+function dupTitle(){
+  const sub = document.querySelector('.l2subs .l2sub.on:not(.folder)'), h = document.querySelector('#main .top h1');
+  if (!h) return;
+  const same = !!sub && L.shape() !== 'side' && !h.querySelector('button,select,a,svg') && h.textContent.trim().toLowerCase() === sub.textContent.trim().toLowerCase();
+  h.classList.toggle('l2same', same);
+  const top = h.closest('.top'); if (top) top.classList.toggle('l2bare', same && ![...top.children].some(c => c !== h && !c.classList.contains('spacer') && c.offsetParent));
+}
+if (L.on) {
+  let t = 0; const later = () => { clearTimeout(t); t = setTimeout(scan, 30); };
+  new MutationObserver(later).observe(document.getElementById('main'), { childList: true, subtree: true });
+  new MutationObserver(later).observe(document.getElementById('player'), { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'hidden'] });
+  new MutationObserver(later).observe(document.getElementById('side'), { childList: true });
+}
 
 // ---------- Today ----------
 // The book being read: the one opened last, from the nightstand or beside it.
@@ -233,20 +300,20 @@ function tidyMenu(menu){
   if (!spec || menu.classList.contains('l2m')) return;
   menu.classList.add('l2m');
   const used = new Set();
-  const take = ([key, label, icon, onRe, bar], withIcon) => {
+  const take = ([key, label, icon, onRe, bar], withIcon, tile) => {
     const b = menu.querySelector(MSEL(key)); if (!b || used.has(b)) return null;
     used.add(b);
     if (bar && shown(document.querySelector(bar))) { b.remove(); return null; }       // the bar above has it
     const ck = b.querySelector('.ck'), c = b.cloneNode(true); c.querySelectorAll('kbd,.kbd').forEach(x => x.remove());
     const was = c.textContent.trim(), on = ck ? !!ck.textContent.trim() : !!(onRe && onRe.test(was));
     b.classList.toggle('on', on); if (on) b.setAttribute('aria-pressed', 'true');
-    b.title = was;
+    if (tile) { b.dataset.tip = label || was; b.setAttribute('aria-label', label || was); b.removeAttribute('title'); } else b.title = was;
     b.innerHTML = (withIcon && icon ? MICON[icon] : '') + '<span class="l2ml">' + esc(label || was) + '</span>';
     return b;
   };
   const box = cls => { const d = document.createElement('div'); d.className = cls; return d; };
   const parts = [];
-  const tiles = box('l2m-tiles'); spec.tiles.forEach(x => { const b = take(x, true); if (b) tiles.appendChild(b); }); if (tiles.children.length) parts.push(tiles);
+  const tiles = box('l2m-tiles'); spec.tiles.forEach(x => { const b = take(x, true, true); if (b) tiles.appendChild(b); }); if (tiles.children.length) parts.push(tiles);
   const chips = box('l2m-chips'); spec.chips[1].forEach(x => { const b = take(x, false); if (b) chips.appendChild(b); });
   if (chips.children.length) { chips.insertAdjacentHTML('afterbegin', '<span class="l2m-h">' + spec.chips[0] + '</span>'); parts.push(chips); }
   spec.rows.forEach(g => { const rows = box('l2m-rows'); g.forEach(x => { const b = take(x, true); if (b) rows.appendChild(b); }); if (rows.children.length) parts.push(rows); });
