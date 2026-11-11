@@ -165,3 +165,6 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - not yet: the sideways side bar folding to its pictures, with the tab's pages in a row on the page (look2.js l2fold)
 - not yet: Listen's pages named for themselves (look2.js LISTEN)
 - not yet: the Sketchbook's edge stops at the page's width, and pushed well past it closes (sketchbook.js grip, sizes)
+- not yet: one Notebook (sketchbook.js, docs/sketchbook.md): the side panel's Notebook tab goes, the panel is Info and Ask (an article's Info with its document note), and the Sketchbook becomes the Notebook: General, a chapter picker that follows where you are (every chapter in the book, with its highlight count), Pages and List
+- not yet: the Notebook's Pages: the chapter's highlights as cards in reading order (from the reader's highlights; a tap goes to it in the book), blocks under each card keeping its id and place (`hl`, `hat` on a block in POST /api/sketchbook), a new highlight landing on the open page
+- not yet: the Notebook's List: every highlight in the book by chapter with the words written under it (GET /api/sketchbook/<item>/all; handwriting as its transcript), searchable, All / Highlights / With notes, the highlight's own row actions

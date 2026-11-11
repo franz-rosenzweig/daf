@@ -398,7 +398,7 @@ const MENUS = {
     tiles: [['more:listen', 'Listen', 'speaker', /^Stop/], ['more:ask', 'Ask', 'ask'], ['more:note', 'Note', 'note'], ['more:star', 'Shortlist', 'star', /^Off/], ['more:focus', 'Focus', 'focus', /^Leave/]],
     chips: ['List', [['more:prevdoc', '‹ Previous'], ['more:nextdoc', 'Next ›']]],
     rows: [[['more:save', 'Save to Library', 'save', null, '#rtop [data-dact="save"]'], ['more:seen', 'Seen', 'eye', /^Back/, '#rtop [data-dact="seen"]'], ['more:later', 'Later', 'clock', /^Back/], ['more:archive', 'Archive', 'archive', /^Back/, '#rtop [data-dact="archive"]'],
-        ['more:panel', 'Notebook', 'note', /^Hide/, '#rtop [data-ract="panel"]'], ['more:pages', 'PDF pages', 'file']],
+        ['more:panel', 'Info', 'info', /^Hide/, '#rtop [data-ract="panel"]'], ['more:pages', 'PDF pages', 'file']],
       [['more:kindle', 'Send to Kindle', 'kindle'], ['more:full', 'Load the full article', 'refresh'], ['more:device', null, 'download']],
       [['more:open', 'Open original', 'external'], ['more:copy', 'Copy link', 'link'], ['more:vault', 'Open in Obsidian', 'external']]],
     foot: [['more:meta', 'Edit title'], ['more:reset', 'Reset progress'], ['more:keys', 'Shortcuts'], ['more:delete', 'Delete']],

@@ -141,6 +141,7 @@ def rewrite_js(name, s):
     for q in ("'", '"', "`"):
         n += s.count(q + "/api/")
         s = s.replace(q + "/api/", q + "api/")
+    s = s.replace("new URL('/vendor/", "new URL('vendor/")       # the handwriting reader's model (pens.js)
     # Covers are static files here, so they need a file ending.
     s, k = re.subn(r"""(src="api/cover/' \+ encodeURIComponent\([\w.]+\) \+ ')(")""", r"\1.jpg\2", s)
     if name == "book.js":

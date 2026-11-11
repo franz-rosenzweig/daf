@@ -29,7 +29,7 @@ A word with a dot in a note becomes a tag, as in Readwise: ".craft" in a note ta
 
 ## Open at the exact spot
 
-Every highlight opens where it is. Press the small arrow next to a highlight on the Highlights page or a book page, click it in the Notebook, or press o in the review, and the book or article opens at that line, and the spot flashes. That works for the Kindle's highlights in books Calibre has, for Daf's own, and for audiobook and paper highlights, which Daf finds by their words.
+Every highlight opens where it is. Press the small arrow next to a highlight on the Highlights page or a book page, tap its card in the Notebook, or press o in the review, and the book or article opens at that line, and the spot flashes. That works for the Kindle's highlights in books Calibre has, for Daf's own, and for audiobook and paper highlights, which Daf finds by their words.
 
 ## The Highlights page
 

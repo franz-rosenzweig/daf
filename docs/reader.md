@@ -2,10 +2,10 @@
 
 # The reader
 
-Daf's reading view is where books, articles and PDFs open. Whatever I'm reading takes the whole window: the sidebar goes away (⌘\\ brings it back for a moment; on a tablet the left edge belongs to the page, so a swipe there turns back a page and doesn't bring the sidebar), and the bar on top is short and gets out of the way once I start reading. The contents and a side panel with **Info**, **Notebook** and **Ask** are there when I want them. This page covers books first, then what's different for articles and PDFs, then Listen, looking words up and the keys.
+Daf's reading view is where books, articles and PDFs open. Whatever I'm reading takes the whole window: the sidebar goes away (⌘\\ brings it back for a moment; on a tablet the left edge belongs to the page, so a swipe there turns back a page and doesn't bring the sidebar), and the bar on top is short and gets out of the way once I start reading. The contents, [the Notebook](sketchbook.md) and a side panel with **Info** and **Ask** are there when I want them. This page covers books first, then what's different for articles and PDFs, then Listen, looking words up and the keys.
 
 ![A book in Daf with highlights and the Notebook](images/reader.png)
-*A book in Daf, with the Notebook open on the right.*
+*A book in Daf, with the Notebook open on the right and the chapter's highlights on its page.*
 
 ## Books
 
@@ -80,8 +80,9 @@ The choice is kept on the server, so every device follows it.
 
 ## The side panel
 
-- **Info:** the cover, the description, and the details, including the series and where the Kindle is.
-- **Notebook:** every highlight in the book, in reading order under chapter headings, from Daf, the Kindle, the audiobook and paper pages. Click one and the book goes there.
+The highlights and my notes on them are in [the Notebook](sketchbook.md), beside the book, with a page for each chapter and a list of everything: every highlight in the book in reading order, from Daf, the Kindle, the audiobook and paper pages. Tapping one takes the book there. The side panel has the rest:
+
+- **Info:** the cover, the description, and the details, including the series and where the Kindle is. In an article it also has the document note and where it is in the vault.
 - **Ask:** a question about where you are, like a name you've forgotten or an argument you lost track of. Claude answers from the pages around you, briefly and without spoiling what comes later, on my own subscription. Ask has ready questions, like **Summarize this** in an article and **Who is this?** in a book.
 
 **Preferences → AI** decides how all of this talks to the model: the ready questions, the prompt behind each thing (summaries, Ask in an article and in a book, a word in its sentence, flashcards), which model (Opus, Sonnet or Haiku), and whether new articles get a summary on their own. Each prompt starts as Daf's, and **Daf's own** puts it back.
@@ -125,7 +126,7 @@ On a tablet with a pen (the S Pen on a Galaxy Tab, or an Apple Pencil on an iPad
 
 English is read on the device by Grape, the reader FineNotes uses, in Daf itself, so it works in the browser too and offline once its 5.7 MB model has come. Hebrew is read by Google's handwriting reader in the Android app (0.5.2 and later), which it fetches from Google once, about 20 MB; pick **עברית** on the card. Lines drawn clean as shapes and the highlighter's strokes aren't read.
 
-For notes beside the page instead of on it, there's [the Sketchbook](sketchbook.md).
+For notes beside the page instead of on it, there's [the Notebook](sketchbook.md).
 
 While the pen is over the screen, a small ring shows where it'll write and how wide. A hand resting on the screen while you write doesn't scroll the page or turn it. What you write is kept on the server, so it's there on every device, and each stroke stays with the words it was written on: change the font size or the line width and it moves with them, and a note in the margin stays beside its paragraph. Written with no signal, it waits on the device and goes when you're back online, as highlights do. Writing on a Feed item saves it to the Library, as a highlight does.
 
@@ -135,7 +136,7 @@ While the pen is over the screen, a small ring shows where it'll write and how w
 
 - **The top or bottom edge:** the bar, with Aa, the contents, the side panel and the rest. It goes again after a few seconds, or when you touch the page. In a book, a tap in the middle of the page does the same; the status bar at the very bottom does its own thing when tapped (see [The status bar](#the-status-bar)), and on a phone the slider and the round button come with the bar.
 - **The left edge:** the contents.
-- **The right edge:** the side panel, with Info, the Notebook and Ask.
+- **The right edge:** the side panel, with Info and Ask.
 
 Focus mode stays on for the next thing you open until you leave it from the **…** menu, Esc, or F (Shift F in an article). The pen's tools are hidden while you're in it; the S Pen's button still opens the round menu.
 

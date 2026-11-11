@@ -471,7 +471,7 @@ document.addEventListener('click', async e => {
     else if (a === 'rownever' || a === 'rowback') { await api('/api/review/' + encodeURIComponent(x.id), { method: 'POST', body: JSON.stringify({ action: a === 'rownever' ? 'never' : 'back' }) }); x.r_status = a === 'rownever' ? 'never' : 'kept'; redrawRow(x); toast(a === 'rownever' ? 'It won’t come up in review again' : 'Back in review'); }
     else if (a === 'rowrm') {
       // In a reader's Notebook, the reader removes it: from the text too, with its own Undo.
-      const inReader = H.ctxRowEl && H.ctxRowEl.closest('.rpanel') && H.active && H.active.rm;
+      const inReader = H.ctxRowEl && H.ctxRowEl.closest('.rpanel, .sklist') && H.active && H.active.rm;
       if (inReader) { await H.active.rm({ h: x }); return; }
       await api('/api/highlights/' + encodeURIComponent(x.id), { method: 'DELETE' });
       const el = rowEl(x.id); if (el) el.remove();

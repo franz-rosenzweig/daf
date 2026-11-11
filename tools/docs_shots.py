@@ -166,8 +166,7 @@ SHOTS = [
     ("library-home.png", DESK, {}, ["#library"]),
     ("library.png", DESK, {}, ["#library/article"]),
     ("paper.png", DESK, {}, ["#today", "js:document.querySelector('[data-act=\"paper\"]').click()"]),
-    ("reader.png", DESK, {"panel": True}, ["#ebook/cal%3A2/hl:WOODS", "wait:4", "js:document.querySelector('[data-bpt=\"notebook\"]').click()",
-                                       "js:(e => { if (e) e.scrollTop = 0; })(document.getElementById('bpanel'))"]),
+    ("reader.png", DESK, {"notebook": True}, ["#ebook/cal%3A2/hl:WOODS", "wait:4", "js:window.DafCore.Sketch.reveal({ view: 'pages' })", "wait:3"]),
     ("review.png", dict(DESK, size=(1398, 708), canvas=(1486, 796)), {}, ["#review"]),
     ("search.png", DESK, {}, ["#today", "js:document.querySelector('[data-act=\"palette\"]').click()",
                               "js:(q => { q.value = 'writing'; q.dispatchEvent(new Event('input', { bubbles: true })); })(document.getElementById('palq'))"]),
@@ -223,6 +222,7 @@ def open_screen(p, base, size, mobile, opts, zone):
          + ("localStorage.setItem('daf.hlColor', JSON.stringify(" + json.dumps(opts["hl"]) + "));" if opts.get("hl") else "")
          + ("localStorage.setItem('daf.type', JSON.stringify({ flow: 'paginated' })); localStorage.setItem('daf.bookPanel', 'false'); localStorage.setItem('daf.bookToc', 'false');" if opts.get("paper") else "")
          + ("localStorage.setItem('daf.bookPanel', 'true'); localStorage.setItem('daf.bookToc', 'false');" if opts.get("panel") else "")
+         + ("localStorage.setItem('daf.bookToc', 'false'); localStorage.setItem('daf.sketch.view', '\"pages\"'); localStorage.setItem('daf.sketch.w', '0.36');" if opts.get("notebook") else "")
          + "})()")
     p.js("location.reload()", 3)
 

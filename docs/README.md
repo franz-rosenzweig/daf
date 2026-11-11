@@ -15,7 +15,7 @@ These pages explain Daf the way I'd explain it to a friend sitting next to me: w
 - [Where the minutes come from](reading-time.md) — the Kindle, audiobooks, paper and Daf, and what counts
 - [Paper books](paper-books.md) — logging minutes, Shabbat, and photos of marked pages
 - [The reader](reader.md) — books, articles and PDFs, themes and typefaces, writing with a pen, focus mode, Listen, lookup, Ask, and the keys
-- [The Sketchbook](sketchbook.md) — a notebook beside whatever I'm reading or watching, kept in Obsidian and on the Kindle
+- [The Notebook](sketchbook.md) — one notebook beside whatever I'm reading or watching: my highlights, and what I write and draw about them, kept in Obsidian and on the Kindle
 - [The Edition](edition.md) — a short paper each morning, chosen by what I read, watch and listen to, and the Taste behind it
 - [Sound](sound.md) — rain, fire, the sea or a crowd under the book, following the scene, in Daf or beside the Kindle
 - [The Feed and the Library](feed-and-library.md) — FreshRSS, the Library and its tags, imports, the morning email, newsletters, Home, search and Send to Kindle
