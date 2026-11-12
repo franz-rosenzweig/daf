@@ -209,7 +209,7 @@ class Agent(unittest.TestCase):
         x = areaagent.chats(self.c, self.a)[0]
         self.assertEqual((x["id"], x["state"]), (cid, "done"))
         self.assertEqual([[ch["go"] for ch in p["from"]] for p in x["paras"]],
-                         [["book/cal%3A1/hl:h1", "book/cal%3A1"], ["read/kk%3A1/p:3"], ["read/kk%3A2/t:95"], []])
+                         [["book/cal%3A1/hl:h1"], ["read/kk%3A1/p:3"], ["read/kk%3A2/t:95"], []])     # one each, where it was first cited
         self.assertEqual(x["paras"][1]["from"][0]["label"], "How to Begin · ¶ 3")
         self.assertEqual(x["paras"][2]["from"][0]["label"], "A Talk · 1:35")
         self.assertEqual(x["n"], 3)
