@@ -18,7 +18,7 @@ In the top right corner are **+** to add something, **Search**, the minutes ring
 
 Each screen keeps the one thing I do there most and what changes what its list shows. Everything else in its bar is in the **⋯** menu: on a list that's Select, Save as a view and Mark seen; on All Books, Columns, Views and the rest; on a book's page, Listen from here, Edit details and the note in Obsidian. Stats, Sources, Preferences and What's new are small at the bottom of every one.
 
-In a book or an article the reader's own **⋯** is tidier too: Listen, Notebook, Ask and Focus are pictures along the top (their names show when I point at them), then a row of places to go, and the rest in short lines.
+In a book or an article the reader's own **⋯** is tidier too: Listen, Ask and Focus are pictures along the top (their names show when I point at them), under them Notebook, [Margin and Side by side](reader.md#margin-and-side-by-side), then a row of places to go, and the rest in short lines.
 
 ## One search
 

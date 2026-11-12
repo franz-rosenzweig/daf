@@ -172,3 +172,8 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - not yet: one Notebook (sketchbook.js, docs/sketchbook.md): the side panel's Notebook tab goes, the panel is Info and Ask (an article's Info with its document note), and the Sketchbook becomes the Notebook: General, a chapter picker that follows where you are (every chapter in the book, with its highlight count), Pages and List
 - not yet: the Notebook's Pages: the chapter's highlights as cards in reading order (from the reader's highlights; a tap goes to it in the book), blocks under each card keeping its id and place (`hl`, `hat` on a block in POST /api/sketchbook), a new highlight landing on the open page
 - not yet: the Notebook's List: every highlight in the book by chapter with the words written under it (GET /api/sketchbook/<item>/all; handwriting as its transcript), searchable, All / Highlights / With notes, the highlight's own row actions
+
+## Margin and Side by side (2026-11-11)
+
+- not yet: Margin (study.js): the page over to the left and a margin beside it with a line for each highlight in its colour, its note and the Notebook's words under it, a tap opens the highlight
+- not yet: Side by side (study.js): a second reader on the right half of the window, its back a ×, reading time for the side touched last

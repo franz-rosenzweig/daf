@@ -205,7 +205,8 @@ C.Split = { open: () => !!SP.el, can: () => !PANE && innerWidth >= 760, toggle: 
 if (PANE) {
   C.Sound = null;
   const X = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-  const backs = () => document.querySelectorAll('#main .top [aria-label="Back"]');
+  // a book's (Back, or Close the book on a narrow screen), an article's and a PDF's
+  const backs = () => document.querySelectorAll('#main .top > :is(a.ib[aria-label="Back"], a.ib[aria-label="Close the book"], [data-ract="back"], [data-pv="back"])');
   new MutationObserver(() => backs().forEach(b => { if (b.dataset.sbsx) return; b.dataset.sbsx = '1'; b.innerHTML = X; b.setAttribute('aria-label', 'Close'); b.title = 'Close'; }))
     .observe(document.getElementById('main'), { childList: true, subtree: true });
   document.addEventListener('click', e => {
