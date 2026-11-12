@@ -3,6 +3,7 @@
 An area holds books, saved articles and videos, and feeds, in the order to go through them, by
 reference (the things themselves stay where they are: in Books, the Library and the Feed):
   book:<books.id>  doc:<docs.id>  feed:<feeds.id>
+                   (a Feed item is saved to the Library as it's added, and the area keeps the Library's copy)
   url:<address>    a link saved while the Library was away; it becomes the doc with that address
   want:<title>|<by>  a book suggested and wanted, until a book of that title is in Daf
 
@@ -94,19 +95,55 @@ def _valid_ref(c, ref):
     return kind == "want" and bool(key.strip(" |"))
 
 
-def add(c, aid, ref):
+SAVED_FIRST = ("feed", "pool")         # the Feed (and the Edition's pool) lets go of what's been seen: kept in the Library instead
+
+
+def _library_copy(c, url):
+    from . import pages
+    n = pages.norm_url(url)
+    for r in c.execute("SELECT id, url FROM docs WHERE where_ = 'library' AND COALESCE(status, '') != 'deleted' AND url IS NOT NULL "
+                       "AND instr(lower(url), ?) > 0 ORDER BY added DESC", (n.split("://", 1)[-1].lower(),)):
+        if pages.norm_url(r["url"]) == n:
+            return r["id"]
+    return None
+
+
+def _save_doc(c, did):
+    from . import reader
+    return reader.save_to_library(c, did)
+
+
+def kept(c, ref, save=None):
+    """The ref an area keeps for a thing: a Feed item is its Library copy, saved now when `save` is given
+    (reader.save_to_library: its highlights and place go along), or the ref as it is."""
+    kind, _, key = (ref or "").partition(":")
+    if kind != "doc":
+        return ref
+    d = c.execute("SELECT where_, url FROM docs WHERE id = ?", (key,)).fetchone()
+    if not d or d["where_"] not in SAVED_FIRST or not d["url"]:
+        return ref
+    have = _library_copy(c, d["url"])
+    if have:
+        return "doc:" + have
+    return "doc:" + save(c, key) if save else ref
+
+
+def add(c, aid, ref, save=_save_doc):
+    """Into an area; gives the ref it's kept as (a Feed item is saved to the Library first)."""
     if not c.execute("SELECT 1 FROM areas WHERE id = ?", (aid,)).fetchone():
         raise KeyError(aid)
     if not _valid_ref(c, ref):
         raise ValueError("Nothing to add")
+    ref = kept(c, ref, save)
     last = c.execute("SELECT COALESCE(MAX(ord), 0) FROM area_items WHERE area_id = ?", (aid,)).fetchone()[0]
     c.execute("INSERT INTO area_items (area_id, ref, ord, added) VALUES (?, ?, ?, ?) ON CONFLICT(area_id, ref) DO NOTHING",
               (aid, ref, last + 1, _now()))
     c.commit()
+    return ref
 
 
 def remove(c, aid, ref):
-    c.execute("DELETE FROM area_items WHERE area_id = ? AND ref = ?", (aid, ref))
+    c.execute("DELETE FROM area_items WHERE area_id = ? AND ref IN (?, ?)", (aid, ref, kept(c, ref)))
     c.commit()
 
 
@@ -218,9 +255,13 @@ def page(c, aid):
             "suggestions": suggestions(c, aid), "looking": aid in _looking}
 
 
-def areas_of(c, ref):
-    """The areas a thing is in (for its Add to an area)."""
-    return [r[0] for r in c.execute("SELECT area_id FROM area_items WHERE ref = ?", (ref,))]
+def areas_of(c, refs):
+    """The areas a thing is in (for its Add to an area); for several, the areas they're all in."""
+    refs = [kept(c, r) for r in ([refs] if isinstance(refs, str) else refs) if r]
+    if not refs:
+        return []
+    ins = [{r[0] for r in c.execute("SELECT area_id FROM area_items WHERE ref = ?", (ref,))} for ref in refs]
+    return sorted(set.intersection(*ins))
 
 
 # ---- the helper ----------------------------------------------------------------------------------

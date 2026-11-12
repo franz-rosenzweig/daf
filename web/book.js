@@ -1718,6 +1718,7 @@ function openMore(anchor){
     '<button data-bm="mark">' + (markHere() ? 'Remove the bookmark' : 'Bookmark this page') + '<span class="kbd">b</span></button>' +
     (B.scans ? '<button data-bm="pairs">Pair the pages the other way</button>' : '') +
     '<button data-bm="book">Book page, notes and nightstand</button>' +
+    (C.Learn ? '<button data-bm="area">Add to an area</button>' : '') +
     '<a href="/api/highlights/export?fmt=md&book=' + encodeURIComponent(B.d.id) + '" download>Export highlights (Markdown)</a>' +
     '<a href="/api/ebooks/' + encodeURIComponent(B.d.id) + '/file" download>Download the file</a>' +
     '<button data-bm="auto"><span><span class="ck">' + (H.auto() ? '✓' : '') + '</span>Auto highlight</span></button>' +
@@ -1830,6 +1831,7 @@ document.addEventListener('click', async e => {
     $('#pop').hidden = true;
     const a = bm.dataset.bm;
     if (a === 'listen') toggleListen();
+    else if (a === 'area' && C.Learn) C.Learn.pick('book:' + B.d.id, B.d.title);
     else if (a === 'notebook') notebook();
     else if (a === 'margin' && C.Margin) C.Margin.toggle();
     else if (a === 'sbs' && C.Split) C.Split.toggle();

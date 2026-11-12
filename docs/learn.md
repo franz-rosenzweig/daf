@@ -24,7 +24,10 @@ There are a few ways:
 
 - **Add**, on the area's page, searches everything in Daf (books, articles, videos) and adds what I pick. Underneath it I can paste a link, which is saved to the Library and goes into the area, or give it a site to follow.
 - **Add to Daf** (the + in the corner) has an Area box when I have areas, so a link I save or a site I follow goes straight into one. On an area's page it's already set to that area.
-- On a book's page, the corner's **⋯** has **Add to an area**, with every area to switch on or off.
+- Anywhere I meet a thing, there's **Add to an area**, with every area to switch on or off. It's in the corner's **⋯** on a book's page, in the **⋯** while I'm reading a book, and in the **⋯** while I'm reading an article or watching a video or listening to an episode, whether it came from the Feed or the Library.
+- In the Feed and the Library lists I can pick rows (Select, or hold a row on a touch screen) and **Add to an area** puts them all in at once. With a row picked on a wide screen, its info on the right has the same button.
+
+A post from the Feed gets saved to the Library as it goes into an area, the same as Save to Library would do, since the Feed lets go of what I've seen after a while and the area would lose it. Its highlights and my place go along, and if I'm reading it at the time, the page switches to the saved copy.
 
 ## The helper
 

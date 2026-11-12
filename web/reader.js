@@ -33,7 +33,8 @@ const ICON = {
   email: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 6l6.5 5 6.5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   star: on => '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
   up: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 12.5l5-5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  down: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  down: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  area: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 8 10 4.5 17.5 8 10 11.5zM5.5 9.6v3.6c1.4 1.3 2.9 2 4.5 2s3.1-.7 4.5-2V9.6M17.5 8v4.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 const KIND_STAR = 'starred';
 const rtl = t => { const s = String(t || ''); const h = (s.match(/[֐-׿]/g) || []).length; return h > 0 && h > s.replace(/\s/g, '').length * 0.3; };
@@ -257,6 +258,7 @@ function infoHTML(d){
     '<div class="kv">' + kv.map(x => '<span>' + esc(x[0]) + '</span><span>' + esc(x[1] || '') + '</span>').join('') + '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn primary" href="#read/' + encodeURIComponent(d.id) + '">' + (d.kind === 'video' ? 'Watch' : 'Read') + '</a>' +
     (d.where_ === 'feed' ? '<button class="btn" data-dact="save" data-id="' + esc(d.id) + '">' + ICON.save + 'Save to Library</button>' : '') +
+    (C.Learn ? '<button class="btn" data-toarea="' + esc(d.id) + '">' + ICON.area + 'Add to an area</button>' : '') +
     '<button class="btn" data-dact="delete" data-id="' + esc(d.id) + '" title="Delete' + K.tip('list', 'delete') + '">' + ICON.trash + 'Delete</button></div></div>';
 }
 function tagSelect(L){
@@ -730,6 +732,7 @@ function drawBulk(){
   const tab = R.tabs[L.where === 'feed' ? 'feed' : 'library'];
   const acts = L.where === 'feed' ? (tab === 'seen' ? [['unseen', 'Mark unseen']] : [['seen', 'Mark seen']]).concat([['save', 'Save to Library']])
     : (tab === 'inbox' ? [['later', 'Later'], ['archive', 'Archive']] : tab === 'later' ? [['inbox', 'Inbox'], ['archive', 'Archive']] : [['inbox', 'Back to Inbox']]).concat([['star', 'Shortlist'], ['kindle', 'Send to Kindle']]);
+  if (C.Learn) acts.push(['area', 'Add to an area']);
   acts.push(['deleted', 'Delete']);
   bar.innerHTML = '<b>' + n + ' selected</b><span class="spacer"></span>' + acts.map(a => '<button class="btn sm' + (a[0] === 'archive' || a[0] === 'seen' ? ' primary' : '') + '" data-bulk="' + a[0] + '">' + a[1] + '</button>').join('') +
     '<button class="btn sm" data-bulk="all">Select all</button><button class="btn sm" data-bulk="none">Clear</button>';
@@ -756,6 +759,7 @@ async function bulkAct(act){
   if (act === 'none') { R.multi.clear(); R.selecting = false; drawRows(); return; }
   if (act === 'all') { visibleItems().forEach(d => R.multi.add(d.id)); drawRows(); return; }
   if (act === 'kindle') { const r = await sendToKindle([...R.multi]); if (r) { R.multi.clear(); R.selecting = false; drawRows(); } return; }
+  if (act === 'area') { const n = R.multi.size; toArea([...R.multi], n > 1 ? n + ' selected' : (L.items.find(x => R.multi.has(x.id)) || {}).title); return; }
   const ids = [...R.multi]; if (!ids.length) return;
   const bar = $('#bulkbar'); if (bar) bar.querySelectorAll('button').forEach(b => { b.disabled = true; });
   try {
@@ -827,6 +831,22 @@ async function docAct(act, id){
     }
     refreshCounts();
   } catch(e){ toast(e.message); }
+}
+
+// Add to an area (learn.js L.pick), for one doc or the rows picked. A Feed item is saved to the Library as it
+// goes in: the reader moves to the saved copy (as Save to Library does), a list shows it gone from the Feed.
+function toArea(ids, title){
+  let again = 0;
+  C.Learn.pick(ids.map(id => 'doc:' + id), title, (was, now) => {
+    const id = was.slice(4), nid = now.slice(4);
+    if (R.doc && R.doc.id === id) {
+      if (Pl.cur && Pl.cur.doc === id) { Pl.cur.doc = nid; Pl.cur.open = '#read/' + encodeURIComponent(nid); }
+      C.swap('#read/' + encodeURIComponent(nid));
+    }
+    if (R.multi.delete(id)) R.multi.add(nid);
+    clearTimeout(again);
+    again = setTimeout(() => { refreshCounts(); if (R.list && R.list.where === 'feed' && !R.doc) listView(R.list.where, R.list.arg); }, 300);
+  });
 }
 
 /* ---------- the reading view ---------- */
@@ -999,6 +1019,7 @@ function openMore(anchor){
     (C.Split && C.Split.can() ? it('sbs', C.Split.open() ? 'Close side by side' : 'Side by side', '') : '') +
     (d.blocks.length && d.kind !== 'video' && !d.episode ? it('listen', R.tts.on && R.tts.doc === d.id ? 'Stop reading aloud' : 'Read aloud from here', K.label('article', 'aloud')) : '') +
     it('ask', 'Ask about this', '') +
+    (C.Learn ? it('area', 'Add to an area', '') : '') +
     (feed && d.url ? it('full', d.full ? 'Load the full article again' : 'Load the full article', '') : '') +
     (d.blocks.length && d.kind !== 'video' && d.kind !== 'podcast' ? it('kindle', d.kindle_sent ? 'Send to the Kindle again' : 'Send to the Kindle', '') : '') +
     (deviceKeeps() && d.blocks.length ? it('device', R.onDevice && R.onDevice.pinned.has(d.id) ? 'Remove from this device' : 'Keep on this device', '') : '') + '<hr>' +
@@ -1029,6 +1050,7 @@ function moreAct(a){
   else if (a === 'sbs' && C.Split) C.Split.toggle();
   else if (a === 'kindle') sendToKindle([d.id]).then(r => { if (r) d.kindle_sent = { file: r.file, at: Date.now() / 1000 }; });
   else if (a === 'ask') { R.panel = 'ask'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#rpanel textarea'); if (x) x.focus(); }, 40); }
+  else if (a === 'area' && C.Learn) toArea([d.id], d.title);
   else if (['save', 'seen', 'later', 'archive', 'delete', 'star'].includes(a)) docAct(a, d.id);
   else if (a === 'focus' && C.Focus) C.Focus.toggle();
   else if (a === 'reset') api('/api/docs/' + encodeURIComponent(d.id) + '/progress', { method:'DELETE' }).then(() => { d.progress = 0; $('#main').scrollTo({ top:0, behavior:'smooth' }); toast('Back to the start; progress cleared'); }).catch(e => toast(e.message));
@@ -1916,6 +1938,8 @@ document.addEventListener('click', e => {
   }
   const de = t.closest('[data-dtagedit]');
   if (de) { tagDoc(de.dataset.dtagedit, de); return; }
+  const ta = t.closest('[data-toarea]');
+  if (ta && C.Learn) { const id = ta.dataset.toarea, d = R.list && R.list.items.find(x => x.id === id); toArea([id], d && d.title); return; }
   const dt = t.closest('[data-dtag]'); if (dt) { R.tag = dt.dataset.dtag || null; if (C.S.route[0] === 'library' && R.list) drawRows(); else { location.hash = 'library/article'; } return; }
   const jp = t.closest('[data-jump]'); if (jp) { const fig = $('#docbody figure[data-img="' + (+jp.dataset.jump) + '"]'); if (fig) fig.scrollIntoView({ block:'center', behavior:'smooth' }); else setFocus(+jp.dataset.jump, true); return; }   // a picture isn't a paragraph to focus
   const aq = t.closest('[data-askq]'); if (aq) { ask(aq.dataset.askq); return; }

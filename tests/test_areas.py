@@ -77,6 +77,49 @@ class Areas(unittest.TestCase):
         self.assertEqual(areas.list_areas(self.c), [])
         self.assertTrue(self.c.execute("SELECT 1 FROM docs WHERE id = 'kk:1'").fetchone())
 
+    def feed_item(self, did="rss:2", url="https://example.org/feeders/"):
+        self.c.execute("INSERT INTO docs (id, kind, where_, status, title, source, url, feed) VALUES (?, 'article', 'feed', 'unseen', 'Feeders', 'A Blog', ?, 'feed/1')",
+                       (did, url))
+        self.saved = []
+
+        def save(c, d):
+            self.saved.append(d)
+            c.execute("INSERT INTO docs (id, kind, where_, status, title, url, added) VALUES ('kk:9', 'article', 'library', 'inbox', 'Feeders', ?, 1)", (url,))
+            return "kk:9"
+        return save
+
+    def test_a_feed_item_is_saved_to_the_library_and_kept_as_that(self):
+        save = self.feed_item()
+        self.assertEqual(areas.add(self.c, self.a, "doc:rss:2", save=save), "doc:kk:9")
+        self.assertEqual(self.saved, ["rss:2"])
+        self.assertEqual([x["ref"] for x in areas.page(self.c, self.a)["items"]], ["doc:kk:9"])
+        # asked about from the Feed's copy: it's in the area, and adding it again saves nothing more
+        self.assertEqual(areas.areas_of(self.c, "doc:rss:2"), [self.a])
+        self.assertEqual(areas.add(self.c, self.a, "doc:rss:2", save=save), "doc:kk:9")
+        self.assertEqual(self.saved, ["rss:2"])
+        # and taken out from there too
+        areas.remove(self.c, self.a, "doc:rss:2")
+        self.assertEqual(areas.page(self.c, self.a)["items"], [])
+
+    def test_a_feed_item_already_in_the_library_is_not_saved_again(self):
+        save = self.feed_item(url="https://example.org/begin/")       # How to Begin, kk:1 (the same address, but for its slash)
+        self.assertEqual(areas.add(self.c, self.a, "doc:rss:2", save=save), "doc:kk:1")
+        self.assertEqual(self.saved, [])
+
+    def test_library_things_books_and_feeds_are_kept_as_they_are(self):
+        for ref in ("doc:kk:1", "book:cal:1", "feed:feed/1", "doc:rss:1"):          # (rss:1 has no address to save)
+            self.assertEqual(areas.add(self.c, self.a, ref, save=lambda c, d: self.fail("saved")), ref)
+
+    def test_the_areas_several_things_are_all_in(self):
+        b = areas.create(self.c, "Knots", suggest=False)
+        for aid in (self.a, b):
+            areas.add(self.c, aid, "doc:kk:1")
+        areas.add(self.c, self.a, "book:cal:1")
+        self.assertEqual(areas.areas_of(self.c, ["doc:kk:1"]), sorted([self.a, b]))
+        self.assertEqual(areas.areas_of(self.c, ["doc:kk:1", "book:cal:1"]), [self.a])
+        self.assertEqual(areas.areas_of(self.c, ["doc:kk:2"]), [])
+        self.assertEqual(areas.areas_of(self.c, []), [])
+
     def test_update(self):
         areas.update(self.c, self.a, {"name": "Birds", "color": "#4b3a78", "suggest": True})
         a = areas.list_areas(self.c)[0]
