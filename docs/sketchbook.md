@@ -11,7 +11,7 @@ There used to be two of these, the Sketchbook for the pen and the Notebook in th
 
 ## Opening it
 
-Every reader has the Notebook button in its bar (a page with a pen on it): next to the bookmark in a book, next to the Info button in an article or a video, before focus mode in a PDF, and in the manga reader's top bar. The same button closes it, and so does the ✕ in its corner. **Notebook** in a book's **…** menu (or the ] key) opens it too. If I had it open the last time I read a book (or an article, a PDF, a manga), it's open again the next time.
+In a book, an article or a video the Notebook is the first tab of the side panel, beside **Info** and **Ask**, and one of the three is open at a time. The side panel's button in the bar (a box with a line down its right side) opens it at the tab I used last, and closes whatever is open, as the ] key does. **Notebook** in a book's **…** menu opens the Notebook itself. A PDF and the manga reader keep their own Notebook button (a page with a pen on it): before focus mode in a PDF, and in the manga reader's top bar. The ✕ in its corner closes it too. If I had it open the last time I read a book (or an article, a PDF, a manga), it's open again the next time.
 
 - **Sideways** (the tablet on its side, or a computer) it's a panel on the right, and the book or the page gets the rest of the screen. I drag its left edge to make it wider, or back to the page's own width; pushed well past that, it closes.
 - **Upright** (the tablet standing) it's a sheet from the bottom, a little over half the screen. I drag the handle on top to the height I want, and dragging it nearly all the way down closes it. The arrow button moves it to the top of the screen, and back.
