@@ -1585,7 +1585,8 @@ html.focus.fpanel .ptabs .pclose{display:none}
 .vhead{transition:top .25s ease}
 .rtitle{flex:1;min-width:0;text-align:center;font-size:13px;color:var(--fg-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .2s}
 .rv.titled .rtitle{opacity:1}
-.rleft{position:sticky;bottom:0;text-align:center;font-size:12.5px;color:var(--fg-3);padding:22px 0 12px;margin-top:-40px;background:linear-gradient(to bottom,transparent,var(--bg) 55%);pointer-events:none;font-variant-numeric:tabular-nums}
+/* (it comes to rest under the last line, not over it: it only fades the text while it rides the bottom edge) */
+.rleft{position:sticky;bottom:0;text-align:center;font-size:12.5px;color:var(--fg-3);padding:22px 0 12px;margin-top:4px;background:linear-gradient(to bottom,transparent,var(--bg) 55%);pointer-events:none;font-variant-numeric:tabular-nums}
 @media (max-width:600px){ .rtitle{display:none} }
 /* ---------- a book, the Apple Books way (book.js): one column for the pages (two pages side by side
    on a wide screen, by foliate), the contents and the side panel as sheets over them at every size,
