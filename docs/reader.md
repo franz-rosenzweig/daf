@@ -21,7 +21,7 @@ A book that's only pictures of its pages, like a scanned book someone turned int
 
 Footnotes open in a small popover next to the link, so you never lose your place. The screen stays awake while a book is open. Near the end of a book in a series, Daf offers the next one (**Start it**), and at the very end it asks "The end. Mark it read on Hardcover?" with **Finished** and **Not now**.
 
-The **…** menu has **Listen from here** (l), **The audiobook from here** when the book has one in Audiobookshelf ([Books and shelves](books-and-shelves.md#the-audiobook)), the **Notebook** (]), **About this book**, **Ask about this book** and **Focus mode** (f), then **Go to the beginning**, **Go to a page or a percent** (type 120 for a page, or 45%), **Go to the Kindle's page**, **Bookmark this page**, **Book page, notes and nightstand**, **Export highlights (Markdown)**, **Download the file**, **Auto highlight**, **Keyboard shortcuts** and **Forget my place in Daf**. In the Mac and Android apps it also has **Keep on this device**.
+The **…** menu has **Listen from here** (l), **The audiobook from here** when the book has one in Audiobookshelf ([Books and shelves](books-and-shelves.md#the-audiobook)), the **Notebook** (]), **Margin** and **Side by side** ([below](#margin-and-side-by-side)), **About this book**, **Ask about this book** and **Focus mode** (f), then **Go to the beginning**, **Go to a page or a percent** (type 120 for a page, or 45%), **Go to the Kindle's page**, **Bookmark this page**, **Book page, notes and nightstand**, **Export highlights (Markdown)**, **Download the file**, **Auto highlight**, **Keyboard shortcuts** and **Forget my place in Daf**. In the Mac and Android apps it also has **Keep on this device**.
 
 ## How the page looks
 
@@ -87,13 +87,21 @@ The highlights and my notes on them are in [the Notebook](sketchbook.md), beside
 
 **Preferences → AI** decides how all of this talks to the model: the ready questions, the prompt behind each thing (summaries, Ask in an article and in a book, a word in its sentence, flashcards), which model (Opus, Sonnet or Haiku), and whether new articles get a summary on their own. Each prompt starts as Daf's, and **Daf's own** puts it back.
 
+## Margin and Side by side
+
+Two more ways to lay out what I'm reading are in the **⋯** menu, beside the Notebook. Only one of the three is open at a time, and a phone has neither of the new ones, since there's no room.
+
+**Margin** moves the page over and opens a margin beside it, the way a study edition has one. Level with each highlight on the page there's a line in its colour, and next to it the note I wrote on it and whatever I've written under it in the Notebook, typed or by hand. Tapping a line or a note opens that highlight, so a note is one tap away. The book shows one page at a time while the margin is open. It stays open for every book and article until I close it, and it works in the Torah readings too. In an article the pen writes in the same margin.
+
+**Side by side** asks what to read next to this one: what's on the nightstand, or anything in Daf by its title. It opens on the right half of the window as a whole second reader, with its own highlights, Notebook and Aa, and its back button becomes **×** to close it. It's for a book and its translation, a parasha and a dvar Torah, or a text and an article about it. Closing the reader on the left closes both. Reading time counts for whichever side I touched last, so the same minutes never count twice.
+
 ## Articles
 
 Articles from the Feed and the Library open in the same view. Click a picture to highlight it: it gets a frame in the color, and it shows as the picture in the Notebook, Highlights, the review and the vault. Hebrew titles and paragraphs read right to left on their own.
 
 The bar has six things on it: back, **Aa**, **Listen** (p), **Done** (e), the **…** menu and the notebook (]). A Feed item has **Save to Library** (s) too. It slides away while I read on, and comes back when I scroll up a little or move the pointer to the top, with the title in the middle once the heading has gone by. Under the text, quietly, is how many minutes are left.
 
-The article **…** menu has the next and previous item of the list I came from (Shift J and Shift K), **Shortlist** (f), **Focus mode** (Shift F), **Add a document note**, **Read aloud from here**, **Ask about this**, **Load the full article** (for feeds that only send a summary), **Send to the Kindle**, **Keep on this device** (in the apps), **Save to Library** and **Mark seen** for a Feed item or **Read later** and **Archive** for a Library one, **Reset reading progress**, **Edit title and author**, **Delete**, **Open the original**, **Copy the link**, **Open the note in Obsidian** and **Keyboard shortcuts**.
+The article **…** menu has the next and previous item of the list I came from (Shift J and Shift K), **Shortlist** (f), **Focus mode** (Shift F), **Add a document note**, **Read aloud from here**, **Ask about this**, **Margin**, **Side by side**, **Load the full article** (for feeds that only send a summary), **Send to the Kindle**, **Keep on this device** (in the apps), **Save to Library** and **Mark seen** for a Feed item or **Read later** and **Archive** for a Library one, **Reset reading progress**, **Edit title and author**, **Delete**, **Open the original**, **Copy the link**, **Open the note in Obsidian** and **Keyboard shortcuts**.
 
 ![An article with a new green highlight](images/article.png)
 *Selecting a sentence highlights it, and the bar above it changes the color, adds a note or tags it.*
@@ -107,7 +115,7 @@ On a tablet with a pen (the S Pen on a Galaxy Tab, or an Apple Pencil on an iPad
 - **Eraser.** Tap it again to choose whether it takes whole strokes or only what it passes over, and how big it is. It also takes away any highlight it passes over. **Erase everything written here** is there too, with Undo.
 - **Lasso.** Draw round handwriting to hold it, then **To text** or **Erase**. Tap the lasso again for **Read all the handwriting here**.
 - **Undo** and **Redo**.
-- **Margin** (articles) moves the text over to leave room on the right for notes. It comes on by itself in an article that already has notes in its margin.
+- **Margin** (articles) moves the text over to leave room on the right for notes. It comes on by itself in an article that already has notes in its margin. It's the same room as the ⋯ menu's Margin, so the two can be on together.
 - **›** puts the tools away, and then the pen scrolls and selects like a finger. The pen button brings them back.
 
 **The S Pen's button.** Press it and let go with the pen just over the screen, not touching, and the round menu opens where the pen is, as in Samsung Notes. The pen you're holding is in the middle (tap it for the other kinds, the highlighter and the eraser), its size is on the left, its colour on the right, Undo and Redo are at the top, and your favourite pens are at the bottom, with **+** to keep the pen you're holding as a favourite. Hold the button while you write and the pen erases.
