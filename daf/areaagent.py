@@ -398,6 +398,8 @@ def _plan_from(got, srcs, check=None):
                 if o:
                     steps.append({"add": o[0], "mins": mins, "done": False})
         if steps:
+            for st in steps:
+                st["id"] = secrets.token_hex(3)
             weeks.append({"name": _clip(w.get("name"), 40) or f"Week {len(weeks) + 1}", "steps": steps})
     if not weeks:
         raise RuntimeError("The plan came back empty")
@@ -450,8 +452,26 @@ def _load(v):
         return None
 
 
+def _ids(plan):
+    """Every step with an id (a plan from before steps had them gets its place as one)."""
+    for w, week in enumerate(plan.get("weeks") or []):
+        for j, st in enumerate(week.get("steps") or []):
+            st.setdefault("id", f"{w}.{j}")
+    return plan
+
+
+def _step(plan, sid):
+    for week in plan["weeks"]:
+        for st in week["steps"]:
+            if st["id"] == str(sid):
+                return st
+    raise ValueError("No such step")
+
+
 def plan_change(c, aid, b):
-    """Keep or drop the draft, clear the plan, tick a step, or add a step's thing to the area."""
+    """Keep or drop the draft, or clear the plan; and a step (by id, in the plan or with draft the draft):
+    tick it, add its outside thing to the area, take it out (remove) or put it back (restore), or the
+    steps in a new order (order: {week: [ids]}, a step may come from another week)."""
     a = _area(c, aid)
     if b.get("keep"):
         draft = _load(a["plan_draft"])
@@ -464,20 +484,34 @@ def plan_change(c, aid, b):
     elif b.get("clear"):
         c.execute("UPDATE areas SET plan = NULL WHERE id = ?", (aid,))
     else:
-        draft_or_plan = "plan_draft" if b.get("draft") else "plan"
-        plan = _load(a[draft_or_plan])
-        try:
-            w, s = (int(x) for x in (b.get("tick") or b.get("add") or [])[:2])
-            step = plan["weeks"][w]["steps"][s]
-        except (TypeError, ValueError, KeyError, IndexError):
-            raise ValueError("No such step")
-        if b.get("tick") is not None:
-            step["done"] = bool(b.get("done"))
-        elif "add" in step:
-            o = step["add"]
-            r = areas.add(c, aid, _outside_ref(c, o))
-            step.update({"ref": r, "title": o["title"], "kind": o["kind"]})
-        c.execute(f"UPDATE areas SET {draft_or_plan} = ? WHERE id = ?", (json.dumps(plan, ensure_ascii=False), aid))
+        col = "plan_draft" if b.get("draft") else "plan"
+        plan = _load(a[col])
+        if not plan:
+            raise ValueError("No plan")
+        _ids(plan)
+        if isinstance(b.get("order"), dict):
+            try:
+                order = {int(k): [str(i) for i in v] for k, v in b["order"].items() if isinstance(v, list)}
+            except ValueError:
+                raise ValueError("No such week")
+            byid = {st["id"]: st for w in plan["weeks"] for st in w["steps"]}
+            placed = {i for ids in order.values() for i in ids if i in byid}
+            for w, week in enumerate(plan["weeks"]):
+                rest = [st for st in week["steps"] if st["id"] not in placed]
+                week["steps"] = ([byid[i] for i in dict.fromkeys(order[w]) if i in byid] + rest) if w in order else rest
+        elif b.get("tick") is not None:
+            _step(plan, b["tick"])["done"] = bool(b.get("done"))
+        elif b.get("remove") is not None:
+            _step(plan, b["remove"])["gone"] = True
+        elif b.get("restore") is not None:
+            _step(plan, b["restore"]).pop("gone", None)
+        elif b.get("add") is not None:
+            step = _step(plan, b["add"])
+            if "add" in step:
+                o = step["add"]
+                r = areas.add(c, aid, _outside_ref(c, o))
+                step.update({"ref": r, "title": o["title"], "kind": o["kind"]})
+        c.execute(f"UPDATE areas SET {col} = ? WHERE id = ?", (json.dumps(plan, ensure_ascii=False), aid))
     c.commit()
 
 
@@ -496,10 +530,13 @@ def plan_view(c, plan, things):
         return None
     by_ref = {x["ref"]: x for x in things}
     weeks = []
+    _ids(plan)
     for w in plan.get("weeks") or []:
         steps = []
         for st in w.get("steps") or []:
-            v = {"mins": st.get("mins") or 0, "done": bool(st.get("done"))}
+            if st.get("gone"):
+                continue
+            v = {"id": st["id"], "mins": st.get("mins") or 0, "done": bool(st.get("done"))}
             if st.get("ref"):
                 x = by_ref.get(st["ref"]) or areas._resolve(c, st["ref"]) or {}
                 v.update({"title": x.get("title") or st.get("title") or "", "kind": x.get("kind") or st.get("kind") or "article",
@@ -510,7 +547,7 @@ def plan_view(c, plan, things):
             else:
                 v.update({"title": st.get("do") or "", "kind": "do"})
             steps.append(v)
-        weeks.append({"name": w.get("name") or "", "steps": steps, "done": all(s["done"] for s in steps)})
+        weeks.append({"name": w.get("name") or "", "steps": steps, "done": bool(steps) and all(s["done"] for s in steps)})
     now = next((i for i, w in enumerate(weeks) if not w["done"]), len(weeks) - 1)
     return {"title": plan.get("title") or "", "mins": plan.get("mins") or 0, "weeks": weeks, "now": max(0, now)}
 
@@ -552,8 +589,10 @@ def _hl_ids(c, things):
         f"SELECT h.id, h.text, h.note, h.book_id FROM highlights h WHERE h.deleted = 0 AND h.book_id IN ({q}) ORDER BY h.created DESC LIMIT 400", ids)}
 
 
-def clean_sections(c, aid, got, things=None):
-    """Sections as they're kept: known kinds only, what they point to checked against the area."""
+def clean_sections(c, aid, got, things=None, strict=True):
+    """Sections as they're kept: known kinds only, what they point to checked against the area. From
+    the model (strict) a kind with nothing to show yet is left out; arranged by hand it stays, to show
+    once it has something."""
     a = _area(c, aid)
     things = things if things is not None else _things(c, aid)
     hls = _hl_ids(c, things)
@@ -563,7 +602,7 @@ def clean_sections(c, aid, got, things=None):
            "feeds": bool(c.execute("SELECT 1 FROM area_items WHERE area_id = ? AND ref LIKE 'feed:%'", (aid,)).fetchone())}
     out = []
     for s in got if isinstance(got, list) else []:
-        if not isinstance(s, dict) or s.get("kind") not in SECTIONS or has.get(s["kind"]) is False:
+        if not isinstance(s, dict) or s.get("kind") not in SECTIONS or (strict and has.get(s["kind"]) is False):
             continue
         v = {"kind": s["kind"], "title": _clip(s.get("title"), 50), "wide": bool(s.get("wide"))}
         if s["kind"] == "highlights" and s.get("groups"):
@@ -624,7 +663,7 @@ def layout_change(c, aid, b):
     elif b.get("plain"):
         c.execute("UPDATE areas SET layout = NULL WHERE id = ?", (aid,))
     elif isinstance(b.get("sections"), list):
-        sections = clean_sections(c, aid, b["sections"])
+        sections = clean_sections(c, aid, b["sections"], strict=False)
         old = _load(a["layout"]) or {}
         c.execute("UPDATE areas SET layout = ? WHERE id = ?", (json.dumps(dict(old, sections=sections, made=old.get("made") or _now()), ensure_ascii=False), aid))
     c.commit()
@@ -703,7 +742,7 @@ def extra(c, aid, p):
     draft = _load(a["layout_draft"])
     return {"plan": plan, "plan_draft": plan_view(c, _load(a["plan_draft"]), p["items"]),
             "sections": sections_view(c, aid, layout["sections"] if layout else DEFAULT, p, plan, chat),
-            "layout": layout["sections"] if layout else None,
+            "layout": layout["sections"] if layout else None, "raw": layout["sections"] if layout else DEFAULT,
             "draft": sections_view(c, aid, draft["sections"], p, plan, chat) if draft else None,
             "chat": chat, "sources": [{"ref": x["ref"], "title": x["title"], "kind": x["kind"]} for x in _things(c, aid)],
             "working": {"plan": (aid, "plan") in _working, "layout": (aid, "layout") in _working},
