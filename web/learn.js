@@ -3,6 +3,7 @@
    #learn          the areas, a card each with a few of its things on it; Edit renames, recolours,
                    moves and removes them; New area asks for a name, a goal, a colour, and whether
                    the helper suggests things
+   #learn/ask      Ask across every area (areaagent.py ALL), which can offer a new area to start
    #learn/<id>     an area: its band, then Overview (its sections), Everything (its books, articles,
                    videos and their highlights, its feeds, the helper's suggestions), Plan and Ask
                    (#learn/<id>/all, /plan, /ask; the agent in daf/areaagent.py)
@@ -39,8 +40,13 @@ function sheet(html, wide){
 
 /* ---------- the areas ---------- */
 let editing = false;
+// Areas home's two pages: the areas, and Ask across all of them (#learn/ask)
+const homeTabs = cur => '<nav class="lntabs lnhtabs" aria-label="Learn">' + [['areas', 'Areas', '#learn'], ['ask', 'Ask', '#learn/ask']].map(t =>
+  '<a class="lntab' + (t[0] === cur ? ' on' : '') + '" href="' + t[2] + '"' + (t[0] === cur ? ' aria-current="page"' : '') + '>' + t[1] +
+  (t[0] === 'ask' && H.data && H.data.chat.some(x => x.state === 'asking') ? '<span class="lndotw"></span>' : '') + '</a>').join('') + '</nav>';
 async function home(){
-  $('#main').innerHTML = '<div class="top"><h1>Areas</h1><span class="spacer"></span><button class="btn sm" data-ln="edit">' + (editing ? 'Done' : 'Edit') + '</button></div><div class="page lnhome"></div>';
+  $('#main').innerHTML = '<div class="top"><h1 class="lnhide">Areas</h1><span class="spacer"></span><button class="btn sm" data-ln="edit">' + (editing ? 'Done' : 'Edit') + '</button></div>' +
+    '<div class="page lnhome">' + homeTabs('areas') + '<div class="lnhomebody"></div></div>';
   const list = L.areas || await L.load();
   drawHome(list);
   L.load().then(fresh => { if (S.route[0] === 'learn' && !S.route[1] && JSON.stringify(fresh) !== JSON.stringify(list)) drawHome(fresh); });
@@ -51,7 +57,7 @@ function art(a){
   return '<span class="lnart">' + (pics || tiles) + '</span>';
 }
 function drawHome(list){
-  const page = $('#main .lnhome'); if (!page) return;
+  const page = $('#main .lnhome .lnhomebody'); if (!page || $('#main .lnaskhome')) return;
   const card = (a, i) => editing
     ? '<div class="lncard editing" data-id="' + esc(a.id) + '" style="' + tint(a) + '">' + art(a) +
       '<span class="lnsw">' + COLORS.map(c => '<button class="' + (c === a.color ? 'on' : '') + '" data-ln-color="' + c + '" style="background:' + c + '" aria-label="Colour"></button>').join('') + '</span>' +
@@ -220,19 +226,64 @@ function planTab(p){
 
 /* Ask */
 function askTab(p){
-  const a = p.area, on = p.sources.filter(x => !P.off.has(x.ref)).length;
-  const chat = p.chat.map(x => '<div class="lnqa" id="lnq-' + esc(x.id) + '"><div class="lnq"><span dir="auto">' + esc(x.q) + '</span><button class="lnno" data-ln-forget="' + esc(x.id) + '" aria-label="Forget">×</button></div>' +
+  return askView(p.chat, { sources: p.sources.map(x => ({ key: x.ref, title: x.title, kind: x.kind })), off: P.off, attr: 'data-ln-src', anywhere: P.anywhere,
+    placeholder: 'Ask about ' + p.area.name });
+}
+// the questions and their answers, the box, My sources / Anywhere, and the sources to draw from (an area's
+// things, or on Areas home the areas)
+function askView(chat, o){
+  const on = o.sources.filter(x => !o.off.has(x.key)).length;
+  const made = name => (L.areas || []).some(a => a.name.toLowerCase() === name.toLowerCase());
+  const list = chat.map(x => '<div class="lnqa" id="lnq-' + esc(x.id) + '"><div class="lnq"><span dir="auto">' + esc(x.q) + '</span><button class="lnno" data-ln-forget="' + esc(x.id) + '" aria-label="Forget">×</button></div>' +
     (x.state === 'asking' ? spin('…') : x.state === 'error' ? '<p class="mute tiny">' + esc(x.error) + '</p>' :
       '<div class="lna">' + x.paras.map(pp => '<p dir="auto">' + esc(pp.text) + '</p>' + (pp.from.length ? '<div class="lnfrom">' + pp.from.map(ch =>
         '<a class="lnsrc" href="#' + esc(ch.go) + '">' + svg(KIND[ch.kind] || KIND.article) + '<span>' + esc(ch.label) + '</span></a>').join('') + '</div>' : '')).join('') +
-      (x.outside && x.outside.length ? '<div class="lnoutside">' + x.outside.map((o, i) => '<div class="lnsg"><a class="lnsgo"' + (o.url ? ' href="' + esc(o.url) + '" target="_blank" rel="noopener"' : '') + '><span class="lnsk">' + svg(KIND[o.kind] || KIND.article) + '</span>' +
-        '<span class="lnrt"><b>' + esc(o.title) + '</b><i>' + esc([KNAME[o.kind], o.by].filter(Boolean).join(' · ')) + '</i></span></a><button class="btn sm primary" data-ln-oadd="' + esc(x.id) + ':' + i + '">Add</button></div>').join('') + '</div>' : '') + '</div>') + '</div>').join('');
-  const srcList = p.sources.map(x => '<label class="aaline"><input type="checkbox" data-ln-src="' + esc(x.ref) + '"' + (P.off.has(x.ref) ? '' : ' checked') + '>' + svg(KIND[x.kind] || KIND.article) + '<span>' + esc(x.title) + '</span></label>').join('');
-  const sw = '<div class="lnseg"><button class="' + (P.anywhere ? '' : 'on') + '" data-ln-any="0">My sources</button><button class="' + (P.anywhere ? 'on' : '') + '" data-ln-any="1">Anywhere</button></div>';
-  return '<div class="lnask"><div class="lnchat">' + chat +
-    '<form id="lnaskf" class="lnaskbox"><input class="field" id="lnaskq" placeholder="Ask about ' + esc(a.name) + '" autocomplete="off" enterkeyhint="send"><button class="btn primary" type="submit" aria-label="Ask">' + SPARK + 'Ask</button></form>' +
-    '<div class="lnaskopts">' + sw + '<details class="lnsrcfold"><summary>Sources · ' + on + ' of ' + p.sources.length + '</summary><div class="lnsrcs">' + srcList + '</div></details></div></div>' +
-    '<section class="card lnsrcside"><div class="cardh"><h2>Sources</h2><span class="spacer"></span><span class="mute tiny">' + on + ' of ' + p.sources.length + '</span></div><div class="lnsrcs">' + srcList + '</div></section></div>';
+      (x.outside && x.outside.length ? '<div class="lnoutside">' + x.outside.map((ot, i) => '<div class="lnsg"><a class="lnsgo"' + (ot.url ? ' href="' + esc(ot.url) + '" target="_blank" rel="noopener"' : '') + '><span class="lnsk">' + svg(KIND[ot.kind] || KIND.article) + '</span>' +
+        '<span class="lnrt"><b>' + esc(ot.title) + '</b><i>' + esc([KNAME[ot.kind], ot.by].filter(Boolean).join(' · ')) + '</i></span></a><button class="btn sm primary" data-ln-oadd="' + esc(x.id) + ':' + i + '">Add</button></div>').join('') + '</div>' : '') +
+      (x.new_area ? '<div class="lnnewarea">' + SPARK + '<span class="lnrt"><b>' + esc(x.new_area.name) + '</b><i>' + esc(x.new_area.goal || '') + '</i></span>' +
+        (made(x.new_area.name) ? '<span class="lnst done">Made</span>' : '<button class="btn sm primary" data-ln-mkarea="' + esc(x.id) + '">New area</button>') + '</div>' : '') + '</div>') + '</div>').join('');
+  const srcList = o.sources.map(x => '<label class="aaline"><input type="checkbox" ' + o.attr + '="' + esc(x.key) + '"' + (o.off.has(x.key) ? '' : ' checked') + '>' +
+    (x.dot ? '<span class="lndot" style="background:' + esc(x.dot) + '"></span>' : svg(KIND[x.kind] || KIND.article)) + '<span>' + esc(x.title) + '</span></label>').join('');
+  const sw = '<div class="lnseg"><button class="' + (o.anywhere ? '' : 'on') + '" data-ln-any="0">My sources</button><button class="' + (o.anywhere ? 'on' : '') + '" data-ln-any="1">Anywhere</button></div>';
+  return '<div class="lnask"><div class="lnchat">' + list +
+    '<form id="lnaskf" class="lnaskbox"><input class="field" id="lnaskq" placeholder="' + esc(o.placeholder) + '" autocomplete="off" enterkeyhint="send"><button class="btn primary" type="submit" aria-label="Ask">' + SPARK + 'Ask</button></form>' +
+    '<div class="lnaskopts">' + sw + '<details class="lnsrcfold"><summary>Sources · ' + on + ' of ' + o.sources.length + '</summary><div class="lnsrcs">' + srcList + '</div></details></div></div>' +
+    '<section class="card lnsrcside"><div class="cardh"><h2>Sources</h2><span class="spacer"></span><span class="mute tiny">' + on + ' of ' + o.sources.length + '</span></div><div class="lnsrcs">' + srcList + '</div></section></div>';
+}
+
+/* Areas home's Ask: across every area (areaagent.py ALL) */
+const H = { data: null, poll: 0, anywhere: false, off: null };
+const onAskHome = () => S.route[0] === 'learn' && S.route[1] === 'ask';
+async function askHome(){
+  if (!H.off) H.off = new Set(C.lsGet ? C.lsGet('lnoffall', []) : []);
+  $('#main').innerHTML = '<div class="top"><h1 class="lnhide">Ask</h1><span class="spacer"></span></div><div class="page lnhome lnaskhome">' + homeTabs('ask') + '<div class="lnhomebody"></div></div>';
+  if (H.data) drawAsk();
+  if (!L.areas) L.load();
+  await refreshAsk();
+}
+async function refreshAsk(){
+  let r;
+  try { r = await api('/api/learn/ask'); }
+  catch(e){ const b = $('#main .lnaskhome .lnhomebody'); if (b) b.innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
+  if (!onAskHome()) return;
+  H.data = r; drawAsk();
+  clearTimeout(H.poll);
+  if (r.chat.some(x => x.state === 'asking')) H.poll = setTimeout(() => { if (onAskHome()) refreshAsk(); }, 3500);
+}
+function drawAsk(){
+  const b = $('#main .lnaskhome .lnhomebody'); if (!b || !H.data) return;
+  const q = $('#lnaskq'), typed = q ? q.value : '', had = q && document.activeElement === q;
+  const tabs = $('#main .lnaskhome .lntabs'); if (tabs) tabs.outerHTML = homeTabs('ask');
+  b.innerHTML = askView(H.data.chat, { sources: H.data.areas.map(a => ({ key: a.id, title: a.name, dot: a.color })), off: H.off, attr: 'data-ln-srca', anywhere: H.anywhere,
+    placeholder: 'Ask about what you’re learning' });
+  const q2 = $('#lnaskq'); if (q2) { q2.value = typed; if (had) q2.focus(); }
+}
+// Areas home's Add (an outside thing from an answer): which area it goes into
+let pickThen = null;
+function chooseArea(then){
+  pickThen = then;
+  sheet('<h2>Add to an area</h2><div class="lnpick">' + (L.areas || []).map(a => '<button class="aaline lnpickb" data-ln-to="' + esc(a.id) + '"><span class="lndot" style="background:' + esc(a.color) + '"></span>' + esc(a.name) + '</button>').join('') + '</div>' +
+    '<div class="lnbtns"><span class="spacer"></span><button class="btn" data-act="close">Cancel</button></div>');
 }
 
 // A suggestion opens where it comes from, to see it before adding it: the page or the video itself, a feed's
@@ -335,12 +386,27 @@ document.addEventListener('submit', async e => {
   if (e.target.id !== 'lnaskf') return;
   e.preventDefault();
   const i = $('#lnaskq'), q = i.value.trim(); if (!q) return;
+  if (onAskHome()) {
+    const ids = H.data.areas.filter(a => !H.off.has(a.id)).map(a => a.id);
+    if (!ids.length && !H.anywhere) { toast('No sources'); return; }
+    i.value = '';
+    try { await api('/api/learn/ask', { method: 'POST', body: JSON.stringify({ q, anywhere: H.anywhere, areas: H.off.size ? ids : [] }) }); await refreshAsk(); }
+    catch(err){ i.value = q; toast(err.message); }
+    setTimeout(() => { const c = $('#main .lnchat .lnqa:last-of-type'); if (c) c.scrollIntoView({ block: 'end', behavior: 'smooth' }); }, 60);
+    return;
+  }
   const refs = P.data.sources.filter(x => !P.off.has(x.ref)).map(x => x.ref);
   if (!refs.length && !P.anywhere) { toast('No sources'); return; }
   i.value = '';
   try { await post('ask', { q, anywhere: P.anywhere, refs: P.off.size ? refs : [] }); }
   catch(err){ i.value = q; toast(err.message); }
   setTimeout(() => { const c = $('#main .lnchat .lnqa:last-of-type'); if (c) c.scrollIntoView({ block: 'end', behavior: 'smooth' }); }, 60);
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.matches || !t.matches('[data-ln-srca]')) return;
+  if (t.checked) H.off.delete(t.dataset.lnSrca); else H.off.add(t.dataset.lnSrca);
+  if (C.lsSet) C.lsSet('lnoffall', [...H.off]);
+  drawAsk();
 });
 document.addEventListener('change', e => {
   const t = e.target; if (!t.matches || !t.matches('[data-ln-src]')) return;
@@ -352,7 +418,7 @@ document.addEventListener('change', e => {
 /* ---------- clicks ---------- */
 document.addEventListener('click', async e => {
   const t = e.target.closest && e.target.closest('[data-ln],[data-ln-color],[data-ln-del],[data-ln-move],[data-ln-kind],[data-ln-up],[data-ln-down],[data-ln-rm],[data-ln-take],[data-ln-skip],[data-ln-pick],[data-ln-addref],[data-ln-find],' +
-    '[data-ln-sup],[data-ln-sdown],[data-ln-srm],[data-ln-addsec],[data-ln-tick],[data-ln-padd],[data-ln-mins],[data-ln-weeks],[data-ln-forget],[data-ln-oadd],[data-ln-any],[data-ln-goq]');
+    '[data-ln-sup],[data-ln-sdown],[data-ln-srm],[data-ln-addsec],[data-ln-tick],[data-ln-padd],[data-ln-mins],[data-ln-weeks],[data-ln-forget],[data-ln-oadd],[data-ln-any],[data-ln-goq],[data-ln-mkarea],[data-ln-to]');
   if (!t) return;
   const d = t.dataset, cardId = (t.closest('[data-id]') || {}).dataset;
   try {
@@ -422,13 +488,27 @@ document.addEventListener('click', async e => {
     else if (d.ln === 'pclear') { if (!confirm('Remove the plan?')) return; await put('plan', { clear: true }); P.editing = false; refresh(); }
     else if (d.lnTick) { const [w, j] = d.lnTick.split(':').map(Number); t.disabled = true; await put('plan', { tick: [w, j], done: t.getAttribute('aria-pressed') !== 'true', draft: !!d.draft }); refresh(); }
     else if (d.lnPadd) { const [w, j] = d.lnPadd.split(':').map(Number); t.disabled = true; t.textContent = 'Adding…'; await put('plan', { add: [w, j], draft: !!d.draft }); refresh(); L.load(); }
-    else if (d.lnAny) { P.anywhere = d.lnAny === '1'; draw(); }
-    else if (d.lnForget) { await api('/api/areas/' + enc(P.id) + '/ask/' + enc(d.lnForget), { method: 'DELETE' }); refresh(); }
+    else if (d.lnAny) { if (onAskHome()) { H.anywhere = d.lnAny === '1'; drawAsk(); } else { P.anywhere = d.lnAny === '1'; draw(); } }
+    else if (d.lnForget) {
+      if (onAskHome()) { await api('/api/learn/ask/' + enc(d.lnForget), { method: 'DELETE' }); refreshAsk(); }
+      else { await api('/api/areas/' + enc(P.id) + '/ask/' + enc(d.lnForget), { method: 'DELETE' }); refresh(); }
+    }
     else if (d.lnOadd) {
-      const [cid, i] = d.lnOadd.split(':'), x = P.data.chat.find(c => c.id === cid), o = x && x.outside[+i]; if (!o) return;
-      t.disabled = true; t.textContent = 'Adding…';
-      await L.put(P.id, o.kind === 'book' ? { ref: 'want:' + o.title + (o.by ? '|' + o.by : '') } : { url: o.url, title: o.title });
-      t.outerHTML = '<span class="lnst done">Added</span>'; L.load();
+      const home = onAskHome(), [cid, i] = d.lnOadd.split(':'), x = (home ? H.data : P.data).chat.find(c => c.id === cid), o = x && x.outside[+i]; if (!o) return;
+      const what = o.kind === 'book' ? { ref: 'want:' + o.title + (o.by ? '|' + o.by : '') } : { url: o.url, title: o.title };
+      const go = async aid => {
+        const b = $('[data-ln-oadd="' + CSS.escape(d.lnOadd) + '"]'); if (b) { b.disabled = true; b.textContent = 'Adding…'; }
+        try { await L.put(aid, what); const b2 = $('[data-ln-oadd="' + CSS.escape(d.lnOadd) + '"]'); if (b2) b2.outerHTML = '<span class="lnst done">Added</span>'; L.load(); }
+        catch(err){ toast(err.message); if (b) { b.disabled = false; b.textContent = 'Add'; } }
+      };
+      if (home) chooseArea(go); else await go(P.id);
+    }
+    else if (d.lnTo) { const then = pickThen; pickThen = null; C.closeModal(); if (then) await then(d.lnTo); }
+    else if (d.lnMkarea) {
+      const x = H.data && H.data.chat.find(c => c.id === d.lnMkarea), na = x && x.new_area; if (!na) return;
+      t.disabled = true;
+      const r = await api('/api/areas', { method: 'POST', body: JSON.stringify({ name: na.name, goal: na.goal || '', suggest: true }) });
+      L.areas = r.areas; await L.load(); location.hash = 'learn/' + enc(r.id);
     }
     else if (d.lnGoq) P.goQ = d.lnGoq;           // (the link goes to Ask, which shows that one)
   } catch(err){ toast(err.message); }
@@ -444,7 +524,7 @@ document.addEventListener('click', e => { if (e.target.closest && e.target.close
 
 C.views.learn = async args => {
   const id = decodeURIComponent((args || [])[0] || '');
-  return id ? area(id, (args || [])[1]) : home();
+  return id === 'ask' ? askHome() : id ? area(id, (args || [])[1]) : home();
 };
 if (C.Look && C.Look.on) L.load();
 })();

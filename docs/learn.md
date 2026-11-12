@@ -10,6 +10,8 @@ In the new look Learn is one of the tabs, and its pages are **Areas** (with each
 
 Areas is a card for each subject, in the area's own colour with a few of its covers on it, how many books, articles, videos and feeds it has, and how long I've spent on it this month. **New area** asks for a name, what I'm after (the goal), a colour, and whether I want suggestions. **Edit** lets me rename an area right on its card, change its colour, move it earlier or later, and delete it. Deleting an area only forgets the gathering; everything that was in it stays in Daf.
 
+Next to Areas is **Ask**, the same helper as in an area but across all of them, so I can ask something that pulls from my D&D things and my Hebrew things at once. Its answers say where each part came from too, with **My sources** or **Anywhere**, and the Sources list lets me leave whole areas out. When I ask about something none of my areas is for ("I want to learn pour-over coffee"), it offers a new area with a name and a goal, and **New area** starts it with the helper looking for things to put in it. A book, article or video it offers from outside has **Add**, which asks which area it goes into.
+
 ## An area's page
 
 The top of an area's page is a band in its colour with the name, the goal, and how many things I've finished out of how many there are. Under it are the area's four pages: **Overview**, **Everything**, **Plan** and **Ask**.

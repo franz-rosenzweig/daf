@@ -11,6 +11,9 @@ Three things the model does for one area, each in the background (an answer take
   that the model picks, titles and fills. areas.layout_draft until Keep; Undo drops it. Without a
   layout of its own the Overview has DEFAULT.
 
+Areas home has an Ask too (area_chat's area ALL): the same answers across every area's things, and,
+when the question is about something no area is for, an area to start.
+
 Nothing private goes to the model: a private book never shows in an area, and a private article is left
 out here.
 """
@@ -28,6 +31,7 @@ DEFAULT = [{"kind": "plan", "wide": True}, {"kind": "continue"}, {"kind": "next"
            {"kind": "highlights", "wide": True}, {"kind": "feeds"}, {"kind": "suggestions"}]
 KNAME = {"book": "Book", "article": "Article", "video": "Video"}
 
+ALL = "*"               # area_chat's area for the questions asked on Areas home, across every area
 _working = {}           # (area id, "plan" | "layout") -> when it began
 _errors = {}            # (area id, "plan" | "layout") -> what went wrong last time
 
@@ -91,12 +95,37 @@ def sources(c, aid, only=None, words=24000):
     things = _things(c, aid)
     if only:
         things = [x for x in things if x["ref"] in set(only)]
+    return _build(c, things, words)
+
+
+def _all_things(c, only=None):
+    """Every area's things (or only some areas'), each once, with the names of the areas it's in."""
+    seen, out = {}, []
+    for a in c.execute("SELECT id, name FROM areas ORDER BY ord, created").fetchall():
+        if only and a["id"] not in set(only):
+            continue
+        for x in _things(c, a["id"]):
+            if x["ref"] in seen:
+                seen[x["ref"]]["areas"].append(a["name"])
+                continue
+            x = dict(x, areas=[a["name"]])
+            seen[x["ref"]] = x
+            out.append(x)
+    return out
+
+
+def sources_all(c, only=None, words=30000):
+    """sources() across every area (Areas home's Ask): only = the area ids to draw from."""
+    return _build(c, _all_things(c, only), words)
+
+
+def _build(c, things, words):
     docs = sum(1 for x in things if x["go"].startswith("read/"))
     share = max(600, min(4000, words // max(1, docs)))
     out = []
     for n, x in enumerate(things, 1):
         s = {"n": n, "ref": x["ref"], "id": x["id"], "kind": x["kind"], "title": x["title"], "by": x["by"], "go": x["go"],
-             "st": x["st"], "len": x["len"], "lines": [], "paras": {}, "times": set(), "hl": {}}
+             "st": x["st"], "len": x["len"], "lines": [], "paras": {}, "times": set(), "hl": {}, "areas": x.get("areas") or []}
         if x["go"].startswith("read/"):
             row = c.execute("SELECT blocks FROM doc_content WHERE id = ?", (x["id"],)).fetchone()
             try:
@@ -128,7 +157,7 @@ def sources(c, aid, only=None, words=24000):
 def _block(s, text=True):
     head = f"[{s['n']}] {KNAME.get(s['kind'], 'Article')}: {s['title']}" + (f" — {s['by']}" if s["by"] else "")
     meta = ", ".join(v for v in (s["len"], {"New": "not started", "Done": "finished", "Wanted": "not in Daf yet"}.get(s["st"], f"{s['st']} through" if s["st"] else "")) if v)
-    lines = [head + (f" ({meta})" if meta else "")]
+    lines = [head + (f" ({meta})" if meta else "") + (f" [in {', '.join(s['areas'])}]" if s.get("areas") else "")]
     if text:
         lines += ["  " + ln for ln in s["lines"]]
         if s["hl"]:
@@ -207,6 +236,24 @@ Reply with JSON only, nothing around it:
 </sources>
 {earlier}
 Their question: {q}"""
+ASK_ALL = """You're the helper in Learn, the part of a personal reading app where someone learns whole subjects, each in an area.
+Their areas:
+{areas}
+Their own things in them are below, numbered, each with the area it's in: books (with their highlights and notes), articles (by paragraph, p:<n>) and videos (by moment, t:<seconds>).
+
+{how}
+Write a few short paragraphs, plain and direct: no headings, no markdown, a list only when they ask for one. With each paragraph say where it came from: the source's number and, when you can, the place in it, a highlight (h:<id>), a paragraph (p:<n>) or a moment (t:<seconds>). A paragraph that comes from what you know has an empty list.
+{outside}
+When they want to learn something none of their areas is for, also give "new_area": a short name for an area to start, and its goal in a few plain words. Otherwise leave it null.
+
+Reply with JSON only, nothing around it:
+{{"paras": [{{"text": "...", "from": [{{"n": 1, "at": "p:4"}}]}}]{outside_key}, "new_area": {{"name": "...", "goal": "..."}}}}
+
+<sources>
+{sources}
+</sources>
+{earlier}
+Their question: {q}"""
 MINE = "Answer from these sources. When they don't say, say so plainly in a sentence, and stop there."
 ANY = "Answer from these sources first, and from what you know beyond them where that helps."
 OUTSIDE = ('Also offer up to 3 things from outside their sources worth adding for this question (books, articles or videos, the '
@@ -215,8 +262,10 @@ OUTSIDE = ('Also offer up to 3 things from outside their sources worth adding fo
 
 
 def ask_start(c, aid, q, anywhere=False, only=None):
-    """A question to the area's helper: its row now (asking), its answer in the background."""
-    _area(c, aid)
+    """A question to the area's helper (or, with aid ALL, to the helper across every area): its row now
+    (asking), its answer in the background."""
+    if aid != ALL:
+        _area(c, aid)
     q = _clip(q, 600)
     if not q:
         raise ValueError("A question, please")
@@ -240,11 +289,12 @@ def ask_now(c, cid, run=None, check=None):
     if not r:
         return None
     try:
-        a = _area(c, r["area_id"])
+        home = r["area_id"] == ALL
+        a = None if home else _area(c, r["area_id"])
         only = json.loads(r["refs"]) if r["refs"] else None
-        srcs = sources(c, a["id"], only)
+        srcs = sources_all(c, only) if home else sources(c, a["id"], only)
         earlier = c.execute("SELECT q, a FROM area_chat WHERE area_id = ? AND state = 'done' AND made <= ? AND id != ? ORDER BY made DESC LIMIT 3",
-                            (a["id"], r["made"], cid)).fetchall()
+                            (r["area_id"], r["made"], cid)).fetchall()
         back = []
         for e in reversed(earlier):
             try:
@@ -252,10 +302,14 @@ def ask_now(c, cid, run=None, check=None):
             except (ValueError, KeyError, TypeError):
                 said = ""
             back.append(f"Q: {e['q']}\nA: {_clip(said, 700)}")
-        text = ASK.format(name=a["name"], goal=_goal(a), how=ANY if r["anywhere"] else MINE,
-                          outside=OUTSIDE if r["anywhere"] else "", outside_key=', "outside": []' if r["anywhere"] else "",
-                          sources="\n\n".join(_block(s) for s in srcs) or "(nothing yet)",
-                          earlier=("Earlier here:\n" + "\n\n".join(back) + "\n") if back else "", q=r["q"])
+        common = dict(how=ANY if r["anywhere"] else MINE, outside=OUTSIDE if r["anywhere"] else "",
+                      outside_key=', "outside": []' if r["anywhere"] else "", sources="\n\n".join(_block(s) for s in srcs) or "(nothing yet)",
+                      earlier=("Earlier here:\n" + "\n\n".join(back) + "\n") if back else "", q=r["q"])
+        if home:
+            names = c.execute("SELECT name, goal FROM areas ORDER BY ord, created").fetchall()
+            text = ASK_ALL.format(areas="\n".join(f"- {x['name']}" + (f": {x['goal']}" if x["goal"] else "") for x in names) or "(none yet)", **common)
+        else:
+            text = ASK.format(name=a["name"], goal=_goal(a), **common)
         out = (run or ai.run)(text, timeout=300)
         got = _json(out)
         paras = []
@@ -271,6 +325,11 @@ def ask_now(c, cid, run=None, check=None):
                 raise RuntimeError("The answer came back empty")
             paras = [{"text": t, "from": []}]
         answer = {"paras": paras, "outside": _outside((got or {}).get("outside"), check) if r["anywhere"] else []}
+        na = (got or {}).get("new_area") if home else None
+        if isinstance(na, dict) and _clip(na.get("name"), 80):
+            name = _clip(na["name"], 80)
+            if not c.execute("SELECT 1 FROM areas WHERE lower(name) = lower(?)", (name,)).fetchone():
+                answer["new_area"] = {"name": name, "goal": _clip(na.get("goal"), 200)}
         c.execute("UPDATE area_chat SET a = ?, state = 'done' WHERE id = ?", (json.dumps(answer, ensure_ascii=False), cid))
     except Exception as e:  # noqa: BLE001 - shown with the question
         c.execute("UPDATE area_chat SET a = ?, state = 'error' WHERE id = ?", (str(e)[:300] or "No answer came back", cid))
@@ -649,3 +708,10 @@ def extra(c, aid, p):
             "chat": chat, "sources": [{"ref": x["ref"], "title": x["title"], "kind": x["kind"]} for x in _things(c, aid)],
             "working": {"plan": (aid, "plan") in _working, "layout": (aid, "layout") in _working},
             "failed": {"plan": _errors.get((aid, "plan"), ""), "layout": _errors.get((aid, "layout"), "")}}
+
+
+def home(c):
+    """Areas home's Ask: what's been asked across the areas, and the areas to draw from."""
+    return {"chat": chats(c, ALL),
+            "areas": [{"id": a["id"], "name": a["name"], "color": a["color"], "n": len(_things(c, a["id"]))}
+                      for a in c.execute("SELECT id, name, color FROM areas ORDER BY ord, created").fetchall()]}

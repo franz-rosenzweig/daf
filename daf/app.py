@@ -1978,6 +1978,27 @@ def post_area_suggest(aid: str, c=Depends(conn)):
     return {"looking": areas.suggest_start(aid) or True}
 
 
+# Areas home's Ask (areaagent.py, area ALL): across every area's things
+@app.get("/api/learn/ask", dependencies=[Depends(user)])
+def get_learn_ask(c=Depends(conn)):
+    from . import areaagent
+    return areaagent.home(c)
+
+
+@app.post("/api/learn/ask", dependencies=[Depends(user)])
+def post_learn_ask(b=Depends(json_body), c=Depends(conn)):
+    from . import areaagent
+    only = [str(x) for x in b.get("areas") or []] or None
+    return {"id": _area_err(areaagent.ask_start, c, areaagent.ALL, b.get("q"), bool(b.get("anywhere")), only)}
+
+
+@app.delete("/api/learn/ask/{cid}", dependencies=[Depends(user)])
+def delete_learn_ask(cid: str, c=Depends(conn)):
+    from . import areaagent
+    areaagent.forget(c, areaagent.ALL, cid)
+    return {"ok": True}
+
+
 # an area's agent (areaagent.py): Ask, the plan, the Overview's layout; each answer comes in the background
 @app.post("/api/areas/{aid}/ask", dependencies=[Depends(user)])
 def post_area_ask(aid: str, b=Depends(json_body), c=Depends(conn)):

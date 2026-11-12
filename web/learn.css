@@ -204,3 +204,11 @@ button.lntick::after{content:"";position:absolute;inset:-9px}
   .lnband h2{font-size:23px}
   .lnbstat b{font-size:19px}
 }
+
+/* Areas home's two pages, and its Ask */
+.lnhtabs{margin-top:0}
+.lnaskhome{container-type:inline-size}
+.lnnewarea{display:flex;align-items:center;gap:10px;margin-top:6px;padding:10px 12px;border-radius:12px;border:1px dashed var(--line-2)}
+.lnnewarea .lnrt b,.lnnewarea .lnrt i{white-space:normal}
+.lnpickb{width:100%;min-height:48px;border:0;background:none;padding:0 4px;font:inherit;font-size:15px;color:var(--fg);text-align:left;cursor:pointer;border-radius:10px}
+.lnpickb:hover{background:var(--active)}
