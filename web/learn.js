@@ -465,7 +465,10 @@ function place(){
   if (!at && rows.length) {
     at = rows.reduce((a, c) => { const r = c.getBoundingClientRect(), d = Math.hypot(r.left + r.width / 2 - x, r.top + r.height / 2 - y); return !a || d < a.d ? { c, d } : a; }, null).c;
     const r = at.getBoundingClientRect(); before = y < r.top + r.height / 2;
-  } else if (at) { const r = at.getBoundingClientRect(); before = (x - r.left) / r.width + (y - r.top) / r.height < 1; }
+  } else if (at) {                         // a list: above or below its middle; a grid (sections, cards): its top-left half
+    const r = at.getBoundingClientRect();
+    before = r.width > list.getBoundingClientRect().width * 0.7 ? y < r.top + r.height / 2 : (x - r.left) / r.width + (y - r.top) / r.height < 1;
+  }
   if (!at) { const last = rowsOf(list).pop(); if (last !== DR.row) (last ? last.after(DR.row) : list.prepend(DR.row)); return; }
   if (before) { if (at.previousElementSibling !== DR.row) at.before(DR.row); }
   else if (at.nextElementSibling !== DR.row) at.after(DR.row);
