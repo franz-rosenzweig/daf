@@ -66,7 +66,7 @@ def update(c, aid, b):
 
 def delete(c, aid):
     """The area goes; what was in it stays where it is."""
-    for t in ("area_items", "area_suggest"):
+    for t in ("area_items", "area_suggest", "area_chat"):
         c.execute(f"DELETE FROM {t} WHERE area_id = ?", (aid,))
     c.execute("DELETE FROM areas WHERE id = ?", (aid,))
     c.commit()

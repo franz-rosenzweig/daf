@@ -3,7 +3,9 @@ network are stood in for."""
 import sqlite3
 import unittest
 
-from daf import areas, db
+import json
+
+from daf import areaagent, areas, db
 
 
 def conn():
@@ -168,6 +170,151 @@ class Helper(unittest.TestCase):
         areas.skip(self.c, areas.suggestions(self.c, self.a)[0]["id"])
         areas.suggest_now(self.c, self.a, ask=self.ask, check=self.check)
         self.assertEqual(self.asked[2], ["Birds of the Garden"])
+
+
+class Agent(unittest.TestCase):
+    """The area's agent (daf/areaagent.py): the model stood in for by what it might say."""
+
+    def setUp(self):
+        self.c = conn()
+        c = self.c
+        c.execute("INSERT INTO doc_content (id, blocks, fetched) VALUES ('kk:1', ?, 1)", (json.dumps(
+            [{"t": "h2", "x": "Begin"}, {"t": "p", "x": "Look up at dawn."}, {"t": "img", "x": ""}, {"t": "p", "x": "Keep a notebook."}]),))
+        c.execute("INSERT INTO doc_content (id, blocks, fetched) VALUES ('kk:2', ?, 1)", (json.dumps(
+            [{"t": "cue", "ts": 0, "x": "Hello."}, {"t": "cue", "ts": 95, "x": "The wren sings loudest."}]),))
+        c.execute("INSERT INTO highlights (id, book_id, source, text, note, created, deleted, seen) VALUES ('h1', 'cal:1', 'daf', 'Robins sing first.', 'true here', 1, 0, 0)")
+        c.execute("INSERT INTO highlights (id, book_id, source, text, created, deleted, seen) VALUES ('h2', 'kk:1', 'daf', 'Keep a notebook.', 2, 0, 0)")
+        c.execute("INSERT INTO books (id, kind, title, private) VALUES ('kk:3', 'article', 'Diary', 1)")
+        c.execute("INSERT INTO docs (id, kind, where_, status, title, url) VALUES ('kk:3', 'article', 'library', 'inbox', 'Diary', 'https://example.org/d')")
+        c.commit()
+        self.a = areas.create(c, "Birdwatching", "Know the garden birds", suggest=False)
+        for ref in ("book:cal:1", "doc:kk:1", "doc:kk:2", "doc:kk:3", "feed:feed/1"):
+            areas.add(c, self.a, ref)
+
+    def test_what_the_model_reads(self):
+        srcs = areaagent.sources(self.c, self.a)
+        self.assertEqual([s["title"] for s in srcs], ["A Field Guide", "How to Begin", "A Talk"])     # no feed, nothing private
+        self.assertEqual(srcs[1]["paras"], {0: 1, 1: 2, 3: 3})
+        self.assertIn("(t:95) The wren sings loudest.", srcs[2]["lines"])
+        block = areaagent._block(srcs[0])
+        self.assertIn('(h:h1) "Robins sing first." (their note: true here)', block)
+        self.assertIn("40% through", block)
+
+    def test_an_answer_says_where_each_part_came_from(self):
+        said = {"paras": [{"text": "Robins first.", "from": [{"n": 1, "at": "h:h1"}, {"n": 1, "at": "h:nope"}]},
+                          {"text": "Write it down.", "from": [{"n": 2, "at": "p:3"}]},
+                          {"text": "Listen for the wren.", "from": [{"n": 3, "at": "t:95"}, {"n": 9}]},
+                          {"text": "From what I know.", "from": []}]}
+        cid = self.ask(said, anywhere=False)
+        x = areaagent.chats(self.c, self.a)[0]
+        self.assertEqual((x["id"], x["state"]), (cid, "done"))
+        self.assertEqual([[ch["go"] for ch in p["from"]] for p in x["paras"]],
+                         [["book/cal%3A1/hl:h1", "book/cal%3A1"], ["read/kk%3A1/p:3"], ["read/kk%3A2/t:95"], []])
+        self.assertEqual(x["paras"][1]["from"][0]["label"], "How to Begin · ¶ 3")
+        self.assertEqual(x["paras"][2]["from"][0]["label"], "A Talk · 1:35")
+        self.assertEqual(x["n"], 3)
+        self.assertNotIn("Diary", self.prompt)                    # a private article never goes to the model
+        self.assertIn("Answer from these sources.", self.prompt)
+
+    def test_from_anywhere_it_offers_things_that_open(self):
+        said = {"paras": [{"text": "Try this.", "from": []}],
+                "outside": [{"kind": "article", "title": "Good", "by": "A", "url": "https://example.org/good"},
+                            {"kind": "article", "title": "Broken", "by": "B", "url": "https://nowhere.invalid/x"},
+                            {"kind": "podcast", "title": "Odd"}]}
+        self.ask(said, anywhere=True)
+        self.assertEqual([o["title"] for o in areaagent.chats(self.c, self.a)[0]["outside"]], ["Good"])
+        self.assertIn("from what you know beyond them", self.prompt)
+
+    def test_words_that_arent_json_still_show(self):
+        self.ask("The robin sings first.", anywhere=False)
+        self.assertEqual(areaagent.chats(self.c, self.a)[0]["paras"][0]["text"], "The robin sings first.")
+
+    def test_a_failed_answer_says_so_and_can_be_forgotten(self):
+        def boom(text, timeout=0):
+            raise RuntimeError("The model didn't answer: busy")
+        cid = self.row("Why?")
+        areaagent.ask_now(self.c, cid, run=boom)
+        x = areaagent.chats(self.c, self.a)[0]
+        self.assertEqual((x["state"], x["error"]), ("error", "The model didn't answer: busy"))
+        areaagent.forget(self.c, self.a, cid)
+        self.assertEqual(areaagent.chats(self.c, self.a), [])
+
+    def row(self, q, anywhere=False):
+        cid = "q" + q.encode().hex()[:8]
+        self.c.execute("INSERT INTO area_chat (id, area_id, q, anywhere, state, made) VALUES (?, ?, ?, ?, 'asking', 1)", (cid, self.a, q, int(anywhere)))
+        return cid
+
+    def ask(self, said, anywhere):
+        cid = self.row("How do I start?", anywhere)
+
+        def run(text, timeout=0):
+            self.prompt = text
+            return said if isinstance(said, str) else "Here: " + json.dumps(said)
+        areaagent.ask_now(self.c, cid, run=run, check=lambda o: None if "invalid" in o["url"] else o)
+        return cid
+
+    def test_a_plan_from_the_areas_things(self):
+        said = {"title": "Two weeks to the garden", "weeks": [
+            {"name": "Sounds", "steps": [{"n": 1, "part": "ch. 1-2", "mins": 60}, {"n": 3, "mins": 14}, {"n": 42}]},
+            {"name": "Out there", "steps": [{"do": "Sit outside at dawn", "mins": 30},
+                                            {"add": {"kind": "article", "title": "Feeders", "by": "A", "url": "https://example.org/f"}, "mins": 10},
+                                            {"add": {"kind": "article", "title": "Gone", "url": "https://nowhere.invalid/"}}]},
+            {"name": "Empty", "steps": []}]}
+        areaagent.plan_now(self.c, self.a, 30, 2, run=lambda t, timeout=0: json.dumps(said), check=lambda o: None if "invalid" in o["url"] else o)
+        p = areas.page(self.c, self.a)
+        x = areaagent.extra(self.c, self.a, p)
+        self.assertIsNone(x["plan"])
+        d = x["plan_draft"]
+        self.assertEqual([w["name"] for w in d["weeks"]], ["Sounds", "Out there"])
+        self.assertEqual([(s["title"], s.get("part", ""), s["mins"]) for s in d["weeks"][0]["steps"]], [("A Field Guide", "ch. 1-2", 60), ("A Talk", "", 14)])
+        self.assertEqual([s["kind"] for s in d["weeks"][1]["steps"]], ["do", "article"])
+        self.assertTrue(d["weeks"][1]["steps"][1]["add"])
+        # kept, ticked off, and its outside thing added to the area
+        areaagent.plan_change(self.c, self.a, {"keep": True})
+        areaagent.plan_change(self.c, self.a, {"tick": [0, 0], "done": True})
+        self.c.execute("INSERT INTO docs (id, kind, where_, status, title, url) VALUES ('kk:9', 'article', 'library', 'inbox', 'Feeders', 'https://example.org/f')")
+        from unittest import mock
+        with mock.patch.object(areas, "_save_link", lambda c, u, t=None: "kk:9"):
+            areaagent.plan_change(self.c, self.a, {"add": [1, 1]})
+        self.c.execute("UPDATE docs SET status = 'archive' WHERE id = 'kk:2'")       # the video watched: its step is done
+        p = areas.page(self.c, self.a)
+        plan = areaagent.extra(self.c, self.a, p)["plan"]
+        self.assertEqual([s["done"] for s in plan["weeks"][0]["steps"]], [True, True])
+        self.assertEqual(plan["now"], 1)
+        self.assertEqual(plan["weeks"][1]["steps"][1]["go"], "read/kk%3A9")
+        self.assertIn("doc:kk:9", [x["ref"] for x in p["items"]])
+        with self.assertRaises(ValueError):
+            areaagent.plan_change(self.c, self.a, {"tick": [5, 0], "done": True})
+
+    def test_a_layout_of_known_sections_only(self):
+        said = {"sections": [{"kind": "continue", "title": "Go on"}, {"kind": "plan"}, {"kind": "widget"},
+                             {"kind": "highlights", "title": "Songs", "wide": True, "groups": [{"name": "First", "hl": ["h1", "nope"]}, {"name": "None", "hl": ["x"]}]},
+                             {"kind": "things", "title": "Watch", "items": [3, 99]}, {"kind": "things", "items": [99]},
+                             {"kind": "suggestions"}, {"kind": "feeds"}]}
+        got = areaagent.layout_now(self.c, self.a, "for spring", run=lambda t, timeout=0: json.dumps(said))
+        self.assertEqual([s["kind"] for s in got], ["continue", "highlights", "things", "feeds"])      # no plan yet, suggestions off
+        self.assertEqual(got[1]["groups"], [{"name": "First", "hl": ["h1"]}])
+        self.assertEqual(got[2]["refs"], ["doc:kk:2"])
+        p = areas.page(self.c, self.a)
+        x = areaagent.extra(self.c, self.a, p)
+        self.assertIsNone(x["layout"])
+        self.assertEqual([s["kind"] for s in x["draft"]], ["continue", "highlights", "things", "feeds"])
+        self.assertEqual(x["draft"][1]["groups"][0]["hls"][0]["go"], "book/cal%3A1/hl:h1")
+        areaagent.layout_change(self.c, self.a, {"keep": True})
+        x = areaagent.extra(self.c, self.a, areas.page(self.c, self.a))
+        self.assertEqual((x["draft"], [s["kind"] for s in x["layout"]]), (None, ["continue", "highlights", "things", "feeds"]))
+        # edited by hand, then back to the plain page
+        areaagent.layout_change(self.c, self.a, {"sections": [{"kind": "feeds"}, {"kind": "next", "wide": True}]})
+        self.assertEqual([s["kind"] for s in areaagent.extra(self.c, self.a, areas.page(self.c, self.a))["layout"]], ["feeds", "next"])
+        areaagent.layout_change(self.c, self.a, {"plain": True})
+        x = areaagent.extra(self.c, self.a, areas.page(self.c, self.a))
+        self.assertIsNone(x["layout"])
+        self.assertEqual([s["kind"] for s in x["sections"]], ["continue", "next", "highlights", "feeds"])   # the plain page: what there is
+
+    def test_deleting_the_area_forgets_what_was_asked(self):
+        self.row("Why?")
+        areas.delete(self.c, self.a)
+        self.assertEqual(self.c.execute("SELECT COUNT(*) FROM area_chat").fetchone()[0], 0)
 
 
 if __name__ == "__main__":

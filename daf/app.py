@@ -1906,8 +1906,10 @@ def put_area_order(b=Depends(json_body), c=Depends(conn)):
 @app.get("/api/areas/{aid}", dependencies=[Depends(user)])
 def get_area(aid: str, c=Depends(conn)):
     from . import areas
+    from . import areaagent
     p = _area_err(areas.page, c, aid)
     p["error"] = areas.error(aid)
+    p.update(areaagent.extra(c, aid, p))
     return p
 
 
@@ -1974,6 +1976,56 @@ def post_area_suggest(aid: str, c=Depends(conn)):
     if not c.execute("SELECT 1 FROM areas WHERE id = ?", (aid,)).fetchone():
         raise HTTPException(404, "No such area")
     return {"looking": areas.suggest_start(aid) or True}
+
+
+# an area's agent (areaagent.py): Ask, the plan, the Overview's layout; each answer comes in the background
+@app.post("/api/areas/{aid}/ask", dependencies=[Depends(user)])
+def post_area_ask(aid: str, b=Depends(json_body), c=Depends(conn)):
+    from . import areaagent
+    only = [str(x) for x in b.get("refs") or []] or None
+    return {"id": _area_err(areaagent.ask_start, c, aid, b.get("q"), bool(b.get("anywhere")), only)}
+
+
+@app.delete("/api/areas/{aid}/ask/{cid}", dependencies=[Depends(user)])
+def delete_area_ask(aid: str, cid: str, c=Depends(conn)):
+    from . import areaagent
+    areaagent.forget(c, aid, cid)
+    return {"ok": True}
+
+
+@app.post("/api/areas/{aid}/plan", dependencies=[Depends(user)])
+def post_area_plan(aid: str, b=Depends(json_body), c=Depends(conn)):
+    from . import areaagent
+    try:
+        mins, weeks = int(b.get("mins") or 30), int(b.get("weeks") or 4)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Minutes and weeks, please")
+    return {"working": _area_err(areaagent.plan_start, c, aid, mins, weeks) or True}
+
+
+@app.put("/api/areas/{aid}/plan", dependencies=[Depends(user)])
+def put_area_plan(aid: str, b=Depends(json_body), c=Depends(conn)):
+    from . import areaagent
+    try:
+        _area_err(areaagent.plan_change, c, aid, b)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 - a step's link that couldn't be saved
+        raise HTTPException(502, str(e)[:200])
+    return {"ok": True}
+
+
+@app.post("/api/areas/{aid}/layout", dependencies=[Depends(user)])
+def post_area_layout(aid: str, b=Depends(json_body), c=Depends(conn)):
+    from . import areaagent
+    return {"working": _area_err(areaagent.layout_start, c, aid, str(b.get("how") or "")) or True}
+
+
+@app.put("/api/areas/{aid}/layout", dependencies=[Depends(user)])
+def put_area_layout(aid: str, b=Depends(json_body), c=Depends(conn)):
+    from . import areaagent
+    _area_err(areaagent.layout_change, c, aid, b)
+    return {"ok": True}
 
 
 @app.post("/api/areas/suggestions/{sid}", dependencies=[Depends(user)])

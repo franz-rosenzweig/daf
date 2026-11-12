@@ -3,8 +3,9 @@
    #learn          the areas, a card each with a few of its things on it; Edit renames, recolours,
                    moves and removes them; New area asks for a name, a goal, a colour, and whether
                    the helper suggests things
-   #learn/<id>     an area: Continue with the next thing, Up next in order, its books, articles and
-                   videos (and their highlights), its feeds, and the helper's suggestions
+   #learn/<id>     an area: its band, then Overview (its sections), Everything (its books, articles,
+                   videos and their highlights, its feeds, the helper's suggestions), Plan and Ask
+                   (#learn/<id>/all, /plan, /ask; the agent in daf/areaagent.py)
 
    Highlights and Review are Learn's other pages in the new look (look2.js). Things get into an area
    from its own Add (a search over Daf, a link, a site to follow), from Add to Daf's Area, from Add to
@@ -63,13 +64,22 @@ function drawHome(list){
 }
 
 /* ---------- an area ---------- */
-const P = { id: null, kind: 'all', editing: false, data: null, poll: 0 };
-async function area(id){
-  if (P.id !== id) Object.assign(P, { id, kind: 'all', editing: false, data: null });
+// Its band (name, colour, how far along), then four pages: Overview (its sections: the helper's
+// layout once one is kept, else DEFAULT's in areaagent.py), Everything (all its things, feeds and
+// suggestions), Plan and Ask (areaagent.py). #learn/<id>[/all|/plan|/ask].
+const TABS = [['overview', 'Overview'], ['all', 'Everything'], ['plan', 'Plan'], ['ask', 'Ask']];
+const P = { id: null, tab: 'overview', kind: 'all', editing: false, data: null, poll: 0, anywhere: false, off: new Set(), pace: { mins: 30, weeks: 4 }, again: false, goQ: '' };
+const offKey = id => 'lnoff.' + id;
+async function area(id, tab){
+  if (P.id !== id) Object.assign(P, { id, kind: 'all', editing: false, data: null, again: false, off: new Set(C.lsGet ? C.lsGet(offKey(id), []) : []) });
+  const was = P.tab; P.tab = TABS.some(t => t[0] === tab) ? tab : 'overview';
+  if (was !== P.tab) { P.editing = false; P.again = false; }
   $('#main').innerHTML = '<div class="top"><a class="btn sm" href="#learn" aria-label="Areas">' + C.I.back + '</a><h1>…</h1><span class="spacer"></span>' +
     '<button class="btn sm" data-ln="add">Add</button><button class="btn sm" data-ln="aedit">' + (P.editing ? 'Done' : 'Edit') + '</button></div><div class="page lnarea"></div>';
+  if (P.data && P.data.area.id === id) draw();
   await refresh();
 }
+const busy = p => p.looking || p.working.plan || p.working.layout || p.chat.some(x => x.state === 'asking');
 async function refresh(){
   const id = P.id;
   let p;
@@ -78,49 +88,151 @@ async function refresh(){
   if (S.route[0] !== 'learn' || decodeURIComponent(S.route[1] || '') !== id) return;
   P.data = p; draw();
   clearTimeout(P.poll);
-  if (p.looking) P.poll = setTimeout(() => { if (S.route[0] === 'learn' && decodeURIComponent(S.route[1] || '') === id) refresh(); }, 4000);
+  if (busy(p)) P.poll = setTimeout(() => { if (S.route[0] === 'learn' && decodeURIComponent(S.route[1] || '') === id) refresh(); }, 3500);
 }
 function pic(x){
   if (x.pic) return '<img class="lnimg ' + (x.kind === 'book' ? 'book' : 'wide') + '" src="' + esc(x.pic) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">';
   return '<span class="lnimg tile ' + (x.kind === 'book' ? 'book' : 'wide') + '">' + svg(KIND[x.kind] || KIND.article) + '</span>';
 }
+const spin = words => '<p class="lnlook"><span class="spin"></span>' + words + '</p>';
+const href = go => go ? ' href="#' + esc(go) + '"' : '';
+function row(x, editable, i, n){
+  return '<div class="lnrow" data-ref="' + esc(x.ref) + '">' +
+    (x.go ? '<a class="lnrowmain" href="#' + esc(x.go) + '">' : '<span class="lnrowmain">') + pic(x) +
+    '<span class="lnrt"><b>' + esc(x.title) + '</b><i>' + svg(KIND[x.kind] || KIND.article) + esc([x.by, x.len].filter(Boolean).join(' · ')) + '</i></span>' + (x.go ? '</a>' : '</span>') +
+    (x.st === 'Wanted' ? '<button class="btn sm" data-ln-find="' + esc(x.title) + '">Find</button>' : '') +
+    (x.st ? '<span class="lnst' + (x.st === 'Done' ? ' done' : x.st === 'New' ? ' new' : '') + '">' + esc(x.st) + '</span>' : '') +
+    (editable ? '<span class="lnedit">' + (i ? '<button data-ln-up aria-label="Earlier">↑</button>' : '') + (i < n - 1 ? '<button data-ln-down aria-label="Later">↓</button>' : '') +
+      '<button data-ln-rm aria-label="Take out">×</button></span>' : '') + '</div>';
+}
 function draw(){
   const p = P.data, a = p.area, page = $('#main .lnarea'); if (!page) return;
-  const h1 = $('#main .top h1'); h1.textContent = a.name; h1.classList.add('lnhide');        // (the panel says it)
+  const h1 = $('#main .top h1'); h1.textContent = a.name; h1.classList.add('lnhide');        // (the band says it)
   const bar = $('#main .top [data-ln="aedit"]'); if (bar) bar.textContent = P.editing ? 'Done' : 'Edit';
   const det = $('#main .top [data-ln="details"]');
   if (P.editing && !det) bar.insertAdjacentHTML('beforebegin', '<button class="btn sm" data-ln="details">Details</button>'); else if (!P.editing && det) det.remove();
-  const next = p.next.find(x => x.go);
-  const hero = '<section class="lnhero" style="' + tint(a) + '"><div class="lnhtext"><span class="lab">Area</span><h2>' + esc(a.name) + '</h2>' +
-    (a.goal ? '<p>' + esc(a.goal) + '</p>' : '') +
-    (next ? '<div class="lnhacts"><a class="btn primary" href="#' + esc(next.go) + '"><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg><span>Continue: ' + esc(C.shortTitle ? C.shortTitle(next.title) : next.title) + '</span></a></div>' : '') +
-    '</div><div class="lnstat"><b>' + a.done + ' of ' + a.n + '</b>' + (a.month ? '<span>' + esc(a.month) + '</span>' : '') + '</div></section>';
-  const steps = p.next.length ? '<div class="lnsteps"><div class="lnlab">Up next</div><div class="lnnext">' + p.next.map((x, i) =>
-    '<a class="lnstep"' + (x.go ? ' href="#' + esc(x.go) + '"' : '') + '><span class="lnnum">' + (i + 1) + '</span><span class="lnrt"><b>' + esc(x.title) + '</b><i>' + esc([KNAME[x.kind], x.len].filter(Boolean).join(' · ')) + '</i></span></a>').join('') + '</div></div>' : '';
-  const n = k => p.items.filter(x => x.kind === k).length;
+  // what's being typed in Ask stays as it was
+  const q = $('#lnaskq'), typed = q ? q.value : '', had = q && document.activeElement === q;
+  const band = '<section class="lnband" style="' + tint(a) + '"><span class="lnbt"><h2>' + esc(a.name) + '</h2>' + (a.goal ? '<span>' + esc(a.goal) + '</span>' : '') + '</span>' +
+    '<span class="lnbstat"><b>' + a.done + ' of ' + a.n + '</b>' + (a.month ? '<span>' + esc(a.month) + '</span>' : '') + '</span></section>' +
+    '<nav class="lntabs" aria-label="' + esc(a.name) + '">' + TABS.map(t => '<a class="lntab' + (t[0] === P.tab ? ' on' : '') + '" href="#learn/' + enc(a.id) + (t[0] === 'overview' ? '' : '/' + t[0]) + '"' +
+      (t[0] === P.tab ? ' aria-current="page"' : '') + '>' + t[1] + (t[0] === 'ask' && p.chat.some(x => x.state === 'asking') || t[0] === 'plan' && p.working.plan ? '<span class="lndotw"></span>' : '') + '</a>').join('') + '</nav>';
+  page.innerHTML = band + '<div class="lntabbody">' + ({ overview, all: everything, plan: planTab, ask: askTab }[P.tab])(p) + '</div>';
+  const q2 = $('#lnaskq'); if (q2) { q2.value = typed; if (had) q2.focus(); }
+  if (P.goQ) { const el = document.getElementById('lnq-' + P.goQ); P.goQ = ''; if (el) el.scrollIntoView({ block: 'start' }); }
+}
+
+/* Overview: the sections */
+const SNAME = { plan: 'This week', continue: 'Continue', next: 'Up next', highlights: 'Highlights', things: 'Things', questions: 'Questions', feeds: 'Feeds', suggestions: 'Suggestions' };
+const ADDABLE = ['plan', 'continue', 'next', 'highlights', 'questions', 'feeds', 'suggestions'];
+function overview(p){
+  const tools = '<div class="lntools">' + (p.working.layout ? spin('Arranging…') : '<button class="btn sm" data-ln="rearrange">' + SPARK + 'Rearrange</button>') +
+    (p.failed.layout && !p.working.layout ? '<span class="mute tiny">' + esc(p.failed.layout) + '</span>' : '') + '</div>';
+  if (p.draft) return '<div class="lnkeep">' + SPARK + '<b>New layout</b><span class="spacer"></span><button class="btn sm primary" data-ln="lkeep">Keep</button><button class="btn sm" data-ln="ldrop">Undo</button></div>' +
+    '<div class="lnsecs">' + p.draft.map(s => section(s, false)).join('') + '</div>';
+  const raw = rawLayout(p);
+  return tools + '<div class="lnsecs">' + p.sections.map(s => section(s, P.editing, raw.length)).join('') + '</div>' +
+    (P.editing ? '<div class="lnaddsec"><span class="mute tiny">Add</span>' + ADDABLE.map(k => '<button class="lnchip" data-ln-addsec="' + k + '">' + SNAME[k] + '</button>').join('') +
+      (p.layout ? '<span class="spacer"></span><button class="btn sm" data-ln="plain">Plain</button>' : '') + '</div>' : '');
+}
+// the layout as it's kept (or the plain one), to change by hand
+const rawLayout = p => p.layout ? p.layout.slice() : p.sections.map(s => ({ kind: s.kind, wide: !!s.wide }));
+function section(s, editable, n){
+  const title = s.title || SNAME[s.kind] || '';
+  const ed = editable ? '<span class="lnedit">' + (s.at ? '<button data-ln-sup="' + s.at + '" aria-label="Earlier">↑</button>' : '') +
+    (s.at < n - 1 ? '<button data-ln-sdown="' + s.at + '" aria-label="Later">↓</button>' : '') + '<button data-ln-srm="' + s.at + '" aria-label="Take out">×</button></span>' : '';
+  let body = '', side = '';
+  if (s.kind === 'plan') { const w = s.plan.weeks[s.plan.now]; side = '<span class="mute tiny">Week ' + (s.plan.now + 1) + ' of ' + s.plan.weeks.length + '</span>';
+    body = progress(s.plan) + '<div class="lnwname">' + esc(w.name) + '</div>' + w.steps.map((st, j) => step(st, s.plan.now, j, false)).join(''); }
+  else if (s.kind === 'continue') { const x = s.item;
+    body = '<a class="lncont" href="#' + esc(x.go) + '">' + pic(x) + '<span class="lnrt"><b>' + esc(x.title) + '</b><i>' + esc([x.by, x.len].filter(Boolean).join(' · ')) + '</i>' +
+      '<span class="lnbar"><span style="width:' + Math.round(x.pct || 0) + '%"></span></span><i>' + esc(x.st === 'New' ? 'New' : x.st) + '</i></span></a>'; }
+  else if (s.kind === 'next') body = '<div class="lnnextv">' + s.items.map((x, i) => '<a class="lnstep"' + href(x.go) + '><span class="lnnum">' + (i + 1) + '</span><span class="lnrt"><b>' + esc(x.title) + '</b><i>' +
+      esc([KNAME[x.kind], x.len].filter(Boolean).join(' · ')) + '</i></span></a>').join('') + '</div>';
+  else if (s.kind === 'highlights') body = s.groups.map(g => (g.name ? '<div class="lngname">' + esc(g.name) + '</div>' : '') + '<div class="lnhls">' +
+      g.hls.map(h => '<a class="lnhlc"' + href(h.go) + '><p dir="auto">' + esc(h.text) + '</p><span>' + esc(h.title) + '</span></a>').join('') + '</div>').join('');
+  else if (s.kind === 'things') body = s.items.map(x => row(x)).join('');
+  else if (s.kind === 'questions') body = s.asked.map(x => '<a class="lnqrow" href="#learn/' + enc(P.id) + '/ask" data-ln-goq="' + esc(x.id) + '">' + SPARK + '<span class="lnrt"><b>' + esc(x.q) + '</b><i>' +
+      x.n + (x.n === 1 ? ' source' : ' sources') + '</i></span></a>').join('');
+  else if (s.kind === 'feeds') body = s.feeds.map(f => '<div class="lnrow" data-ref="' + esc(f.ref) + '"><a class="lnrowmain" href="#' + esc(f.go) + '">' + svg(KIND.feed) + '<span class="lnrt"><b>' + esc(f.title) + '</b></span></a>' +
+      (f.new ? '<span class="lnst new">' + f.new + ' new</span>' : '') + '</div>').join('');
+  else if (s.kind === 'suggestions') body = suggRows(s.suggestions, s.looking, P.data.error);
+  return '<section class="card lnsec lnsec-' + s.kind + (s.wide ? ' wide' : '') + '"><div class="cardh"><h2>' + esc(title) + '</h2><span class="spacer"></span>' + side + ed + '</div>' + body + '</section>';
+}
+function progress(plan){
+  return '<div class="lnprog">' + plan.weeks.map((w, i) => '<span class="' + (w.done ? 'done' : i === plan.now ? 'now' : '') + '"></span>').join('') + '</div>';
+}
+function step(st, w, j, draft){
+  const tick = st.auto ? '<span class="lntick on" aria-label="Done">' + CHECK + '</span>'
+    : st.add ? '<span class="lntick"></span>'
+    : '<button class="lntick' + (st.done ? ' on' : '') + '" data-ln-tick="' + w + ':' + j + '"' + (draft ? ' data-draft="1"' : '') + ' aria-pressed="' + st.done + '" aria-label="Done">' + (st.done ? CHECK : '') + '</button>';
+  const name = (st.go ? '<a href="#' + esc(st.go) + '">' : '<span>') + esc(st.title) + (st.go ? '</a>' : '</span>');
+  return '<div class="lnpstep' + (st.done ? ' done' : '') + '">' + tick + '<span class="lnpk">' + (st.kind === 'do' ? svg('M4 16h3l8.5-8.5-3-3L4 13v3z') : svg(KIND[st.kind] || KIND.article)) + '</span>' +
+    '<span class="lnpt">' + name + (st.part ? '<i>' + esc(st.part) + '</i>' : '') + (st.by ? '<i>' + esc(st.by) + '</i>' : '') + '</span>' +
+    (st.add ? '<button class="btn sm primary" data-ln-padd="' + w + ':' + j + '"' + (draft ? ' data-draft="1"' : '') + '>Add</button>' : '') +
+    (st.mins ? '<span class="lnpm">' + mins(st.mins) + '</span>' : '') + '</div>';
+}
+const mins = m => m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '') : m + ' min';
+const SPARK = '<svg class="lnspark" width="15" height="15" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor"/></svg>';
+const CHECK = '<svg width="13" height="13" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function suggRows(list, looking, error){
+  return list.map(s => '<div class="lnsg">' + see(s) + '<span class="lnsk">' + svg(KIND[s.kind] || KIND.article) + '</span><span class="lnrt"><b>' + esc(s.title) + '</b><i>' + esc([KNAME[s.kind], s.by].filter(Boolean).join(' · ')) + OUT + '</i></span>' + (s.kind === 'book' ? '</button>' : '</a>') +
+      '<button class="btn sm primary" data-ln-take="' + esc(s.id) + '">Add</button><button class="lnno" data-ln-skip="' + esc(s.id) + '" aria-label="Not this">×</button></div>').join('') +
+    (looking ? spin('Looking…') : (error ? '<p class="mute tiny">' + esc(error) + '</p>' : '') + '<button class="btn sm" data-ln="more">Find more</button>');
+}
+
+/* Everything: all its things, and its feeds and suggestions beside them */
+function everything(p){
+  const a = p.area, n = k => p.items.filter(x => x.kind === k).length;
   const kinds = [['all', 'All ' + p.items.length], ['book', 'Books ' + n('book')], ['article', 'Articles ' + n('article')], ['video', 'Videos ' + n('video')], ['hl', 'Highlights ' + p.highlights.length]]
     .filter(k => k[0] === 'all' || !/ 0$/.test(k[1]));
   const chips = '<div class="lnchips">' + kinds.map(k => '<button class="lnchip' + (P.kind === k[0] ? ' on' : '') + '" data-ln-kind="' + k[0] + '">' + k[1] + '</button>').join('') + '</div>';
   let body;
   if (P.kind === 'hl') body = p.highlights.map(h => '<div class="lnhl"><p dir="auto">' + esc(h.text || '') + '</p><span>' + esc(h.title || '') + '</span></div>').join('');
-  else {
-    const rows = p.items.filter(x => P.kind === 'all' || x.kind === P.kind);
-    body = rows.map((x, i) => '<div class="lnrow" data-ref="' + esc(x.ref) + '">' +
-      (x.go ? '<a class="lnrowmain" href="#' + esc(x.go) + '">' : '<span class="lnrowmain">') + pic(x) +
-      '<span class="lnrt"><b>' + esc(x.title) + '</b><i>' + svg(KIND[x.kind] || KIND.article) + esc([x.by, x.len].filter(Boolean).join(' · ')) + '</i></span>' + (x.go ? '</a>' : '</span>') +
-      (x.st === 'Wanted' ? '<button class="btn sm" data-ln-find="' + esc(x.title) + '">Find</button>' : '') +
-      (x.st ? '<span class="lnst' + (x.st === 'Done' ? ' done' : x.st === 'New' ? ' new' : '') + '">' + esc(x.st) + '</span>' : '') +
-      (P.editing ? '<span class="lnedit">' + (i ? '<button data-ln-up aria-label="Earlier">↑</button>' : '') + (i < rows.length - 1 ? '<button data-ln-down aria-label="Later">↓</button>' : '') +
-        '<button data-ln-rm aria-label="Take out">×</button></span>' : '') + '</div>').join('');
-  }
+  else { const rows = p.items.filter(x => P.kind === 'all' || x.kind === P.kind); body = rows.map((x, i) => row(x, P.editing, i, rows.length)).join(''); }
   const feeds = '<section class="card lnfeeds"><div class="cardh"><h2>Feeds</h2><span class="spacer"></span><button class="linkbtn" data-ln="follow">Follow</button></div>' +
     p.feeds.map(f => '<div class="lnrow" data-ref="' + esc(f.ref) + '"><a class="lnrowmain" href="#' + esc(f.go) + '">' + svg(KIND.feed) + '<span class="lnrt"><b>' + esc(f.title) + '</b></span></a>' +
       (f.new ? '<span class="lnst new">' + f.new + ' new</span>' : '') + (P.editing ? '<span class="lnedit"><button data-ln-rm aria-label="Take out">×</button></span>' : '') + '</div>').join('') + '</section>';
-  const sugg = a.suggest ? '<section class="card lnsugg"><div class="cardh"><h2>Suggestions</h2></div>' +
-    p.suggestions.map(s => '<div class="lnsg">' + see(s) + '<span class="lnsk">' + svg(KIND[s.kind] || KIND.article) + '</span><span class="lnrt"><b>' + esc(s.title) + '</b><i>' + esc([KNAME[s.kind], s.by].filter(Boolean).join(' · ')) + OUT + '</i></span>' + (s.kind === 'book' ? '</button>' : '</a>') +
-      '<button class="btn sm primary" data-ln-take="' + esc(s.id) + '">Add</button><button class="lnno" data-ln-skip="' + esc(s.id) + '" aria-label="Not this">×</button></div>').join('') +
-    (p.looking ? '<p class="lnlook"><span class="spin"></span>Looking…</p>' : (p.error ? '<p class="mute tiny">' + esc(p.error) + '</p>' : '') + '<button class="btn sm" data-ln="more">Find more</button>') + '</section>' : '';
-  page.innerHTML = hero + steps + '<div class="lncols"><section class="card lnlist">' + chips + body + '</section><div class="lnside">' + feeds + sugg + '</div></div>';
+  const sugg = a.suggest ? '<section class="card lnsugg"><div class="cardh"><h2>Suggestions</h2></div>' + suggRows(p.suggestions, p.looking, p.error) + '</section>' : '';
+  return '<div class="lncols"><section class="card lnlist">' + chips + body + '</section><div class="lnside">' + feeds + sugg + '</div></div>';
+}
+
+/* Plan */
+const PACE = [[20, '20 min a day'], [30, '30 min a day'], [45, '45 min a day'], [60, '1 h a day']], WEEKS = [[2, '2 weeks'], [4, '4 weeks'], [8, '8 weeks']];
+function paceRow(){
+  return '<div class="lnpace">' + PACE.map(x => '<button class="lnchip' + (P.pace.mins === x[0] ? ' on' : '') + '" data-ln-mins="' + x[0] + '">' + x[1] + '</button>').join('') +
+    '<span class="lnsep"></span>' + WEEKS.map(x => '<button class="lnchip' + (P.pace.weeks === x[0] ? ' on' : '') + '" data-ln-weeks="' + x[0] + '">' + x[1] + '</button>').join('') +
+    '<button class="btn sm primary" data-ln="makeplan">' + SPARK + 'Make a plan</button></div>';
+}
+function weeks(plan, draft){
+  return '<div class="lnweeks">' + plan.weeks.map((w, i) => '<section class="card lnweek' + (!draft && i === plan.now ? ' now' : '') + (w.done ? ' done' : '') + '"><span class="lnwk">Week ' + (i + 1) + '</span>' +
+    '<div class="lnwname">' + esc(w.name) + '</div>' + w.steps.map((st, j) => step(st, i, j, draft)).join('') + '</section>').join('') + '</div>';
+}
+function planTab(p){
+  if (p.working.plan) return spin('Making a plan…');
+  const fail = p.failed.plan ? '<p class="mute tiny">' + esc(p.failed.plan) + '</p>' : '';
+  if (p.plan_draft) return fail + '<div class="lnphead"><h2>' + esc(p.plan_draft.title) + '</h2><span class="spacer"></span><button class="btn sm primary" data-ln="pkeep">Keep</button>' +
+    '<button class="btn sm" data-ln="pagain">Again</button><button class="btn sm" data-ln="pdrop">Not now</button></div>' + (P.again ? paceRow() : '') + weeks(p.plan_draft, true);
+  if (p.plan) return fail + '<div class="lnphead"><h2>' + esc(p.plan.title) + '</h2><span class="spacer"></span>' + progress(p.plan) +
+    '<button class="btn sm" data-ln="pagain">Again</button>' + (P.editing ? '<button class="btn sm" data-ln="pclear">Remove</button>' : '') + '</div>' + (P.again ? paceRow() : '') + weeks(p.plan, false);
+  return fail + '<div class="lnpempty">' + paceRow() + '</div>';
+}
+
+/* Ask */
+function askTab(p){
+  const a = p.area, on = p.sources.filter(x => !P.off.has(x.ref)).length;
+  const chat = p.chat.map(x => '<div class="lnqa" id="lnq-' + esc(x.id) + '"><div class="lnq"><span dir="auto">' + esc(x.q) + '</span><button class="lnno" data-ln-forget="' + esc(x.id) + '" aria-label="Forget">×</button></div>' +
+    (x.state === 'asking' ? spin('…') : x.state === 'error' ? '<p class="mute tiny">' + esc(x.error) + '</p>' :
+      '<div class="lna">' + x.paras.map(pp => '<p dir="auto">' + esc(pp.text) + '</p>' + (pp.from.length ? '<div class="lnfrom">' + pp.from.map(ch =>
+        '<a class="lnsrc" href="#' + esc(ch.go) + '">' + svg(KIND[ch.kind] || KIND.article) + '<span>' + esc(ch.label) + '</span></a>').join('') + '</div>' : '')).join('') +
+      (x.outside && x.outside.length ? '<div class="lnoutside">' + x.outside.map((o, i) => '<div class="lnsg"><a class="lnsgo"' + (o.url ? ' href="' + esc(o.url) + '" target="_blank" rel="noopener"' : '') + '><span class="lnsk">' + svg(KIND[o.kind] || KIND.article) + '</span>' +
+        '<span class="lnrt"><b>' + esc(o.title) + '</b><i>' + esc([KNAME[o.kind], o.by].filter(Boolean).join(' · ')) + '</i></span></a><button class="btn sm primary" data-ln-oadd="' + esc(x.id) + ':' + i + '">Add</button></div>').join('') + '</div>' : '') + '</div>') + '</div>').join('');
+  const srcList = p.sources.map(x => '<label class="aaline"><input type="checkbox" data-ln-src="' + esc(x.ref) + '"' + (P.off.has(x.ref) ? '' : ' checked') + '>' + svg(KIND[x.kind] || KIND.article) + '<span>' + esc(x.title) + '</span></label>').join('');
+  const sw = '<div class="lnseg"><button class="' + (P.anywhere ? '' : 'on') + '" data-ln-any="0">My sources</button><button class="' + (P.anywhere ? 'on' : '') + '" data-ln-any="1">Anywhere</button></div>';
+  return '<div class="lnask"><div class="lnchat">' + chat +
+    '<form id="lnaskf" class="lnaskbox"><input class="field" id="lnaskq" placeholder="Ask about ' + esc(a.name) + '" autocomplete="off" enterkeyhint="send"><button class="btn primary" type="submit" aria-label="Ask">' + SPARK + 'Ask</button></form>' +
+    '<div class="lnaskopts">' + sw + '<details class="lnsrcfold"><summary>Sources · ' + on + ' of ' + p.sources.length + '</summary><div class="lnsrcs">' + srcList + '</div></details></div></div>' +
+    '<section class="card lnsrcside"><div class="cardh"><h2>Sources</h2><span class="spacer"></span><span class="mute tiny">' + on + ' of ' + p.sources.length + '</span></div><div class="lnsrcs">' + srcList + '</div></section></div>';
 }
 
 // A suggestion opens where it comes from, to see it before adding it: the page or the video itself, a feed's
@@ -217,9 +329,30 @@ L.addPicker = m => {
 };
 L.chosen = () => { const s = $('#addarea'); return s && s.value; };
 
+const post = async (what, body) => { await api('/api/areas/' + enc(P.id) + '/' + what, { method: 'POST', body: JSON.stringify(body || {}) }); refresh(); };
+const put = (what, body) => api('/api/areas/' + enc(P.id) + '/' + what, { method: 'PUT', body: JSON.stringify(body) });
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'lnaskf') return;
+  e.preventDefault();
+  const i = $('#lnaskq'), q = i.value.trim(); if (!q) return;
+  const refs = P.data.sources.filter(x => !P.off.has(x.ref)).map(x => x.ref);
+  if (!refs.length && !P.anywhere) { toast('No sources'); return; }
+  i.value = '';
+  try { await post('ask', { q, anywhere: P.anywhere, refs: P.off.size ? refs : [] }); }
+  catch(err){ i.value = q; toast(err.message); }
+  setTimeout(() => { const c = $('#main .lnchat .lnqa:last-of-type'); if (c) c.scrollIntoView({ block: 'end', behavior: 'smooth' }); }, 60);
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.matches || !t.matches('[data-ln-src]')) return;
+  if (t.checked) P.off.delete(t.dataset.lnSrc); else P.off.add(t.dataset.lnSrc);
+  if (C.lsSet) C.lsSet(offKey(P.id), [...P.off]);
+  draw();
+});
+
 /* ---------- clicks ---------- */
 document.addEventListener('click', async e => {
-  const t = e.target.closest && e.target.closest('[data-ln],[data-ln-color],[data-ln-del],[data-ln-move],[data-ln-kind],[data-ln-up],[data-ln-down],[data-ln-rm],[data-ln-take],[data-ln-skip],[data-ln-pick],[data-ln-addref],[data-ln-find]');
+  const t = e.target.closest && e.target.closest('[data-ln],[data-ln-color],[data-ln-del],[data-ln-move],[data-ln-kind],[data-ln-up],[data-ln-down],[data-ln-rm],[data-ln-take],[data-ln-skip],[data-ln-pick],[data-ln-addref],[data-ln-find],' +
+    '[data-ln-sup],[data-ln-sdown],[data-ln-srm],[data-ln-addsec],[data-ln-tick],[data-ln-padd],[data-ln-mins],[data-ln-weeks],[data-ln-forget],[data-ln-oadd],[data-ln-any],[data-ln-goq]');
   if (!t) return;
   const d = t.dataset, cardId = (t.closest('[data-id]') || {}).dataset;
   try {
@@ -270,6 +403,34 @@ document.addEventListener('click', async e => {
     else if (d.lnSkip) { await api('/api/areas/suggestions/' + enc(d.lnSkip), { method: 'POST', body: JSON.stringify({ skip: true }) }); refresh(); }
     else if (d.lnAddref) { await L.put(P.id, { ref: d.lnAddref }); t.outerHTML = '<span class="lnst done">Added</span>'; }
     else if (d.lnFind) { if (C.AddBook) C.AddBook.open(d.lnFind); }
+    // the agent (areaagent.py): the Overview's layout, the plan, Ask
+    else if (d.ln === 'rearrange') { sheet('<h2>Rearrange</h2><input class="field" id="lnhow" placeholder="For" autocomplete="off">' +
+      '<div class="lnbtns"><span class="spacer"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-ln="arrange">Rearrange</button></div>'); $('#lnhow').focus(); }
+    else if (d.ln === 'arrange') { const how = ($('#lnhow') || {}).value || ''; C.closeModal(); await post('layout', { how }); }
+    else if (d.ln === 'lkeep' || d.ln === 'ldrop' || d.ln === 'plain') { await put('layout', { [{ lkeep: 'keep', ldrop: 'drop', plain: 'plain' }[d.ln]]: true }); if (d.ln === 'plain') P.editing = false; refresh(); }
+    else if (d.lnSup || d.lnSdown || d.lnSrm || d.lnAddsec) {
+      const raw = rawLayout(P.data), i = +(d.lnSup || d.lnSdown || d.lnSrm);
+      if (d.lnAddsec) raw.push({ kind: d.lnAddsec, wide: ['plan', 'next', 'highlights'].includes(d.lnAddsec) });
+      else if (d.lnSrm) raw.splice(i, 1);
+      else { const j = i + (d.lnSup ? -1 : 1); if (j < 0 || j >= raw.length) return; [raw[i], raw[j]] = [raw[j], raw[i]]; }
+      await put('layout', { sections: raw }); refresh();
+    }
+    else if (d.lnMins || d.lnWeeks) { if (d.lnMins) P.pace.mins = +d.lnMins; else P.pace.weeks = +d.lnWeeks; draw(); }
+    else if (d.ln === 'makeplan') { P.again = false; await post('plan', P.pace); }
+    else if (d.ln === 'pagain') { P.again = !P.again; draw(); }
+    else if (d.ln === 'pkeep' || d.ln === 'pdrop') { await put('plan', { [d.ln === 'pkeep' ? 'keep' : 'drop']: true }); P.again = false; refresh(); }
+    else if (d.ln === 'pclear') { if (!confirm('Remove the plan?')) return; await put('plan', { clear: true }); P.editing = false; refresh(); }
+    else if (d.lnTick) { const [w, j] = d.lnTick.split(':').map(Number); t.disabled = true; await put('plan', { tick: [w, j], done: t.getAttribute('aria-pressed') !== 'true', draft: !!d.draft }); refresh(); }
+    else if (d.lnPadd) { const [w, j] = d.lnPadd.split(':').map(Number); t.disabled = true; t.textContent = 'Adding…'; await put('plan', { add: [w, j], draft: !!d.draft }); refresh(); L.load(); }
+    else if (d.lnAny) { P.anywhere = d.lnAny === '1'; draw(); }
+    else if (d.lnForget) { await api('/api/areas/' + enc(P.id) + '/ask/' + enc(d.lnForget), { method: 'DELETE' }); refresh(); }
+    else if (d.lnOadd) {
+      const [cid, i] = d.lnOadd.split(':'), x = P.data.chat.find(c => c.id === cid), o = x && x.outside[+i]; if (!o) return;
+      t.disabled = true; t.textContent = 'Adding…';
+      await L.put(P.id, o.kind === 'book' ? { ref: 'want:' + o.title + (o.by ? '|' + o.by : '') } : { url: o.url, title: o.title });
+      t.outerHTML = '<span class="lnst done">Added</span>'; L.load();
+    }
+    else if (d.lnGoq) P.goQ = d.lnGoq;           // (the link goes to Ask, which shows that one)
   } catch(err){ toast(err.message); }
 });
 // renaming an area in place: on Enter, or when the box is left
@@ -283,7 +444,7 @@ document.addEventListener('click', e => { if (e.target.closest && e.target.close
 
 C.views.learn = async args => {
   const id = decodeURIComponent((args || [])[0] || '');
-  return id ? area(id) : home();
+  return id ? area(id, (args || [])[1]) : home();
 };
 if (C.Look && C.Look.on) L.load();
 })();

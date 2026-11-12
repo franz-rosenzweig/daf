@@ -1268,9 +1268,13 @@ function startPlayer(d){
   clearInterval(V.timer); V.player = null; V.cur = -1; V.playing = false;
   if (d.reel) { startReel(); return; }
   const id = ytId(d.url); if (!id) return;
+  // opened at a moment (#read/<id>/t:<seconds>, from Learn's Ask): it starts there, its line in view
+  const at = !d.episode && R.podAt != null ? Math.floor(R.podAt) : 0;
+  if (!d.episode) { R.podAt = null; R.podPlay = false; }
+  if (at) setTimeout(() => { const i = cueAt(at); if (i >= 0) setFocus(i, true); }, 300);
   const make = () => {
     V.player = new YT.Player('ytp', { videoId: id, host: 'https://www.youtube-nocookie.com', width: '100%', height: '100%',
-      playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+      playerVars: Object.assign({ rel: 0, modestbranding: 1, playsinline: 1 }, at ? { start: at } : {}),
       events: { onStateChange: e => { V.playing = e.data === 1; R.lastActive = Date.now(); } } });
     V.timer = setInterval(syncCue, 500);
   };
@@ -1836,6 +1840,11 @@ C.views.read = args => {
     const id = decodeURIComponent(args.slice(0, -1).join('/')), t = +last.slice(2);
     if (R.doc && R.doc.id === id && R.doc.episode && V.player) { seek(t); return; }
     R.podAt = t; R.podPlay = true; return readView(id);
+  }
+  if (/^p:\d+$/.test(last) && args.length > 1) {      // a paragraph (where an answer in Learn's Ask came from)
+    const id = decodeURIComponent(args.slice(0, -1).join('/')), i = +last.slice(2);
+    if (R.doc && R.doc.id === id && $('#docbody')) { setFocus(i, true); return; }
+    return readView(id).then(() => setTimeout(() => setFocus(i, true), 150));
   }
   if (last.startsWith('hl:') && args.length > 1) {
     const id = decodeURIComponent(args.slice(0, -1).join('/')), hid = decodeURIComponent(last.slice(3));
