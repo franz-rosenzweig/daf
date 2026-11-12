@@ -7,8 +7,9 @@
                    videos (and their highlights), its feeds, and the helper's suggestions
 
    Highlights and Review are Learn's other pages in the new look (look2.js). Things get into an area
-   from its own Add (a search over Daf, a link, a site to follow), from Add to Daf's Area, from a
-   book's ⋯, and from the helper. */
+   from its own Add (a search over Daf, a link, a site to follow), from Add to Daf's Area, from Add to
+   an area (L.pick: a book's page and ⋯, an article's or a video's ⋯, the rows picked in the Feed and
+   the Library), and from the helper. */
 (() => {
 const C = window.DafCore, { $, esc, api, toast, S } = C;
 const L = C.Learn = { areas: null };
@@ -176,23 +177,36 @@ document.addEventListener('submit', async e => {
   try { await L.put(P.id, feed ? { feed: v } : { url: v }); st.textContent = feed ? 'Following it, in this area' : 'Saved, in this area'; i.value = ''; }
   catch(err){ st.textContent = err.message; }
 });
-// Add to an area, from anywhere: the areas, each one switched on or off for this thing.
-L.pick = async (ref, title) => {
-  let r; try { r = await api('/api/areas?ref=' + enc(ref)); } catch(e){ toast(e.message); return; }
+// Add to an area, from anywhere (a book's page and ⋯, an article's or a video's ⋯, the rows picked in the
+// Feed and the Library): the areas, each one switched on or off for this thing, or these things. A Feed
+// item is saved to the Library as it goes in (areas.py kept), and moved(was, now) tells the caller.
+const PK = { refs: [], moved: null };
+L.pick = async (refs, title, moved) => {
+  refs = [].concat(refs);
+  let r; try { r = await api('/api/areas?' + refs.map(x => 'ref=' + enc(x)).join('&')); } catch(e){ toast(e.message); return; }
   const on = new Set(r.in);
+  Object.assign(PK, { refs, moved: moved || null });
   sheet('<h2>Add to an area</h2>' + (title ? '<p class="mute" style="margin:0">' + esc(title) + '</p>' : '') +
     '<div class="lnpick">' + r.areas.map(a => '<label class="aaline"><input type="checkbox" data-ln-in="' + esc(a.id) + '"' + (on.has(a.id) ? ' checked' : '') + '><span class="lndot" style="background:' + esc(a.color) + '"></span>' + esc(a.name) + '</label>').join('') + '</div>' +
     '<div class="lnbtns"><button class="btn" data-ln="pnew">New area</button><span class="spacer"></span><button class="btn primary" data-act="close">Done</button></div>');
-  $('#modal').dataset.lnref = ref;
 };
+// each one in (the ref it's kept as from then on), or each one out
+async function putAll(aid){
+  for (let i = 0; i < PK.refs.length; i++) {
+    const was = PK.refs[i], r = await L.put(aid, { ref: was });
+    if (r.ref && r.ref !== was) { PK.refs[i] = r.ref; if (PK.moved) PK.moved(was, r.ref); }
+  }
+}
 document.addEventListener('change', async e => {
   const t = e.target; if (!t.matches || !t.matches('[data-ln-in]')) return;
-  const ref = $('#modal').dataset.lnref, aid = t.dataset.lnIn;
+  const aid = t.dataset.lnIn;
+  t.disabled = true;
   try {
-    if (t.checked) await L.put(aid, { ref });
-    else await api('/api/areas/' + enc(aid) + '/items?ref=' + enc(ref), { method: 'DELETE' });
+    if (t.checked) await putAll(aid);
+    else for (const ref of PK.refs) await api('/api/areas/' + enc(aid) + '/items?ref=' + enc(ref), { method: 'DELETE' });
     L.load();
   } catch(err){ toast(err.message); t.checked = !t.checked; }
+  t.disabled = false;
 });
 // Add to Daf (reader.js openAdd): which area, when there are any; on an area's page, that one.
 L.addPicker = m => {
@@ -210,14 +224,14 @@ document.addEventListener('click', async e => {
   const d = t.dataset, cardId = (t.closest('[data-id]') || {}).dataset;
   try {
     if (d.ln === 'edit') { editing = !editing; t.textContent = editing ? 'Done' : 'Edit'; drawHome(L.areas || []); }
-    else if (d.ln === 'new' || d.ln === 'pnew') { const ref = d.ln === 'pnew' ? $('#modal').dataset.lnref : ''; areaSheet(null); $('#modal').dataset.lnthen = ref || ''; }
+    else if (d.ln === 'new' || d.ln === 'pnew') { areaSheet(null); $('#modal').dataset.lnthen = d.ln === 'pnew' ? '1' : ''; }
     else if (d.ln === 'save') {
       const m = $('#modal'), name = $('#lnname').value.trim(); if (!name) { $('#lnname').focus(); return; }
       const body = { name, goal: $('#lngoal').value.trim(), color: (m.querySelector('[data-ln-pick].on') || {}).dataset.lnPick, suggest: $('#lnsug').checked };
       if (m.dataset.lnfor) { await api('/api/areas/' + enc(m.dataset.lnfor), { method: 'PUT', body: JSON.stringify(body) }); C.closeModal(); await L.load(); refresh(); }
       else {
         const r = await api('/api/areas', { method: 'POST', body: JSON.stringify(body) }), then = m.dataset.lnthen;
-        if (then) await L.put(r.id, { ref: then });
+        if (then) await putAll(r.id);
         C.closeModal(); L.areas = r.areas; await L.load(); location.hash = 'learn/' + enc(r.id);
       }
     }

@@ -385,6 +385,7 @@ const MICON = {
   grid: MI('M4 4h5v5H4z|M11 4h5v5h-5z|M4 11h5v5H4z|M11 11h5v5h-5z'),
   taste: MI('M10 16.5s-6-3.6-6-8A3.5 3.5 0 0 1 10 6a3.5 3.5 0 0 1 6 2.5c0 4.4-6 8-6 8z'),
   select: MI('M4.5 10.5l3.5 3.5 7.5-8'),
+  area: MI(TICON.Learn),
 };
 const MSEL = k => { const [t, v] = k.split(':'); return t === 'a' ? (v === 'export' ? 'a[href*="/highlights/export"]' : 'a[href$="/file"]') : '[data-' + t + '="' + v + '"]'; };
 // [button, short label, icon, the words that mean it's on now, the bar's own button for the same thing]
@@ -393,7 +394,7 @@ const MENUS = {
     tiles: [[['bm:listen', 'Listen', 'speaker', /^Stop/], ['abk:herebook', 'Audiobook', 'headphones'], ['bm:ask', 'Ask', 'ask'], ['bm:focus', 'Focus', 'focus', /^Leave/]],
       [['bm:notebook', 'Notebook', 'note'], ['bm:margin', 'Margin', 'margin', /^Hide/], ['bm:sbs', 'Side by side', 'split', /^Close/]]],
     chips: ['Go to', [['bm:start', 'Start'], ['bm:goto', 'Page…'], ['bm:kindle', 'Kindle']]],
-    rows: [[['bm:info', 'About', 'info'], ['bm:book', 'Book page', 'book'], ['bm:mark', 'Bookmark', 'bookmark', /^Remove/, '[data-bk="bookmark"]'], ['bm:pairs', 'Swap the page pairs', 'pairs']],
+    rows: [[['bm:info', 'About', 'info'], ['bm:book', 'Book page', 'book'], ['bm:area', 'Add to an area', 'area'], ['bm:mark', 'Bookmark', 'bookmark', /^Remove/, '[data-bk="bookmark"]'], ['bm:pairs', 'Swap the page pairs', 'pairs']],
       [['a:export', 'Export highlights', 'export'], ['a:file', 'Download', 'download'], ['bm:offline', null, 'download']]],
     foot: [['bm:auto', 'Auto highlight'], ['bm:keys', 'Shortcuts'], ['bm:reset', 'Forget my place']],
   },
@@ -401,7 +402,7 @@ const MENUS = {
     tiles: [[['more:listen', 'Listen', 'speaker', /^Stop/], ['more:ask', 'Ask', 'ask'], ['more:note', 'Note', 'note'], ['more:star', 'Shortlist', 'star', /^Off/], ['more:focus', 'Focus', 'focus', /^Leave/]],
       [['more:margin', 'Margin', 'margin', /^Hide/], ['more:sbs', 'Side by side', 'split', /^Close/]]],
     chips: ['List', [['more:prevdoc', '‹ Previous'], ['more:nextdoc', 'Next ›']]],
-    rows: [[['more:save', 'Save to Library', 'save', null, '#rtop [data-dact="save"]'], ['more:seen', 'Seen', 'eye', /^Back/, '#rtop [data-dact="seen"]'], ['more:later', 'Later', 'clock', /^Back/], ['more:archive', 'Archive', 'archive', /^Back/, '#rtop [data-dact="archive"]'],
+    rows: [[['more:save', 'Save to Library', 'save', null, '#rtop [data-dact="save"]'], ['more:area', 'Add to an area', 'area'], ['more:seen', 'Seen', 'eye', /^Back/, '#rtop [data-dact="seen"]'], ['more:later', 'Later', 'clock', /^Back/], ['more:archive', 'Archive', 'archive', /^Back/, '#rtop [data-dact="archive"]'],
         ['more:panel', 'Info', 'info', /^Hide/, '#rtop [data-ract="panel"]'], ['more:pages', 'PDF pages', 'file']],
       [['more:kindle', 'Send to Kindle', 'kindle'], ['more:full', 'Load the full article', 'refresh'], ['more:device', null, 'download']],
       [['more:open', 'Open original', 'external'], ['more:copy', 'Copy link', 'link'], ['more:vault', 'Open in Obsidian', 'external']]],
@@ -524,7 +525,7 @@ function screenItems(){
   else if (v === 'book') {
     pr('Listen from here', 'headphones', '[data-abk="here"]'); pr('Edit details', 'edit', '[data-act="bookedit"]');
     const o = q('.bookhead a[target="_blank"]'); if (o) add('Open the original', 'external', { href: o.href, blank: true });
-    const bid = decodeURIComponent(r[1] || ''); if (bid && C.Learn) add('Add to an area', 'plus', { fn: () => C.Learn.pick('book:' + bid, (q('.btitle') || {}).textContent) });
+    const bid = decodeURIComponent(r[1] || ''); if (bid && C.Learn) add('Add to an area', 'area', { fn: () => C.Learn.pick('book:' + bid, (q('.btitle') || {}).textContent) });
     const vl = q('.l2vault code'); if (vl) add('Open the note in Obsidian', 'external', { href: 'obsidian://open?vault=' + encodeURIComponent(q('.l2vault').dataset.vname || '') + '&file=' + encodeURIComponent(vl.textContent.trim()) });
   }
   else if (v === 'catalog') { pr('Columns', 'columns', '[data-act="cat:cols"]'); pr('Views', 'views', '[data-act="cat:views"]'); }

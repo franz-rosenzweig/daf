@@ -11,7 +11,7 @@ import unicodedata
 from urllib.parse import quote as _urlq
 from datetime import date, datetime, timedelta
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -1881,7 +1881,8 @@ def _area_err(fn, *a):
 
 
 @app.get("/api/areas", dependencies=[Depends(user)])
-def get_areas(ref: str = "", c=Depends(conn)):
+def get_areas(ref: list[str] = Query([]), c=Depends(conn)):
+    """The areas; with ref (one or more), also the areas that has (or all of them have) in."""
     from . import areas
     return {"areas": areas.list_areas(c), "in": areas.areas_of(c, ref) if ref else []}
 
@@ -1926,7 +1927,8 @@ def delete_area(aid: str, c=Depends(conn)):
 
 @app.post("/api/areas/{aid}/items", dependencies=[Depends(user)])
 def post_area_item(aid: str, b=Depends(json_body), c=Depends(conn)):
-    """Add to an area: a ref (book:, doc:, feed:), or a link, which is saved to the Library first."""
+    """Add to an area: a ref (book:, doc:, feed:), or a link, which is saved to the Library first (so is a Feed
+    item given as doc:); gives the ref it's kept as."""
     from . import areas
     ref = str(b.get("ref") or "")
     url = str(b.get("url") or "").strip()
@@ -1943,7 +1945,12 @@ def post_area_item(aid: str, b=Depends(json_body), c=Depends(conn)):
             raise HTTPException(400, "A link starting with http:// or https://, please")
         did = areas._save_link(c, url, str(b.get("title") or "").strip() or None)
         ref = ("doc:" + did) if did else ("url:" + url)
-    _area_err(areas.add, c, aid, ref)
+    try:
+        ref = _area_err(areas.add, c, aid, ref)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 - a Feed item that couldn't be saved to the Library
+        raise HTTPException(502, str(e)[:200])
     return {"ref": ref}
 
 
