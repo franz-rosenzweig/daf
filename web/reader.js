@@ -995,6 +995,8 @@ function openMore(anchor){
     (!feed ? it('star', d.starred ? 'Off the Shortlist' : 'Shortlist', K.label('article', 'star')) : '') +
     (C.Focus ? it('focus', C.Focus.on() ? 'Leave focus mode' : 'Focus mode', K.label('article', 'focus')) : '') + '<hr>' +
     it('note', 'Add a document note', K.label('article', 'docnote')) +
+    (C.Margin && C.Margin.can() && d.blocks.length ? it('margin', C.Margin.active() ? 'Hide the margin' : 'Margin', '') : '') +
+    (C.Split && C.Split.can() ? it('sbs', C.Split.open() ? 'Close side by side' : 'Side by side', '') : '') +
     (d.blocks.length && d.kind !== 'video' && !d.episode ? it('listen', R.tts.on && R.tts.doc === d.id ? 'Stop reading aloud' : 'Read aloud from here', K.label('article', 'aloud')) : '') +
     it('ask', 'Ask about this', '') +
     (feed && d.url ? it('full', d.full ? 'Load the full article again' : 'Load the full article', '') : '') +
@@ -1023,6 +1025,8 @@ function moreAct(a){
   else if (a === 'pages') C.swap('#pdf/' + encodeURIComponent(d.id));
   else if (a === 'note') { R.panel = 'info'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#docnote'); if (x) x.focus(); }, 40); }
   else if (a === 'listen') { if (R.tts.on && R.tts.doc === d.id) stopTTS(); else startTTS(); }
+  else if (a === 'margin' && C.Margin) C.Margin.toggle();
+  else if (a === 'sbs' && C.Split) C.Split.toggle();
   else if (a === 'kindle') sendToKindle([d.id]).then(r => { if (r) d.kindle_sent = { file: r.file, at: Date.now() / 1000 }; });
   else if (a === 'ask') { R.panel = 'ask'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#rpanel textarea'); if (x) x.focus(); }, 40); }
   else if (['save', 'seen', 'later', 'archive', 'delete', 'star'].includes(a)) docAct(a, d.id);
@@ -1099,6 +1103,20 @@ async function readView(id){
   if (C.Ink) C.Ink.open(d);                           // what's written on it with a pen (ink.js)
   const timed = d.kind === 'video' || !!d.episode;   // the Sketchbook beside it (sketchbook.js), a video's with its time
   if (C.Sketch) C.Sketch.attach({ item: 'doc:' + d.id, kind: 'doc', time: timed ? curTime : null, seek: timed ? seek : null, highlights: () => notebookHls(d), go: h => showHl(h.id) });
+  if (C.Margin) C.Margin.attach({ item: 'doc:' + d.id, host: () => R.doc === d ? $('#main .rv .doc') : null, places: () => marginPlaces(d),
+    open: id => { const h = d.highlights.find(x => x.id === id); if (h) showHlBar(h); } });   // the margin (study.js)
+}
+// The highlights in the text, for the margin (study.js): each one's top and height from the top of the text.
+function marginPlaces(d){
+  const doc = $('#main .rv .doc'); if (R.doc !== d || !doc) return [];
+  const top = doc.getBoundingClientRect().top, out = [];
+  for (const h of d.highlights) {
+    const ms = doc.querySelectorAll('mark.hl[data-h="' + CSS.escape(h.id) + '"], figure.hlimg[data-h="' + CSS.escape(h.id) + '"]'); if (!ms.length) continue;
+    const rs = [...ms].flatMap(m => [...m.getClientRects()]).filter(r => r.height > 0); if (!rs.length) continue;
+    const t = Math.min(...rs.map(r => r.top)), b = Math.max(...rs.map(r => r.bottom));
+    out.push({ id: h.id, color: h.color || 'yellow', note: h.user_note || '', top: t - top, h: b - t });
+  }
+  return out;
 }
 // The highlights for the Notebook (sketchbook.js): its one page's cards, in the order they're in the text.
 function notebookHls(d){
@@ -1575,7 +1593,7 @@ function prefetchDocs(items){
   setTimeout(next, 1500);
 }
 setInterval(() => {
-  const T = R.tts, viewing = C.S.route[0] === 'read' && R.doc && !document.hidden && (Date.now() - R.lastActive < 90000 || (R.doc.kind === 'video' && V.playing));
+  const T = R.tts, viewing = C.S.route[0] === 'read' && R.doc && !document.hidden && (Date.now() - R.lastActive < 90000 || (R.doc.kind === 'video' && V.playing)) && (!C.Split || C.Split.mine());
   const id = T.on && T.playing ? T.doc : viewing ? R.doc.id : null;
   if (id) sendBeat({ doc_id:id, seconds:15, at:Math.floor(Date.now() / 1000) });
   const c = $('#counting'); if (c) c.classList.toggle('off', !id);

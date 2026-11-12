@@ -26,7 +26,8 @@ const ICON = {
   focus: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
 // The room the book has: the window, less the Sketchbook beside it or under it (sketchbook.js).
-const room = () => C.Sketch && C.Sketch.open() ? C.Sketch.room() : { w: window.innerWidth, h: window.innerHeight };
+// what's left for the page: less the Notebook (or Side by side) on the right, and the margin (study.js)
+const room = () => { const r = C.Sketch ? C.Sketch.room() : { w: window.innerWidth, h: window.innerHeight }; if (C.Margin && C.Margin.active()) r.w -= 320; return r; };
 const fmtMins = m => { m = Math.max(0, Math.round(m || 0)); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; };
 const xpIndex = xp => { const m = /DocFragment\[(\d+)\]/.exec(xp || ''); return m ? +m[1] - 1 : null; };
 
@@ -72,7 +73,7 @@ function applyBookType(){
   const flow = t.flow || 'paginated';  // pages, as Apple Books has them; Aa → Scroll for one long column
   v.renderer.setAttribute('flow', flow);
   v.renderer.setAttribute('max-inline-size', Math.round((t.measure || 38) * 16 * ((t.size || 20) / 20)) + 'px');
-  v.renderer.setAttribute('max-column-count', flow === 'paginated' && room().w >= 1180 && room().w > room().h ? '2' : '1');   // two pages, as a book opens
+  v.renderer.setAttribute('max-column-count', flow === 'paginated' && room().w >= 1180 && room().w > room().h && !(C.Margin && C.Margin.active()) ? '2' : '1');   // two pages, as a book opens
   v.renderer.setAttribute('gap', '6%');
   v.renderer.setAttribute('margin', room().w < 760 ? '24px' : '40px');
   if (B.scans) B.scans.layout();   // a book of scanned pages: a page a picture, as big as fits (scans.js)
@@ -145,6 +146,7 @@ async function openBook(id, at){
     for (const h of d.highlights) if (h.index === index) view.addAnnotation({ value: h.pos.cfi });
     markKindle(index);
     inkSection(index);
+    if (C.Margin) C.Margin.draw();
   });
   view.addEventListener('draw-annotation', e => {
     const { draw, annotation, range } = e.detail, v = annotation.value;
@@ -172,7 +174,8 @@ async function openBook(id, at){
   drawToc();
   Pens.use(INKSURF);
   TOCAT.clear(); SECDOC.clear();
-  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, resized: applyBookType, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
+  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, resized: () => { applyBookType(); if (C.Margin) C.Margin.draw(); }, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
+  if (C.Margin) C.Margin.attach({ item: 'book:' + id, host: () => B.id === id ? $('#bstage') : null, places: marginPlaces, open: marginOpen, relayout: applyBookType, ok: () => !B.scans });   // the margin (study.js)
   // Where to start: a highlight we were sent to, else the newest of here / this device / the Kindle.
   const local = store.get('bookpos.' + id, null);
   const server = d.position;
@@ -778,6 +781,7 @@ function onRelocate(e){
   const mk = $('[data-bk="bookmark"]'); if (mk) { const m = markHere(); mk.classList.toggle('on', !!m); mk.innerHTML = ICON.mark(!!m); mk.title = m ? 'Remove the bookmark (b)' : 'Bookmark this page (b)'; }
   clearTimeout(B.saveT); B.saveT = setTimeout(() => savePosition(), 1500);
   if (C.Sound) C.Sound.moved(C.BookPlace.here());     // Sound: the scene on this page (sound.js)
+  if (C.Margin) C.Margin.draw();
   if (B.panel === 'info' && panelShown()) drawPanelInfoProgress();
 }
 function savePosition(now){
@@ -1219,6 +1223,33 @@ function drawPanelInfoProgress(){
 }
 
 /* ---------- selection, highlights ---------- */
+// The highlights on the page, for the margin (study.js): each one's top and height on the stage, level with
+// its words (the part of it on this page, in a book laid out as pages).
+function marginPlaces(){
+  const v = B.view, stage = $('#bstage'), fv = $('#fv'); if (!v || !B.d || !stage || !fv) return [];
+  const sr = stage.getBoundingClientRect(), vr = fv.getBoundingClientRect(), shown = new Map();
+  try { for (const c of v.renderer.getContents()) shown.set(c.index, c.doc); } catch(e){ return []; }
+  const out = [];
+  for (const h of allHighlights()) {
+    const cfi = (h.pos && h.pos.cfi) || h.cfi; if (!cfi) continue;
+    let at, range; try { at = v.resolveNavigation(cfi); } catch(e){ continue; }
+    const doc = at && shown.get(at.index); if (!doc) continue;
+    try { range = at.anchor(doc); } catch(e){ continue; }
+    if (!range || !range.getClientRects) continue;
+    const fr = doc.defaultView.frameElement.getBoundingClientRect();
+    const rs = [...range.getClientRects()].map(r => ({ l: fr.left + r.left, r: fr.left + r.right, t: fr.top + r.top, b: fr.top + r.bottom }))
+      .filter(r => r.b > r.t && r.r > vr.left + 1 && r.l < vr.right - 1 && r.b > vr.top && r.t < vr.bottom);
+    if (!rs.length) continue;
+    const t = Math.min(...rs.map(r => r.t)), b = Math.max(...rs.map(r => r.b));
+    out.push({ id: h.id, color: h.color || 'yellow', note: h.user_note || h.note || '', top: t - sr.top, h: b - t });
+  }
+  return out;
+}
+function marginOpen(id, el){
+  const h = findHl(id); if (!h) return;
+  const cfi = (h.pos && h.pos.cfi) || h.cfi, kindle = !!(cfi && B.kindleByCfi.get(cfi) === h), r = el.getBoundingClientRect();
+  H.show(H.hlBar(h, { kindle }), { left: r.left, top: r.top, bottom: r.bottom, right: r.right, width: r.width, height: r.height }, { h, cfi, kindle });
+}
 function rectFor(doc, range){
   const fr = doc.defaultView.frameElement.getBoundingClientRect(), r = range.getBoundingClientRect();
   return { left: fr.left + r.left, top: fr.top + r.top, bottom: fr.top + r.bottom, right: fr.left + r.right, width: r.width, height: r.height };
@@ -1674,6 +1705,8 @@ function openMore(anchor){
     '<button data-bm="listen">' + (listening() ? 'Stop listening' : 'Listen from here') + '<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'listen') : 'l') + '</span></button>' +
     (C.Audiobooks ? C.Audiobooks.menu(B.d.id) : '') +
     '<button data-bm="notebook">Notebook<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'panel') : ']') + '</span></button>' +
+    (C.Margin && C.Margin.can() && !B.scans ? '<button data-bm="margin">' + (C.Margin.active() ? 'Hide the margin' : 'Margin') + '</button>' : '') +
+    (C.Split && C.Split.can() ? '<button data-bm="sbs">' + (C.Split.open() ? 'Close side by side' : 'Side by side') + '</button>' : '') +
     '<button data-bm="info">About this book</button>' +
     '<button data-bm="ask">Ask about this book</button>' +
     (C.Focus ? '<button data-bm="focus">' + (C.Focus.on() ? 'Leave focus mode' : 'Focus mode') + '<span class="kbd">' + esc(C.Keys.label ? C.Keys.label('book', 'focus') : 'f') + '</span></button>' : '') + '<hr>' +
@@ -1796,6 +1829,8 @@ document.addEventListener('click', async e => {
     const a = bm.dataset.bm;
     if (a === 'listen') toggleListen();
     else if (a === 'notebook') notebook();
+    else if (a === 'margin' && C.Margin) C.Margin.toggle();
+    else if (a === 'sbs' && C.Split) C.Split.toggle();
     else if (a === 'info' || a === 'ask') openPanel(a);
     else if (a === 'focus' && C.Focus) C.Focus.toggle();
     else if (a === 'start') await B.view.goToTextStart().catch(() => {});
@@ -1829,7 +1864,7 @@ document.addEventListener('input', e => { if (e.target.id === 'bq') { clearTimeo
 /* ---------- reading time ---------- */
 setInterval(() => {
   // (not while the audiobook reads it: that hour is Audiobookshelf's listening time already)
-  const reading = C.S.route[0] === 'ebook' && B.view && B.d && !document.hidden && Date.now() - B.lastActive < 120000 && !(alongHere() && C.Player.playing());
+  const reading = C.S.route[0] === 'ebook' && B.view && B.d && !document.hidden && Date.now() - B.lastActive < 120000 && !(alongHere() && C.Player.playing()) && (!C.Split || C.Split.mine());
   if (reading) C.sendBeat({ book_id: B.d.id, seconds: 15, at: Math.floor(Date.now() / 1000) });
   const c = $('#bcounting'); if (c) c.classList.toggle('off', !reading);
 }, 15000);

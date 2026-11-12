@@ -114,11 +114,11 @@ function place(){
   const r = document.documentElement, z = sizes();
   S.mode = z.mode;
   if (!S.editing || innerWidth !== S.fullW) { S.fullH = innerHeight; S.fullW = innerWidth; }
-  r.classList.toggle('skopen', S.shown);
+  r.classList.toggle('skopen', S.shown || S.extra > 0);
   r.classList.toggle('skside', S.shown && z.mode === 'side');
   r.classList.toggle('skbottom', S.shown && z.mode === 'bottom');
   r.classList.toggle('sktop', S.shown && z.mode === 'top');
-  r.style.setProperty('--skr', (S.shown && z.mode === 'side' ? z.w : 0) + 'px');
+  r.style.setProperty('--skr', ((S.shown && z.mode === 'side' ? z.w : 0) + (S.extra || 0)) + 'px');
   r.style.setProperty('--skb', (S.shown && z.mode === 'bottom' ? z.h : 0) + 'px');
   r.style.setProperty('--skt', (S.shown && z.mode === 'top' ? z.h : 0) + 'px');
 }
@@ -1188,6 +1188,7 @@ window.addEventListener('daf-hl-changed', () => { if (S.shown && S.ctx) { if (S.
 const openKey = () => 'open.' + (S.ctx ? S.ctx.kind : 'doc');
 function show(){
   if (!S.ctx) return;
+  if (S.extra && C.Split) C.Split.close();     // Side by side has this room (study.js)
   build();
   S.shown = true; S.el.hidden = false;
   place(); theme();
@@ -1211,6 +1212,9 @@ function hide(keep){
   buttons(); relayout();
 }
 function toggle(){ if (S.shown) hide(); else show(); }
+// Room kept on the right for something else beside the reader (Side by side, study.js), as the
+// Notebook's own is: the readers lay out in what's left (room()).
+function reserve(px){ S.extra = Math.max(0, Math.round(px || 0)); place(); relayout(); }
 function buttons(){ document.querySelectorAll('[data-sketch]').forEach(b => { b.setAttribute('aria-pressed', String(S.shown)); b.classList.toggle('on', S.shown); }); }
 // A reader opened something: the Notebook is for that now, and comes up if it was up last time.
 // ctx: {item, kind (book | doc | pdf | manga), here() (where you are: {tab, title, pos}), view (a book's
@@ -1259,7 +1263,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('pagehide', flush);
 window.addEventListener('online', () => { if (S.shown && S.ctx) setTimeout(() => load(S.tab), 3000); });
 
-C.Sketch = { attach, detach, button, toggle, show, hide, room, open: () => S.shown, flush, reveal, hlChanged,
+C.Sketch = { attach, detach, button, toggle, show, hide, room, reserve, open: () => S.shown, flush, reveal, hlChanged,
   list: () => reveal({ view: 'list' }),
   state: () => ({ shown: S.shown, mode: S.mode, view: S.view, item: S.ctx && S.ctx.item, tab: S.tab, here: S.here, tabs: tabList().map(t => t.tab),
     cards: cardsHere().map(h => h.id), groups: S.groups.map(g => (g.card ? 'card' : g.id ? 'gone' : 'top') + ':' + g.blocks.length), hls: S.hls.length,

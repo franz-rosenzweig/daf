@@ -6,7 +6,9 @@
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
 <title>Daf</title>
-<script>/* the new look (web/look2.js and look2.css), unless this device has turned it off (Preferences → New look, or ?look=1; ?look=2 turns it on again) */
+<script>/* the right half of Side by side (web/study.js): just the reader */
+if(/[?&]pane=1/.test(location.search))document.documentElement.classList.add('pane');
+/* the new look (web/look2.js and look2.css), unless this device has turned it off (Preferences → New look, or ?look=1; ?look=2 turns it on again) */
 try{var q=/[?&]look=(\d)/.exec(location.search);if(q)localStorage.setItem('daf.look',q[1]);if(!/1/.test(localStorage.getItem('daf.look')||''))document.documentElement.dataset.look='2';}catch(e){}
 /* the theme, before anything paints (web/themes.js keeps daf.themeVars, and the new look's version of each) */
 try{var r=document.documentElement,L2=r.dataset.look==='2',t=JSON.parse(localStorage.getItem('daf.themeVars')||'null'),a=(t||{}).a||{},d=a.mode==='dark'||(a.mode!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);if(t&&(!L2||t.light2)){var v=L2?(d?t.dark2:t.light2):(d?t.dark:t.light);for(var k in v)r.style.setProperty(k,v[k]);var m=(t.room||{})[d?'dark':'light'];if(m)r.dataset.room=m;}if(t||L2)r.dataset.mode=d?'dark':'light';}catch(e){}</script>
@@ -19,6 +21,7 @@ try{var r=document.documentElement,L2=r.dataset.look==='2',t=JSON.parse(localSto
 <link rel="stylesheet" href="/sketchbook.css">
 <link rel="stylesheet" href="/look2.css">
 <link rel="stylesheet" href="/learn.css">
+<link rel="stylesheet" href="/study.css">
 </head>
 <body>
 <div class="app" id="app">
@@ -78,6 +81,7 @@ try{var r=document.documentElement,L2=r.dataset.look==='2',t=JSON.parse(localSto
 <script src="/tips.js"></script>
 <script src="/tagman.js"></script>
 <script src="/scans.js"></script>
+<script src="/study.js"></script>
 <script type="module" src="/book.js"></script>
 <script type="module" src="/pdfview.js"></script>
 </body>

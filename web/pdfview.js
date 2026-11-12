@@ -832,7 +832,7 @@ window.addEventListener('resize', () => {
 });
 ['mousemove', 'keydown', 'touchstart', 'wheel'].forEach(ev => document.addEventListener(ev, () => { P.active = Date.now(); }, { passive: true }));
 setInterval(() => {
-  if (C.S.route[0] !== 'pdf' || !P.id || !P.pdf || document.hidden || Date.now() - P.active > 90000) return;
+  if (C.S.route[0] !== 'pdf' || !P.id || !P.pdf || document.hidden || Date.now() - P.active > 90000 || (C.Split && !C.Split.mine())) return;
   C.sendBeat && C.sendBeat(Object.assign({ seconds: 15, at: Math.floor(Date.now() / 1000) }, P.src.beat));
 }, 15000);
 
