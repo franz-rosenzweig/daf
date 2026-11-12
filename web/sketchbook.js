@@ -153,6 +153,7 @@ function build(){
   el.addEventListener('mousedown', e => { if (e.target.closest('.skhead button, .sktools button')) e.preventDefault(); });
   el.querySelector('.sklq input').addEventListener('input', e => { S.lq = e.target.value; drawRows(); });
   el.querySelector('.sklist').addEventListener('click', onList);
+  el.querySelector('.sklist').addEventListener('focusout', () => setTimeout(() => { if (S.listStale && !typingInList()) { S.listStale = false; drawRows(); } }, 400));
   document.addEventListener('pointerdown', e => { if (S.picking && !e.target.closest('.skpick, [data-skch]')) { S.picking = false; drawHead(); } }, true);
   grip(el.querySelector('.skgrip'));
   S.frame = el.querySelector('.skframe');
@@ -378,7 +379,8 @@ function frameOf(b, W, strokes){
 // (four tenths of the screen's long side), the same upright and sideways. A wider panel leaves room
 // around it and the lines stay as they are, and the panel's edge stops at the page's width, so the
 // lines never change size as it's dragged. A phone's page is its whole width.
-function paperW(){ return Math.round(clamp(Math.max(S.fullW || innerWidth, S.fullH || innerHeight) * 0.4, 300, 720)); }
+// (with a mouse the page is narrower, so the Notebook can be pushed further to the side: the pen is the tablet's)
+function paperW(){ return Math.round(clamp(Math.max(S.fullW || innerWidth, S.fullH || innerHeight) * (matchMedia('(pointer: fine)').matches ? 0.27 : 0.4), 300, 720)); }
 function pageW(room){
   const w = S.fullW || innerWidth, h = S.fullH || innerHeight;
   if (Math.min(w, h) < 600) return room;                 // a phone: all of its width
@@ -1068,9 +1070,12 @@ async function loadHls(){
   for (const h of list) if (h.tab == null) { const c = h.tocItem && ctx.view ? chapterOf(ctx.view, h.tocItem) : null; h.tab = c ? c.tab : ''; }
   S.hls = list;
   if (!S.shown) return;
-  if (S.view === 'list') drawRows(); else if (!S.editing) render();
+  if (S.view === 'list') { if (typingInList()) S.listStale = true; else drawRows(); } else if (!S.editing) render();
   drawHead();
 }
+// A note being typed in the list: its row isn't drawn again under the typing (each pause saves it, and
+// the reader then tells the Notebook its highlights changed); the list catches up once the typing ends.
+const typingInList = () => { const a = document.activeElement; return !!(a && S.el && a.closest('.sklrows') && a.matches('textarea, input, [contenteditable]')); };
 // A highlight made, changed or taken away in the reader: the cards again; one just made, shown on its page.
 let hlT = 0;
 function hlChanged(id){

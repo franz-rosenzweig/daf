@@ -423,16 +423,22 @@ function editNote(x){
   n.innerHTML = '<textarea class="field" rows="2" placeholder="A thought, for the vault note" data-hnote="' + esc(x.id) + '">' + esc(x.user_note || '') + '</textarea>';
   const t = n.querySelector('textarea'); t.focus(); t.setSelectionRange(t.value.length, t.value.length);
 }
-const noteT = {};
+const noteT = {}, noteSaid = {};
 document.addEventListener('input', e => {
   const t = e.target.closest('[data-hnote]'); if (!t) return;
   const x = H.reg.get(t.dataset.hnote); if (!x) return;
   x.user_note = t.value; clearTimeout(noteT[x.id]);
-  noteT[x.id] = setTimeout(() => api('/api/highlights/' + encodeURIComponent(x.id) + '/note', { method: 'PUT', body: JSON.stringify({ note: t.value }) }).then(r => (changed(x), toast(t.value.trim() ? (r.vault === 'written' || r.vault === 'unchanged' ? 'Note saved to the vault' : 'Note saved') : 'Note removed'))).catch(err => toast(err.message)), 800);
+  // saved at each pause; said once, when the typing ends
+  noteT[x.id] = setTimeout(() => api('/api/highlights/' + encodeURIComponent(x.id) + '/note', { method: 'PUT', body: JSON.stringify({ note: t.value }) }).then(r => {
+    changed(x);
+    const msg = t.value.trim() ? (r.vault === 'written' || r.vault === 'unchanged' ? 'Note saved to the vault' : 'Note saved') : 'Note removed';
+    if (document.activeElement === t) noteSaid[x.id] = msg; else toast(msg);
+  }).catch(err => toast(err.message)), 800);
 });
 document.addEventListener('focusout', e => {
   const t = e.target.closest && e.target.closest('[data-hnote]'); if (!t) return;
   const x = H.reg.get(t.dataset.hnote); if (!x) return;
+  if (noteSaid[x.id]) { toast(noteSaid[x.id]); delete noteSaid[x.id]; }
   setTimeout(() => { if (document.activeElement !== t) { const n = t.closest('.hnote'); if (n) { n.innerHTML = esc(x.user_note || ''); n.classList.toggle('empty', !(x.user_note || '').trim()); } } }, 150);
   H.noteTags(x, t.value).then(did => { if (did) redrawRow(x); }).catch(() => {});
 });
