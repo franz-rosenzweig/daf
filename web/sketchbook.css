@@ -177,3 +177,9 @@ html.skframe:has(.skpage.sheet){background:color-mix(in srgb,var(--fg) 4%,var(--
 .skbar [data-skb="del"]{color:var(--bad)}
 /* the side panel's tabs (the Notebook, Info, Ask) over the Notebook's own head */
 .skb .skptabs{flex:none;position:static;padding:12px 16px 0}
+/* Info and Ask in the Notebook's place: the reader's own panel, moved in (sketchbook.js host) */
+.skb .skpslot{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
+.skb.skreader > :is(.skhead,.skbody,.sktools){display:none !important}
+.skb .skpslot > .rpanel{display:block !important;position:static !important;inset:auto !important;width:auto !important;height:auto !important;max-height:none !important;
+  box-shadow:none !important;border:0 !important;background:transparent !important;overflow:visible !important;z-index:auto !important;padding-top:0 !important}
+.skb .skpslot > .rpanel > .ptabs{display:none}

@@ -175,7 +175,7 @@ async function openBook(id, at){
   drawToc();
   Pens.use(INKSURF);
   TOCAT.clear(); SECDOC.clear();
-  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, panel: { open: t => openPanel(t), close: closePanel, shown: panelShown }, resized: () => { applyBookType(); if (C.Margin) C.Margin.draw(); }, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
+  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, panel: { el: () => B.id === id ? $('#bpanel') : null, draw: t => { B.panel = t; drawPanel(); } }, resized: () => { applyBookType(); if (C.Margin) C.Margin.draw(); }, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
   if (C.Margin) C.Margin.attach({ item: 'book:' + id, host: () => B.id === id ? $('#bstage') : null, places: marginPlaces, open: marginOpen, relayout: applyBookType, ok: () => !B.scans,
     pageW: () => (parseFloat(B.view && B.view.renderer.getAttribute('max-inline-size')) || 600) * 1.12 + 72 });   // the margin (study.js)
   // Where to start: a highlight we were sent to, else the newest of here / this device / the Kindle.
@@ -1666,12 +1666,12 @@ C.BookInk = {
 function openPanel(tab){
   if (tab) B.panel = tab;
   if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(true); return; }   // focus mode has its own drawers (focus.js)
+  if (C.Sketch) { C.Sketch.tab(B.panel); return; }    // Info and Ask are tabs of the side panel, beside the Notebook (sketchbook.js)
   document.body.classList.remove('btocsheet'); document.body.classList.add('bpanelsheet');
   showChrome(); drawPanel();
-  if (C.Sketch) C.Sketch.panelChanged(B.panel);      // the Notebook is the panel's other tab: it makes way
 }
-const panelShown = () => document.body.classList.contains('bpanelsheet');
-function closePanel(){ document.body.classList.remove('bpanelsheet'); if (C.Sketch) C.Sketch.panelChanged(); }
+const panelShown = () => document.body.classList.contains('bpanelsheet') || !!(C.Sketch && C.Sketch.hosting());
+function closePanel(){ document.body.classList.remove('bpanelsheet'); if (C.Sketch && C.Sketch.hosting()) C.Sketch.hide(); }
 function openToc(){ if (C.Focus && C.Focus.on()) { C.Focus.toc(true); return; } document.body.classList.remove('bpanelsheet'); document.body.classList.add('btocsheet'); showChrome(); }
 function contextText(){
   try { return (B.loc && B.loc.range ? B.loc.range.toString() : '').slice(0, 6000); } catch(e){ return ''; }
@@ -1790,7 +1790,7 @@ document.addEventListener('click', async e => {
     if (a === 'toc') { if (C.Focus && C.Focus.on()) C.Focus.toc(); else if (document.body.classList.contains('btocsheet')) document.body.classList.remove('btocsheet'); else openToc(); }
     else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
     else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); } else if (panelShown()) closePanel(); else openPanel(); }
-    else if (a === 'closesheets') { document.body.classList.remove('btocsheet'); if (panelShown()) closePanel(); }
+    else if (a === 'closesheets') document.body.classList.remove('btocsheet', 'bpanelsheet');
     else if (a === 'nblist') { if (C.Focus && C.Focus.on()) C.Focus.panel(false); document.body.classList.remove('bpanelsheet'); if (C.Sketch) C.Sketch.list(); }
     else if (a === 'pmenu') { if (!$('#pop').hidden && $('#pop .pmenu')) $('#pop').hidden = true; else openPhoneMenu(bk); }
     else if (a === 'aa') { showChrome(); B.aaFromBar = false; C.openAa && C.openAa(bk, { book: true }); }
@@ -1809,7 +1809,7 @@ document.addEventListener('click', async e => {
     return;
   }
   if (!t.closest('#fnote') && $('#fnote') && !$('#fnote').hidden) closeNote();
-  const pt = t.closest('[data-bpt]'); if (pt) { if (pt.dataset.bpt === 'notebook') { C.Sketch.tab('notebook'); return; } B.panel = pt.dataset.bpt; drawPanel(); if (C.Sketch) C.Sketch.panelChanged(B.panel); return; }
+  const pt = t.closest('[data-bpt]'); if (pt) { if (pt.dataset.bpt === 'notebook') { C.Sketch.tab('notebook'); return; } B.panel = pt.dataset.bpt; drawPanel(); return; }
   const ti = t.closest('#btoc [data-href]'); if (ti) { e.preventDefault(); await B.view.goTo(ti.dataset.href).catch(() => {}); document.body.classList.remove('btocsheet'); return; }
   const sr = t.closest('#bres [data-cfi]'); if (sr) { e.preventDefault(); await B.view.goTo(sr.dataset.cfi).catch(() => {}); document.body.classList.remove('btocsheet'); return; }
   const gm = t.closest('[data-gomark]'); if (gm) { e.preventDefault(); await B.view.goTo(gm.dataset.gomark).catch(() => {}); document.body.classList.remove('btocsheet'); return; }

@@ -1040,7 +1040,7 @@ function moreAct(a){
   const d = R.doc; if (!d) return;
   $('#pop').hidden = true;
   if (a === 'nextdoc' || a === 'prevdoc') { const nb = neighbor(d.id, a === 'nextdoc' ? 1 : -1); if (nb) location.hash = 'read/' + encodeURIComponent(nb.id); }
-  else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; } setPanel(!R.panelOpen); }
+  else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; } setPanel(!panelOn()); }
   else if (a === 'full') loadFull(d.id);
   else if (a === 'device') deviceList().then(on => keepOnDevice(d.id, !(on && on.pinned.has(d.id))));
   else if (a === 'pages') C.swap('#pdf/' + encodeURIComponent(d.id));
@@ -1090,6 +1090,8 @@ async function readView(id){
   $('#main').innerHTML = '<div class="rv"><div class="top" id="rtop"><button class="ib" data-ract="back" aria-label="Back">' + I.back + '</button></div><div class="docwrap"><div class="doc"><span class="mute">Loading…</span></div></div></div>';
   let d;
   try { d = await api('/api/docs/' + encodeURIComponent(id)); } catch(e){ $('.doc').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
+  // a Feed item saved to the Library: that copy, with its highlights and notes
+  if (d.in_library && d.in_library !== id) { location.replace('#read/' + encodeURIComponent(d.in_library)); return; }
   R.doc = d; R.focus = 0; document.body.dataset.tl = store.get('torahLang', 'both');
   R.junk = d.kind === 'tweet' ? new Set(d.blocks.map((b, i) => [b, i]).filter(([b]) => XJUNK.test((b.x || '').trim())).map(([, i]) => i)) : null;
   const heads = d.blocks.map((b, i) => [b, i]).filter(x => (x[0].t === 'h2' || x[0].t === 'h3') && !(R.junk && R.junk.has(x[1])));
@@ -1124,7 +1126,7 @@ async function readView(id){
   markSpeaking();
   if (C.Ink) C.Ink.open(d);                           // what's written on it with a pen (ink.js)
   const timed = d.kind === 'video' || !!d.episode;   // the Sketchbook beside it (sketchbook.js), a video's with its time
-  if (C.Sketch) C.Sketch.attach({ item: 'doc:' + d.id, kind: 'doc', panel: { open: t => { R.panel = t; setPanel(true); }, close: () => setPanel(false), shown: () => !!R.panelOpen }, time: timed ? curTime : null, seek: timed ? seek : null, highlights: () => notebookHls(d), go: h => showHl(h.id) });
+  if (C.Sketch) C.Sketch.attach({ item: 'doc:' + d.id, kind: 'doc', panel: { el: () => R.doc === d ? $('#rpanel') : null, draw: t => { R.panel = t; drawPanel(); } }, time: timed ? curTime : null, seek: timed ? seek : null, highlights: () => notebookHls(d), go: h => showHl(h.id) });
   if (C.Margin) C.Margin.attach({ item: 'doc:' + d.id, host: () => R.doc === d ? $('#main .rv .doc') : null, places: () => marginPlaces(d),
     open: id => { const h = d.highlights.find(x => x.id === id); if (h) showHlBar(h); } });   // the margin (study.js)
 }
@@ -1179,10 +1181,15 @@ async function ask(q, quote){
   catch(e){ toast(e.message); }
   R.asking = null; if (R.doc === d) drawPanel();
 }
-function openPanel(){ if (C.Focus && C.Focus.on()) { C.Focus.panel(true); return; } if (!R.panelOpen) setPanel(true); }
+function openPanel(){ if (C.Focus && C.Focus.on()) { C.Focus.panel(true); return; } if (C.Sketch || !R.panelOpen) setPanel(true); }
 // Info and Ask open or close; the Notebook is the panel's other tab (sketchbook.js), so it makes way.
+const panelOn = () => C.Sketch && !(C.Focus && C.Focus.on()) ? C.Sketch.hosting() : !!R.panelOpen;
 function setPanel(on){
   if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(on); return; }
+  if (C.Sketch) {                       // Info and Ask are tabs of the side panel, beside the Notebook (sketchbook.js)
+    if (on) C.Sketch.tab(R.panel); else if (C.Sketch.hosting()) C.Sketch.hide();
+    return;
+  }
   R.panelOpen = !!on; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); if (R.panelOpen) drawPanel();
   if (C.Sketch) C.Sketch.panelChanged(R.panelOpen ? R.panel : null);
 }
@@ -1891,7 +1898,7 @@ document.addEventListener('click', e => {
     else if (a === 'aa') openAa(ra);
     else if (a === 'panel') {
       if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; }     // focus mode hides the column: its drawer instead
-      setPanel(!R.panelOpen);
+      setPanel(!panelOn());
     }
     else if (a === 'listen') { const T = R.tts; if (T.on && T.doc === R.doc.id) { T.playing ? pauseTTS() : resumeTTS(); } else startTTS(); }
     else if (a === 'more') openMore(ra);
@@ -1932,7 +1939,7 @@ document.addEventListener('click', e => {
     if (key !== 'type') delete tp.theme;
     store.set(key, tp); applyType(); openAa($('[data-ract="aa"]') || $('[data-bk="aa"]') || ty, { book: R.aaBook }); return;
   }
-  const pt = t.closest('[data-ptab]'); if (pt) { if (pt.dataset.ptab === 'notebook') { C.Sketch.tab('notebook'); return; } R.panel = pt.dataset.ptab; drawPanel(); if (C.Sketch) C.Sketch.panelChanged(R.panel); return; }
+  const pt = t.closest('[data-ptab]'); if (pt) { if (pt.dataset.ptab === 'notebook') { C.Sketch.tab('notebook'); return; } R.panel = pt.dataset.ptab; drawPanel(); return; }
   const sm = t.closest('[data-summ]');
   if (sm) {
     const id = sm.dataset.summ; sm.disabled = true; sm.textContent = 'Summarizing… (about 15 seconds)';
@@ -2112,7 +2119,7 @@ document.addEventListener('keydown', e => {
     }
     else if (is('article', 'listen')) { const T = R.tts; if (T.on && T.doc === d.id) { T.playing ? pauseTTS() : resumeTTS(); } else startTTS(); }
     else if (is('article', 'toc')) { R.toc = !R.toc; const g = $('.rvgrid'); if (g) g.classList.toggle('notoc', !R.toc); }
-    else if (is('article', 'panel')) { if (C.Sketch) C.Sketch.togglePanel(); else setPanel(!R.panelOpen); }
+    else if (is('article', 'panel')) { if (C.Sketch) C.Sketch.togglePanel(); else setPanel(!panelOn()); }
     else if (is('article', 'archive')) docAct(feed ? 'seen' : 'archive', d.id);
     else if (is('article', 'later') && lib) docAct('later', d.id);
     else if (is('article', 'save') && feed) docAct('save', d.id);
