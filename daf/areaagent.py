@@ -161,6 +161,18 @@ def _cite(srcs, f):
     return {"label": label, "go": go, "kind": s["kind"]}
 
 
+def _one_each(chips):
+    """A paragraph's sources, each once (at the first place it was cited), so a paragraph doesn't list one
+    article five times."""
+    out, seen = [], set()
+    for ch in chips:
+        base = ch and re.sub(r"/(hl|p|t):[^/]*$", "", ch["go"])
+        if base and base not in seen:
+            seen.add(base)
+            out.append(ch)
+    return out
+
+
 def _outside(got, check=None):
     """Things from outside the area the model offers: only the ones whose link opens (a book needs none)."""
     keep = []
@@ -251,12 +263,7 @@ def ask_now(c, cid, run=None, check=None):
             t = _clip(p.get("text") if isinstance(p, dict) else p, 2000)
             if not t:
                 continue
-            chips, seen = [], set()
-            for f in (p.get("from") if isinstance(p, dict) else None) or []:
-                ch = _cite(srcs, f)
-                if ch and ch["go"] not in seen:
-                    seen.add(ch["go"])
-                    chips.append(ch)
+            chips = _one_each([_cite(srcs, f) for f in (p.get("from") if isinstance(p, dict) else None) or []])
             paras.append({"text": t, "from": chips})
         if not paras:                       # not the JSON asked for: the words as they came
             t = _clip(re.sub(r"[{}\[\]\"]", " ", out), 2000) if not got else ""
@@ -284,6 +291,8 @@ def chats(c, aid, limit=30):
                 x.update(json.loads(r["a"]))
             except (ValueError, TypeError):
                 x.update({"paras": [], "outside": []})
+            for p in x.get("paras", []):
+                p["from"] = _one_each(p.get("from") or [])
             x["n"] = len({ch["go"].split("/")[1] for p in x.get("paras", []) for ch in p.get("from", [])})
         out.append(x)
     return out
