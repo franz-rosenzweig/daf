@@ -80,7 +80,7 @@ The choice is kept on the server, so every device follows it.
 
 ## The side panel
 
-The highlights and my notes on them are in [the Notebook](sketchbook.md), beside the book, with a page for each chapter and a list of everything: every highlight in the book in reading order, from Daf, the Kindle, the audiobook and paper pages. Tapping one takes the book there. The side panel has the rest:
+The highlights and my notes on them are in [the Notebook](sketchbook.md), beside the book, with a page for each chapter and a list of everything: every highlight in the book in reading order, from Daf, the Kindle, the audiobook and paper pages. Tapping one takes the book there. The Notebook is the side panel's first tab, and the other two are:
 
 - **Info:** the cover, the description, and the details, including the series and where the Kindle is. In an article it also has the document note and where it is in the vault.
 - **Ask:** a question about where you are, like a name you've forgotten or an argument you lost track of. Claude answers from the pages around you, briefly and without spoiling what comes later, on my own subscription. Ask has ready questions, like **Summarize this** in an article and **Who is this?** in a book.
@@ -99,7 +99,7 @@ Two more ways to lay out what I'm reading are in the **⋯** menu, beside the No
 
 Articles from the Feed and the Library open in the same view. Click a picture to highlight it: it gets a frame in the color, and it shows as the picture in the Notebook, Highlights, the review and the vault. Hebrew titles and paragraphs read right to left on their own.
 
-The bar has six things on it: back, **Aa**, **Listen** (p), **Done** (e), the **…** menu and the notebook (]). A Feed item has **Save to Library** (s) too. It slides away while I read on, and comes back when I scroll up a little or move the pointer to the top, with the title in the middle once the heading has gone by. Under the text, quietly, is how many minutes are left.
+The bar has six things on it: back, **Aa**, **Listen** (p), **Done** (e), the **…** menu and the side panel (]), whose tabs are the Notebook, Info and Ask. A Feed item has **Save to Library** (s) too. It slides away while I read on, and comes back when I scroll up a little or move the pointer to the top, with the title in the middle once the heading has gone by. Under the text, quietly, is how many minutes are left.
 
 The article **…** menu has the next and previous item of the list I came from (Shift J and Shift K), **Shortlist** (f), **Focus mode** (Shift F), **Add a document note**, **Read aloud from here**, **Ask about this**, **Margin**, **Side by side**, **Load the full article** (for feeds that only send a summary), **Send to the Kindle**, **Keep on this device** (in the apps), **Save to Library** and **Mark seen** for a Feed item or **Read later** and **Archive** for a Library one, **Reset reading progress**, **Edit title and author**, **Delete**, **Open the original**, **Copy the link**, **Open the note in Obsidian** and **Keyboard shortcuts**.
 
