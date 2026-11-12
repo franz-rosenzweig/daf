@@ -164,6 +164,14 @@ T.vars2 = (p, dark) => {
   });
   Object.assign(v, { '--l2-ink': fg, '--l2-on-ink': bg, '--l2-track': v['--line-2'], '--l2-p1': mix(p2, '#000000', 0.35), '--l2-p2': p2 });
   if (p.pure) v['--l2-back'] = bg;
+  // the web's clear layers (look2.css): the page a step back toward the backdrop, the cards a step forward
+  // (a room keeps its wall and its cards as they are)
+  Object.assign(v, room ? { '--l2-page': bg, '--l2-card2': v['--l2-card'] } : {
+    '--l2-page': mix(bg, v['--l2-back'], 0.38), '--l2-card2': mix(v['--l2-card'], '#ffffff', dark ? 0.12 : 0.5) },
+    dark ? { '--l2-edge': 'rgba(255,255,255,.07)', '--l2-lift2': 'inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.4),0 10px 24px -8px rgba(0,0,0,.6)',
+             '--l2-lift3': 'inset 0 1px 0 rgba(255,255,255,.08),0 2px 4px rgba(0,0,0,.45),0 18px 36px -10px rgba(0,0,0,.7)' }
+         : { '--l2-edge': 'rgba(60,50,30,.09)', '--l2-lift2': '0 1px 1px rgba(60,50,30,.06),0 6px 16px -6px rgba(60,50,30,.18)',
+             '--l2-lift3': '0 2px 4px rgba(60,50,30,.08),0 16px 34px -10px rgba(60,50,30,.26)' });
   return v;
 };
 const ownL2 = (fam, dark) => fam.id === 'daf' || (fam.id === 'oled' && !dark);
