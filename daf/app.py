@@ -2244,6 +2244,7 @@ def get_doc(doc_id: str, prefetch: int = 0, c=Depends(conn)):
     from . import kindlesend
     d["kindle_sent"] = kindlesend.sent(c, doc_id)
     d["questions"] = ai.questions()
+    d["in_library"] = reader.library_copy(c, d)          # saved already: the reader opens that copy
     return d
 
 

@@ -148,7 +148,7 @@ function build(){
       '<span class="skhb"></span><div class="skpick" role="listbox" aria-label="Chapters" hidden></div></div>' +
     '<div class="skbody"><iframe class="skframe" title="Notebook page"></iframe>' +
       '<div class="sklist" hidden><div class="sklhead"><label class="sklq"><span class="ic">' + IC.search + '</span><input type="search" placeholder="Search" aria-label="Search the Notebook" autocomplete="off" dir="auto"></label><div class="sklchips"></div></div><div class="sklrows"></div></div>' +
-      '<div class="sktools"><span class="skpens"></span><span class="skown"></span></div></div>';
+      '<div class="sktools"><span class="skpens"></span><span class="skown"></span></div></div><div class="skpslot" hidden></div>';
   document.body.appendChild(el);
   el.addEventListener('click', onHead);
   // the head's buttons leave the typing where it is (a tap there doesn't end it)
@@ -1197,11 +1197,11 @@ const openKey = () => 'open.' + (S.ctx ? S.ctx.kind : 'doc');
 function show(){
   if (!S.ctx) return;
   if (S.extra && C.Split) C.Split.close();     // Side by side has this room (study.js)
-  const p = S.ctx.panel; if (p && p.shown()) p.close();        // one tab of the side panel at a time
+  const p = S.ctx.panel;
   build();
   S.el.querySelector('.skptabs').hidden = !p;
-  if (p) store.set('ptab', 'notebook');
   S.shown = true; S.el.hidden = false;
+  host(p && S.ptab !== 'notebook' ? S.ptab : null);
   place(); theme();
   const s = Pens.surface(); if (s && s !== surface) S.prev = s;
   Pens.use(surface);
@@ -1217,39 +1217,55 @@ function hide(keep){
   if (S.rec) S.rec.r.stop();
   S.picking = false;
   S.shown = false; if (S.el) S.el.hidden = true;
+  unhost();
   place();
   if (Pens.surface() === surface) Pens.use(S.prev && S.prev.live && S.prev.live() ? S.prev : null);
   if (!keep && S.ctx) store.set(openKey(), false);
   buttons(); relayout();
 }
 function toggle(){ if (S.shown) hide(); else show(); }
-// The side panel's tabs: the Notebook, then a reader's own Info and Ask (it hands them over as
-// ctx.panel: {open(tab), close(), shown()}). One is open at a time; the bar's one button opens the last.
+// The side panel's tabs: the Notebook, then a reader's own Info and Ask. The reader hands its panel over
+// (ctx.panel: {el() its element, draw(tab)}), and it's shown here in the Notebook's place, so all three
+// are one panel: the same size, in the same place. The bar's one button opens the tab used last.
 const PTABS = [['notebook', 'Notebook'], ['info', 'Info'], ['ask', 'Ask']];
+S.ptab = 'notebook';
 function panelTab(t){
   const p = S.ctx && S.ctx.panel;
-  if (t === 'notebook' || !p) { show(); return; }
-  if (S.shown) hide();
-  p.open(t); store.set('ptab', t); buttons();
+  S.ptab = p && t !== 'notebook' ? t : 'notebook';
+  if (p) store.set('ptab', S.ptab);
+  if (!S.shown) show(); else host(S.ptab === 'notebook' ? null : S.ptab);
 }
 function togglePanel(){
-  const p = S.ctx && S.ctx.panel;
-  if (!p) { toggle(); return; }
   if (S.shown) hide();
-  else if (p.shown()) { p.close(); buttons(); }
-  else panelTab(store.get('ptab', 'notebook'));
+  else panelTab(S.ctx && S.ctx.panel ? store.get('ptab', 'notebook') : 'notebook');
 }
-// a reader opened or closed its Info or Ask by itself (its ⋯, a key): the Notebook makes way, the button follows
-function panelChanged(t){
-  const p = S.ctx && S.ctx.panel;
-  if (p && p.shown()) { if (S.shown) hide(); if (t) store.set('ptab', t); }
-  buttons();
+// Info or Ask in the Notebook's place (the reader's own panel, moved in), or the Notebook's pages back.
+function host(t){
+  const p = S.ctx && S.ctx.panel, slot = S.el && S.el.querySelector('.skpslot'); if (!slot) return;
+  const el = t && p ? p.el() : null;
+  if (el) {
+    if (S.home && S.home.el !== el) unhost();
+    if (el.parentNode !== slot) { S.home = { el, parent: el.parentNode, next: el.nextSibling }; slot.appendChild(el); }
+    p.draw(t);
+    if (Pens.surface() === surface) Pens.use(S.prev && S.prev.live && S.prev.live() ? S.prev : null);   // the pen writes on the reader
+  } else { unhost(); t = null; S.ptab = 'notebook'; }
+  S.el.classList.toggle('skreader', !!t); slot.hidden = !t;
+  S.el.querySelectorAll('.skptabs .ptab').forEach(b => b.classList.toggle('on', b.dataset.skpt === (t || 'notebook')));
+  if (!t && S.shown) { Pens.use(surface); drawTools(); later(); }
 }
+// the reader's panel back where it lives (or gone, when its page has gone)
+function unhost(){
+  const h = S.home; S.home = null; if (!h) return;
+  if (h.parent && h.parent.isConnected) h.parent.insertBefore(h.el, h.next && h.next.parentNode === h.parent ? h.next : null);
+  else h.el.remove();
+}
+const hosting = () => !!(S.shown && S.home);
+function panelChanged(){ buttons(); }
 // Room kept on the right for something else beside the reader (Side by side, study.js), as the
 // Notebook's own is: the readers lay out in what's left (room()).
 function reserve(px){ S.extra = Math.max(0, Math.round(px || 0)); place(); relayout(); }
 function buttons(){
-  const on = S.shown || !!(S.ctx && S.ctx.panel && S.ctx.panel.shown());
+  const on = S.shown;
   document.querySelectorAll('[data-sketch]').forEach(b => { b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); });
 }
 // A reader opened something: the Notebook is for that now, and comes up if it was up last time.
@@ -1261,6 +1277,7 @@ function attach(ctx){
   stopEditing(); unpick(); readNow(); flush();
   if (S.off) { S.off(); S.off = null; }
   const same = S.ctx && S.ctx.item === ctx.item;
+  unhost();                                   // the last page's Info and Ask go with it
   S.ctx = ctx;
   const s = Pens.surface(); if (s && s !== surface) S.prev = s;
   if (!same) { S.tabs = []; S.pages = new Map(); S.vault = null; S.hls = []; S.all = null; S.chs = null; S.lq = ''; S.picking = false; }
@@ -1273,7 +1290,7 @@ function attach(ctx){
     try { for (const c of ctx.view.renderer.getContents()) watchDoc(c.doc); } catch(e){}
     S.off = () => { ctx.view.removeEventListener('relocate', on); ctx.view.removeEventListener('load', loaded); };
   }
-  if (store.get(openKey(), false)) { if (S.shown) { place(); show1(S.tab, S.meta); Pens.use(surface); drawTools(); relayout(); loadHls(); if (S.view === 'list') loadAll(); } else show(); }
+  if (store.get(openKey(), false)) { if (S.shown) { place(); show1(S.tab, S.meta); Pens.use(surface); drawTools(); relayout(); loadHls(); if (S.view === 'list') loadAll(); host(ctx.panel && S.ptab !== 'notebook' ? S.ptab : null); S.el.querySelector('.skptabs').hidden = !ctx.panel; } else show(); }
   else if (S.shown) hide(true);
   buttons();
 }
@@ -1286,7 +1303,7 @@ function detach(){
 // The bar's button, in each reader's own kind of button.
 // A book's and an article's is the side panel's (the Notebook, Info and Ask); a PDF's and manga's, the Notebook's.
 function button(kind){
-  const side = !kind, label = side ? 'Side panel' : 'Notebook', on = S.shown || !!(side && S.ctx && S.ctx.panel && S.ctx.panel.shown());
+  const side = !kind, label = side ? 'Side panel' : 'Notebook', on = S.shown;
   const cls = kind === 'manga' ? 'mic' : 'ib';
   return '<button class="' + cls + (on ? ' on' : '') + '" data-sketch aria-pressed="' + on + '" title="' + label + '" aria-label="' + label + '">' + (side ? IC.panel : IC.book) + '</button>';
 }
@@ -1300,7 +1317,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('pagehide', flush);
 window.addEventListener('online', () => { if (S.shown && S.ctx) setTimeout(() => load(S.tab), 3000); });
 
-C.Sketch = { attach, detach, button, toggle, togglePanel, tab: panelTab, panelChanged, show, hide, room, reserve, open: () => S.shown, flush, reveal, hlChanged,
+C.Sketch = { attach, detach, button, toggle, togglePanel, tab: panelTab, panelChanged, hosting, show, hide, room, reserve, open: () => S.shown, flush, reveal, hlChanged,
   list: () => reveal({ view: 'list' }),
   state: () => ({ shown: S.shown, mode: S.mode, view: S.view, item: S.ctx && S.ctx.item, tab: S.tab, here: S.here, tabs: tabList().map(t => t.tab),
     cards: cardsHere().map(h => h.id), groups: S.groups.map(g => (g.card ? 'card' : g.id ? 'gone' : 'top') + ':' + g.blocks.length), hls: S.hls.length,

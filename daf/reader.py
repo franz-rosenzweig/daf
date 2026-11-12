@@ -627,6 +627,22 @@ def save_to_library(conn, doc_id):
     return new_id
 
 
+def library_copy(conn, d):
+    """A Feed (or Edition) item that's been saved: its Library copy's id, which has its highlights and
+    notes (save_to_library moves them there). None when it isn't saved, or has highlights of its own."""
+    if d["where_"] not in ("feed", "pool") or not d["url"]:
+        return None
+    if conn.execute("SELECT 1 FROM highlights WHERE book_id = ? AND deleted = 0", (d["id"],)).fetchone():
+        return None
+    from . import pages
+    want = pages.norm_url(d["url"])
+    for r in conn.execute("SELECT id, url FROM docs WHERE where_ = 'library' AND COALESCE(deleted, 0) = 0 AND status != 'deleted' AND url IS NOT NULL "
+                          "AND instr(lower(url), ?) > 0", (want.split("://", 1)[-1].lower(),)).fetchall():
+        if pages.norm_url(r["url"]) == want:
+            return r["id"]
+    return None
+
+
 def _ensure_book(conn, d):
     from . import library
     private = 1 if library.is_private(f"{d['title']} {d['source'] or ''} {d['category'] or ''}", config.load_settings()) else 0
