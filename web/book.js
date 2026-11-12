@@ -175,7 +175,8 @@ async function openBook(id, at){
   Pens.use(INKSURF);
   TOCAT.clear(); SECDOC.clear();
   if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, resized: () => { applyBookType(); if (C.Margin) C.Margin.draw(); }, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
-  if (C.Margin) C.Margin.attach({ item: 'book:' + id, host: () => B.id === id ? $('#bstage') : null, places: marginPlaces, open: marginOpen, relayout: applyBookType, ok: () => !B.scans });   // the margin (study.js)
+  if (C.Margin) C.Margin.attach({ item: 'book:' + id, host: () => B.id === id ? $('#bstage') : null, places: marginPlaces, open: marginOpen, relayout: applyBookType, ok: () => !B.scans,
+    pageW: () => (parseFloat(B.view && B.view.renderer.getAttribute('max-inline-size')) || 600) * 1.12 + 72 });   // the margin (study.js)
   // Where to start: a highlight we were sent to, else the newest of here / this device / the Kindle.
   const local = store.get('bookpos.' + id, null);
   const server = d.position;

@@ -2,8 +2,8 @@
 
 /* ---------- Margin ---------- */
 /* a book: the page keeps the stage less the margin, which is on the right of it */
-#bstage.mghost foliate-view{width:calc(100% - var(--mgw))}
-#bstage.mghost > .mgcol{position:absolute;top:0;right:0;bottom:0;width:var(--mgw);overflow:hidden}
+#bstage.mghost foliate-view{width:var(--mgv,calc(100% - var(--mgw)));margin-left:var(--mgx,0px)}
+#bstage.mghost > .mgcol{position:absolute;top:0;bottom:0;left:calc(var(--mgx,0px) + var(--mgv,calc(100% - var(--mgw))));width:var(--mgw);overflow:hidden}
 /* an article: the text moves over by half the margin, and the margin scrolls with it */
 .rv .doc.mghost{position:relative;max-width:min(var(--measure),calc(100% - var(--mgw) - 48px));left:calc((var(--mgw) + 48px) / -2)}
 body[data-tl="both"] .rv .doc.mghost:has(.verse){max-width:min(60rem,calc(100% - var(--mgw) - 48px))}
@@ -13,12 +13,12 @@ body[data-tl="both"] .rv .doc.mghost:has(.verse){max-width:min(60rem,calc(100% -
 #bstage.mghost > .mgcol::before{top:24px;bottom:24px}
 .mgl,.mgn{pointer-events:auto;position:absolute;border:0;background:none;padding:0;margin:0;cursor:pointer;font:inherit;color:inherit;text-align:left}
 /* a highlight's line, level with its words, in its colour */
-.mgl{left:-12px;width:24px}
+.mgl{left:-4px;width:24px}
 .mgl::before{content:"";position:absolute;left:10px;top:0;bottom:0;width:4px;border-radius:2px;background:var(--c)}
 /* its note, and what's under it in the Notebook */
-.mgn{left:22px;right:10px;display:flex;flex-direction:column;gap:5px;padding:6px 10px;border-radius:10px;border-left:3px solid var(--c)}
+.mgn{left:20px;right:10px;display:flex;flex-direction:column;gap:5px;padding:6px 10px;border-radius:10px;border-left:3px solid var(--c)}
 .mgn:hover{background:var(--hover)}
-.mgnote{font-family:var(--ui);font-size:13.5px;line-height:1.42;color:var(--fg);display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.mgnote{font-family:var(--ui);font-size:14px;line-height:1.42;color:var(--fg);display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
 .mgw{font-family:var(--serif);font-style:italic;font-size:14.5px;line-height:1.4;color:var(--fg-2);display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
 html.focus #bstage.mghost > .mgcol{top:var(--btop,56px)}
 
