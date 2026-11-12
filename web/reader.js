@@ -1262,7 +1262,7 @@ function videoHead(d){
   return '<div class="vhead"><div class="vframe"><div id="ytp"></div></div><div class="vctl">' +
     '<button class="btn sm" data-vclip="30" title="Highlight the last 30 seconds (c)">Clip 30s</button>' +
     '<label class="tiny mute" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="vfollow" checked> Follow along</label><span class="spacer"></span>' +
-    (id ? '<a class="tiny" href="https://yt.tiresia.xyz/watch?v=' + id + '" target="_blank" rel="noopener">Watch on Invidious</a>' : '') + '</div></div>';
+    (id ? '<a class="tiny" href="https://tube.tiresia.xyz/watch/' + id + '" target="_blank" rel="noopener">Watch in Materialious</a>' : '') + '</div></div>';
 }
 function startPlayer(d){
   clearInterval(V.timer); V.player = null; V.cur = -1; V.playing = false;
