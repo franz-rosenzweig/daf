@@ -175,3 +175,5 @@ html.skframe:has(.skpage.sheet){background:color-mix(in srgb,var(--fg) 4%,var(--
 .skbar button{width:36px;height:34px;border:0;border-radius:8px;background:none;color:var(--fg);display:grid;place-items:center;cursor:pointer}
 .skbar button:hover{background:var(--hover)}
 .skbar [data-skb="del"]{color:var(--bad)}
+/* the side panel's tabs (the Notebook, Info, Ask) over the Notebook's own head */
+.skb .skptabs{flex:none;position:static;padding:12px 16px 0}

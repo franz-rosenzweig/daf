@@ -977,8 +977,8 @@ function drawReaderTop(){
     (pod ? '' : '<button class="ib" data-dact="' + (feed ? 'seen' : 'archive') + '" data-id="' + esc(d.id) + '" title="Done' + K.tip('article', 'archive') + '" aria-label="Done">' + ICON.done + '</button>') +
     (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" data-swap title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
     '<button class="ib" data-ract="more" title="More actions (m)" aria-label="More actions"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg></button>' +
-    (C.Sketch ? C.Sketch.button() : '') +
-    '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" title="Info' + K.tip('article', 'panel') + '" aria-label="Info">' + ICON.panel + '</button>';
+    // one button for the side panel: the Notebook, Info and Ask (sketchbook.js)
+    (C.Sketch ? C.Sketch.button() : '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" title="Info' + K.tip('article', 'panel') + '" aria-label="Info">' + ICON.panel + '</button>');
 }
 // The … menu (Readwise's "More actions"): everything the bar doesn't show, with its key.
 function openMore(anchor){
@@ -1019,7 +1019,7 @@ function moreAct(a){
   const d = R.doc; if (!d) return;
   $('#pop').hidden = true;
   if (a === 'nextdoc' || a === 'prevdoc') { const nb = neighbor(d.id, a === 'nextdoc' ? 1 : -1); if (nb) location.hash = 'read/' + encodeURIComponent(nb.id); }
-  else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; } R.panelOpen = !R.panelOpen; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); if (R.panelOpen) drawPanel(); }
+  else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; } setPanel(!R.panelOpen); }
   else if (a === 'full') loadFull(d.id);
   else if (a === 'device') deviceList().then(on => keepOnDevice(d.id, !(on && on.pinned.has(d.id))));
   else if (a === 'pages') C.swap('#pdf/' + encodeURIComponent(d.id));
@@ -1102,7 +1102,7 @@ async function readView(id){
   markSpeaking();
   if (C.Ink) C.Ink.open(d);                           // what's written on it with a pen (ink.js)
   const timed = d.kind === 'video' || !!d.episode;   // the Sketchbook beside it (sketchbook.js), a video's with its time
-  if (C.Sketch) C.Sketch.attach({ item: 'doc:' + d.id, kind: 'doc', time: timed ? curTime : null, seek: timed ? seek : null, highlights: () => notebookHls(d), go: h => showHl(h.id) });
+  if (C.Sketch) C.Sketch.attach({ item: 'doc:' + d.id, kind: 'doc', panel: { open: t => { R.panel = t; setPanel(true); }, close: () => setPanel(false), shown: () => !!R.panelOpen }, time: timed ? curTime : null, seek: timed ? seek : null, highlights: () => notebookHls(d), go: h => showHl(h.id) });
   if (C.Margin) C.Margin.attach({ item: 'doc:' + d.id, host: () => R.doc === d ? $('#main .rv .doc') : null, places: () => marginPlaces(d),
     open: id => { const h = d.highlights.find(x => x.id === id); if (h) showHlBar(h); } });   // the margin (study.js)
 }
@@ -1134,7 +1134,7 @@ function drawToc(){
 function drawPanel(){
   const p = $('#rpanel'), d = R.doc; if (!p || !d) return;
   if (R.panel === 'notebook') R.panel = 'info';      // the Notebook is its own now (sketchbook.js)
-  const tabs = [['info', 'Info'], ['ask', 'Ask']];
+  const tabs = (C.Sketch ? [['notebook', 'Notebook']] : []).concat([['info', 'Info'], ['ask', 'Ask']]);
   let h = '<div class="ptabs" role="tablist">' + tabs.map(t => '<button class="ptab' + (R.panel === t[0] ? ' on' : '') + '" data-ptab="' + t[0] + '" role="tab">' + t[1] + '</button>').join('') + '<button class="ib pclose" data-ract="panel" aria-label="Close">' + ICON.close + '</button></div>';
   if (R.panel === 'info') {
     h += '<div class="pbody"><div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="docnote">Document note</label><input class="field" id="docnote" placeholder="Why you saved this, in a line" value="' + esc(d.note || '') + '"></div>' +
@@ -1157,7 +1157,13 @@ async function ask(q, quote){
   catch(e){ toast(e.message); }
   R.asking = null; if (R.doc === d) drawPanel();
 }
-function openPanel(){ if (C.Focus && C.Focus.on()) { C.Focus.panel(true); return; } if (!R.panelOpen){ R.panelOpen = true; const g = $('.rvgrid'); if (g) g.classList.add('withpanel'); drawReaderTop(); } }
+function openPanel(){ if (C.Focus && C.Focus.on()) { C.Focus.panel(true); return; } if (!R.panelOpen) setPanel(true); }
+// Info and Ask open or close; the Notebook is the panel's other tab (sketchbook.js), so it makes way.
+function setPanel(on){
+  if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(on); return; }
+  R.panelOpen = !!on; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); if (R.panelOpen) drawPanel();
+  if (C.Sketch) C.Sketch.panelChanged(R.panelOpen ? R.panel : null);
+}
 function onScroll(){
   // (on a touch screen a selection's bar stays and follows the words: the scroll listener below)
   const main = $('#main'), d = R.doc; if (!(H.touch() && H.ctx && H.ctx.kind === 'sel')) stopSel(); R.lastActive = Date.now();
@@ -1863,7 +1869,7 @@ document.addEventListener('click', e => {
     else if (a === 'aa') openAa(ra);
     else if (a === 'panel') {
       if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); return; }     // focus mode hides the column: its drawer instead
-      R.panelOpen = !R.panelOpen; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); if (R.panelOpen) drawPanel();
+      setPanel(!R.panelOpen);
     }
     else if (a === 'listen') { const T = R.tts; if (T.on && T.doc === R.doc.id) { T.playing ? pauseTTS() : resumeTTS(); } else startTTS(); }
     else if (a === 'more') openMore(ra);
@@ -1904,7 +1910,7 @@ document.addEventListener('click', e => {
     if (key !== 'type') delete tp.theme;
     store.set(key, tp); applyType(); openAa($('[data-ract="aa"]') || $('[data-bk="aa"]') || ty, { book: R.aaBook }); return;
   }
-  const pt = t.closest('[data-ptab]'); if (pt) { R.panel = pt.dataset.ptab; drawPanel(); return; }
+  const pt = t.closest('[data-ptab]'); if (pt) { if (pt.dataset.ptab === 'notebook') { C.Sketch.tab('notebook'); return; } R.panel = pt.dataset.ptab; drawPanel(); if (C.Sketch) C.Sketch.panelChanged(R.panel); return; }
   const sm = t.closest('[data-summ]');
   if (sm) {
     const id = sm.dataset.summ; sm.disabled = true; sm.textContent = 'Summarizing… (about 15 seconds)';
@@ -2082,7 +2088,7 @@ document.addEventListener('keydown', e => {
     }
     else if (is('article', 'listen')) { const T = R.tts; if (T.on && T.doc === d.id) { T.playing ? pauseTTS() : resumeTTS(); } else startTTS(); }
     else if (is('article', 'toc')) { R.toc = !R.toc; const g = $('.rvgrid'); if (g) g.classList.toggle('notoc', !R.toc); }
-    else if (is('article', 'panel')) { R.panelOpen = !R.panelOpen; const g = $('.rvgrid'); if (g) g.classList.toggle('withpanel', R.panelOpen); drawReaderTop(); }
+    else if (is('article', 'panel')) { if (C.Sketch) C.Sketch.togglePanel(); else setPanel(!R.panelOpen); }
     else if (is('article', 'archive')) docAct(feed ? 'seen' : 'archive', d.id);
     else if (is('article', 'later') && lib) docAct('later', d.id);
     else if (is('article', 'save') && feed) docAct('save', d.id);

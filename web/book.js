@@ -175,7 +175,7 @@ async function openBook(id, at){
   drawToc();
   Pens.use(INKSURF);
   TOCAT.clear(); SECDOC.clear();
-  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, resized: () => { applyBookType(); if (C.Margin) C.Margin.draw(); }, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
+  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, panel: { open: t => openPanel(t), close: closePanel, shown: panelShown }, resized: () => { applyBookType(); if (C.Margin) C.Margin.draw(); }, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
   if (C.Margin) C.Margin.attach({ item: 'book:' + id, host: () => B.id === id ? $('#bstage') : null, places: marginPlaces, open: marginOpen, relayout: applyBookType, ok: () => !B.scans,
     pageW: () => (parseFloat(B.view && B.view.renderer.getAttribute('max-inline-size')) || 600) * 1.12 + 72 });   // the margin (study.js)
   // Where to start: a highlight we were sent to, else the newest of here / this device / the Kindle.
@@ -1196,7 +1196,7 @@ function drawPanel(){
   const p = $('#bpanel'); if (!p || !B.d) return;
   if (B.panel === 'notebook') B.panel = 'info';      // the Notebook is its own now (sketchbook.js)
   const d = B.d, all = allHighlights(), n = all.length;
-  p.innerHTML = '<div class="ptabs" role="tablist">' + [['info', 'Info'], ['ask', 'Ask']].map(t => '<button class="ptab' + (B.panel === t[0] ? ' on' : '') + '" data-bpt="' + t[0] + '" role="tab">' + t[1] + '</button>').join('') + '</div><div id="bpbody"></div>';
+  p.innerHTML = '<div class="ptabs" role="tablist">' + (C.Sketch ? [['notebook', 'Notebook']] : []).concat([['info', 'Info'], ['ask', 'Ask']]).map(t => '<button class="ptab' + (B.panel === t[0] ? ' on' : '') + '" data-bpt="' + t[0] + '" role="tab">' + t[1] + '</button>').join('') + '</div><div id="bpbody"></div>';
   const b = $('#bpbody');
   if (B.panel === 'info') {
     b.innerHTML = '<div class="binfo">' + (d.has_cover ? '<img class="bcover" src="/api/cover/' + encodeURIComponent(d.id) + '" alt="">' : '') +
@@ -1320,7 +1320,7 @@ async function highlightSel(withNote, quiet){
 // A note on a highlight: its row in the Notebook's list, typing in its note.
 function openNote(h){ if (C.Sketch) C.Sketch.reveal({ hl: h.id, note: true }); }
 // The Notebook (sketchbook.js), from the menus and the key: open or closed; at a highlight, its card.
-function notebook(id){ if (!C.Sketch) return; if (id) C.Sketch.reveal({ hl: id }); else C.Sketch.toggle(); }
+function notebook(id){ if (!C.Sketch) return; if (id) C.Sketch.reveal({ hl: id }); else if (C.Sketch.open()) C.Sketch.hide(); else C.Sketch.tab('notebook'); }
 // quiet: no Undo toast (the pen's eraser has its own Undo); either way it answers with the way back.
 async function removeHighlight(id, quiet){
   const h = B.d.highlights.find(x => x.id === id); if (!h) return null;
@@ -1668,8 +1668,10 @@ function openPanel(tab){
   if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(true); return; }   // focus mode has its own drawers (focus.js)
   document.body.classList.remove('btocsheet'); document.body.classList.add('bpanelsheet');
   showChrome(); drawPanel();
+  if (C.Sketch) C.Sketch.panelChanged(B.panel);      // the Notebook is the panel's other tab: it makes way
 }
 const panelShown = () => document.body.classList.contains('bpanelsheet');
+function closePanel(){ document.body.classList.remove('bpanelsheet'); if (C.Sketch) C.Sketch.panelChanged(); }
 function openToc(){ if (C.Focus && C.Focus.on()) { C.Focus.toc(true); return; } document.body.classList.remove('bpanelsheet'); document.body.classList.add('btocsheet'); showChrome(); }
 function contextText(){
   try { return (B.loc && B.loc.range ? B.loc.range.toString() : '').slice(0, 6000); } catch(e){ return ''; }
@@ -1751,7 +1753,7 @@ function onKey(e){
   else if (is('listen')) toggleListen();          // (it's in the … menu, not a button on the bar)
   else if (k === '?') showKeys();
   else if (is('search')) { e.preventDefault(); openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
-  else if (is('panel')) notebook();
+  else if (is('panel')) { if (C.Sketch) C.Sketch.togglePanel(); }
   else if (is('focus') && C.Focus) C.Focus.toggle();
   else if (k === 'Escape' && C.Focus && C.Focus.escape()) {}
   else if (k === 'Escape') { if (H.visible()) H.hide(); else if (!$('#pop').hidden) $('#pop').hidden = true; else location.hash = '#book/' + encodeURIComponent(B.d.id); }
@@ -1786,8 +1788,8 @@ document.addEventListener('click', async e => {
     if (a === 'nextch') { bk.hidden = true; B.view.next(); return; }
     if (a === 'toc') { if (C.Focus && C.Focus.on()) C.Focus.toc(); else if (document.body.classList.contains('btocsheet')) document.body.classList.remove('btocsheet'); else openToc(); }
     else if (a === 'search') { openToc(); setTimeout(() => $('#bq') && $('#bq').focus(), 30); }
-    else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); } else if (panelShown()) document.body.classList.remove('bpanelsheet'); else openPanel(); }
-    else if (a === 'closesheets') document.body.classList.remove('btocsheet', 'bpanelsheet');
+    else if (a === 'panel') { if (C.Focus && C.Focus.on()) { drawPanel(); C.Focus.panel(); } else if (panelShown()) closePanel(); else openPanel(); }
+    else if (a === 'closesheets') { document.body.classList.remove('btocsheet'); if (panelShown()) closePanel(); }
     else if (a === 'nblist') { if (C.Focus && C.Focus.on()) C.Focus.panel(false); document.body.classList.remove('bpanelsheet'); if (C.Sketch) C.Sketch.list(); }
     else if (a === 'pmenu') { if (!$('#pop').hidden && $('#pop .pmenu')) $('#pop').hidden = true; else openPhoneMenu(bk); }
     else if (a === 'aa') { showChrome(); B.aaFromBar = false; C.openAa && C.openAa(bk, { book: true }); }
@@ -1806,7 +1808,7 @@ document.addEventListener('click', async e => {
     return;
   }
   if (!t.closest('#fnote') && $('#fnote') && !$('#fnote').hidden) closeNote();
-  const pt = t.closest('[data-bpt]'); if (pt) { B.panel = pt.dataset.bpt; drawPanel(); return; }
+  const pt = t.closest('[data-bpt]'); if (pt) { if (pt.dataset.bpt === 'notebook') { C.Sketch.tab('notebook'); return; } B.panel = pt.dataset.bpt; drawPanel(); if (C.Sketch) C.Sketch.panelChanged(B.panel); return; }
   const ti = t.closest('#btoc [data-href]'); if (ti) { e.preventDefault(); await B.view.goTo(ti.dataset.href).catch(() => {}); document.body.classList.remove('btocsheet'); return; }
   const sr = t.closest('#bres [data-cfi]'); if (sr) { e.preventDefault(); await B.view.goTo(sr.dataset.cfi).catch(() => {}); document.body.classList.remove('btocsheet'); return; }
   const gm = t.closest('[data-gomark]'); if (gm) { e.preventDefault(); await B.view.goTo(gm.dataset.gomark).catch(() => {}); document.body.classList.remove('btocsheet'); return; }
