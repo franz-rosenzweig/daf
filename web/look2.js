@@ -357,6 +357,8 @@ const MICON = {
   note: MI('M4 16h3l8.5-8.5-3-3L4 13v3z|M11.5 5.5l3 3'),
   ask: MI('M4 5h12v8H9l-3.5 3v-3H4V5z'),
   focus: MI('M4 8V4h4|M12 4h4v4|M16 12v4h-4|M8 16H4v-4'),
+  margin: MI('M3.5 4.5h9v11h-9z|M6 8h4|M6 11h4|M16 5v10'),
+  split: MI('M3 4.5h14v11H3z|M10 4.5v11'),
   star: MI('m10 3.3 2 4.3 4.6.6-3.4 3.2.9 4.6L10 13.7 5.9 16l.9-4.6-3.4-3.2 4.6-.6z'),
   info: MI('M10 9.2v4.6|M10 6.3v.1', '<circle cx="10" cy="10" r="7"/>'),
   book: MI('M10 6.5C8.5 5 6.5 4.5 4 4.5v10c2.5 0 4.5.5 6 2 1.5-1.5 3.5-2 6-2v-10c-2.5 0-4.5.5-6 2z|M10 6.5v10'),
@@ -388,14 +390,16 @@ const MSEL = k => { const [t, v] = k.split(':'); return t === 'a' ? (v === 'expo
 // [button, short label, icon, the words that mean it's on now, the bar's own button for the same thing]
 const MENUS = {
   bm: {
-    tiles: [['bm:listen', 'Listen', 'speaker', /^Stop/], ['abk:herebook', 'Audiobook', 'headphones'], ['bm:notebook', 'Notebook', 'note'], ['bm:ask', 'Ask', 'ask'], ['bm:focus', 'Focus', 'focus', /^Leave/]],
+    tiles: [[['bm:listen', 'Listen', 'speaker', /^Stop/], ['abk:herebook', 'Audiobook', 'headphones'], ['bm:ask', 'Ask', 'ask'], ['bm:focus', 'Focus', 'focus', /^Leave/]],
+      [['bm:notebook', 'Notebook', 'note'], ['bm:margin', 'Margin', 'margin', /^Hide/], ['bm:sbs', 'Side by side', 'split', /^Close/]]],
     chips: ['Go to', [['bm:start', 'Start'], ['bm:goto', 'Page…'], ['bm:kindle', 'Kindle']]],
     rows: [[['bm:info', 'About', 'info'], ['bm:book', 'Book page', 'book'], ['bm:mark', 'Bookmark', 'bookmark', /^Remove/, '[data-bk="bookmark"]'], ['bm:pairs', 'Swap the page pairs', 'pairs']],
       [['a:export', 'Export highlights', 'export'], ['a:file', 'Download', 'download'], ['bm:offline', null, 'download']]],
     foot: [['bm:auto', 'Auto highlight'], ['bm:keys', 'Shortcuts'], ['bm:reset', 'Forget my place']],
   },
   more: {
-    tiles: [['more:listen', 'Listen', 'speaker', /^Stop/], ['more:ask', 'Ask', 'ask'], ['more:note', 'Note', 'note'], ['more:star', 'Shortlist', 'star', /^Off/], ['more:focus', 'Focus', 'focus', /^Leave/]],
+    tiles: [[['more:listen', 'Listen', 'speaker', /^Stop/], ['more:ask', 'Ask', 'ask'], ['more:note', 'Note', 'note'], ['more:star', 'Shortlist', 'star', /^Off/], ['more:focus', 'Focus', 'focus', /^Leave/]],
+      [['more:margin', 'Margin', 'margin', /^Hide/], ['more:sbs', 'Side by side', 'split', /^Close/]]],
     chips: ['List', [['more:prevdoc', '‹ Previous'], ['more:nextdoc', 'Next ›']]],
     rows: [[['more:save', 'Save to Library', 'save', null, '#rtop [data-dact="save"]'], ['more:seen', 'Seen', 'eye', /^Back/, '#rtop [data-dact="seen"]'], ['more:later', 'Later', 'clock', /^Back/], ['more:archive', 'Archive', 'archive', /^Back/, '#rtop [data-dact="archive"]'],
         ['more:panel', 'Info', 'info', /^Hide/, '#rtop [data-ract="panel"]'], ['more:pages', 'PDF pages', 'file']],
@@ -464,7 +468,14 @@ function tidyMenu(menu){
   };
   const box = cls => { const d = document.createElement('div'); d.className = cls; return d; };
   const parts = [];
-  const tiles = box('l2m-tiles'); spec.tiles.forEach(x => { const b = take(x, true, true); if (b) tiles.appendChild(b); }); if (tiles.children.length) parts.push(tiles);
+  // rows of tiles; a row left with one tile (a phone has no Margin or Side by side) joins the row above
+  let last = null;
+  spec.tiles.forEach(rw => {
+    const tiles = box('l2m-tiles'); rw.forEach(x => { const b = take(x, true, true); if (b) tiles.appendChild(b); });
+    if (!tiles.children.length) return;
+    if (tiles.children.length < 2 && last) { [...tiles.children].forEach(b => last.appendChild(b)); return; }
+    parts.push(tiles); last = tiles;
+  });
   const chips = box('l2m-chips'); spec.chips[1].forEach(x => { const b = take(x, false); if (b) chips.appendChild(b); });
   if (chips.children.length) { chips.insertAdjacentHTML('afterbegin', '<span class="l2m-h">' + spec.chips[0] + '</span>'); parts.push(chips); }
   spec.rows.forEach(g => { const rows = box('l2m-rows'); g.forEach(x => { const b = take(x, true); if (b) rows.appendChild(b); }); if (rows.children.length) parts.push(rows); });
