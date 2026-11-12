@@ -24,7 +24,8 @@ const roomW = () => C.Sketch ? C.Sketch.room().w : innerWidth;
 
 /* ---------- Margin ---------- */
 // ctx: {item (book:… | doc:…), host() (the element the margin goes in: a book's stage, an article's text),
-// places() (the highlights on the page: [{id, color, note, top, h}], top from the host's top),
+// places() (the highlights on the page: [{id, color, note, top, h}], top from the host's top), pageW() (a
+// book's page as wide as its text needs),
 // open(id, el) (that highlight's bar, by el), relayout() (the reader lays out again, for a book)}
 const M = { ctx: null, words: null, wordsFor: null, shown: false, t: 0 };
 const can = () => !PANE && roomW() >= 760;
@@ -35,16 +36,23 @@ function mount(host){
   let col = host.querySelector(':scope > .mgcol');
   if (!col) { col = document.createElement('div'); col.className = 'mgcol'; host.appendChild(col); }
   host.classList.add('mghost'); root.classList.add('mgopen');
-  host.style.setProperty('--mgw', width() + 'px');
+  const mw = width();
+  host.style.setProperty('--mgw', mw + 'px');
+  // a book's page as wide as its text, and the margin right beside it, the two in the middle
+  if (M.ctx.pageW) {
+    const W = host.clientWidth, pw = Math.max(240, Math.min(W - mw, Math.round(M.ctx.pageW())));
+    host.style.setProperty('--mgv', pw + 'px');
+    host.style.setProperty('--mgx', Math.max(0, Math.round((W - pw - mw) / 2)) + 'px');
+  }
   // a page that grows (its pictures come in) or narrows: the places again
   if (M.ro && M.roHost !== host) { M.ro.disconnect(); M.ro = null; }
-  if (!M.ro && window.ResizeObserver) { M.ro = new ResizeObserver(() => draw()); M.ro.observe(host); M.roHost = host; }
+  if (!M.ro && window.ResizeObserver) { M.ro = new ResizeObserver(() => requestAnimationFrame(draw)); M.ro.observe(host); M.roHost = host; }
   return col;
 }
 function unmount(){
   if (M.ro) { M.ro.disconnect(); M.ro = null; }
   root.classList.remove('mgopen');
-  document.querySelectorAll('.mghost').forEach(h => { h.classList.remove('mghost'); h.style.removeProperty('--mgw'); });
+  document.querySelectorAll('.mghost').forEach(h => { h.classList.remove('mghost'); ['--mgw', '--mgv', '--mgx'].forEach(k => h.style.removeProperty(k)); });
   document.querySelectorAll('.mgcol').forEach(c => c.remove());
 }
 // What's written in the Notebook under each highlight: the typed words and the handwriting as it was read.
