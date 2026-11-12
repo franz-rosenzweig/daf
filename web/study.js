@@ -97,11 +97,12 @@ function paint(col){
   let below = -Infinity;
   col.querySelectorAll('.mgn').forEach(n => { const t = Math.max(+n.dataset.top, below + 8); n.style.top = t + 'px'; below = t + n.offsetHeight; });
 }
+// (before the page's own taps, which would show the bars instead)
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('.mgcol [data-mg]'); if (!b || !M.ctx) return;
   e.preventDefault(); e.stopPropagation();
   M.ctx.open(b.dataset.mg, b);
-});
+}, true);
 function attach(ctx){ M.ctx = ctx; M.words = null; M.wordsFor = null; M.shown = !!document.querySelector('.mgcol') && M.shown; draw(); }
 function detach(){ if (M.shown) unmount(); M.shown = false; M.ctx = null; }
 function toggle(){
