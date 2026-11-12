@@ -62,6 +62,7 @@ const IC = {
   down: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   toTop: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4.5h12M10 16V8M6.5 11.5 10 8l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   toBottom: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 15.5h12M10 4v8M6.5 8.5 10 12l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  panel: '<svg width="17" height="17" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.5 4v12" stroke="currentColor" stroke-width="1.6"/></svg>',
   close: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
   trash: '<svg width="17" height="17" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4.5h4V6M5.5 6l.8 10h7.4l.8-10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   chev: '<svg width="12" height="12" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -141,6 +142,7 @@ function build(){
   const el = S.el = document.createElement('aside');
   el.className = 'skb'; el.id = 'skb'; el.setAttribute('aria-label', 'Notebook'); el.hidden = true;
   el.innerHTML = '<div class="skgrip" role="separator" aria-label="Resize the Notebook"><i></i></div>' +
+    '<div class="ptabs skptabs" role="tablist" hidden>' + PTABS.map(t => '<button class="ptab' + (t[0] === 'notebook' ? ' on' : '') + '" data-skpt="' + t[0] + '" role="tab">' + t[1] + '</button>').join('') + '</div>' +
     '<div class="skhead"><div class="skwhere"></div><span class="spacer"></span>' +
       '<div class="skseg" role="tablist" aria-label="Notebook"><button role="tab" data-skv="pages">Pages</button><button role="tab" data-skv="list">List</button></div>' +
       '<span class="skhb"></span><div class="skpick" role="listbox" aria-label="Chapters" hidden></div></div>' +
@@ -283,6 +285,7 @@ function drawTools(){
   drawHead();
 }
 function onHead(e){
+  const pt = e.target.closest('[data-skpt]'); if (pt) { panelTab(pt.dataset.skpt); return; }
   const t = e.target.closest('[data-sktab], [data-sk], [data-skch], [data-skv]'); if (!t) return;
   if (t.dataset.skv) { setView(t.dataset.skv); return; }
   if (t.dataset.skch != null) {
@@ -1194,7 +1197,10 @@ const openKey = () => 'open.' + (S.ctx ? S.ctx.kind : 'doc');
 function show(){
   if (!S.ctx) return;
   if (S.extra && C.Split) C.Split.close();     // Side by side has this room (study.js)
+  const p = S.ctx.panel; if (p && p.shown()) p.close();        // one tab of the side panel at a time
   build();
+  S.el.querySelector('.skptabs').hidden = !p;
+  if (p) store.set('ptab', 'notebook');
   S.shown = true; S.el.hidden = false;
   place(); theme();
   const s = Pens.surface(); if (s && s !== surface) S.prev = s;
@@ -1217,10 +1223,35 @@ function hide(keep){
   buttons(); relayout();
 }
 function toggle(){ if (S.shown) hide(); else show(); }
+// The side panel's tabs: the Notebook, then a reader's own Info and Ask (it hands them over as
+// ctx.panel: {open(tab), close(), shown()}). One is open at a time; the bar's one button opens the last.
+const PTABS = [['notebook', 'Notebook'], ['info', 'Info'], ['ask', 'Ask']];
+function panelTab(t){
+  const p = S.ctx && S.ctx.panel;
+  if (t === 'notebook' || !p) { show(); return; }
+  if (S.shown) hide();
+  p.open(t); store.set('ptab', t); buttons();
+}
+function togglePanel(){
+  const p = S.ctx && S.ctx.panel;
+  if (!p) { toggle(); return; }
+  if (S.shown) hide();
+  else if (p.shown()) { p.close(); buttons(); }
+  else panelTab(store.get('ptab', 'notebook'));
+}
+// a reader opened or closed its Info or Ask by itself (its ⋯, a key): the Notebook makes way, the button follows
+function panelChanged(t){
+  const p = S.ctx && S.ctx.panel;
+  if (p && p.shown()) { if (S.shown) hide(); if (t) store.set('ptab', t); }
+  buttons();
+}
 // Room kept on the right for something else beside the reader (Side by side, study.js), as the
 // Notebook's own is: the readers lay out in what's left (room()).
 function reserve(px){ S.extra = Math.max(0, Math.round(px || 0)); place(); relayout(); }
-function buttons(){ document.querySelectorAll('[data-sketch]').forEach(b => { b.setAttribute('aria-pressed', String(S.shown)); b.classList.toggle('on', S.shown); }); }
+function buttons(){
+  const on = S.shown || !!(S.ctx && S.ctx.panel && S.ctx.panel.shown());
+  document.querySelectorAll('[data-sketch]').forEach(b => { b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); });
+}
 // A reader opened something: the Notebook is for that now, and comes up if it was up last time.
 // ctx: {item, kind (book | doc | pdf | manga), here() (where you are: {tab, title, pos}), view (a book's
 // foliate view), shots() (what the camera can take), time() and seek(t) (a video's), resized(),
@@ -1253,12 +1284,13 @@ function detach(){
   S.ctx = null;
 }
 // The bar's button, in each reader's own kind of button.
+// A book's and an article's is the side panel's (the Notebook, Info and Ask); a PDF's and manga's, the Notebook's.
 function button(kind){
-  const label = 'Notebook', on = S.shown;
+  const side = !kind, label = side ? 'Side panel' : 'Notebook', on = S.shown || !!(side && S.ctx && S.ctx.panel && S.ctx.panel.shown());
   const cls = kind === 'manga' ? 'mic' : 'ib';
-  return '<button class="' + cls + (on ? ' on' : '') + '" data-sketch aria-pressed="' + on + '" title="' + label + '" aria-label="' + label + '">' + IC.book + '</button>';
+  return '<button class="' + cls + (on ? ' on' : '') + '" data-sketch aria-pressed="' + on + '" title="' + label + '" aria-label="' + label + '">' + (side ? IC.panel : IC.book) + '</button>';
 }
-document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-sketch]'); if (!b) return; e.preventDefault(); toggle(); });
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-sketch]'); if (!b) return; e.preventDefault(); togglePanel(); });
 // Gone from the readers (a list, Today): it goes, and comes back with the next one opened.
 const watchView = () => new MutationObserver(() => { if (S.ctx && !READING.includes(document.body.dataset.view)) detach(); }).observe(document.body, { attributes: true, attributeFilter: ['data-view'] });
 if (document.body) watchView(); else document.addEventListener('DOMContentLoaded', watchView);
@@ -1268,7 +1300,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('pagehide', flush);
 window.addEventListener('online', () => { if (S.shown && S.ctx) setTimeout(() => load(S.tab), 3000); });
 
-C.Sketch = { attach, detach, button, toggle, show, hide, room, reserve, open: () => S.shown, flush, reveal, hlChanged,
+C.Sketch = { attach, detach, button, toggle, togglePanel, tab: panelTab, panelChanged, show, hide, room, reserve, open: () => S.shown, flush, reveal, hlChanged,
   list: () => reveal({ view: 'list' }),
   state: () => ({ shown: S.shown, mode: S.mode, view: S.view, item: S.ctx && S.ctx.item, tab: S.tab, here: S.here, tabs: tabList().map(t => t.tab),
     cards: cardsHere().map(h => h.id), groups: S.groups.map(g => (g.card ? 'card' : g.id ? 'gone' : 'top') + ':' + g.blocks.length), hls: S.hls.length,
