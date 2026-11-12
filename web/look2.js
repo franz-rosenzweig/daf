@@ -537,7 +537,7 @@ function screenItems(){
   else if (v === 'manga') add('AniList', 'external', { go: '#prefs/anilist' });
   else if (v === 'podcasts') add('Follow a show', 'plus', { search: true });
   else if (v === 'learn' && !r[1]) add('New area', 'plus', { press: '#main [data-ln="new"]' });
-  else if (v === 'learn') { add('Add', 'plus', { press: '#main [data-ln="add"]' }); pr('Rearrange', 'grid', '[data-ln="rearrange"]'); pr('Find more', 'refresh', '[data-ln="more"]'); }      // its search finds shows in the directory too
+  else if (v === 'learn' && r[1] !== 'ask') { add('Add', 'plus', { press: '#main [data-ln="add"]' }); pr('Rearrange', 'grid', '[data-ln="rearrange"]'); pr('Find more', 'refresh', '[data-ln="more"]'); }      // its search finds shows in the directory too
   return it;
 }
 // The places with no tab, small at the foot (on a phone, Search and Add as well, and Listen's pages).

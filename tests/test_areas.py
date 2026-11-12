@@ -311,6 +311,40 @@ class Agent(unittest.TestCase):
         self.assertIsNone(x["layout"])
         self.assertEqual([s["kind"] for s in x["sections"]], ["continue", "next", "highlights", "feeds"])   # the plain page: what there is
 
+    def test_areas_home_asks_across_every_area(self):
+        b = areas.create(self.c, "Knots", "Tie a bowline", suggest=False)
+        areas.add(self.c, b, "doc:kk:1")                     # in both areas: read once, with both names
+        areas.add(self.c, b, "book:cal:2")
+        srcs = areaagent.sources_all(self.c)
+        self.assertEqual([(s["title"], s["areas"]) for s in srcs],
+                         [("A Field Guide", ["Birdwatching"]), ("How to Begin", ["Birdwatching", "Knots"]), ("A Talk", ["Birdwatching"]), ("Done Already", ["Knots"])])
+        self.assertEqual([s["title"] for s in areaagent.sources_all(self.c, [b])], ["How to Begin", "Done Already"])
+        cid = "qall1"
+        self.c.execute("INSERT INTO area_chat (id, area_id, q, anywhere, refs, state, made) VALUES (?, ?, ?, 0, ?, 'asking', 1)",
+                       (cid, areaagent.ALL, "I want to learn sailing", json.dumps([b])))
+        said = {"paras": [{"text": "Knots first.", "from": [{"n": 1, "at": "p:3"}]}], "new_area": {"name": "Sailing", "goal": "Sail a dinghy"}}
+        seen = {}
+
+        def run(text, timeout=0):
+            seen["text"] = text
+            return json.dumps(said)
+        areaagent.ask_now(self.c, cid, run=run)
+        self.assertIn("- Knots: Tie a bowline", seen["text"])
+        self.assertIn("[in Knots]", seen["text"])
+        self.assertNotIn("A Field Guide", seen["text"])          # only the areas asked about
+        x = areaagent.home(self.c)
+        self.assertEqual([a["name"] for a in x["areas"]], ["Birdwatching", "Knots"])
+        q = x["chat"][0]
+        self.assertEqual((q["paras"][0]["from"][0]["go"], q["new_area"]), ("read/kk%3A1/p:3", {"name": "Sailing", "goal": "Sail a dinghy"}))
+        self.assertEqual(areaagent.chats(self.c, self.a), [])     # (not in an area's own Ask)
+        # an area that's already there is never offered again
+        areas.create(self.c, "sailing", suggest=False)
+        self.c.execute("UPDATE area_chat SET state = 'asking' WHERE id = ?", (cid,))
+        areaagent.ask_now(self.c, cid, run=run)
+        self.assertNotIn("new_area", areaagent.home(self.c)["chat"][0])
+        areaagent.forget(self.c, areaagent.ALL, cid)
+        self.assertEqual(areaagent.home(self.c)["chat"], [])
+
     def test_deleting_the_area_forgets_what_was_asked(self):
         self.row("Why?")
         areas.delete(self.c, self.a)
