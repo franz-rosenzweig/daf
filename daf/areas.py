@@ -142,8 +142,29 @@ def add(c, aid, ref, save=_save_doc):
     return ref
 
 
-def remove(c, aid, ref):
-    c.execute("DELETE FROM area_items WHERE area_id = ? AND ref IN (?, ?)", (aid, ref, kept(c, ref)))
+def remove(c, aid, ref, bad=False):
+    """Out of the area. Not a good source (bad): the helper keeps it as set aside, so it isn't suggested
+    again; gives that row's id, so Undo can take it back (unskip)."""
+    k = kept(c, ref)
+    sid = None
+    if bad:
+        x = _resolve(c, k)
+        if x:
+            kind, _, key = k.partition(":")
+            row = (c.execute("SELECT url FROM docs WHERE id = ?", (key,)).fetchone() if kind == "doc" else
+                   c.execute("SELECT url FROM feeds WHERE id = ?", (key,)).fetchone() if kind == "feed" else None)
+            url = key if kind == "url" else (row[0] if row else "") or ""
+            sid = "s" + secrets.token_hex(5)
+            c.execute("INSERT INTO area_suggest (id, area_id, kind, title, by, url, state, made) VALUES (?, ?, ?, ?, ?, ?, 'skipped', ?)",
+                      (sid, aid, x["kind"] if x["kind"] in KINDS else "article", x["title"], x["by"], url, _now()))
+    c.execute("DELETE FROM area_items WHERE area_id = ? AND ref IN (?, ?)", (aid, ref, k))
+    c.commit()
+    return sid
+
+
+def unskip(c, sid):
+    """Undo a "not a good source": the helper may suggest it again."""
+    c.execute("DELETE FROM area_suggest WHERE id = ? AND state = 'skipped'", (sid,))
     c.commit()
 
 

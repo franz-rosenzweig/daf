@@ -1957,10 +1957,10 @@ def post_area_item(aid: str, b=Depends(json_body), c=Depends(conn)):
 
 
 @app.delete("/api/areas/{aid}/items", dependencies=[Depends(user)])
-def delete_area_item(aid: str, ref: str, c=Depends(conn)):
+def delete_area_item(aid: str, ref: str, bad: int = 0, c=Depends(conn)):
+    """Out of the area; with bad=1, not a good source (the helper won't suggest it again)."""
     from . import areas
-    areas.remove(c, aid, ref)
-    return {"ok": True}
+    return {"ok": True, "skip": areas.remove(c, aid, ref, bool(bad))}
 
 
 @app.put("/api/areas/{aid}/items/order", dependencies=[Depends(user)])
@@ -2055,6 +2055,9 @@ def post_area_suggestion(sid: str, b=Depends(json_body), c=Depends(conn)):
     from . import areas
     if b.get("skip"):
         areas.skip(c, sid)
+        return {"ok": True}
+    if b.get("unskip"):
+        areas.unskip(c, sid)
         return {"ok": True}
     try:
         return {"ref": areas.take(c, sid)}

@@ -24,6 +24,11 @@ const KIND = { book: 'M5 3.5h8l2 2v11H5zM8 3.5v13', article: 'M5 3.5h10v13H5zM7.
 const KNAME = { book: 'Book', article: 'Article', video: 'Video', feed: 'Feed' };
 const PLUS = '<svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 const enc = encodeURIComponent;
+// a thing's handle (drag it to move it) and its × (take it out)
+const GRIPI = '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="currentColor"><circle cx="7.5" cy="5" r="1.4"/><circle cx="12.5" cy="5" r="1.4"/><circle cx="7.5" cy="10" r="1.4"/><circle cx="12.5" cy="10" r="1.4"/><circle cx="7.5" cy="15" r="1.4"/><circle cx="12.5" cy="15" r="1.4"/></svg>';
+const GRIP = '<button class="lngrip" type="button" data-drag aria-label="Move">' + GRIPI + '</button>';
+const XI = '<svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+const takeBtn = ref => '<button class="lnrx" type="button" data-ln-x="' + esc(ref) + '" aria-label="Take out">' + XI + '</button>';
 
 L.load = async () => {
   try { L.areas = (await api('/api/areas')).areas; } catch(e){ L.areas = L.areas || []; }
@@ -59,14 +64,14 @@ function art(a){
 function drawHome(list){
   const page = $('#main .lnhome .lnhomebody'); if (!page || $('#main .lnaskhome')) return;
   const card = (a, i) => editing
-    ? '<div class="lncard editing" data-id="' + esc(a.id) + '" style="' + tint(a) + '">' + art(a) +
+    ? '<div class="lncard editing" data-id="' + esc(a.id) + '" data-drow style="' + tint(a) + '">' + art(a) + '<span class="lncgrip">' + GRIP + '</span>' +
       '<span class="lnsw">' + COLORS.map(c => '<button class="' + (c === a.color ? 'on' : '') + '" data-ln-color="' + c + '" style="background:' + c + '" aria-label="Colour"></button>').join('') + '</span>' +
       '<button class="lnx" data-ln-del aria-label="Delete">×</button>' +
       '<span class="lnmove">' + (i ? '<button data-ln-move="-1" aria-label="Earlier">‹</button>' : '') + (i < list.length - 1 ? '<button data-ln-move="1" aria-label="Later">›</button>' : '') + '</span>' +
       '<span class="lnbody"><input class="field lnrename" data-ln-name value="' + esc(a.name) + '" aria-label="Name"><span class="lncount">' + esc(a.counts) + '</span></span></div>'
     : '<a class="lncard" href="#learn/' + enc(a.id) + '" style="' + tint(a) + '">' + art(a) +
       '<span class="lnbody"><b class="lnname">' + esc(a.name) + '</b><span class="lncount">' + esc(a.counts) + '</span>' + (a.month ? '<span class="lnmonth">' + esc(a.month) + '</span>' : '') + '</span></a>';
-  page.innerHTML = '<div class="lngrid">' + list.map(card).join('') + '<button class="lnnew" data-ln="new">' + PLUS + '<span>New area</span></button></div>';
+  page.innerHTML = '<div class="lngrid"' + (editing ? ' data-dlist="areas"' : '') + '>' + list.map(card).join('') + '<button class="lnnew" data-ln="new">' + PLUS + '<span>New area</span></button></div>';
 }
 
 /* ---------- an area ---------- */
@@ -103,14 +108,17 @@ function pic(x){
 const spin = words => '<p class="lnlook"><span class="spin"></span>' + words + '</p>';
 const href = go => go ? ' href="#' + esc(go) + '"' : '';
 function row(x, editable, i, n){
-  return '<div class="lnrow" data-ref="' + esc(x.ref) + '">' +
+  return '<div class="lnrow" data-ref="' + esc(x.ref) + '" data-drow>' + (editable ? '' : GRIP) +
     (x.go ? '<a class="lnrowmain" href="#' + esc(x.go) + '">' : '<span class="lnrowmain">') + pic(x) +
     '<span class="lnrt"><b>' + esc(x.title) + '</b><i>' + svg(KIND[x.kind] || KIND.article) + esc([x.by, x.len].filter(Boolean).join(' · ')) + '</i></span>' + (x.go ? '</a>' : '</span>') +
     (x.st === 'Wanted' ? '<button class="btn sm" data-ln-find="' + esc(x.title) + '">Find</button>' : '') +
     (x.st ? '<span class="lnst' + (x.st === 'Done' ? ' done' : x.st === 'New' ? ' new' : '') + '">' + esc(x.st) + '</span>' : '') +
     (editable ? '<span class="lnedit">' + (i ? '<button data-ln-up aria-label="Earlier">↑</button>' : '') + (i < n - 1 ? '<button data-ln-down aria-label="Later">↓</button>' : '') +
-      '<button data-ln-rm aria-label="Take out">×</button></span>' : '') + '</div>';
+      '<button data-ln-rm aria-label="Take out">×</button></span>' : takeBtn(x.ref)) + '</div>';
 }
+const feedRow = (f, editable) => '<div class="lnrow" data-ref="' + esc(f.ref) + '" data-drow>' + (editable ? '' : GRIP) + '<a class="lnrowmain" href="#' + esc(f.go) + '">' + svg(KIND.feed) +
+  '<span class="lnrt"><b>' + esc(f.title) + '</b></span></a>' + (f.new ? '<span class="lnst new">' + f.new + ' new</span>' : '') +
+  (editable ? '<span class="lnedit"><button data-ln-rm aria-label="Take out">×</button></span>' : takeBtn(f.ref)) + '</div>';
 function draw(){
   const p = P.data, a = p.area, page = $('#main .lnarea'); if (!page) return;
   const h1 = $('#main .top h1'); h1.textContent = a.name; h1.classList.add('lnhide');        // (the band says it)
@@ -135,48 +143,52 @@ function overview(p){
   const tools = '<div class="lntools">' + (p.working.layout ? spin('Arranging…') : '<button class="btn sm" data-ln="rearrange">' + SPARK + 'Rearrange</button>') +
     (p.failed.layout && !p.working.layout ? '<span class="mute tiny">' + esc(p.failed.layout) + '</span>' : '') + '</div>';
   if (p.draft) return '<div class="lnkeep">' + SPARK + '<b>New layout</b><span class="spacer"></span><button class="btn sm primary" data-ln="lkeep">Keep</button><button class="btn sm" data-ln="ldrop">Undo</button></div>' +
-    '<div class="lnsecs">' + p.draft.map(s => section(s, false)).join('') + '</div>';
+    '<div class="lnsecs">' + p.draft.map(s => section(s, false, 0, true)).join('') + '</div>';
   const raw = rawLayout(p);
-  return tools + '<div class="lnsecs">' + p.sections.map(s => section(s, P.editing, raw.length)).join('') + '</div>' +
+  return tools + '<div class="lnsecs" data-dlist="sections">' + p.sections.map(s => section(s, P.editing, raw.length)).join('') + '</div>' +
     (P.editing ? '<div class="lnaddsec"><span class="mute tiny">Add</span>' + ADDABLE.map(k => '<button class="lnchip" data-ln-addsec="' + k + '">' + SNAME[k] + '</button>').join('') +
       (p.layout ? '<span class="spacer"></span><button class="btn sm" data-ln="plain">Plain</button>' : '') + '</div>' : '');
 }
-// the layout as it's kept (or the plain one), to change by hand
-const rawLayout = p => p.layout ? p.layout.slice() : p.sections.map(s => ({ kind: s.kind, wide: !!s.wide }));
-function section(s, editable, n){
+// the layout as it's kept (or the plain one), to change by hand: every section, shown or not (s.at is its place)
+const rawLayout = p => JSON.parse(JSON.stringify(p.raw));
+function section(s, editable, n, draft){
   const title = s.title || SNAME[s.kind] || '';
   const ed = editable ? '<span class="lnedit">' + (s.at ? '<button data-ln-sup="' + s.at + '" aria-label="Earlier">↑</button>' : '') +
     (s.at < n - 1 ? '<button data-ln-sdown="' + s.at + '" aria-label="Later">↓</button>' : '') + '<button data-ln-srm="' + s.at + '" aria-label="Take out">×</button></span>' : '';
   let body = '', side = '';
   if (s.kind === 'plan') { const w = s.plan.weeks[s.plan.now]; side = '<span class="mute tiny">Week ' + (s.plan.now + 1) + ' of ' + s.plan.weeks.length + '</span>';
-    body = progress(s.plan) + '<div class="lnwname">' + esc(w.name) + '</div>' + w.steps.map((st, j) => step(st, s.plan.now, j, false)).join(''); }
+    body = progress(s.plan) + '<div class="lnwname">' + esc(w.name) + '</div><div class="lnwsteps"' + (draft ? '' : ' data-dlist="plan" data-week="' + s.plan.now + '"') + '>' +
+      w.steps.map(st => step(st, false, draft)).join('') + '</div>'; }
   else if (s.kind === 'continue') { const x = s.item;
     body = '<a class="lncont" href="#' + esc(x.go) + '">' + pic(x) + '<span class="lnrt"><b>' + esc(x.title) + '</b><i>' + esc([x.by, x.len].filter(Boolean).join(' · ')) + '</i>' +
       '<span class="lnbar"><span style="width:' + Math.round(x.pct || 0) + '%"></span></span><i>' + esc(x.st === 'New' ? 'New' : x.st) + '</i></span></a>'; }
-  else if (s.kind === 'next') body = '<div class="lnnextv">' + s.items.map((x, i) => '<a class="lnstep"' + href(x.go) + '><span class="lnnum">' + (i + 1) + '</span><span class="lnrt"><b>' + esc(x.title) + '</b><i>' +
-      esc([KNAME[x.kind], x.len].filter(Boolean).join(' · ')) + '</i></span></a>').join('') + '</div>';
+  else if (s.kind === 'next') body = '<div class="lnnextv"' + (draft ? '' : ' data-dlist="items"') + '>' + s.items.map((x, i) => '<div class="lnstep" data-ref="' + esc(x.ref) + '" data-drow>' + (draft ? '' : GRIP) +
+      '<a class="lnstepm"' + href(x.go) + '><span class="lnnum">' + (i + 1) + '</span><span class="lnrt"><b>' + esc(x.title) + '</b><i>' +
+      esc([KNAME[x.kind], x.len].filter(Boolean).join(' · ')) + '</i></span></a>' + (draft ? '' : takeBtn(x.ref)) + '</div>').join('') + '</div>';
   else if (s.kind === 'highlights') body = s.groups.map(g => (g.name ? '<div class="lngname">' + esc(g.name) + '</div>' : '') + '<div class="lnhls">' +
       g.hls.map(h => '<a class="lnhlc"' + href(h.go) + '><p dir="auto">' + esc(h.text) + '</p><span>' + esc(h.title) + '</span></a>').join('') + '</div>').join('');
-  else if (s.kind === 'things') body = s.items.map(x => row(x)).join('');
+  else if (s.kind === 'things') body = '<div' + (draft ? '' : ' data-dlist="things" data-at="' + s.at + '"') + '>' + s.items.map(x => row(x)).join('') + '</div>';
   else if (s.kind === 'questions') body = s.asked.map(x => '<a class="lnqrow" href="#learn/' + enc(P.id) + '/ask" data-ln-goq="' + esc(x.id) + '">' + SPARK + '<span class="lnrt"><b>' + esc(x.q) + '</b><i>' +
       x.n + (x.n === 1 ? ' source' : ' sources') + '</i></span></a>').join('');
-  else if (s.kind === 'feeds') body = s.feeds.map(f => '<div class="lnrow" data-ref="' + esc(f.ref) + '"><a class="lnrowmain" href="#' + esc(f.go) + '">' + svg(KIND.feed) + '<span class="lnrt"><b>' + esc(f.title) + '</b></span></a>' +
-      (f.new ? '<span class="lnst new">' + f.new + ' new</span>' : '') + '</div>').join('');
+  else if (s.kind === 'feeds') body = '<div' + (draft ? '' : ' data-dlist="items"') + '>' + s.feeds.map(f => feedRow(f)).join('') + '</div>';
   else if (s.kind === 'suggestions') body = suggRows(s.suggestions, s.looking, P.data.error);
-  return '<section class="card lnsec lnsec-' + s.kind + (s.wide ? ' wide' : '') + '"><div class="cardh"><h2>' + esc(title) + '</h2><span class="spacer"></span>' + side + ed + '</div>' + body + '</section>';
+  return '<section class="card lnsec lnsec-' + s.kind + (s.wide ? ' wide' : '') + '"' + (draft ? '' : ' data-drow data-at="' + s.at + '"') + '><div class="cardh">' + (draft ? '' : GRIP) +
+    '<h2>' + esc(title) + '</h2><span class="spacer"></span>' + side + ed + '</div>' + body + '</section>';
 }
 function progress(plan){
   return '<div class="lnprog">' + plan.weeks.map((w, i) => '<span class="' + (w.done ? 'done' : i === plan.now ? 'now' : '') + '"></span>').join('') + '</div>';
 }
-function step(st, w, j, draft){
+function step(st, draft, preview){
+  const dr = draft ? ' data-draft="1"' : '';
   const tick = st.auto ? '<span class="lntick on" aria-label="Done">' + CHECK + '</span>'
     : st.add ? '<span class="lntick"></span>'
-    : '<button class="lntick' + (st.done ? ' on' : '') + '" data-ln-tick="' + w + ':' + j + '"' + (draft ? ' data-draft="1"' : '') + ' aria-pressed="' + st.done + '" aria-label="Done">' + (st.done ? CHECK : '') + '</button>';
+    : '<button class="lntick' + (st.done ? ' on' : '') + '" data-ln-tick="' + esc(st.id) + '"' + dr + ' aria-pressed="' + st.done + '" aria-label="Done">' + (st.done ? CHECK : '') + '</button>';
   const name = (st.go ? '<a href="#' + esc(st.go) + '">' : '<span>') + esc(st.title) + (st.go ? '</a>' : '</span>');
-  return '<div class="lnpstep' + (st.done ? ' done' : '') + '">' + tick + '<span class="lnpk">' + (st.kind === 'do' ? svg('M4 16h3l8.5-8.5-3-3L4 13v3z') : svg(KIND[st.kind] || KIND.article)) + '</span>' +
+  return '<div class="lnpstep' + (st.done ? ' done' : '') + '" data-sid="' + esc(st.id) + '"' + (preview ? '' : ' data-drow') + '>' + (preview ? '' : GRIP) + tick + '<span class="lnpk">' + (st.kind === 'do' ? svg('M4 16h3l8.5-8.5-3-3L4 13v3z') : svg(KIND[st.kind] || KIND.article)) + '</span>' +
     '<span class="lnpt">' + name + (st.part ? '<i>' + esc(st.part) + '</i>' : '') + (st.by ? '<i>' + esc(st.by) + '</i>' : '') + '</span>' +
-    (st.add ? '<button class="btn sm primary" data-ln-padd="' + w + ':' + j + '"' + (draft ? ' data-draft="1"' : '') + '>Add</button>' : '') +
-    (st.mins ? '<span class="lnpm">' + mins(st.mins) + '</span>' : '') + '</div>';
+    (st.add ? '<button class="btn sm primary" data-ln-padd="' + esc(st.id) + '"' + dr + '>Add</button>' : '') +
+    (st.mins ? '<span class="lnpm">' + mins(st.mins) + '</span>' : '') +
+    (preview ? '' : '<button class="lnrx" type="button" data-ln-sx="' + esc(st.id) + '"' + dr + ' aria-label="Take out">' + XI + '</button>') + '</div>';
 }
 const mins = m => m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '') : m + ' min';
 const SPARK = '<svg class="lnspark" width="15" height="15" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor"/></svg>';
@@ -197,10 +209,9 @@ function everything(p){
   if (P.kind === 'hl') body = p.highlights.map(h => '<div class="lnhl"><p dir="auto">' + esc(h.text || '') + '</p><span>' + esc(h.title || '') + '</span></div>').join('');
   else { const rows = p.items.filter(x => P.kind === 'all' || x.kind === P.kind); body = rows.map((x, i) => row(x, P.editing, i, rows.length)).join(''); }
   const feeds = '<section class="card lnfeeds"><div class="cardh"><h2>Feeds</h2><span class="spacer"></span><button class="linkbtn" data-ln="follow">Follow</button></div>' +
-    p.feeds.map(f => '<div class="lnrow" data-ref="' + esc(f.ref) + '"><a class="lnrowmain" href="#' + esc(f.go) + '">' + svg(KIND.feed) + '<span class="lnrt"><b>' + esc(f.title) + '</b></span></a>' +
-      (f.new ? '<span class="lnst new">' + f.new + ' new</span>' : '') + (P.editing ? '<span class="lnedit"><button data-ln-rm aria-label="Take out">×</button></span>' : '') + '</div>').join('') + '</section>';
+    '<div data-dlist="items">' + p.feeds.map(f => feedRow(f, P.editing)).join('') + '</div></section>';
   const sugg = a.suggest ? '<section class="card lnsugg"><div class="cardh"><h2>Suggestions</h2></div>' + suggRows(p.suggestions, p.looking, p.error) + '</section>' : '';
-  return '<div class="lncols"><section class="card lnlist">' + chips + body + '</section><div class="lnside">' + feeds + sugg + '</div></div>';
+  return '<div class="lncols"><section class="card lnlist">' + chips + (P.kind === 'hl' ? body : '<div data-dlist="items">' + body + '</div>') + '</section><div class="lnside">' + feeds + sugg + '</div></div>';
 }
 
 /* Plan */
@@ -212,7 +223,8 @@ function paceRow(){
 }
 function weeks(plan, draft){
   return '<div class="lnweeks">' + plan.weeks.map((w, i) => '<section class="card lnweek' + (!draft && i === plan.now ? ' now' : '') + (w.done ? ' done' : '') + '"><span class="lnwk">Week ' + (i + 1) + '</span>' +
-    '<div class="lnwname">' + esc(w.name) + '</div>' + w.steps.map((st, j) => step(st, i, j, draft)).join('') + '</section>').join('') + '</div>';
+    '<div class="lnwname">' + esc(w.name) + '</div><div class="lnwsteps" data-dlist="plan" data-dgroup="plan" data-week="' + i + '"' + (draft ? ' data-draft="1"' : '') + '>' +
+    w.steps.map(st => step(st, draft)).join('') + '</div></section>').join('') + '</div>';
 }
 function planTab(p){
   if (p.working.plan) return spin('Making a plan…');
@@ -415,10 +427,121 @@ document.addEventListener('change', e => {
   draw();
 });
 
+/* ---------- moving things by hand, and taking them out ---------- */
+// Drag a handle ([data-drag]) on a row ([data-drow]) in a list ([data-dlist]; lists with the same data-dgroup
+// take each other's rows): the row moves through the list as the finger or the mouse goes, a copy of it
+// under the pointer, and the page scrolls at its edges. On the drop, moved() saves the new order.
+const DR = { row: null };
+const inRect = (r, x, y) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+const rowsOf = list => [...list.children].filter(c => c.matches('[data-drow]'));
+const keyOf = c => c.dataset.ref || c.dataset.sid || c.dataset.at || c.dataset.id;
+document.addEventListener('pointerdown', e => {
+  const h = e.target.closest && e.target.closest('[data-drag]'); if (!h || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const row = h.closest('[data-drow]'), list = row && row.parentElement; if (!list || !list.matches('[data-dlist]')) return;
+  e.preventDefault();
+  const r = row.getBoundingClientRect(), ghost = row.cloneNode(true);
+  ghost.classList.add('lnghost'); ghost.removeAttribute('data-drow');
+  Object.assign(ghost.style, { width: r.width + 'px', height: r.height + 'px', left: r.left + 'px', top: r.top + 'px' });
+  document.body.appendChild(ghost); document.body.classList.add('lndragging'); row.classList.add('lndrag');
+  const group = list.dataset.dgroup ? [...document.querySelectorAll('[data-dgroup="' + CSS.escape(list.dataset.dgroup) + '"]')] : [list];
+  Object.assign(DR, { row, group, ghost, id: e.pointerId, ox: e.clientX - r.left, oy: e.clientY - r.top, x: e.clientX, y: e.clientY,
+    was: group.map(l => rowsOf(l).map(keyOf).join('|')).join('/') });
+  try { h.setPointerCapture(e.pointerId); } catch(err){}
+  const sc = $('#main');
+  (function edge(){
+    if (!DR.row) return;
+    const m = sc.getBoundingClientRect(), d = DR.y < m.top + 70 ? -12 : DR.y > m.bottom - 70 ? 12 : 0;
+    if (d) { sc.scrollTop += d; place(); }
+    requestAnimationFrame(edge);
+  })();
+}, { passive: false });
+function place(){
+  const { x, y } = DR;
+  const list = DR.group.find(l => inRect(l.getBoundingClientRect(), x, y)) || DR.group.reduce((a, l) => {
+    const r = l.getBoundingClientRect(), d = Math.abs(y - Math.min(Math.max(y, r.top), r.bottom));
+    return !a || d < a.d ? { l, d } : a; }, null).l;
+  const rows = rowsOf(list).filter(c => c !== DR.row);
+  let at = rows.find(c => inRect(c.getBoundingClientRect(), x, y)), before = true;
+  if (!at && rows.length) {
+    at = rows.reduce((a, c) => { const r = c.getBoundingClientRect(), d = Math.hypot(r.left + r.width / 2 - x, r.top + r.height / 2 - y); return !a || d < a.d ? { c, d } : a; }, null).c;
+    const r = at.getBoundingClientRect(); before = y < r.top + r.height / 2;
+  } else if (at) { const r = at.getBoundingClientRect(); before = (x - r.left) / r.width + (y - r.top) / r.height < 1; }
+  if (!at) { const last = rowsOf(list).pop(); if (last !== DR.row) (last ? last.after(DR.row) : list.prepend(DR.row)); return; }
+  if (before) { if (at.previousElementSibling !== DR.row) at.before(DR.row); }
+  else if (at.nextElementSibling !== DR.row) at.after(DR.row);
+}
+document.addEventListener('pointermove', e => {
+  if (!DR.row || e.pointerId !== DR.id) return;
+  e.preventDefault();
+  DR.x = e.clientX; DR.y = e.clientY;
+  DR.ghost.style.left = (e.clientX - DR.ox) + 'px'; DR.ghost.style.top = (e.clientY - DR.oy) + 'px';
+  place();
+}, { passive: false });
+const dragEnd = e => {
+  if (!DR.row || (e && e.pointerId !== DR.id)) return;
+  const { row, group, was } = DR;
+  DR.ghost.remove(); row.classList.remove('lndrag'); document.body.classList.remove('lndragging'); DR.row = null;
+  if (group.map(l => rowsOf(l).map(keyOf).join('|')).join('/') !== was) moved(row.parentElement, group).catch(err => { toast(err.message); if (onArea()) refresh(); });
+};
+document.addEventListener('pointerup', dragEnd);
+document.addEventListener('pointercancel', dragEnd);
+const onArea = () => S.route[0] === 'learn' && S.route[1] && S.route[1] !== 'ask';
+// the new order, saved
+async function moved(list, group){
+  const kind = list.dataset.dlist, rows = rowsOf(list);
+  if (kind === 'areas') { const r = await api('/api/areas/order', { method: 'PUT', body: JSON.stringify({ ids: rows.map(c => c.dataset.id) }) }); L.areas = r.areas; drawHome(r.areas); L.load(); return; }
+  if (kind === 'items') {                 // (a list shows some of the things: they change places among their own)
+    const shown = rows.map(c => c.dataset.ref), all = P.data.items.map(x => x.ref).concat(P.data.feeds.map(x => x.ref)), out = all.slice();
+    all.map((r, i) => shown.includes(r) ? i : -1).filter(i => i >= 0).forEach((slot, k) => { out[slot] = shown[k]; });
+    await put('items/order', { refs: out });
+  }
+  else if (kind === 'things') { const raw = rawLayout(P.data), at = +list.dataset.at; raw[at] = Object.assign({}, raw[at], { refs: rows.map(c => c.dataset.ref) }); await put('layout', { sections: raw }); }
+  else if (kind === 'sections') {
+    const raw = rawLayout(P.data), ats = rows.map(c => +c.dataset.at), out = raw.slice();
+    ats.slice().sort((a, b) => a - b).forEach((slot, k) => { out[slot] = raw[ats[k]]; });
+    await put('layout', { sections: out });
+  }
+  else if (kind === 'plan') {
+    const order = {}; group.forEach(l => { order[l.dataset.week] = rowsOf(l).map(c => c.dataset.sid); });
+    await put('plan', { order, draft: !!list.dataset.draft });
+  }
+  refresh(); L.load();
+}
+// Undo, in the toast
+function undoable(msg, fn){
+  const t = $('#toast');
+  t.innerHTML = '<span>' + esc(msg) + '</span><button class="tundo" type="button">Undo</button>'; t.hidden = false;
+  t.querySelector('.tundo').onclick = async () => { t.hidden = true; try { await fn(); } catch(err){ toast(err.message); } };
+  clearTimeout(undoable.t); undoable.t = setTimeout(() => { t.hidden = true; }, 7000);
+}
+// a thing's ×: out of the area, or out as not a good source (the helper won't suggest it again)
+function outMenu(btn, ref){
+  const p = $('#pop'), r = btn.getBoundingClientRect();
+  p.innerHTML = '<div class="menu lnoutm"><button data-ln-out="0">Take out</button><button data-ln-out="1">Not a good source</button></div>';
+  p.dataset.lnref = ref; p.hidden = false;
+  const w = p.offsetWidth, h = p.offsetHeight;
+  p.style.right = 'auto'; p.style.bottom = 'auto';
+  p.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  p.style.top = (r.bottom + 6 + h > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
+}
+async function takeOut(ref, bad){
+  $('#pop').hidden = true;
+  const aid = P.id, before = P.data.items.map(x => x.ref).concat(P.data.feeds.map(x => x.ref));
+  C.$$('#main [data-ln-x="' + CSS.escape(ref) + '"]').forEach(b => { const r = b.closest('[data-drow]'); if (r) r.classList.add('lngone'); });
+  const r = await api('/api/areas/' + enc(aid) + '/items?ref=' + enc(ref) + (bad ? '&bad=1' : ''), { method: 'DELETE' });
+  refresh(); L.load();
+  undoable('Taken out', async () => {
+    await L.put(aid, { ref });
+    await api('/api/areas/' + enc(aid) + '/items/order', { method: 'PUT', body: JSON.stringify({ refs: before }) });
+    if (r.skip) await api('/api/areas/suggestions/' + enc(r.skip), { method: 'POST', body: JSON.stringify({ unskip: true }) });
+    if (P.id === aid) refresh(); L.load();
+  });
+}
+
 /* ---------- clicks ---------- */
 document.addEventListener('click', async e => {
   const t = e.target.closest && e.target.closest('[data-ln],[data-ln-color],[data-ln-del],[data-ln-move],[data-ln-kind],[data-ln-up],[data-ln-down],[data-ln-rm],[data-ln-take],[data-ln-skip],[data-ln-pick],[data-ln-addref],[data-ln-find],' +
-    '[data-ln-sup],[data-ln-sdown],[data-ln-srm],[data-ln-addsec],[data-ln-tick],[data-ln-padd],[data-ln-mins],[data-ln-weeks],[data-ln-forget],[data-ln-oadd],[data-ln-any],[data-ln-goq],[data-ln-mkarea],[data-ln-to]');
+    '[data-ln-sup],[data-ln-sdown],[data-ln-srm],[data-ln-addsec],[data-ln-tick],[data-ln-padd],[data-ln-mins],[data-ln-weeks],[data-ln-forget],[data-ln-oadd],[data-ln-any],[data-ln-goq],[data-ln-mkarea],[data-ln-to],[data-ln-x],[data-ln-out],[data-ln-sx]');
   if (!t) return;
   const d = t.dataset, cardId = (t.closest('[data-id]') || {}).dataset;
   try {
@@ -486,8 +609,15 @@ document.addEventListener('click', async e => {
     else if (d.ln === 'pagain') { P.again = !P.again; draw(); }
     else if (d.ln === 'pkeep' || d.ln === 'pdrop') { await put('plan', { [d.ln === 'pkeep' ? 'keep' : 'drop']: true }); P.again = false; refresh(); }
     else if (d.ln === 'pclear') { if (!confirm('Remove the plan?')) return; await put('plan', { clear: true }); P.editing = false; refresh(); }
-    else if (d.lnTick) { const [w, j] = d.lnTick.split(':').map(Number); t.disabled = true; await put('plan', { tick: [w, j], done: t.getAttribute('aria-pressed') !== 'true', draft: !!d.draft }); refresh(); }
-    else if (d.lnPadd) { const [w, j] = d.lnPadd.split(':').map(Number); t.disabled = true; t.textContent = 'Adding…'; await put('plan', { add: [w, j], draft: !!d.draft }); refresh(); L.load(); }
+    else if (d.lnTick) { t.disabled = true; await put('plan', { tick: d.lnTick, done: t.getAttribute('aria-pressed') !== 'true', draft: !!d.draft }); refresh(); }
+    else if (d.lnPadd) { t.disabled = true; t.textContent = 'Adding…'; await put('plan', { add: d.lnPadd, draft: !!d.draft }); refresh(); L.load(); }
+    else if (d.lnSx) {
+      const sid = d.lnSx, draft = !!d.draft, aid = P.id; t.closest('[data-drow]').classList.add('lngone');
+      await put('plan', { remove: sid, draft }); refresh();
+      undoable('Taken out', async () => { await api('/api/areas/' + enc(aid) + '/plan', { method: 'PUT', body: JSON.stringify({ restore: sid, draft }) }); if (P.id === aid) refresh(); });
+    }
+    else if (d.lnX) { if (!$('#pop').hidden && $('#pop').dataset.lnref === d.lnX && $('#pop .lnoutm')) $('#pop').hidden = true; else outMenu(t, d.lnX); }
+    else if (d.lnOut) await takeOut($('#pop').dataset.lnref, d.lnOut === '1');
     else if (d.lnAny) { if (onAskHome()) { H.anywhere = d.lnAny === '1'; drawAsk(); } else { P.anywhere = d.lnAny === '1'; draw(); } }
     else if (d.lnForget) {
       if (onAskHome()) { await api('/api/learn/ask/' + enc(d.lnForget), { method: 'DELETE' }); refreshAsk(); }

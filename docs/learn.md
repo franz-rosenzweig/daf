@@ -26,6 +26,12 @@ The top of an area's page is a band in its colour with the name, the goal, and h
 
 The helper is the model I picked in Preferences → AI, and an answer, a plan or a layout takes a minute or so. Nothing private goes to it.
 
+## Moving things around, and taking them out
+
+Anything in an area can be moved by its handle, the six dots at its left: I hold it and drag it where I want it, with a finger on the tablet or the phone, or with the mouse. That works for the things in Everything and in Up next, for the Overview's sections, for the plan's steps (from one week to another too), and for the areas themselves on Areas while Edit is on. With a mouse the handles only show when I'm over a row.
+
+The × beside a thing takes it out of the area, right there. It asks once: **Take out**, or **Not a good source**, which takes it out and also tells the helper never to suggest it again. Either way the toast at the bottom has **Undo**, which puts it back where it was. A plan's steps have an × too, with the same Undo.
+
 ## Getting things in
 
 There are a few ways:

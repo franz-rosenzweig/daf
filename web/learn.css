@@ -212,3 +212,22 @@ button.lntick::after{content:"";position:absolute;inset:-9px}
 .lnnewarea .lnrt b,.lnnewarea .lnrt i{white-space:normal}
 .lnpickb{width:100%;min-height:48px;border:0;background:none;padding:0 4px;font:inherit;font-size:15px;color:var(--fg);text-align:left;cursor:pointer;border-radius:10px}
 .lnpickb:hover{background:var(--active)}
+
+/* moving things by hand, and taking them out */
+.lngrip{width:30px;min-height:40px;flex:none;align-self:stretch;border:0;padding:0;background:none;color:var(--fg-3);cursor:grab;touch-action:none;display:inline-flex;align-items:center;justify-content:center;margin-left:-6px}
+.lnrx{width:36px;height:36px;flex:none;border:0;border-radius:50%;padding:0;background:none;color:var(--fg-3);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.lnrx:hover{background:var(--active);color:var(--fg)}
+.l2-hover [data-drow]:not(:hover):not(:focus-within)>.lngrip,.l2-hover [data-drow]:not(:hover):not(:focus-within)>.lnrx,
+.l2-hover .lnsec:not(:hover) .cardh>.lngrip{opacity:0}
+.lnsec .cardh>.lngrip{min-height:32px;margin-right:-4px}
+.lnstep{gap:6px;padding:4px 4px 4px 10px}
+.lnstepm{flex:1;min-width:0;display:flex;gap:10px;align-items:center;color:var(--fg);text-decoration:none;min-height:40px}
+.lnpstep .lngrip{min-height:36px;width:26px;margin-left:-8px}
+.lnwsteps{display:flex;flex-direction:column;min-height:20px}
+.lncgrip{position:absolute;left:10px;top:44px}
+.lncgrip .lngrip{color:#fff;background:rgba(0,0,0,.35);border-radius:50%;width:34px;min-height:34px;height:34px;margin:0}
+.lndrag{opacity:.3}
+.lngone{opacity:.3;pointer-events:none;transition:opacity .15s}
+.lnghost{position:fixed!important;z-index:1000;margin:0!important;pointer-events:none;box-sizing:border-box;background:var(--l2-card,var(--bg));border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.28);opacity:.96;transform:scale(1.02)}
+body.lndragging,body.lndragging *{user-select:none;-webkit-user-select:none;cursor:grabbing!important}
+.lnoutm{min-width:200px}

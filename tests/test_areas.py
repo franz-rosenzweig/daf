@@ -122,6 +122,20 @@ class Areas(unittest.TestCase):
         self.assertEqual(areas.areas_of(self.c, ["doc:kk:2"]), [])
         self.assertEqual(areas.areas_of(self.c, []), [])
 
+    def test_not_a_good_source_is_set_aside_for_the_helper(self):
+        for ref in ("doc:kk:1", "feed:feed/1", "want:Bad Book|X"):
+            areas.add(self.c, self.a, ref)
+        self.assertIsNone(areas.remove(self.c, self.a, "doc:kk:1"))                  # just taken out
+        sids = [areas.remove(self.c, self.a, r, bad=True) for r in ("feed:feed/1", "want:Bad Book|X")]
+        self.assertEqual(areas.page(self.c, self.a)["items"], [])
+        rows = self.c.execute("SELECT kind, title, url, state FROM area_suggest ORDER BY rowid").fetchall()
+        self.assertEqual([tuple(r) for r in rows], [("feed", "A Blog", "https://example.org/rss", "skipped"), ("book", "Bad Book", "", "skipped")])
+        seen = {}
+        areas.suggest_now(self.c, self.a, ask=lambda n, g, have, skipped: seen.setdefault("skipped", skipped) and [])
+        self.assertEqual(seen["skipped"], ["A Blog", "Bad Book"])                   # told to the model, never suggested again
+        areas.unskip(self.c, sids[1])                                                 # Undo
+        self.assertEqual(self.c.execute("SELECT COUNT(*) FROM area_suggest").fetchone()[0], 1)
+
     def test_update(self):
         areas.update(self.c, self.a, {"name": "Birds", "color": "#4b3a78", "suggest": True})
         a = areas.list_areas(self.c)[0]
@@ -270,12 +284,13 @@ class Agent(unittest.TestCase):
         self.assertEqual([s["kind"] for s in d["weeks"][1]["steps"]], ["do", "article"])
         self.assertTrue(d["weeks"][1]["steps"][1]["add"])
         # kept, ticked off, and its outside thing added to the area
+        ids = [[st["id"] for st in w["steps"]] for w in d["weeks"]]
         areaagent.plan_change(self.c, self.a, {"keep": True})
-        areaagent.plan_change(self.c, self.a, {"tick": [0, 0], "done": True})
+        areaagent.plan_change(self.c, self.a, {"tick": ids[0][0], "done": True})
         self.c.execute("INSERT INTO docs (id, kind, where_, status, title, url) VALUES ('kk:9', 'article', 'library', 'inbox', 'Feeders', 'https://example.org/f')")
         from unittest import mock
         with mock.patch.object(areas, "_save_link", lambda c, u, t=None: "kk:9"):
-            areaagent.plan_change(self.c, self.a, {"add": [1, 1]})
+            areaagent.plan_change(self.c, self.a, {"add": ids[1][1]})
         self.c.execute("UPDATE docs SET status = 'archive' WHERE id = 'kk:2'")       # the video watched: its step is done
         p = areas.page(self.c, self.a)
         plan = areaagent.extra(self.c, self.a, p)["plan"]
@@ -284,7 +299,17 @@ class Agent(unittest.TestCase):
         self.assertEqual(plan["weeks"][1]["steps"][1]["go"], "read/kk%3A9")
         self.assertIn("doc:kk:9", [x["ref"] for x in p["items"]])
         with self.assertRaises(ValueError):
-            areaagent.plan_change(self.c, self.a, {"tick": [5, 0], "done": True})
+            areaagent.plan_change(self.c, self.a, {"tick": "nope", "done": True})
+        # moved (the "do" step into week 1, first), taken out and put back
+        areaagent.plan_change(self.c, self.a, {"order": {"0": [ids[1][0], ids[0][1], ids[0][0]]}})
+        view = lambda: areaagent.extra(self.c, self.a, areas.page(self.c, self.a))["plan"]
+        self.assertEqual([[s["title"] for s in w["steps"]] for w in view()["weeks"]],
+                         [["Sit outside at dawn", "A Talk", "A Field Guide"], ["Feeders"]])
+        areaagent.plan_change(self.c, self.a, {"remove": ids[0][1]})
+        self.assertEqual([s["title"] for s in view()["weeks"][0]["steps"]], ["Sit outside at dawn", "A Field Guide"])
+        areaagent.plan_change(self.c, self.a, {"order": {"0": [ids[0][0], ids[1][0]]}})          # (a step taken out keeps its place behind)
+        areaagent.plan_change(self.c, self.a, {"restore": ids[0][1]})
+        self.assertEqual([s["title"] for s in view()["weeks"][0]["steps"]], ["A Field Guide", "Sit outside at dawn", "A Talk"])
 
     def test_a_layout_of_known_sections_only(self):
         said = {"sections": [{"kind": "continue", "title": "Go on"}, {"kind": "plan"}, {"kind": "widget"},
