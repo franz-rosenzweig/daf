@@ -15,6 +15,8 @@ html[data-look="2"]:root{
   --l2-well:rgba(0,0,0,.07); --l2-chip:#ffffff; --l2-tab:#ffffff; --l2-track:#cfcfd6;
   --l2-sheet:0 1px 2px rgba(0,0,0,.05),0 18px 50px rgba(60,50,30,.10);
   --l2-lift:0 1px 2px rgba(0,0,0,.04),0 10px 28px rgba(60,50,30,.07);
+  --l2-page:#f3f2ef; --l2-card2:#ffffff; --l2-edge:rgba(60,50,30,.09);
+  --l2-lift2:0 1px 1px rgba(60,50,30,.06),0 6px 16px -6px rgba(60,50,30,.18); --l2-lift3:0 2px 4px rgba(60,50,30,.08),0 16px 34px -10px rgba(60,50,30,.26);
   --ok:#2f8a57; --bad:#b8392b; --hl:#fbeba8; --hl-2:#efd25c; --speak:#e6ecf7; --speak-line:#bccbe8;
   --hl-yellow:#fdf0c0; --hl-green:#dcf1d5; --hl-blue:#d9e8fc; --hl-pink:#fbdee9; --hl-purple:#ebe1f9;
   --hl-yellow-line:#efc83a; --hl-green-line:#72c46c; --hl-blue-line:#6ea7ee; --hl-pink-line:#ec84aa; --hl-purple-line:#ab8ae2;
@@ -32,6 +34,8 @@ html[data-look="2"][data-mode="dark"]:root{
   --l2-well:rgba(255,255,255,.07); --l2-chip:#2a2b30; --l2-tab:#4b4d55; --l2-track:#3d4047;
   --l2-sheet:0 1px 2px rgba(0,0,0,.4),0 18px 50px rgba(0,0,0,.45);
   --l2-lift:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.3);
+  --l2-page:#1a1b1e; --l2-card2:#303136; --l2-edge:rgba(255,255,255,.07);
+  --l2-lift2:inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.4),0 10px 24px -8px rgba(0,0,0,.6); --l2-lift3:inset 0 1px 0 rgba(255,255,255,.08),0 2px 4px rgba(0,0,0,.45),0 18px 36px -10px rgba(0,0,0,.7);
   color-scheme:dark;
 }
 
@@ -450,3 +454,13 @@ html[data-look="2"] .rv.ebook .btitle-top,html[data-look="2"] .rv .rtitle{flex:1
 html[data-look="2"] .rv.ebook .btitle-top{display:block}
 @media (max-width:700px){ html[data-look="2"] .rv.ebook .btitle-top{display:none} }
 html[data-look="2"] .rv.ebook .bookfoot{color:var(--fg-3)}
+
+/* ---------- the web's clear layers (Nathan's pick, B, 2026-11-11) ----------
+   In a browser (the top navigation, not the Android app) the page steps back a shade toward the backdrop and
+   the cards step forward, brighter, with crisp edges; a card a pointer is over lifts a little. The page's own
+   colour (--bg) is the stepped-back one everywhere inside the frame, so its bars and fades match; reading
+   views keep their paper. */
+html[data-look="2"].l2-top:not(.shell-android):not(.reading) .app{--bg:var(--l2-page)}
+html[data-look="2"].l2-top:not(.shell-android):not(.reading) :is(.card,.hcard,.tcard,.notice){background:var(--l2-card2);border:1px solid var(--l2-edge);box-shadow:var(--l2-lift2)}
+html[data-look="2"].l2-top.l2-hover:not(.shell-android):not(.reading) :is(.hcard,.tcard){transition:transform .18s ease,box-shadow .18s ease}
+html[data-look="2"].l2-top.l2-hover:not(.shell-android):not(.reading) :is(.hcard,.tcard):hover{transform:translateY(-2px);box-shadow:var(--l2-lift3)}
