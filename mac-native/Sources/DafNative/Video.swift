@@ -321,7 +321,7 @@ struct VideoArticle: View {
                 followToggle(v)
                 Text(VideoPlayer.clock(v.time)).monospacedDigit().foregroundStyle(.secondary)
                 Spacer()
-                Link("Watch on Invidious", destination: URL(string: "https://yt.tiresia.xyz/watch?v=" + v.ytID)!).font(.callout)
+                Link("Watch in Materialious", destination: URL(string: "https://tube.tiresia.xyz/watch/" + v.ytID)!).font(.callout)
             }
             .controlSize(.small)
             .padding(.horizontal, 16).padding(.vertical, 8)
