@@ -256,7 +256,7 @@ const H = { data: null, poll: 0, anywhere: false, off: null };
 const onAskHome = () => S.route[0] === 'learn' && S.route[1] === 'ask';
 async function askHome(){
   if (!H.off) H.off = new Set(C.lsGet ? C.lsGet('lnoffall', []) : []);
-  $('#main').innerHTML = '<div class="top"><h1 class="lnhide">Ask</h1><span class="spacer"></span></div><div class="page lnhome lnaskhome">' + homeTabs('ask') + '<div class="lnhomebody"></div></div>';
+  $('#main').innerHTML = '<div class="page lnhome lnaskhome"><h1 class="lnhide">Ask</h1>' + homeTabs('ask') + '<div class="lnhomebody"></div></div>';
   if (H.data) drawAsk();
   if (!L.areas) L.load();
   await refreshAsk();
