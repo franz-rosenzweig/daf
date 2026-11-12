@@ -12,11 +12,17 @@ Areas is a card for each subject, in the area's own colour with a few of its cov
 
 ## An area's page
 
-The top of an area's page is a panel in its colour with the goal, how many things I've finished out of how many there are, and **Continue**, which opens the next thing I haven't finished. Under it is **Up next**, the next five in order.
+The top of an area's page is a band in its colour with the name, the goal, and how many things I've finished out of how many there are. Under it are the area's four pages: **Overview**, **Everything**, **Plan** and **Ask**.
 
-Then comes the list of everything in it, with chips for books, articles, videos and the highlights I've made in them. Each one says where I am: New, a percent, or Done. A book the helper suggested that I don't have yet says Wanted, and **Find** opens Add a book with its title. **Edit** lets me move things up and down and take them out, and **Details** changes the name, the goal, the colour and the suggestions.
+**Overview** is the area at a glance, in sections: this week of my plan, the thing to continue, what's next in order, my highlights, the questions I've asked, the feeds and the suggestions. Each one only shows when it has something in it. **Rearrange** asks the helper to lay the page out for the subject, and I can tell it what for ("for running my first game", say). It picks the sections, names them, groups my highlights by topic, and can gather a few of my things under a heading of their own, like the videos to watch before a session zero. The new layout shows with **Keep** and **Undo** at the top, and nothing changes until I keep it. **Edit** lets me move sections up and down, take them out and add others, and **Plain** goes back to the page as it was.
 
-Beside the list are the area's **Feeds**, with how many posts are new in each, and **Follow** to add a site or a feed.
+**Everything** is the list of everything in the area, with chips for books, articles, videos and the highlights I've made in them. Each one says where I am: New, a percent, or Done. A book the helper suggested that I don't have yet says Wanted, and **Find** opens Add a book with its title. Beside the list are the area's **Feeds**, with how many posts are new in each, and **Follow** to add a site or a feed, and the helper's suggestions. **Edit** lets me move things up and down and take them out, and **Details** changes the name, the goal, the colour and the suggestions.
+
+**Plan** makes me a study plan. I pick how long a day (20 minutes up to an hour) and how many weeks, and the helper builds the weeks out of my own things in an order that builds, splitting a long book into chapters, with minutes for each step. Where the subject needs something I don't have, it adds a step from outside with **Add**, and where it's learned by doing, a step to go and do it. I see the plan first and choose **Keep**, **Again** or **Not now**. Once it's kept I tick steps off as I go, and a step ticks itself when I finish the thing it points to. This week of the plan shows on the Overview.
+
+**Ask** is where I ask the helper about the subject. With **My sources** it answers from what's in the area: my highlights and notes in its books, the articles' text and the videos' transcripts. Under every paragraph it says where that came from, and a tap opens it right there: the highlight, the paragraph in the article, or the moment in the video. With **Anywhere** it can go beyond my things too, and it offers a few books, articles or videos worth adding, each with **Add**. The Sources list lets me leave some of the area's things out of the answer. Each question stays on the page, and the × forgets it.
+
+The helper is the model I picked in Preferences → AI, and an answer, a plan or a layout takes a minute or so. Nothing private goes to it.
 
 ## Getting things in
 

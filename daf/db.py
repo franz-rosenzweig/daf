@@ -332,6 +332,9 @@ CREATE TABLE IF NOT EXISTS area_items (     -- what's in an area, in the order t
 CREATE TABLE IF NOT EXISTS area_suggest (   -- the helper's suggestions for an area: new until added or set aside
   id TEXT PRIMARY KEY, area_id TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, by TEXT, url TEXT,
   state TEXT NOT NULL DEFAULT 'new', made INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS area_chat (      -- what's been asked in an area (areaagent.py): the answer is JSON, paragraphs with where each came from
+  id TEXT PRIMARY KEY, area_id TEXT NOT NULL, q TEXT NOT NULL, anywhere INTEGER NOT NULL DEFAULT 0, refs TEXT, a TEXT,
+  state TEXT NOT NULL DEFAULT 'asking', made INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS editions (        -- the Edition, one a day (edition.py): the pieces chosen, in order, with why
   day TEXT PRIMARY KEY, made INTEGER NOT NULL, items TEXT NOT NULL, how TEXT, kindle TEXT);
 CREATE TABLE IF NOT EXISTS edition_votes (   -- thumbs on an Edition's pieces: +1 / -1, with what the piece was, for the taste
@@ -371,7 +374,8 @@ def connect():
     return conn
 
 
-MIGRATIONS = [("feeds", "show", "TEXT"), ("books", "hc_id", "INTEGER"), ("docs", "duration", "INTEGER"), ("audio_bookmarks", "transcribed", "INTEGER"), ("highlights", "color", "TEXT"), ("review_state", "tags", "TEXT"), ("review_state", "fav", "INTEGER"),
+MIGRATIONS = [("areas", "plan", "TEXT"), ("areas", "plan_draft", "TEXT"), ("areas", "layout", "TEXT"), ("areas", "layout_draft", "TEXT"),   # areaagent.py
+              ("feeds", "show", "TEXT"), ("books", "hc_id", "INTEGER"), ("docs", "duration", "INTEGER"), ("audio_bookmarks", "transcribed", "INTEGER"), ("highlights", "color", "TEXT"), ("review_state", "tags", "TEXT"), ("review_state", "fav", "INTEGER"),
               ("docs", "tags", "TEXT"), ("docs", "ai_summary", "TEXT"),
               ("docs", "starred", "INTEGER"), ("sessions", "pages", "INTEGER"),
               ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("shelves", "kindle", "TEXT"), ("docs", "full", "INTEGER"),
