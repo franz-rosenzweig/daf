@@ -380,7 +380,7 @@ function frameOf(b, W, strokes){
 // around it and the lines stay as they are, and the panel's edge stops at the page's width, so the
 // lines never change size as it's dragged. A phone's page is its whole width.
 // (with a mouse the page is narrower, so the Notebook can be pushed further to the side: the pen is the tablet's)
-function paperW(){ return Math.round(clamp(Math.max(S.fullW || innerWidth, S.fullH || innerHeight) * (matchMedia('(pointer: fine)').matches ? 0.27 : 0.4), 300, 720)); }
+function paperW(){ return Math.round(clamp(Math.max(S.fullW || innerWidth, S.fullH || innerHeight) * (matchMedia('(pointer: coarse)').matches ? 0.4 : 0.27), 300, 720)); }
 function pageW(room){
   const w = S.fullW || innerWidth, h = S.fullH || innerHeight;
   if (Math.min(w, h) < 600) return room;                 // a phone: all of its width
