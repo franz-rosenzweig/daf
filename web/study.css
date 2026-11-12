@@ -35,3 +35,8 @@ html.sbsopen .player{right:calc(12px + var(--skr,0px))}
 
 /* the right half itself: just the reader */
 html.pane .side,html.pane .player{display:none !important}
+/* the window's reader in the left half: laid out as on a narrower screen (no contents column) */
+html.sbsopen .rvgrid,html.sbsopen .rvgrid.notoc,html.sbsopen .rvgrid.withpanel,html.sbsopen .rvgrid.notoc.withpanel{grid-template-columns:minmax(0,1fr)}
+html.sbsopen .rvgrid .toc{display:none}
+html.sbsopen .rvgrid > .docwrap{grid-column:1}
+html.sbsopen .rvgrid.withpanel .rpanel{display:block;position:fixed;right:var(--skr,0px);top:0;bottom:0;width:min(360px,92vw);z-index:35;max-height:none;box-shadow:var(--shadow)}
