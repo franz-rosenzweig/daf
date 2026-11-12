@@ -26,8 +26,9 @@ const ICON = {
   focus: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
 // The room the book has: the window, less the Sketchbook beside it or under it (sketchbook.js).
-// what's left for the page: less the Notebook (or Side by side) on the right, and the margin (study.js)
-const room = () => { const r = C.Sketch ? C.Sketch.room() : { w: window.innerWidth, h: window.innerHeight }; if (C.Margin && C.Margin.active()) r.w -= 320; return r; };
+// what's left for the page: less the Notebook (or Side by side) on the right (the margin, study.js, only
+// makes it one page at a time: applyBookType)
+const room = () => C.Sketch ? C.Sketch.room() : { w: window.innerWidth, h: window.innerHeight };
 const fmtMins = m => { m = Math.max(0, Math.round(m || 0)); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; };
 const xpIndex = xp => { const m = /DocFragment\[(\d+)\]/.exec(xp || ''); return m ? +m[1] - 1 : null; };
 
