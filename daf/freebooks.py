@@ -69,6 +69,8 @@ def search_pg(q, n=15):
         if not m:
             continue
         num = m.group(1)
+        if re.match(r"(?i)index of the project gutenberg works", e.findtext(ATOM + "title") or ""):
+            continue                                   # Gutenberg's list of an author's books, not a book
         out.append({"source": "pg", "id": num, "title": _text(e.findtext(ATOM + "title")), "author": _text(e.findtext(ATOM + "content")),
                     "cover": f"{PG}/cache/epub/{num}/pg{num}.cover.medium.jpg"})
         if len(out) >= n:
