@@ -7,7 +7,8 @@ Calibre does it, and metadata.opf beside each book is written again.
 One change at a time (a lock): Calibre-Web Automated's imports go through Calibre too, and SQLite
 waits for whichever is first.
 
-    DAF_CALIBRE_RUN   how to reach Calibre (default: docker exec -i -u abc calibre-web-automated)
+    DAF_CALIBRE_RUN   how to reach Calibre (default: docker exec -i -u abc -e CALIBRE_CONFIG_DIRECTORY=/config/.daf-calibre
+                      calibre-web-automated: Daf's own Calibre settings and plugins, apart from the container's)
     DAF_CALIBRE_LIB   the library's path as Calibre sees it (default: /calibre-library)
 """
 import base64
@@ -23,7 +24,7 @@ import uuid
 from . import config
 
 log = logging.getLogger("daf.calibrewrite")
-RUN = shlex.split(os.environ.get("DAF_CALIBRE_RUN", "docker exec -i -u abc calibre-web-automated"))
+RUN = shlex.split(os.environ.get("DAF_CALIBRE_RUN", "docker exec -i -u abc -e CALIBRE_CONFIG_DIRECTORY=/config/.daf-calibre calibre-web-automated"))
 LIB = os.environ.get("DAF_CALIBRE_LIB", "/calibre-library")
 DEBUG = "/app/calibre/calibre-debug"
 _lock = threading.Lock()

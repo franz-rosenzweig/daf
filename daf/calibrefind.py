@@ -1,8 +1,10 @@
 """Find details: a Calibre book's details and covers as others have them, for the Edit sheet to
 compare and take from. Two places are asked at once:
 
-- Calibre's own metadata sources (Google, Amazon.com, Edelweiss, Open Library…), run by Calibre in
-  Calibre-Web Automated's container the same way calibrewrite.py runs changes, only reading.
+- Calibre's own metadata sources (Google, Amazon.com, and the plugins installed in Daf's Calibre
+  settings: Goodreads, Goodreads More Tags, Apple Books covers), run by Calibre in Calibre-Web
+  Automated's container the same way calibrewrite.py runs changes, only reading. A source that only
+  has covers (Apple Books) comes back as answers with just a title, an author and a cover.
 - Hardcover, through Daf's own connection (hardcover.py): its matches for the ISBN, then the title.
 
 Each answer comes back in the shape of the Edit sheet's fields. It takes 10–40 seconds, so it's a
@@ -52,6 +54,22 @@ def main():
                         "tags": list(r.tags or []), "comments": r.comments or "", "identifiers": dict(r.identifiers or {}),
                         "languages": list(r.languages or []), "series": r.series, "series_index": r.series_index if r.series else None,
                         "rating": r.rating or None, "cover": cover})
+        if job.get("covers"):
+            for p in metadata_plugins(["cover"]):
+                # Apple Books covers: its search gives the covers' addresses (its download_cover fetches the images themselves)
+                if "identify" in p.capabilities or not hasattr(p, "_find_covers"):
+                    continue
+                try:
+                    found = p._find_covers(log, job.get("title"), tuple(job.get("authors") or ()), job.get("cover_ids") or {})
+                except Exception:
+                    found = []
+                for c in list(found)[:3]:
+                    u = getattr(c, "artwork_url", None)
+                    if u:
+                        out.append({"source": p.name.replace(" covers", ""), "title": getattr(c, "title", ""), "authors": [getattr(c, "author", "")],
+                                    "publisher": None, "published": None, "tags": [], "comments": "", "identifiers": {}, "languages": [],
+                                    "series": None, "series_index": None, "rating": None, "cover": u,
+                                    "thumb": u.rsplit("/", 1)[0] + "/600x600bb.jpg" if u.endswith("bb.jpg") else u})
     except Exception as e:
         print("DAFRESULT " + json.dumps({"ok": False, "error": str(e)}))
         return
@@ -68,8 +86,10 @@ def _text(h):
     return re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]+", " ", t)).strip()
 
 
-def calibre_sources(title, authors, identifiers, timeout=25, plugins=None):
-    job = json.dumps({"title": title, "authors": authors, "identifiers": identifiers, "timeout": timeout, "plugins": plugins})
+def calibre_sources(title, authors, identifiers, timeout=25, plugins=None, covers=None):
+    """covers: the identifiers to ask cover-only sources with as well (None: not asked)."""
+    job = json.dumps({"title": title, "authors": authors, "identifiers": identifiers, "timeout": timeout, "plugins": plugins,
+                      "covers": covers is not None, "cover_ids": covers or {}})
     try:
         r = subprocess.run(RUN + [W.DEBUG, "-c", IDENTIFY], input=job, capture_output=True, text=True, timeout=timeout + 60)
     except (subprocess.TimeoutExpired, OSError) as e:
@@ -117,7 +137,7 @@ def find(conn_factory, cid, book_id, title, authors, identifiers, q=None):
         # By the book's identifiers, and by its title and author alone: an ISBN in Calibre can be
         # wrong (a study guide's), and then only the title finds the book itself.
         try:
-            res["calibre_ids" if by_ids else "calibre"] = calibre_sources(title, authors, ids if by_ids else {})
+            res["calibre_ids" if by_ids else "calibre"] = calibre_sources(title, authors, ids if by_ids else {}, covers=None if by_ids else ids)
         except Exception as e:  # noqa: BLE001
             if not by_ids:
                 errs.append(f"Calibre's sources: {e}")
@@ -137,7 +157,7 @@ def find(conn_factory, cid, book_id, title, authors, identifiers, q=None):
         t.join()
     out, seen = [], set()
     for x in (res.get("hardcover") or []) + (res.get("calibre_ids") or []) + (res.get("calibre") or []):
-        key = (x["identifiers"].get("isbn") or x["identifiers"].get("google") or x["identifiers"].get("amazon") or "") + "|" + (x["title"] or "").lower()
+        key = (x["identifiers"].get("isbn") or x["identifiers"].get("google") or x["identifiers"].get("amazon") or x.get("thumb") or "") + "|" + (x["title"] or "").lower()
         if key in seen:
             continue
         seen.add(key)
@@ -161,7 +181,7 @@ def start(conn_factory, cid, book_id, title, authors, identifiers, q=None):
 
 # ---------- Find details for many books: what's missing, from an answer that's surely the same book ----------
 FILL_FIELDS = ["publisher", "published", "comments", "tags", "series", "languages", "identifiers", "#pages", "cover"]
-QUICK = ["Google", "Open Library", "Edelweiss"]            # Amazon opens a browser for each book: too slow for many
+QUICK = ["Google", "Goodreads", "Goodreads More Tags"]     # Amazon opens a browser for each book: too slow for many
 _hc_gate = threading.Lock()
 _hc_last = [0.0]
 
