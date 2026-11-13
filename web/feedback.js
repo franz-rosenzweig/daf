@@ -20,10 +20,7 @@ function open(text){
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false;
   const ctx = context();
   m.innerHTML = '<h2>Send feedback</h2>' +
-    '<textarea class="field" id="fbtext" rows="6" placeholder="Something broken, something missing, something you’d like different…">' + esc(text || '') + '</textarea>' +
-    '<details class="steps"><summary class="mute tiny">What goes with it</summary><span class="mute tiny">Where Daf is (' + esc(ctx.route) + '), this device and window, the theme, and ' +
-      (ctx.errors.length ? 'the last ' + ctx.errors.length + ' things that went wrong.' : 'that nothing went wrong lately.') + ' A private title is left out.</span></details>' +
-    '<span class="mute tiny">It becomes an issue on Daf’s private GitHub repo, where the next working session picks it up.</span>' +
+    '<textarea class="field" id="fbtext" rows="6" placeholder="Feedback">' + esc(text || '') + '</textarea>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="fbsend">Send</button></div>';
   const t = $('#fbtext'); t.focus();
   m.onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); $('#fbsend').click(); } };
@@ -33,7 +30,7 @@ function open(text){
     try {
       const r = await api('/api/feedback', { method: 'POST', body: JSON.stringify({ text, ctx }) });
       C.closeModal();
-      toast(r && r.issue ? 'Sent, thank you' : r && r.queued ? 'It goes when you’re back online' : 'Kept; it goes to GitHub on the next sync');
+      toast(r && r.issue ? 'Sent' : 'Queued');
       if ($('#fbcard')) prefs($('#fbcard'));
     } catch(e){ toast(e.message); $('#fbsend').disabled = false; $('#fbsend').textContent = 'Send'; }
   };
@@ -41,7 +38,6 @@ function open(text){
 async function prefs(card){
   const r = await api('/api/feedback');
   card.innerHTML = '<div class="cardh"><h2>Feedback</h2><button class="btn sm" data-fb="open">Send feedback</button></div>' +
-    '<p class="mute" style="margin:0">Also in ⌘K. Each one becomes an issue on Daf’s GitHub repo.</p>' +
     (r.feedback.length ? '<div class="fblist">' + r.feedback.map(f => '<div class="fbrow"><span>' + esc(f.text.split('\n')[0].slice(0, 120)) + '</span><span class="mute tiny">' + ago(f.at) +
       (f.issue ? ' · <a href="' + esc(f.issue) + '" target="_blank" rel="noopener">#' + esc(f.issue.split('/').pop()) + '</a>' : f.error ? ' · waiting for GitHub' : '') + '</span></div>').join('') + '</div>' : '');
 }

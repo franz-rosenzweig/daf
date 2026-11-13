@@ -45,16 +45,15 @@ function draw(){
   const t = t0;
   let h = '';
   h += t.week.length ? '<div class="tweek">' + t.week.map(weekCard).join('') + '</div>'
-    : '<section class="card"><h2>This week’s reading isn’t here yet</h2><p class="mute" style="margin:0">Sefaria didn’t answer. Daf tries again on the next sync.</p></section>';
+    : '<section class="card"><h2>This week’s reading isn’t here yet</h2><p class="mute" style="margin:0">Sefaria didn’t answer</p></section>';
   const divrei = t.divrei || [], listen = t.listen || [];
   h += '<section class="card"><div class="cardh"><h2>Divrei Torah this week</h2>' + (t.folder ? '<a class="tiny" href="#feed/' + encodeURIComponent(t.folder) + '">In the Feed</a>' : '') + '</div>' +
     (divrei.length ? divrei.map(r => postRow(r, t)).join('') : '<p class="mute" style="margin:0">Nothing new this week.</p>') + '</section>';
   if (listen.length) h += '<section class="card"><h2>Listen</h2>' + listen.map(r => postRow(r, t)).join('') + '</section>';
   if (t.essays && t.essays.length) h += '<section class="card"><div class="cardh"><h2>From your vault</h2><span class="mute tiny">' + esc(t.essays[0].series || '') + ' on ' + esc(t.parasha ? t.parasha.name : '') + '</span></div>' +
-    t.essays.map(essayRow).join('') +
-    '<span class="mute tiny">Opens in Daf, so the time counts. Highlights go into the same note.</span></section>';
+    t.essays.map(essayRow).join('') + '</section>';
   if (t.earlier.length) h += '<section class="card"><h2>Earlier weeks</h2>' + t.earlier.map(earlierRow).join('') + '</section>';
-  h += '<p class="mute tiny">Texts from Sefaria (JPS translation). Select a word to define it; select a Hebrew phrase to translate it. Highlights go to Reference/torah in the vault.</p>';
+  h += '<p class="mute tiny">Sefaria · JPS</p>';
   page.innerHTML = h;
 }
 
@@ -85,11 +84,11 @@ C.lookup = async (info, sentence, translate) => {
     const r = await api('/api/lookup?q=' + encodeURIComponent(word));
     pop(info.rect, '<div class="lkw"' + (r.lang === 'he' ? ' lang="he" dir="rtl"' : '') + '>' + esc(word) + '</div><div class="lkbody">' + entriesHTML(r) + '</div>' +
       '<div class="lkfoot"><button class="btn sm" data-lk="ctx">In this sentence</button><span class="mute tiny">' + esc(r.source) + '</span></div>');
-  } catch(e){ pop(info.rect, '<p class="mute">' + esc(e.message) + '</p><div class="lkfoot"><button class="btn sm" data-lk="ctx">Explain it in context</button></div>'); }
+  } catch(e){ pop(info.rect, '<p class="mute">' + esc(e.message) + '</p><div class="lkfoot"><button class="btn sm" data-lk="ctx">In this sentence</button></div>'); }
 };
 async function inContext(){
   const c = ctx; if (!c) return;
-  pop(c.rect, '<div class="lkw"' + (/[֐-׿]/.test(c.word) ? ' lang="he" dir="rtl"' : '') + '>' + esc(c.word) + '</div><p class="mute">Working out what it means here… (about ten seconds)</p>');
+  pop(c.rect, '<div class="lkw"' + (/[֐-׿]/.test(c.word) ? ' lang="he" dir="rtl"' : '') + '>' + esc(c.word) + '</div><p class="mute">Thinking…</p>');
   try {
     const r = await api('/api/lookup/context', { method:'POST', body:JSON.stringify({ word:c.word, sentence:c.sentence }) });
     pop(c.rect, '<div class="lkw"' + (/[֐-׿]/.test(c.word) ? ' lang="he" dir="rtl"' : '') + '>' + esc(c.word) + '</div><div class="lkbody lkctx">' + esc(r.answer).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>') + '</div><div class="lkfoot"><span class="mute tiny">In context</span></div>');

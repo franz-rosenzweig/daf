@@ -151,13 +151,12 @@ function menu(anchor, items){
   p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
   p.style.top = (r.bottom + 8 + 300 < window.innerHeight ? r.bottom + 8 : Math.max(8, r.top - (p.offsetHeight || 280) - 8)) + 'px';
 }
-const autoHint = '<div class="mhint">Hold <span class="kbd">' + (/Mac|iPhone|iPad/.test(navigator.platform) ? '⌥ option' : 'Alt') + '</span> to select text without highlighting it.</div>';
 // A picture has no words to share as an image card or to make a flashcard from.
 H.moreMenu = (anchor, h) => menu(anchor, [
   { a: 'copy', label: H.picture(h.text) ? 'Copy the picture’s address' : 'Copy text', key: 'c' }, ...(H.picture(h.text) ? [] : [{ a: 'ask', label: 'Ask about this' }, { a: 'share', label: 'Share as image' }]),
   { a: 'notebook', label: 'View in notebook' }, { a: 'fav', label: h.fav ? 'Unfavorite' : 'Favorite' }, ...(H.picture(h.text) ? [] : [{ a: 'card', label: 'Make a flashcard' }]), '-',
-  { a: 'auto', label: 'Auto highlight', check: H.auto() }, { html: autoHint }]);
-H.selMenu = anchor => menu(anchor, [{ a: 'share', label: 'Share as image' }, '-', { a: 'auto', label: 'Auto highlight', check: H.auto() }, { html: autoHint }]);
+  { a: 'auto', label: 'Auto highlight', check: H.auto() }]);
+H.selMenu = anchor => menu(anchor, [{ a: 'share', label: 'Share as image' }, '-', { a: 'auto', label: 'Auto highlight', check: H.auto() }]);
 
 // Clicks on the toolbar and its menu. The reader in front (H.active) does what only it can.
 document.addEventListener('click', async e => {
@@ -170,13 +169,13 @@ document.addEventListener('click', async e => {
   try {
     if (a === 'more') { H.moreMenu(b, h); return; }
     if (a === 'selmore') { H.selMenu(b); return; }
-    if (a === 'auto') { H.setAuto(!H.auto()); toast(H.auto() ? 'Auto highlight on: selecting text highlights it' : 'Auto highlight off'); return; }
+    if (a === 'auto') { H.setAuto(!H.auto()); toast(H.auto() ? 'Auto highlight on' : 'Auto highlight off'); return; }
     if (a === 'copy') { const t = h ? (H.picture(h.text) ? H.picture(h.text).src : h.text) : ctx.text; H.hide(); navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast('Copied'), () => toast('Couldn’t copy')); R.deselect && R.deselect(); return; }
     if (a === 'share') { H.hide(); H.share(h || { text: ctx.text }, R.meta ? R.meta() : {}); return; }
     if (a === 'card' && h) { H.hide(); H.cardEditor(h); return; }
     if (a === 'color' && h) { const c = b.dataset.c; store.set('hlColor', c); h.color = c; $$('#selbar .cdot').forEach(x => x.classList.toggle('on', x.dataset.c === c)); const x = $('#selbar .hbx'); if (x) { x.style.setProperty('--c', 'var(--hl-' + c + '-line)'); x.style.setProperty('--f', 'var(--hl-' + c + ')'); } await api('/api/highlights/' + encodeURIComponent(h.id) + '/color', { method: 'PUT', body: JSON.stringify({ color: c }) }); R.changed && R.changed(h, 'color'); return; }
     if (a === 'tag' && h) { const r = $('#selbar').getBoundingClientRect(); H.hide(); H.tagEditor(h, r, () => R.changed && R.changed(h, 'tags')); return; }
-    if (a === 'fav' && h) { h.fav = !h.fav; await api('/api/highlights/' + encodeURIComponent(h.id) + '/fav', { method: 'PUT', body: JSON.stringify({ fav: h.fav }) }); toast(h.fav ? 'Favorited · it comes back in review more often' : 'No longer a favorite'); R.changed && R.changed(h, 'fav'); return; }
+    if (a === 'fav' && h) { h.fav = !h.fav; await api('/api/highlights/' + encodeURIComponent(h.id) + '/fav', { method: 'PUT', body: JSON.stringify({ fav: h.fav }) }); toast(h.fav ? 'Favorited' : 'No longer a favorite'); R.changed && R.changed(h, 'fav'); return; }
     if (R[a]) { await R[a](ctx, b); return; }
   } catch(err){ toast(err.message); }
 }, true);
@@ -191,7 +190,7 @@ H.tagEditor = async (h, rect, done, o) => {
   const draw = () => {
     p.innerHTML = '<div class="tagbox"><div class="tagchips">' + tags.map(t => '<span class="tchip">' + mark + esc(t) + '<button data-tagrm="' + esc(t) + '" aria-label="Remove ' + esc(t) + '">×</button></span>').join('') +
       '<input id="tagin" class="tagin" placeholder="' + (tags.length ? 'Another tag' : 'Add a tag') + '" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
-      '<div class="tagsugg" id="tagsugg"></div><div class="taghint mute tiny">' + esc(o.hint || 'Enter adds a tag · tags go to the vault note as #tags') + '</div></div>';
+      '<div class="tagsugg" id="tagsugg"></div></div>';
     sugg('');
     setTimeout(() => $('#tagin') && $('#tagin').focus(), 10);
   };
@@ -346,8 +345,8 @@ H.cardEditor = async (x, done) => {
     m.innerHTML = '<h2>Flashcard</h2>' +
       (list.length ? '<div class="clist">' + list.map(c => '<div class="citem"><span>' + H.renderFront(c, true) + (c.kind === 'qa' ? ' <span class="mute">→ ' + esc(c.back || '') + '</span>' : '') + '</span><span class="mute tiny">' + (c.due ? 'next ' + c.due : 'new') + '</span><button class="linkbtn tiny" data-cedit="' + c.id + '">Edit</button><button class="linkbtn tiny danger" data-cdel="' + c.id + '">Delete</button></div>').join('') + '</div>' : '') +
       '<div class="seg" role="radiogroup"><button type="button" class="' + (mode === 'cloze' ? 'on' : '') + '" data-cmode="cloze">Fill in the blank</button><button type="button" class="' + (mode === 'qa' ? 'on' : '') + '" data-cmode="qa">Question</button></div>' +
-      (mode === 'cloze' ? '<span class="mute tiny">Tap the words to hide.</span><div class="cwords">' + words.map((w, i) => /\s/.test(w) ? w : '<span class="cw' + (hidden.has(i) ? ' on' : '') + '" data-cw="' + i + '">' + esc(w) + '</span>').join('') + '</div>'
-        : '<label class="mute tiny" for="cq">Question</label><input class="field" id="cq" value="' + esc(q) + '" placeholder="What does it say about…?"><label class="mute tiny" for="ca">Answer</label><textarea class="field" id="ca" rows="3">' + esc(a) + '</textarea>') +
+      (mode === 'cloze' ? '<div class="cwords">' + words.map((w, i) => /\s/.test(w) ? w : '<span class="cw' + (hidden.has(i) ? ' on' : '') + '" data-cw="' + i + '">' + esc(w) + '</span>').join('') + '</div>'
+        : '<label class="mute tiny" for="cq">Question</label><input class="field" id="cq" value="' + esc(q) + '" placeholder="Question"><label class="mute tiny" for="ca">Answer</label><textarea class="field" id="ca" rows="3">' + esc(a) + '</textarea>') +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn sm" id="csuggest">' + IC.ask + ' Suggest a card</button><span class="spacer"></span><button class="btn" data-act="close">Close</button><button class="btn primary" id="csave">' + (editing ? 'Save the card' : 'Add the card') + '</button></div>' +
       '<div id="cstatus" class="tiny mute" role="status"></div>';
   };
@@ -359,14 +358,14 @@ H.cardEditor = async (x, done) => {
     const dl = e.target.closest('[data-cdel]'); if (dl) { await api('/api/cards/' + encodeURIComponent(dl.dataset.cdel), { method: 'DELETE' }); list = list.filter(y => y.id !== dl.dataset.cdel); x.cards = list.length; draw(); done && done(); return; }
     if (e.target.closest('#csuggest')) {
       const st = $('#cstatus'); st.textContent = 'Thinking…'; e.target.closest('#csuggest').disabled = true;
-      try { const r = await api('/api/highlights/' + encodeURIComponent(x.id) + '/cards/suggest', { method: 'POST' }); if (r.cloze) fromCloze(r.cloze); q = r.question || q; a = r.answer || a; draw(); $('#cstatus').textContent = 'A suggestion: hidden words for the blank, and a question. Change anything.'; }
+      try { const r = await api('/api/highlights/' + encodeURIComponent(x.id) + '/cards/suggest', { method: 'POST' }); if (r.cloze) fromCloze(r.cloze); q = r.question || q; a = r.answer || a; draw(); $('#cstatus').textContent = 'Suggested'; }
       catch(err){ st.textContent = err.message; }
       const b = $('#csuggest'); if (b) b.disabled = false; return;
     }
     if (e.target.closest('#csave')) {
       const body = mode === 'cloze' ? { kind: 'cloze', front: clozeText() } : { kind: 'qa', front: $('#cq').value, back: $('#ca').value };
       if (editing) body.id = editing;
-      try { const r = await api('/api/highlights/' + encodeURIComponent(x.id) + '/cards', { method: 'POST', body: JSON.stringify(body) }); list = r.cards; x.cards = list.length; editing = null; hidden = new Set(); q = ''; a = text; draw(); toast('Card saved · it comes up in your daily review'); done && done(); }
+      try { const r = await api('/api/highlights/' + encodeURIComponent(x.id) + '/cards', { method: 'POST', body: JSON.stringify(body) }); list = r.cards; x.cards = list.length; editing = null; hidden = new Set(); q = ''; a = text; draw(); toast('Card saved'); done && done(); }
       catch(err){ $('#cstatus').textContent = err.message; }
     }
   };
@@ -420,7 +419,7 @@ function editNote(x){
   const el = rowEl(x.id); if (!el) return;
   const n = el.querySelector('.hnote.mine'); if (!n || n.querySelector('textarea')) return;
   n.classList.remove('empty');
-  n.innerHTML = '<textarea class="field" rows="2" placeholder="A thought, for the vault note" data-hnote="' + esc(x.id) + '">' + esc(x.user_note || '') + '</textarea>';
+  n.innerHTML = '<textarea class="field" rows="2" placeholder="Note" data-hnote="' + esc(x.id) + '">' + esc(x.user_note || '') + '</textarea>';
   const t = n.querySelector('textarea'); t.focus(); t.setSelectionRange(t.value.length, t.value.length);
 }
 const noteT = {}, noteSaid = {};
@@ -431,7 +430,7 @@ document.addEventListener('input', e => {
   // saved at each pause; said once, when the typing ends
   noteT[x.id] = setTimeout(() => api('/api/highlights/' + encodeURIComponent(x.id) + '/note', { method: 'PUT', body: JSON.stringify({ note: t.value }) }).then(r => {
     changed(x);
-    const msg = t.value.trim() ? (r.vault === 'written' || r.vault === 'unchanged' ? 'Note saved to the vault' : 'Note saved') : 'Note removed';
+    const msg = t.value.trim() ? 'Note saved' : 'Note removed';
     if (document.activeElement === t) noteSaid[x.id] = msg; else toast(msg);
   }).catch(err => toast(err.message)), 800);
 });
@@ -452,7 +451,7 @@ document.addEventListener('click', async e => {
   try {
     if (a === 'note') editNote(x);
     else if (a === 'tag') H.tagEditor(x, b.getBoundingClientRect(), () => redrawRow(x));
-    else if (a === 'fav') { x.fav = !x.fav; await api('/api/highlights/' + encodeURIComponent(x.id) + '/fav', { method: 'PUT', body: JSON.stringify({ fav: x.fav }) }); redrawRow(x); toast(x.fav ? 'Favorited · it comes back in review more often' : 'No longer a favorite'); }
+    else if (a === 'fav') { x.fav = !x.fav; await api('/api/highlights/' + encodeURIComponent(x.id) + '/fav', { method: 'PUT', body: JSON.stringify({ fav: x.fav }) }); redrawRow(x); toast(x.fav ? 'Favorited' : 'No longer a favorite'); }
     else if (a === 'more') {
       H.ctxRow = x; H.ctxRowEl = b.closest('.hrow');
       menu(b, [{ html: '<div class="mdots">' + COLORS.map(c => '<button class="cdot' + ((x.color || 'yellow') === c ? ' on' : '') + '" data-hrc="' + c + '" aria-label="' + c + '" style="--c:var(--hl-' + c + '-line)"></button>').join('') + '</div>' },
@@ -474,7 +473,7 @@ document.addEventListener('click', async e => {
     else if (a === 'rowshare') H.share(x);
     else if (a === 'rowcard') H.cardEditor(x, () => redrawRow(x));
     else if (a === 'rowopen') location.hash = x.open.slice(1);
-    else if (a === 'rownever' || a === 'rowback') { await api('/api/review/' + encodeURIComponent(x.id), { method: 'POST', body: JSON.stringify({ action: a === 'rownever' ? 'never' : 'back' }) }); x.r_status = a === 'rownever' ? 'never' : 'kept'; redrawRow(x); toast(a === 'rownever' ? 'It won’t come up in review again' : 'Back in review'); }
+    else if (a === 'rownever' || a === 'rowback') { await api('/api/review/' + encodeURIComponent(x.id), { method: 'POST', body: JSON.stringify({ action: a === 'rownever' ? 'never' : 'back' }) }); x.r_status = a === 'rownever' ? 'never' : 'kept'; redrawRow(x); toast(a === 'rownever' ? 'Never in review' : 'Back in review'); }
     else if (a === 'rowrm') {
       // In a reader's Notebook, the reader removes it: from the text too, with its own Undo.
       const inReader = H.ctxRowEl && H.ctxRowEl.closest('.rpanel, .sklist') && H.active && H.active.rm;

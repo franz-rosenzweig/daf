@@ -15,7 +15,7 @@ function bookLine(b, extra){
 
 let S0 = null;
 C.views.stats = async () => {
-  $('#main').innerHTML = '<div class="top"><h1>Stats</h1><span class="spacer"></span><span class="mute tiny">Counted minutes, your home time zone</span>' + C.Find.html('stats', 'Search stats', draw) + '</div><div class="page" id="statspage"><span class="mute">Loading…</span></div>';
+  $('#main').innerHTML = '<div class="top"><h1>Stats</h1><span class="spacer"></span>' + C.Find.html('stats', 'Search stats', draw) + '</div><div class="page" id="statspage"><span class="mute">Loading…</span></div>';
   S0 = await C.swr('/api/stats');
   draw();
 };
@@ -40,23 +40,23 @@ function draw(){
   const lead = k.goal > 0 ? [k.goal, 'in a row ' + at, k.any + ' day' + (k.any === 1 ? '' : 's') + ' in a row with some reading'] : [k.any, 'in a row reading', 'None ' + at + ' yet in this streak'];
   h += '<section class="card"><h2>Streak</h2><div class="sbig"><b>' + lead[0] + '</b><span>day' + (lead[0] === 1 ? '' : 's') + ' ' + lead[1] + '</span></div>' +
     '<div class="mute">' + lead[2] + ' · best: ' + k.best_goal + ' ' + at + ', ' + k.best_any + ' reading</div>' +
-    '<div class="dots">' + s.days14.map(d => '<span class="dot2' + (d.minutes >= goal ? ' full' : d.minutes >= 1 ? ' some' : '') + '" title="' + d.date + ': ' + Math.round(d.minutes) + ' min"></span>').join('') + '</div><span class="tiny mute">The last two weeks: full = ' + (goal === 60 ? 'the hour' : 'the goal') + ', ring = some reading</span></section>';
+    '<div class="dots">' + s.days14.map(d => '<span class="dot2' + (d.minutes >= goal ? ' full' : d.minutes >= 1 ? ' some' : '') + '" title="' + d.date + ': ' + Math.round(d.minutes) + ' min"></span>').join('') + '</div><span class="tiny mute">Last two weeks</span></section>';
   h += '<section class="card"><h2>Totals</h2><div class="kv">' +
     '<span>Today</span><b>' + hm(t.today) + '</b><span>Last 7 days</span><b>' + hm(t.week) + '</b><span>Last 30 days</span><b>' + hm(t.month) + ' · ' + Math.round(t.avg30) + ' min a day</b>' +
-    '<span>Year 30 so far</span><b>' + t.year30_hours + ' h · ' + t.year30_days_goal + ' of ' + t.year30_elapsed + ' days ' + at + '</b></div>' +
-    '<p class="sproj">At the last month’s pace, Year 30 ends with about <b>' + t.projection_hours + ' hours</b>. ' + (goal === 60 ? 'An hour every day is ' : 'Your goal every day comes to ') + t.goal_hours + '.</p></section>';
+    '<span>Year 30 so far</span><b>' + t.year30_hours + ' h · ' + t.year30_days_goal + ' of ' + t.year30_elapsed + ' days ' + at + '</b>' +
+    '<span>Year 30 at this pace</span><b>' + t.projection_hours + ' h of ' + t.goal_hours + '</b></div></section>';
   h += '</div>';
-  h += '<div class="sgrid"><section class="card"><h2>When you read</h2><span class="mute tiny">Last 90 days, by the hour you started</span>' +
+  h += '<div class="sgrid"><section class="card"><h2>When you read</h2><span class="mute tiny">Last 90 days</span>' +
     bars(s.hours, s.hours.map((_, i) => i % 3 === 0 ? (i === 0 ? '12a' : i < 12 ? i + 'a' : i === 12 ? '12p' : (i - 12) + 'p') : ''), 'min') +
-    '<span class="mute tiny">Average minutes by day of the week</span>' + bars(s.weekdays, DAYS, 'min a day', new Date().getDay()) + '</section>';
+    '<span class="mute tiny">By day of the week</span>' + bars(s.weekdays, DAYS, 'min a day', new Date().getDay()) + '</section>';
   h += '<section class="card"><h2>Where the minutes came from</h2><span class="mute tiny">Last 90 days</span><div class="kv">' +
     s.sources.map(x => '<span' + (x.counted ? '' : ' class="mute"') + '>' + esc(x.label) + (x.counted ? '' : ' (not counted)') + '</span><b>' + hm(x.minutes) + '</b>').join('') + '</div>' +
     '<span class="mute tiny">Highlights per week, last 12 weeks</span>' + bars(s.highlight_weeks.map(w => w.n), s.highlight_weeks.map((w, i) => i % 2 ? '' : w.week.slice(5).replace('-', '/')), 'highlights', 11) + '</section></div>';
-  if (s.stalled.length) h += '<section class="card"><div class="cardh"><h2>Waiting for you</h2><span class="mute tiny">Started, then left for two weeks or more. One sitting might be all it takes.</span></div><div class="brows">' +
+  if (s.stalled.length) h += '<section class="card"><div class="cardh"><h2>Waiting for you</h2></div><div class="brows">' +
     s.stalled.map(b => bookLine(b, 'last read ' + b.days_ago + ' days ago')).join('') + '</div></section>';
   if (s.in_progress.length) h += '<section class="card"><h2>Reading now</h2><div class="brows">' + s.in_progress.map(b => bookLine(b, b.days_ago ? b.days_ago + ' days ago' : 'today')).join('') + '</div></section>';
   if (s.on_this_day.length) h += '<section class="card"><h2>On this day</h2>' + s.on_this_day.map(onThisDay).join('') + '</section>';
-  if (s.finished.length) h += '<section class="card"><h2>Finished</h2><span class="mute tiny">Read to the end on the Kindle, last two years</span><div class="libgrid">' +
+  if (s.finished.length) h += '<section class="card"><h2>Finished</h2><span class="mute tiny">Last two years</span><div class="libgrid">' +
     s.finished.map(finished).join('') + '</div></section>';
   page.innerHTML = h + (document.documentElement.dataset.look === '2' && C.yearCards ? C.yearCards() : '');     // the new look keeps the week and the years here, not on Today
 }

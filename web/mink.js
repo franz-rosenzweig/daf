@@ -160,7 +160,7 @@ function erased(L){ const a = {}; if (L.erased.length) a.del = L.erased; if (L.a
 function eraseAll(){
   const ns = new Set(pictures().filter(seen).map(numOf)), list = K.strokes.filter(s => ns.has(s.at.pg - 1)); if (!list.length) return;
   take(list); act({ del: list });
-  toast((ns.size > 1 ? 'Everything drawn on these pages is erased.' : 'Everything drawn on this page is erased.') + ' Undo brings it back.');
+  toast('Erased');
 }
 function take(list){ const ids = new Set(list.map(s => s.id)); K.strokes = K.strokes.filter(s => !ids.has(s.id)); list.forEach(s => bump(s.at.pg - 1)); later(); }
 

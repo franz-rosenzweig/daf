@@ -61,7 +61,7 @@ function layoutForAll(){
   PER_SERIES.forEach(k => { d[k] = RD.p[k]; P.defaults[k] = RD.p[k]; });
   delete P.series[sid];
   api('/api/manga/prefs', { method: 'PUT', body: JSON.stringify({ defaults: d, series: { [sid]: { _clear: true } } }) }).catch(() => {});
-  toast('Every series now reads this way, unless it has its own');
+  toast('Set for every series');
   return own;
 }
 
@@ -116,10 +116,9 @@ const curPages = () => { const u = RD.units[RD.k]; return u.pages || (u.t === 'e
 function cardHTML(u){
   const b = RD.book;
   if (u.t === 'start') return '<div class="mcard2"><span class="mute">Before this</span><b>' + esc(b.prev_name || 'The previous volume') + '</b>' +
-    '<button class="mbtn primary" data-mr="prevvol">Read it</button><span class="mute tiny">' + (RD.p.mode === 'rtl' ? 'Swipe right' : RD.p.mode === 'vertical' ? 'Swipe down' : 'Swipe left') + ' for its last page</span></div>';
+    '<button class="mbtn primary" data-mr="prevvol">Read it</button></div>';
   return '<div class="mcard2"><span class="mute">Finished</span><b>' + esc(b.name) + '</b>' +
-    (b.next ? '<span class="mute">Next</span><b>' + esc(b.next_name || 'the next volume') + '</b><button class="mbtn primary" data-mr="nextvol">Keep reading</button>' +
-      '<span class="mute tiny">or keep turning</span>' : '<span class="mute">That’s the last volume in Komga.</span>') +
+    (b.next ? '<span class="mute">Next</span><b>' + esc(b.next_name || 'the next volume') + '</b><button class="mbtn primary" data-mr="nextvol">Keep reading</button>' : '<span class="mute">Last volume</span>') +
     '<button class="mbtn" data-mr="toseries">Back to the series</button></div>';
 }
 function unitHTML(u){
@@ -238,7 +237,7 @@ function preload(){
 function go(d, opts){
   if (!RD || !paged(RD.p.mode) || RD.busy) return;
   const t = RD.k + d;
-  if (t >= RD.units.length) { if (RD.book.next) otherVolume(RD.book.next); else toast('That’s the end of what Komga has'); return; }
+  if (t >= RD.units.length) { if (RD.book.next) otherVolume(RD.book.next); else toast('Last volume'); return; }
   if (t < 0) { if (RD.book.prev) otherVolume(RD.book.prev, true); else toast('The start of ' + RD.book.name); return; }
   if (Math.abs(d) > 1 || !RD.p.animate || (opts && opts.instant)) { RD.k = t; slots(); turned(); return; }
   slide(d, (opts && opts.from) || 0);
@@ -404,21 +403,21 @@ function drawSettings(){
   const tabs = [['reading', 'Reading'], ['controls', 'Controls'], ['display', 'Display'], ['filters', 'Filters']];
   let h = '<div class="mshead"><div class="mtabs" role="tablist">' + tabs.map(x => '<button role="tab" data-mtab="' + x[0] + '" class="' + (t === x[0] ? 'on' : '') + '">' + x[1] + '</button>').join('') + '</div><button class="mic" data-mr="sheetclose" aria-label="Close">×</button></div><div class="msbody">';
   if (t === 'reading') {
-    h += '<p class="mnote">For ' + esc(RD.book.series.name || 'this series') + (PER_SERIES.some(k => k in own) ? '' : ' (as every series reads)') + '. <button class="mlink" data-mr="forall">Use for every series</button></p>' +
+    h += '<p class="mnote">' + esc(RD.book.series.name || 'This series') + ' <button class="mlink" data-mr="forall">Use for every series</button></p>' +
       seg('mode', MODES, 'Reading mode') +
-      (pg && p.mode !== 'vertical' ? seg('layout', LAYOUTS, 'Pages') + tog('shift', 'Shift pairs by one', 'When two pages that belong together don’t land side by side') : '') +
-      (pg && p.mode !== 'vertical' ? tog('split', 'Split wide pages', 'A two-page spread shown as two pages, in reading order, when one page is on screen') : '') +
-      (pg ? seg('scale', SCALES, 'Scale') + tog('stretch', 'Stretch small pages', 'Up to the screen, when a page is smaller') : rng('stripw', 'Strip width on wide screens', 40, 100, 5, '%') + (p.mode === 'gaps' ? rng('gap', 'Gap between pages', 0, 60, 2, 'px') : '')) +
-      tog('crop', 'Crop borders', 'Trims white or black margins off each page');
+      (pg && p.mode !== 'vertical' ? seg('layout', LAYOUTS, 'Pages') + tog('shift', 'Shift pairs by one') : '') +
+      (pg && p.mode !== 'vertical' ? tog('split', 'Split wide pages') : '') +
+      (pg ? seg('scale', SCALES, 'Scale') + tog('stretch', 'Stretch small pages') : rng('stripw', 'Strip width', 40, 100, 5, '%') + (p.mode === 'gaps' ? rng('gap', 'Gap between pages', 0, 60, 2, 'px') : '')) +
+      tog('crop', 'Crop borders');
   } else if (t === 'controls') {
     h += seg('zones', ZONESETS, 'Tap zones') + '<div class="mrow"><span class="mlab"></span><button class="mlink" data-mr="showzones">Show the tap zones</button></div>' +
       seg('invert', INVERTS, 'Invert tap zones') +
-      (pg ? tog('swipe', 'Swipe to turn', 'The page follows your finger') + tog('animate', 'Slide pages', 'Pages slide in when you tap or press a key; off turns them at once') : tog('animate', 'Smooth scrolling', 'Taps and keys glide down a screen')) +
-      tog('dbltap', 'Double tap to zoom', 'Pinch zooms either way') + rng('autospeed', 'Auto scroll: seconds a page (or a screen)', 2, 30, 1, ' s') +
+      (pg ? tog('swipe', 'Swipe to turn') + tog('animate', 'Slide pages') : tog('animate', 'Smooth scrolling')) +
+      tog('dbltap', 'Double tap to zoom') + rng('autospeed', 'Auto scroll', 2, 30, 1, ' s') +
       (window.dafShell ? seg('volkeys', [['on', 'Turn pages'], ['inv', 'Inverted'], ['off', 'Off']], 'Volume keys') : '') +
-      tog('showzones', 'Show the tap zones', 'For a moment, when the mode or zones change');
+      tog('showzones', 'Show the tap zones');
   } else if (t === 'display') {
-    h += seg('bg', BGS, 'Background') + tog('pagenum', 'Page number', 'At the bottom while the bars are hidden') + tog('progress', 'Progress line', 'A thin line along the bottom edge');
+    h += seg('bg', BGS, 'Background') + tog('pagenum', 'Page number') + tog('progress', 'Progress line');
   } else {
     h += rng('brightness', 'Brightness', 30, 130, 5, '%') + rng('contrast', 'Contrast', 50, 150, 5, '%') + rng('saturate', 'Saturation', 0, 200, 10, '%') +
       rng('sepia', 'Sepia', 0, 100, 10, '%') + rng('grayscale', 'Grayscale', 0, 100, 10, '%') + rng('invertc', 'Invert', 0, 100, 100, '%') +
@@ -479,7 +478,7 @@ function autoStart(){
     }
   };
   step();
-  toast('Auto scroll: ' + RD.p.autospeed + ' s ' + (paged(RD.p.mode) ? 'a page' : 'a screen') + '. Tap Stop, or press A');
+  toast('Auto scroll: ' + RD.p.autospeed + ' s ' + (paged(RD.p.mode) ? 'a page' : 'a screen'));
 }
 function autoStop(){ if (!RD || !RD.auto) return; RD.auto = false; clearTimeout(RD.autoT); cancelAnimationFrame(RD.autoT); drawBars(); }
 

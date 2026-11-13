@@ -276,13 +276,12 @@ T.section = box => {
       (which !== 'dark' ? swatch(f.light, false, f.room) : '') + (which !== 'light' ? swatch(f.dark, true, f.room) : '') + '<span class="thn">' + esc(f.name) + '</span></button>';
   };
   const split = box.dataset.split === '1' || a.light !== a.dark;
-  box.innerHTML = '<div class="cardh"><h2>Appearance</h2><span class="mute tiny">Every device follows what you pick here</span></div>' +
-    '<div class="prow"><div class="d"><b>Light or dark</b><span>' + (a.mode === 'system' ? 'Light by day, dark at night, as the device is set' : a.mode === 'light' ? 'Always the light version' : 'Always the dark version') + '</span></div>' + seg + '</div>' +
+  box.innerHTML = '<div class="cardh"><h2>Appearance</h2></div>' +
+    '<div class="prow"><div class="d"><b>Light or dark</b></div>' + seg + '</div>' +
     (split ? '<span class="lbl">For light</span><div class="thgrid">' + FAMILIES.map(f => card(f, 'light')).join('') + '</div><span class="lbl">For dark</span><div class="thgrid">' + FAMILIES.map(f => card(f, 'dark')).join('') + '</div>'
       : '<div class="thgrid">' + FAMILIES.map(f => card(f, 'both')).join('') + '</div>') +
     '<label class="aaline thsplit"><input type="checkbox" data-thsplit' + (split ? ' checked' : '') + '> A different theme for dark</label>' +
-    '<div class="prow thfonts"><div class="d"><b>Your own fonts</b><span>A font file you have (TTF, OTF or WOFF), such as Bookerly from a Kindle. It stays on the server and your devices, ' +
-    'and shows under Typeface in Aa.</span></div><label class="btn sm">Add a font file<input type="file" accept=".ttf,.otf,.woff,.woff2" multiple hidden data-thfont></label></div>' +
+    '<div class="prow thfonts"><div class="d"><b>Your own fonts</b></div><label class="btn sm">Add a font file<input type="file" accept=".ttf,.otf,.woff,.woff2" multiple hidden data-thfont></label></div>' +
     (userFonts.length ? '<div class="thmine">' + userFonts.map(f => '<span class="chip">' + '<span style="font-family:\'' + esc(f.family) + '\';font-weight:' + f.weight + ';font-style:' + f.style + '">' + esc(f.family) + '</span>' +
       ' <span class="mute tiny">' + (f.weight >= 700 ? 'bold ' : f.weight <= 300 ? 'light ' : '') + (f.style === 'italic' ? 'italic' : f.weight >= 700 || f.weight <= 300 ? '' : 'regular') + '</span>' +
       '<button type="button" data-thfontrm="' + esc(f.file) + '" aria-label="Remove">×</button></span>').join('') + '</div>' : '');
@@ -298,7 +297,7 @@ T.section = box => {
     if (e.target.matches('[data-thfont]')) {
       for (const f of e.target.files) {
         try { const r = await fetch('/api/fonts?name=' + encodeURIComponent(f.name), { method: 'POST', credentials: 'same-origin', body: f });
-          const j = await r.json(); if (!r.ok) throw new Error(j.detail || r.statusText); T.setUserFonts(j.fonts); C.toast(j.family + ' added: Aa → Typeface'); }
+          const j = await r.json(); if (!r.ok) throw new Error(j.detail || r.statusText); T.setUserFonts(j.fonts); C.toast(j.family + ' added'); }
         catch(err){ C.toast(f.name + ': ' + err.message); }
       }
       T.section(box); return;

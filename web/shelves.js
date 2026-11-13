@@ -20,7 +20,7 @@ SH.section = async box => {
   try { r = await api('/api/shelves'); } catch(e){ box.innerHTML = '<h2>Shelves</h2><p class="mute">' + esc(e.message) + '</p>'; return; }
   box.innerHTML = '<div class="cardh"><h2>Shelves</h2><span class="spacer"></span><button class="btn sm" data-shelf="new">New shelf</button></div>' +
     (r.shelves.length ? '<div class="shelves">' + r.shelves.map(tile).join('') + '</div>'
-      : '<p class="mute" style="margin:0">Group books your way: a subject, a project, a year. Add a book from its page, or start a shelf here.</p>');
+      : '<p class="mute" style="margin:0">No shelves yet</p>');
 };
 
 async function newShelf(book){
@@ -49,7 +49,7 @@ SH.forBook = async (b, box) => {
         if (!was && kindle.includes(id)) kindle.forEach(k => on.delete(k));      // one Kindle shelf at a time, as on the Kindle
         was ? on.delete(id) : on.add(id); b.shelves = [...on];
         box.querySelectorAll('[data-shelfbook]').forEach(c => { const x = on.has(c.dataset.shelfbook); c.classList.toggle('on', x); c.setAttribute('aria-pressed', x); });
-        toast(was ? 'Off the shelf' : res && res.kindle === 'moves' ? 'It moves there on the Kindle at its next sync' : res && res.kindle === 'sent' ? 'It goes to the Kindle at its next sync' : 'On the shelf');
+        toast(was ? 'Off the shelf' : res && res.kindle === 'moves' ? 'Moving on the Kindle' : res && res.kindle === 'sent' ? 'Sending to the Kindle' : 'On the shelf');
       } catch(err){ toast(err.message); }
       return;
     }
@@ -73,9 +73,8 @@ C.views.shelf = async args => {
     const rows = books.map(b => '<div class="bcell">' + C.bookRow(b, (b.highlights ? '<span class="tiny mute">' + b.highlights + ' highlights</span>' : '')) +
       '<span class="tiny rowacts">' + (b.readable ? '<a class="btn sm primary" href="#ebook/' + encodeURIComponent(b.id) + '">Read</a> ' : '') +
       '<button class="linkbtn" data-shelfout="' + esc(b.id) + '">Take off this shelf</button></span></div>').join('');
-    page.innerHTML = (r.hardcover && !q ? '<p class="mute tiny" style="margin:0 0 10px">This shelf is your Hardcover list. Put a book on or take one off here and it changes there too; private books stay off it.</p>' : '') +
-      (q && !books.length ? C.Find.none() : '<section class="card">' + (books.length ? '<div class="bgrid">' + rows + '</div>'
-      : '<p class="mute" style="margin:0">Nothing here yet. On a book’s page, under Shelves, switch this one on.</p>') + '</section>');
+    page.innerHTML = (q && !books.length ? C.Find.none() : '<section class="card">' + (books.length ? '<div class="bgrid">' + rows + '</div>'
+      : '<p class="mute" style="margin:0">Nothing here yet</p>') + '</section>');
   };
   draw();
   $('#main').onclick = async e => {
@@ -83,7 +82,7 @@ C.views.shelf = async args => {
     try {
       if (a.dataset.shelfout) { await api('/api/shelves/' + encodeURIComponent(id) + '/books/' + encodeURIComponent(a.dataset.shelfout), { method: 'DELETE' }); toast('Off the shelf'); C.views.shelf(args); }
       else if (a.dataset.shelf === 'rename') { const n = prompt('Rename the shelf', r.name); if (n && n.trim()) { await api('/api/shelves/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify({ name: n.trim() }) }); C.views.shelf(args); } }
-      else if (a.dataset.shelf === 'delete') { if (confirm('Delete the shelf “' + r.name + '”? The books stay in your library.')) { await api('/api/shelves/' + encodeURIComponent(id), { method: 'DELETE' }); toast('Shelf deleted'); location.hash = 'books'; } }
+      else if (a.dataset.shelf === 'delete') { if (confirm('Delete the shelf “' + r.name + '”?')) { await api('/api/shelves/' + encodeURIComponent(id), { method: 'DELETE' }); toast('Shelf deleted'); location.hash = 'books'; } }
     } catch(err){ toast(err.message); }
   };
 };

@@ -324,7 +324,7 @@ async function jumpTo(h){
     }
   }
   const k = B.d.kindle;
-  if (h.page && k && k.total) { await B.view.goToFraction(Math.min(1, h.page / k.total)); toast('The exact words aren’t in this edition. This is about where page ' + h.page + ' falls.'); }
+  if (h.page && k && k.total) { await B.view.goToFraction(Math.min(1, h.page / k.total)); toast('About page ' + h.page); }
   else toast('Couldn’t find that passage in this edition');
 }
 function redrawAll(){
@@ -661,7 +661,7 @@ function offerKindle(mine){
   const d = B.d, k = d && d.kindle; if (!k || k.fraction == null) return;
   const here = mine ? (mine.fraction || 0) : 0, newer = !mine || k.at > (mine.updated || mine.at || 0);
   if (!newer || Math.abs(k.fraction - here) < 0.01) return;
-  $('#bnotice').innerHTML = '<div class="bnotice">On the Kindle you’re at page ' + k.page + ' of ' + k.total + ' (' + Math.round(k.fraction * 100) + '%), ' + epochDate(k.at) + '. <button class="btn sm" data-bk="kindle">Go there</button><button class="btn sm" data-bk="nokindle">Stay here</button></div>';
+  $('#bnotice').innerHTML = '<div class="bnotice">Kindle: page ' + k.page + ' of ' + k.total + ' (' + Math.round(k.fraction * 100) + '%) · ' + epochDate(k.at) + ' <button class="btn sm" data-bk="kindle">Go there</button><button class="btn sm" data-bk="nokindle">Stay here</button></div>';
 }
 
 /* ---------- each section as it loads ---------- */
@@ -1020,7 +1020,7 @@ setInterval(() => { if (C.S.route[0] === 'ebook' && B.view && !document.hidden &
 // Go to a page (the printed one, or the screen's) or a percent ("45%"), from the … menu, in the footer.
 function openJump(){
   const f = $('#bfoot'); if (!f) return;
-  f.innerHTML = '<span class="mute">Go to</span><input id="bjump" class="field" inputmode="decimal" placeholder="120 or 45%" autocomplete="off"><span class="spacer"></span><button class="btn sm" data-bk="jumpcancel">Cancel</button>';
+  f.innerHTML = '<span class="mute">Go to</span><input id="bjump" class="field" inputmode="decimal" placeholder="Page or %" autocomplete="off"><span class="spacer"></span><button class="btn sm" data-bk="jumpcancel">Cancel</button>';
   if (PHONE()) { B.chrome = false; document.body.classList.add('bookbare'); }     // the slider would sit over it
   $('#bjump').focus();
 }
@@ -1065,7 +1065,7 @@ async function toggleMark(){
       const cfi = CFI.collapse(l.cfi), excerpt = (() => { try { return l.range.toString().replace(/\s+/g, ' ').trim().slice(0, 140); } catch(e){ return ''; } })();
       const r = await api('/api/ebooks/' + encodeURIComponent(B.d.id) + '/bookmarks', { method: 'POST', body: JSON.stringify({ cfi, fraction: l.fraction, chapter: l.tocItem?.label || null, excerpt }) });
       (B.d.bookmarks = B.d.bookmarks || []).push({ id: r.id, cfi, fraction: l.fraction, chapter: l.tocItem?.label || null, excerpt, created: Date.now() / 1000 });
-      B.d.bookmarks.sort((a, b) => (a.fraction || 0) - (b.fraction || 0)); toast('Bookmarked · in Contents');
+      B.d.bookmarks.sort((a, b) => (a.fraction || 0) - (b.fraction || 0)); toast('Bookmarked');
     }
   } catch(e){ toast(e.message); return; }
   onRelocate({ detail: B.loc }); drawMarks();
@@ -1125,8 +1125,8 @@ function tocHTML(items, depth){
 function drawToc(){
   const t = $('#btoc'); if (!t || !B.view) return;
   const book = B.view.book;
-  t.innerHTML = '<div class="bsearch"><span class="ic">' + ICON.search + '</span><input id="bq" placeholder="Search in the book" autocomplete="off"' + (B.d && B.d.language === 'heb' ? ' dir="auto"' : '') + '></div>' +
-    '<div id="btocl"><div id="bmarks"></div><div class="tochead">Contents</div>' + (book.toc && book.toc.length ? tocHTML(book.toc, 0) : '<p class="mute tiny">This book has no table of contents.</p>') + '</div><div id="bres" hidden></div>';
+  t.innerHTML = '<div class="bsearch"><span class="ic">' + ICON.search + '</span><input id="bq" placeholder="Search" autocomplete="off"' + (B.d && B.d.language === 'heb' ? ' dir="auto"' : '') + '></div>' +
+    '<div id="btocl"><div id="bmarks"></div><div class="tochead">Contents</div>' + (book.toc && book.toc.length ? tocHTML(book.toc, 0) : '<p class="mute tiny">No contents</p>') + '</div><div id="bres" hidden></div>';
   drawMarks();
 }
 async function runSearch(q){
@@ -1211,12 +1211,12 @@ function drawPanel(){
       '<div class="mr"><span>Highlights</span><span>' + n + (n ? ' <button class="linkbtn" data-bk="nblist">See them</button>' : '') + '</span></div>' +
       (d.series ? '<div class="mr"><span>Series</span><span>' + esc(d.series.name) + (d.series.index ? ' #' + (+d.series.index) : '') + (d.series.next ? '<br><a href="#ebook/' + encodeURIComponent(d.series.next.id) + '">Next: ' + esc(d.series.next.title) + '</a>' : '') + '</span></div>' : '') +
       (d.kindle ? '<div class="mr"><span>Kindle</span><span>p. ' + d.kindle.page + ' of ' + d.kindle.total + ' · ' + epochDate(d.kindle.at) + ' <button class="linkbtn" data-bk="kindle">Go there</button></span></div>' : '') +
-      '</div>' + (d.vault_path ? '<span class="tiny mute">Highlights go to <code>' + esc(d.vault_path) + '</code></span>' : '<span class="tiny mute">Your first highlight here makes this book a vault note.</span>') + '</div>';
+      '</div>' + (d.vault_path ? '<span class="tiny mute"><code>' + esc(d.vault_path) + '</code></span>' : '') + '</div>';
     drawPanelInfoProgress();
   } else {
     const chips = (B.d && B.d.questions) || [];      // Preferences → AI
     b.innerHTML = '<div class="askbox">' + (chips.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + chips.map(q => '<button class="chip" data-bkq="' + esc(q) + '">' + esc(q) + '</button>').join('') + '</div>' : '') +
-      '<textarea class="field" id="bask" rows="3" placeholder="Ask about where you are: a word, a name you’ve forgotten, an argument…"></textarea><div style="display:flex;justify-content:flex-end"><button class="btn primary sm" data-bk="ask">Ask</button></div></div><div id="banswers"></div>';
+      '<textarea class="field" id="bask" rows="3" placeholder="Ask"></textarea><div style="display:flex;justify-content:flex-end"><button class="btn primary sm" data-bk="ask">Ask</button></div></div><div id="banswers"></div>';
   }
 }
 function drawPanelInfoProgress(){
@@ -1496,7 +1496,7 @@ async function inkErased(L){
 function inkEraseAll(){
   const at = B.loc && B.loc.section != null ? B.loc.section.current : null;
   const list = inkAll().filter(s => at == null || s.at.s === at); if (!list.length) return;
-  inkTake(list); inkAct({ del: list }); toast('Everything written in this chapter is erased. Undo brings it back.');
+  inkTake(list); inkAct({ del: list }); toast('Erased');
 }
 // The highlighter along a line (or down a few) makes a highlight of the words, as selecting them does.
 function inkHighlight(L){
@@ -1600,8 +1600,8 @@ function inkBox(list){
   return { x1, y1, x2, y2, doc };
 }
 function inkTyped(list, text){
-  const b = inkBox(list), doc = b.doc, index = doc && secOf(doc); if (index == null) throw new Error('That page has gone; turn back to it.');
-  const range = placeAt(doc, b.x1, b.y1); if (!range) throw new Error('There are no words here to keep it by.');
+  const b = inkBox(list), doc = b.doc, index = doc && secOf(doc); if (index == null) throw new Error('That page has gone');
+  const range = placeAt(doc, b.x1, b.y1); if (!range) throw new Error('No words here');
   const cfi = B.view.getCFI(index, range), r = range.getClientRects()[0] || range.getBoundingClientRect();
   const f = fontAt(doc, range), lines = text.split('\n').length;
   const first = list.find(Pens.writingOf) || list[0];
@@ -1610,8 +1610,8 @@ function inkTyped(list, text){
   inkTake(list); inkAdd([t]); inkAct({ add: [t], del: list });
 }
 async function inkNote(list, text){
-  const b = inkBox(list), doc = b.doc, index = doc && secOf(doc); if (index == null) throw new Error('That page has gone; turn back to it.');
-  const letter = letterAt(doc, (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2); if (!letter) throw new Error('There’s no passage beside it to keep the note with.');
+  const b = inkBox(list), doc = b.doc, index = doc && secOf(doc); if (index == null) throw new Error('That page has gone');
+  const letter = letterAt(doc, (b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2); if (!letter) throw new Error('No passage beside it');
   const block = letter.startContainer.parentElement.closest('p, li, blockquote, dd, td, h1, h2, h3, h4, div') || letter.startContainer.parentElement;
   // the sentence round that letter (a short paragraph whole)
   const full = block.textContent, pre = doc.createRange(); pre.selectNodeContents(block); pre.setEnd(letter.startContainer, letter.startOffset);
@@ -1623,7 +1623,7 @@ async function inkNote(list, text){
   const pos = c => { const w = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT); let n, sum = 0; while ((n = w.nextNode())) { if (c <= sum + n.data.length) return [n, c - sum]; sum += n.data.length; } return null; };
   const a = pos(s), z = pos(e); if (!a || !z) throw new Error('That passage couldn’t be found.');
   const range = doc.createRange(); range.setStart(a[0], a[1]); range.setEnd(z[0], z[1]); snapRange(range);
-  const words = range.toString().trim(); if (words.length < 2) throw new Error('There’s no passage beside it to keep the note with.');
+  const words = range.toString().trim(); if (words.length < 2) throw new Error('No passage beside it');
   B.sel = { doc, index, range, text: words, cfi: B.view.getCFI(index, range), rect: rectFor(doc, range), sentence: full };
   const h = await highlightSel(false, true); if (!h) throw new Error('That passage couldn’t be highlighted.');
   const note = [h.user_note, text].filter(x => (x || '').trim()).join('\n\n');
@@ -1845,7 +1845,7 @@ document.addEventListener('click', async e => {
     else if (a === 'mark') toggleMark();
     else if (a === 'pairs' && B.scans) B.scans.pairs();
     else if (a === 'book') location.hash = '#book/' + encodeURIComponent(B.d.id);
-    else if (a === 'auto') { H.setAuto(!H.auto()); toast(H.auto() ? 'Auto highlight on: selecting a passage highlights it' : 'Auto highlight off'); }
+    else if (a === 'auto') { H.setAuto(!H.auto()); toast(H.auto() ? 'Auto highlight on' : 'Auto highlight off'); }
     else if (a === 'keys') showKeys();
     else if (a === 'reset') {
       // Forgotten on the server too, and not saved again as the book closes (savePosition checks B.forget).
@@ -1854,7 +1854,7 @@ document.addEventListener('click', async e => {
     }
     else if (a === 'offline' && phoneKeeps()) {
       const on = !bm.dataset.on; toast(on ? 'Keeping it on this device…' : 'Removing it from this device…');
-      dafShell.offline({ op: 'keep', id: B.d.id, on }).then(() => toast(on ? 'On this device, also with no network' : 'Removed from this device'), err => toast(err.message));
+      dafShell.offline({ op: 'keep', id: B.d.id, on }).then(() => toast(on ? 'Kept on this device' : 'Removed from this device'), err => toast(err.message));
     }
     return;
   }

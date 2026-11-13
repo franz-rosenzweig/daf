@@ -52,7 +52,7 @@ async function api(path, opts){
   catch(e){
     clearTimeout(timer);
     if (late) return outbox.add(path, o);
-    if (!navigator.onLine || e instanceof TypeError) throw new Error('No connection: this needs Daf on the server. Try again when you’re back online.');
+    if (!navigator.onLine || e instanceof TypeError) throw new Error('No connection');
     throw e;
   }
   if (r.status === 401 && path !== '/api/login') { renderLogin(); throw new Error('signed out'); }
@@ -89,7 +89,7 @@ const outbox = {
       if (old) { if (item.body) item.body.pages = [...new Set([...(old.body && old.body.pages || []), ...(item.body.pages || [])])]; q.splice(q.indexOf(old), 1); }
     }
     q.push(item); outbox.set(q);
-    if (!outbox.told && !navigator.onLine) { outbox.told = true; toast('Kept on this device until it’s back online'); }
+    if (!outbox.told && !navigator.onLine) { outbox.told = true; toast('Saved offline'); }
     outbox.changed();
     const m = /^\/api\/ebooks\/([^/]+)\/(highlights|bookmarks)$/.exec(path);
     if (m && o.method === 'POST' && body && body.cfi) {
@@ -147,8 +147,8 @@ const outbox = {
         drop(x); sent++;                                    // sent, or refused for good
       }
     } finally { outbox.busy = false; outbox.changed(); }
-    if (stuck) toast(stuck === 1 ? 'One change Daf kept refusing was set aside; Send feedback includes it' : stuck + ' changes Daf kept refusing were set aside');
-    if (sent && !outbox.get().length) { outbox.told = false; toast('Sent what you did offline'); if (S.route && S.route[0] === 'today') load(); }
+    if (stuck) toast(stuck === 1 ? '1 change set aside' : stuck + ' changes set aside');
+    if (sent && !outbox.get().length) { outbox.told = false; toast('Synced'); if (S.route && S.route[0] === 'today') load(); }
   }
 };
 window.addEventListener('online', () => { outbox.flush(); outbox.changed(); });
@@ -194,7 +194,7 @@ function drawSyncPill(){
   let el = $('#syncpill');
   const n = outbox.get().length, off = !navigator.onLine;
   if (!n && !off) { if (el) el.hidden = true; return; }
-  if (!el) { el = document.createElement('button'); el.id = 'syncpill'; el.className = 'syncpill'; el.addEventListener('click', () => { outbox.flush(); toast(navigator.onLine ? 'Sending…' : 'No connection yet: it goes by itself when there is'); }); document.body.appendChild(el); }
+  if (!el) { el = document.createElement('button'); el.id = 'syncpill'; el.className = 'syncpill'; el.addEventListener('click', () => { outbox.flush(); toast(navigator.onLine ? 'Sending…' : 'No connection'); }); document.body.appendChild(el); }
   el.hidden = false; el.classList.toggle('off', off);
   el.textContent = (off ? 'Offline' : 'Not yet synced') + (n ? ' · ' + n + ' waiting' : '');
   el.title = n ? 'Saved on this device; it goes to the server when the connection is back' : 'No connection: what you do is kept on this device';
@@ -455,19 +455,19 @@ function renderToday(dry){      // dry: only work out the week and year cards (t
     .map(k => '<span' + (set.count[k] ? '' : ' class="off"') + '>' + esc(d.labels[k]) + (set.count[k] ? '' : ' · not counted') + '</span><span class="num' + (set.count[k] ? '' : ' off') + '">' + Math.round(M[k]) + ' min</span>').join('');
   const sess = d.sessions.filter(s => s.minutes >= 0.5);
   const sessHTML = sess.length ? sess.map(s => '<div class="si"><span class="w">' + esc(s.start || '') + '</span><span class="t">' + esc(shortTitle(s.title)) + (s.counted ? '' : '<span class="pill">not counted</span>') + (s.note ? ' <span class="mute tiny" style="font-weight:400">· ' + esc(s.note) + '</span>' : '') + '</span><span class="w">' + Math.max(1, Math.round(s.minutes)) + ' min · ' + esc(s.label) + '</span></div>').join('')
-    : '<p class="mute" style="margin:0">Nothing yet' + (isToday ? ' today' : '') + '. Kindle reading arrives when the Kindle sleeps or closes a book; audiobooks every five minutes.</p>';
+    : '<p class="mute" style="margin:0">Nothing yet' + (isToday ? ' today' : '') + '</p>';
   const maxW = Math.max(60, ...d.week.map(w => w.minutes));
   const week = d.week.map(w => '<div class="wk' + (w.date === d.today ? ' today' : '') + '"><span class="m">' + (w.minutes >= 1 ? Math.round(w.minutes) : '') + '</span><div class="bar' + (w.minutes >= (w.target || 60) ? ' goal' : '') + '" style="height:' + Math.max(3, Math.round(w.minutes / maxW * 82)) + 'px" title="' + shortDate(w.date) + ': ' + Math.round(w.minutes) + ' min"></div><span class="d">' + DAYS[parseDay(w.date).getDay()].slice(0, 3) + '</span></div>').join('');
   const y = d.year30, fresh = d.fresh || {}, kin = (fresh.kindle && fresh.kindle.last) || {};
-  const freshLine = 'Kindle: newest page ' + ago(kin.plugin || kin.koinsight) + (kin.plugin ? ' (Daf plugin)' : ' (KoInsight)') + ' · Audiobookshelf checked ' + ago(fresh.audiobookshelf && fresh.audiobookshelf.checked) + ' · updates every five minutes';
+  const freshLine = 'Kindle: newest page ' + ago(kin.plugin || kin.koinsight) + (kin.plugin ? ' (Daf plugin)' : ' (KoInsight)') + ' · Audiobookshelf checked ' + ago(fresh.audiobookshelf && fresh.audiobookshelf.checked);
   const rv = d.review || {};
   const L2 = LOOK2 && window.DafCore.Look;      // the new look's Today: one panel for the book being read, then three cards (look2.js)
   let h = L2 ? '<div class="page l2today">' + L2.hero(d, isToday, dayN) : '<div class="top"><h1>Today</h1><span class="spacer"></span><button class="btn sm" data-act="refresh" aria-label="Sync now">' + I.sync + '</button><button class="btn sm primary" data-act="paper">Log paper</button></div><div class="page">';
   if (!L2) h += '<div class="hello"><h1><span style="color:var(--accent)">' + I.today.replace('width="18" height="18"', 'width="30" height="30"') + '</span>' + (isToday ? 'Today' : esc(longDate(d.date))) + '</h1><p class="mute">' + esc(longDate(d.date)) + (dayN && isToday ? ' · Year 30, day ' + dayN : '') + (isToday && d.streak && d.streak.any > 1 ? ' · ' + (d.streak.goal > 1 ? d.streak.goal + ' days in a row ' + atWord(d.goal) : d.streak.any + ' days in a row reading') : '') + '</p></div>';
-  if (d.shabbat && isToday) h += '<div class="notice"><span style="color:var(--accent)">' + I.moon + '</span><span>' + (new Date().getDay() === 5 ? 'Shabbat is coming. <a href="#torah">This week’s parasha</a> is on the Torah shelf. ' : 'Shabbat. ') + 'Paper counts: log it here after havdalah, or send Ezer <b>shabbat 60</b>.</span></div>';
+  if (d.shabbat && isToday) h += '<div class="notice"><span style="color:var(--accent)">' + I.moon + '</span><span>' + (new Date().getDay() === 5 ? 'Shabbat is coming · <a href="#torah">This week’s parasha</a>' : 'Shabbat') + '</span></div>';
   if (isToday && window.DafCore.HC) h += window.DafCore.HC.todayNotice(d);
   if (isToday && window.DafCore.Sound) h += window.DafCore.Sound.todayNotice();   // Sound beside the Kindle (sound.js)
-  if (d.offstand) h += '<div class="notice"><span style="color:var(--accent)">' + I.books + '</span><span style="flex:1">You’ve been reading <b>' + esc(shortTitle(d.offstand.title)) + '</b>, and it isn’t on the nightstand.</span><span style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn sm" href="#books">Swap it in</a><button class="btn sm" data-act="notstand" data-id="' + esc(d.offstand.id) + '">Just browsing</button></span></div>';
+  if (d.offstand) h += '<div class="notice"><span style="color:var(--accent)">' + I.books + '</span><span style="flex:1"><b>' + esc(shortTitle(d.offstand.title)) + '</b> isn’t on the nightstand</span><span style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn sm" href="#books">Swap it in</a><button class="btn sm" data-act="notstand" data-id="' + esc(d.offstand.id) + '">Just browsing</button></span></div>';
   const GL = window.DafCore.Goals;
   if (L2) h += L2.todayCards(d, sessHTML, srcRows, rv);
   else h += '<div class="todaygrid">' + (GL ? GL.ringCard(d, ring, srcRows) : '<section class="card" aria-label="Minutes"><div class="ringrow">' + ring(118, 11, d.counted, d.goal) + '<div><div style="font-size:20px;font-weight:700">of ' + d.goal + ' minutes</div><div class="mute tiny">' + (d.counted >= d.goal ? 'That’s the hour.' : Math.ceil(d.goal - d.counted) + ' to go') + '</div></div></div><div class="rows">' + srcRows + '</div></section>') +
@@ -484,7 +484,7 @@ function renderToday(dry){      // dry: only work out the week and year cards (t
   if (isToday && d.on_this_day && d.on_this_day.length) h += '<section class="card"><div class="cardh"><h2>On this day</h2><a class="tiny" href="#stats">Stats</a></div>' +
     d.on_this_day.map(x => '<div class="hlc"><q' + (x.open ? ' class="go" data-open="' + esc(x.open) + '" role="link" tabindex="0" title="Open at this spot"' : '') + '>' + window.DafCore.HL.quote(x.text) + '</q><div class="meta tiny mute">' + esc(shortTitle(x.title)) + ' · ' + x.year + '</div></div>').join('') + '</section>';
   const stand = d.nightstand.length ? d.nightstand : d.nightstand_suggested;
-  if (stand.length && !L2) h += '<section class="card"><div class="cardh"><h2>Nightstand</h2><a class="tiny" href="#books">' + (d.nightstand.length ? 'Change' : 'Suggested from what you read lately · choose your three') + '</a></div><div class="brows">' + stand.map(b => bookRow(b)).join('') + '</div></section>';
+  if (stand.length && !L2) h += '<section class="card"><div class="cardh"><h2>Nightstand</h2><a class="tiny" href="#books">' + (d.nightstand.length ? 'Change' : 'Choose') + '</a></div><div class="brows">' + stand.map(b => bookRow(b)).join('') + '</div></section>';
   const h0 = h; h = '';
   h += '<section class="card" aria-label="This week"><h2>This week</h2><div class="week">' + week + '</div></section>';
   h += '<section class="card" aria-label="Year 30"><div class="cardh"><h2>Year 30</h2><span class="mute tiny">October 9, 2026 to October 8, 2027</span></div>' +
@@ -531,13 +531,13 @@ function drawReview(){
   const R = S.rev, items = R.items, i = S.revIdx, cur = items[i];
   let h = '<div class="rtop"><a class="ib" href="#today" aria-label="Close the review">' + RIC.close + '</a><div class="rtitle"><b>' + (R.theme ? esc(R.theme) : 'Daily Review') + '</b>' +
     '<div class="rprog" aria-hidden="true">' + items.map((x, j) => '<i class="' + (x.action ? 'done' : j === i ? 'cur' : '') + '"></i>').join('') + '</div></div>' +
-    '<span class="mute tiny rkeys">' + (cur && cur.card ? 'space · 1 2 3 4' : ['keep', 'less', 'note', 'never', 'open', 'fav'].map(a => window.DafCore.Keys ? window.DafCore.Keys.keys('review', a)[0] : '').filter(Boolean).map(k => window.DafCore.Keys.name(k)).join(' · ')) + '</span></div><div class="review">';
-  if (!items.length) h += '<div class="rcard"><p class="mute" style="margin:0">No highlights to review yet.</p></div>';
+    '<span class="rkeys"></span></div><div class="review">';
+  if (!items.length) h += '<div class="rcard"><p class="mute" style="margin:0">Nothing to review</p></div>';
   else if (i >= items.length) {
     const kept = items.filter(x => !x.card && (x.action === 'keep' || x.action === 'note')).length, less = items.filter(x => x.action === 'less').length, nc = items.filter(x => x.card && !x.again).length;
     const st = R.streak && !R.theme ? Object.assign({}, R.streak, { days: Math.max(R.streak.days, 1), week: R.streak.week.map((w, k, a) => k === a.length - 1 ? Object.assign({}, w, { done: true }) : w) }) : null;
     h += '<div class="rcard rdone"><div class="rdonemark">' + RIC.check + '</div><div class="rdh">' + (R.theme ? 'Done with ' + esc(R.theme) : 'Great job') + '</div>' +
-      '<p class="mute" style="margin:0;text-align:center">' + kept + ' kept' + (less ? ', ' + less + ' less often' : '') + (nc ? ', ' + nc + ' flashcard' + (nc > 1 ? 's' : '') : '') + '. Kept highlights come back in a few days, then less and less often.</p>' +
+      '<p class="mute" style="margin:0;text-align:center">' + kept + ' kept' + (less ? ', ' + less + ' less often' : '') + (nc ? ', ' + nc + ' flashcard' + (nc > 1 ? 's' : '') : '') + '</p>' +
       streakRow(st) +
       '<div class="rdacts">' + (R.theme ? '<button class="btn primary rpill" data-act="revagain">Another round</button>' : '<a class="btn primary rpill" href="#today">Done</a>') +
       '<a class="rmore" href="#review/more">Review more highlights →</a></div></div>';
@@ -553,7 +553,7 @@ function drawReview(){
     h += '<div class="rcard" id="rc" data-h="' + esc(x.id) + '" data-color="' + esc(x.color || 'yellow') + '">' + reviewSource(x, x.reviews ? 'Seen ' + x.reviews + '×' : 'First time') +
       '<q' + (/[֐-׿]/.test(x.text) ? ' dir="rtl"' : '') + '>' + H.quote(x.text) + '</q>' +
       (x.note ? '<div class="kindlenote"><span class="mute tiny">Your note on the Kindle</span><span>' + esc(x.note) + '</span></div>' : '') +
-      (S.revNote ? '<textarea class="field" id="rnote" rows="3" placeholder="A thought, for the vault note" aria-label="Note">' + esc(x.user_note || '') + '</textarea><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn sm" data-act="rnotecancel">Cancel</button><button class="btn sm primary" data-act="rnote">Save note</button></div>'
+      (S.revNote ? '<textarea class="field" id="rnote" rows="3" placeholder="Note" aria-label="Note">' + esc(x.user_note || '') + '</textarea><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn sm" data-act="rnotecancel">Cancel</button><button class="btn sm primary" data-act="rnote">Save note</button></div>'
         : (x.user_note ? '<div class="kindlenote"><span class="mute tiny">Your note in Daf</span><span>' + esc(x.user_note) + '</span></div>' : '')) +
       ((x.tags || []).length ? '<div class="htags rtags">' + x.tags.map(t => '<span>#' + esc(t) + '</span>').join('') + '</div>' : '') +
       '<div class="rtools">' + (x.open ? '<a class="hb" href="' + esc(x.open) + '" data-tip="Open at this spot (o)">' + H.IC.open + '</a>' : '') +
@@ -612,8 +612,8 @@ async function reviewAct(action){
   try { await api('/api/review/' + encodeURIComponent(x.id), { method:'POST', body:JSON.stringify(body) }); }
   catch(e){ toast(e.message); return; }
   x.action = action; S.revNote = false; S.revIdx++;
-  if (action === 'never') toast('It won’t come up in review again. It stays in Highlights and the vault.');
-  if (action === 'note') { toast('Note saved to the vault'); window.DafCore.HL.noteTags(x, x.user_note).catch(() => {}); }
+  if (action === 'never') toast('Won’t come up again');
+  if (action === 'note') { toast('Note saved'); window.DafCore.HL.noteTags(x, x.user_note).catch(() => {}); }
   drawReview(); load(true);
 }
 
@@ -665,8 +665,7 @@ function exportMenu(anchor, extra){
   const q = extra || hlQuery(), p = $('#pop'), r = anchor.getBoundingClientRect();
   p.onclick = p.oninput = p.onkeydown = null;
   p.innerHTML = '<div class="menu">' + [['md', 'Markdown, by book'], ['csv', 'CSV (spreadsheet)'], ['json', 'JSON']].map(f => { const qq = new URLSearchParams(q); qq.set('fmt', f[0]); return '<a href="/api/highlights/export?' + qq.toString() + '" download>' + f[1] + '</a>'; }).join('') +
-    '<span class="mhint" style="padding-left:10px">Exports what the filters show now.</span>' +
-    '<a href="/api/cards/export" download>Flashcards for Anki</a><span class="mhint" style="padding-left:10px">Every card, as a file Anki imports (File → Import).</span></div>';
+        '<a href="/api/cards/export" download>Flashcards for Anki</a></div>';
   p.hidden = false; p.style.left = Math.max(8, Math.min(window.innerWidth - 260, r.right - 240)) + 'px'; p.style.top = (r.bottom + 8) + 'px';
 }
 // Five highlight colors; the last one used is the next default.
@@ -683,16 +682,16 @@ async function renderBooks(){
   const r = await swr('/api/books');
   S.books = r;
   const stand = r.nightstand.length ? r.nightstand : [];
-  let h = (LOOK2 && window.DafCore.Look && stand.length ? window.DafCore.Look.readingNow(stand[0]) : '') + '<section class="card"><div class="cardh"><h2>Nightstand</h2><span class="mute tiny">Three books. ' + r.marked_reading + ' notes in the vault say “reading”.</span></div>';
+  let h = (LOOK2 && window.DafCore.Look && stand.length ? window.DafCore.Look.readingNow(stand[0]) : '') + '<section class="card"><div class="cardh"><h2>Nightstand</h2></div>';
   const readBtn = b => b.readable ? '<a class="btn sm primary" href="#ebook/' + encodeURIComponent(b.id) + '">Read</a> ' : '';
   if (stand.length) h += '<div class="brows">' + stand.map(b => bookRow(b, '<span class="tiny rowacts">' + readBtn(b) + '<button class="linkbtn" data-act="standoff" data-id="' + esc(b.id) + '">Take off the nightstand</button></span>')).join('') + '</div>';
-  else h += '<p class="mute" style="margin:0">Nothing chosen yet. Suggested from what you read lately:</p><div class="brows">' + r.suggested.map(b => bookRow(b)).join('') + '</div><button class="btn primary" data-act="standuse" style="align-self:flex-start">Use these three</button>';
-  h += '</section><section class="card" id="shelfsec"><h2>Shelves</h2><span class="mute">Loading…</span></section><section class="card" id="hcwant"><div class="cardh"><h2>Want to read</h2><span class="mute tiny">Asking Hardcover…</span></div></section>';
+  else h += '<p class="mute" style="margin:0">Suggested</p><div class="brows">' + r.suggested.map(b => bookRow(b)).join('') + '</div><button class="btn primary" data-act="standuse" style="align-self:flex-start">Use these three</button>';
+  h += '</section><section class="card" id="shelfsec"><h2>Shelves</h2><span class="mute">Loading…</span></section><section class="card" id="hcwant"><div class="cardh"><h2>Want to read</h2><span class="mute tiny">Loading…</span></div></section>';
   const others = S.booksAll ? r.others : r.others.slice(0, 24);
-  h += '<section class="card"><div class="cardh"><h2>Opened lately</h2><span class="mute tiny">Newest first' + (r.manga ? ' · <a href="#manga">manga is on its own page</a>' : '') + '</span></div><div class="bgrid">' + others.map(b => '<div class="bcell">' + bookRow(b, b.highlights ? '<span class="tiny mute">' + b.highlights + ' highlights</span>' : '') +
+  h += '<section class="card"><div class="cardh"><h2>Opened lately</h2>' + (r.manga ? '<a class="tiny" href="#manga">Manga</a>' : '') + '</div><div class="bgrid">' + others.map(b => '<div class="bcell">' + bookRow(b, b.highlights ? '<span class="tiny mute">' + b.highlights + ' highlights</span>' : '') +
     '<button class="btn sm" data-act="standon" data-id="' + esc(b.id) + '"' + (stand.length >= 3 ? ' data-full="1"' : '') + '>Put on the nightstand</button></div>').join('') + '</div>' +
     (r.others.length > 24 && !S.booksAll ? '<button class="btn" data-act="booksall" style="align-self:flex-start">Show all ' + r.others.length + '</button>' : '') + '</section>';
-  h += '<section class="card"><div class="cardh"><h2>Your library</h2><span class="mute tiny">Calibre · opens in Daf’s reader</span></div><div class="libgrid" id="libgrid"><span class="mute">Loading…</span></div></section>';
+  h += '<section class="card"><div class="cardh"><h2>Your library</h2><span class="mute tiny">Calibre</span></div><div class="libgrid" id="libgrid"><span class="mute">Loading…</span></div></section>';
   $('#main .page').innerHTML = h;
   if (window.DafCore.HC) window.DafCore.HC.shelf($('#hcwant'));
   if (window.DafCore.Shelves) window.DafCore.Shelves.section();
@@ -729,7 +728,7 @@ async function setStand(ids){ await api('/api/nightstand', { method:'PUT', body:
 function askSwap(newId){
   const r = S.books; const stand = r.nightstand;
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false;
-  m.innerHTML = '<h2>Which one steps off?</h2><p class="mute" style="margin:0">The nightstand holds three. The one you take off stays in your library and your vault.</p><div class="brows">' +
+  m.innerHTML = '<h2>Which one steps off?</h2><div class="brows">' +
     stand.map(b => '<button class="swap" data-act="swap" data-out="' + esc(b.id) + '" data-in="' + esc(newId) + '">' + cover(b, 'cv xs') + '<span>' + esc(shortTitle(b.title)) + '</span></button>').join('') + '</div><div style="display:flex;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button></div>';
 }
 
@@ -757,19 +756,19 @@ async function renderBook(id, hl){
     '<div id="bacts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' + (b.readable ? '<a class="btn primary" href="#ebook/' + encodeURIComponent(b.id) + '">' + (b.daf_position ? 'Continue in Daf · ' + Math.round((b.daf_position.fraction || 0) * 100) + '%' : 'Read in Daf') + '</a>' : '') + (b.kind === 'book' ? (b.on_nightstand ? '<button class="btn" data-act="standoff" data-id="' + esc(b.id) + '">Take off the nightstand</button>' : '<button class="btn primary" data-act="standon" data-id="' + esc(b.id) + '">Put on the nightstand</button>') : '') +
     (b.url ? '<a class="btn" href="' + esc(b.url) + '" target="_blank" rel="noopener">Open original</a>' : '') +
     (/^cal:\d+$/.test(b.id) && window.DafCore.BookEdit ? '<button class="btn" data-act="bookedit" data-id="' + esc(b.id) + '">Edit details</button>' : '') + '</div>' +
-    (b.vault_path ? '<span class="tiny mute l2vault" data-vname="' + esc(b.vault_name || '') + '">Vault: <code>' + esc(b.vault_path) + '</code></span>' : '<span class="tiny mute">No vault note for this book yet; notes stay in Daf until there is one.</span>') + '</div></div>';
+    (b.vault_path ? '<span class="tiny mute l2vault" data-vname="' + esc(b.vault_name || '') + '">Vault: <code>' + esc(b.vault_path) + '</code></span>' : '<span class="tiny mute">No vault note yet</span>') + '</div></div>';
   if (b.stats) h += bookStats(b.stats);
   if (window.DafCore.AddBook) h += window.DafCore.AddBook.sections(b);
   if (b.kind === 'book') h += '<section class="card" id="bshelves"></section>';
   if (b.kind === 'book' && !b.private) h += '<section class="card hcsec" id="hcsec"><div class="cardh"><h2>Hardcover</h2></div><span class="mute tiny">Asking Hardcover…</span></section>';
-  h += '<section class="card"><div class="cardh"><h2>A note on this book</h2></div><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="field" id="bnote" placeholder="A thought while reading" style="flex:1 1 260px"><button class="btn primary" data-act="booknote" data-id="' + esc(b.id) + '">Save</button></div>' +
+  h += '<section class="card"><div class="cardh"><h2>A note on this book</h2></div><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="field" id="bnote" placeholder="Note" style="flex:1 1 260px"><button class="btn primary" data-act="booknote" data-id="' + esc(b.id) + '">Save</button></div>' +
     (b.notes.length ? '<div class="sess">' + b.notes.map(n => '<div class="nrow"><span class="mute tiny">' + epochDate(n.created) + (n.page ? ' · page ' + n.page : '') + ' · ' + (n.source === 'voice' ? 'voice note' : 'note') + '</span><span>' + esc(n.text) + '</span></div>').join('') + '</div>' : '') + '</section>';
-  if (b.bookmarks.length) h += '<section class="card"><div class="cardh"><h2>Audiobook bookmarks</h2></div>' + b.bookmarks.map(m => '<div class="nrow"><span class="mute tiny num">' + Math.floor(m.at / 3600) + ':' + String(Math.floor(m.at % 3600 / 60)).padStart(2, '0') + ':' + String(Math.floor(m.at % 60)).padStart(2, '0') + '</span><span>' + esc(m.title) + '</span></div>').join('') + '<span class="mute tiny">Daf transcribes the minute before each bookmark into a highlight.</span></section>';
+  if (b.bookmarks.length) h += '<section class="card"><div class="cardh"><h2>Audiobook bookmarks</h2></div>' + b.bookmarks.map(m => '<div class="nrow"><span class="mute tiny num">' + Math.floor(m.at / 3600) + ':' + String(Math.floor(m.at % 3600 / 60)).padStart(2, '0') + ':' + String(Math.floor(m.at % 60)).padStart(2, '0') + '</span><span>' + esc(m.title) + '</span></div>').join('') + '</section>';
   const H = window.DafCore.HL, hls = b.highlights.slice().sort((a, c) => a.order - c.order);
   let ch = null; H.rowOpts = { chapter: false };
   h += '<section class="card"><div class="cardh"><h2>Highlights</h2><span class="mute tiny">' + hls.length + (hls.length ? ', in reading order' : '') + '</span>' +
     (hls.length ? '<span class="spacer"></span>' + (b.private ? '' : '<a class="btn sm" href="#review/book/' + encodeURIComponent(b.id) + '">Review these</a>') + '<button class="btn sm" data-act="bookexport" data-id="' + esc(b.id) + '">Export</button>' : '') + '</div>' +
-    (hls.length && !b.private ? '<div class="prow brfreq"><div class="d"><b>In the daily review</b><span>' + ({ more: 'This book comes up more often.', less: 'This book comes up less often.', never: 'This book stays out of the daily review. Its highlights are still here.', normal: 'Like any other book.' }[b.review_freq] || '') + '</span></div>' +
+    (hls.length && !b.private ? '<div class="prow brfreq"><div class="d"><b>In the daily review</b></div>' +
       '<div class="seg" role="radiogroup" aria-label="How often">' + [['more','More'],['normal','As usual'],['less','Less'],['never','Never']].map(x => '<button type="button" role="radio" aria-checked="' + (b.review_freq === x[0]) + '" class="' + (b.review_freq === x[0] ? 'on' : '') + '" data-act="bookfreq" data-id="' + esc(b.id) + '" data-f="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>' : '') +
     (hls.length ? '<div class="hrows">' + hls.map(x => { let o = ''; if (x.chapter && x.chapter !== ch) { ch = x.chapter; o = '<div class="nbch">' + esc(ch) + '</div>'; } return o + H.row(x, H.rowOpts); }).join('') + '</div>' : '<p class="mute" style="margin:0">None yet.</p>') + '</section>';
   $('#main .page').innerHTML = h;
@@ -793,7 +792,7 @@ function drawSources(){
   const q = F.q('sources'), checks = S.sources.checks.filter(c => F.match(q, c.name, c.detail, SRC_USE[c.name]));
   page.innerHTML = (checks.length ? '<section class="card"><div class="srcs">' + checks.map(c =>
     '<div class="src"><span class="dot' + (c.ok ? '' : ' bad') + '" aria-label="' + (c.ok ? 'Working' : 'Not working') + '"></span><b>' + esc(c.name) + '</b><span class="dt mute">' + esc(c.detail) + '</span><span class="mute tiny">' + esc(SRC_USE[c.name] || '') + '</span></div>'
-  ).join('') + '</div></section>' : F.none()) + (q ? '' : '<p class="mute tiny" style="margin:0">Daf only reads these. In the vault it writes the reading log, a “From Daf” section at the end of book notes, and notes for what you highlight or write a note on in Daf, with the full text (Reference/clippings, youtube, podcasts, instagram, torah). Nothing else.</p>');
+  ).join('') + '</div></section>' : F.none());
 }
 /* ---------- read-aloud voices (Kokoro on the server) ---------- */
 // Kokoro's voice names start with two letters for the accent and whose voice it is (af_heart: an
@@ -836,7 +835,7 @@ const Voices = {
   // The list, from the read-aloud bar: a voice's name picks it, ▶ plays a line in it.
   async menu(anchor){
     const p = $('#pop'), all = await Voices.load();
-    if (!all.length) { toast('Kokoro isn’t answering on the server'); return; }
+    if (!all.length) { toast('Kokoro isn’t answering'); return; }
     let group = '';
     p.onclick = p.oninput = p.onkeydown = null;
     p.innerHTML = '<span class="lbl">Read-aloud voice</span><div class="vlist">' + all.map(id => {
@@ -866,18 +865,18 @@ const FEED_WINDOWS = [[7, 'a week'], [14, '2 weeks'], [21, '3 weeks'], [30, 'a m
 async function renderPrefs(){
   const s = await api('/api/settings');
   S.settings = s;
-  const sw = (k, label, desc, locked) => '<div class="prow"><div class="d"><b>' + label + '</b><span>' + desc + '</span></div><input type="checkbox" class="sw" id="c-' + k + '" data-count="' + k + '"' + (s.count[k] ? ' checked' : '') + (locked ? ' disabled' : '') + ' aria-label="' + esc(label) + '"></div>';
+  const sw = (k, label, desc, locked) => '<div class="prow"><div class="d"><b>' + label + '</b>' + (desc ? '<span>' + desc + '</span>' : '') + '</div><input type="checkbox" class="sw" id="c-' + k + '" data-count="' + k + '"' + (s.count[k] ? ' checked' : '') + (locked ? ' disabled' : '') + ' aria-label="' + esc(label) + '"></div>';
   let zones = []; try { zones = Intl.supportedValuesOf('timeZone'); } catch(e) {} if (zones.indexOf('UTC') < 0) zones.unshift('UTC'); if (s.home_tz && zones.indexOf(s.home_tz) < 0) zones.push(s.home_tz);
   $('#main').innerHTML = '<div class="top"><h1>Preferences</h1></div><div class="page"><section class="card" id="goalscard"><h2>Goals</h2><span class="mute">Loading…</span></section><section class="card" id="appearcard"></section><section class="card" id="sidecard"></section><section class="card" id="countcard"><h2>What counts toward the goal</h2><div>' +
-    sw('kindle','Books on the Kindle','KOReader reading time') + sw('manga','Manga in Daf','Time in Daf’s manga reader') + sw('audio','Audiobooks','Listening time from Audiobookshelf') + sw('article','Articles in Daf','Time with an article open in Daf') +
-    sw('paper','Paper books','Minutes you log here or with Ezer') + sw('video','Videos','Time with a video open in Daf') + sw('podcast','Podcasts','Never counted', true) + '</div></section>' +
-    '<section class="card" id="reviewcard"><h2>Daily review</h2><div class="prow"><div class="d"><b>Highlights per day</b><span>Ezer sends the first one in the morning. Takes effect tomorrow.</span></div><select class="field" id="revsize" style="width:auto">' + [3,5,8,12].map(n => '<option' + (n === s.review_size ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div></section>' +
-    '<section class="card" id="readercard"><h2>Reader</h2><div class="prow"><div class="d"><b>Read-aloud voice</b><span>Kokoro on the server. The voice button in the read-aloud bar changes it too, with a line in each voice.</span></div><select class="field" id="ttsvoice" style="width:auto"><option value="' + esc(s.tts_voice || 'af_heart') + '">' + esc(Voices.label(s.tts_voice || 'af_heart')) + '</option></select><button class="btn sm" id="ttshear">Hear it</button></div>' +
+    sw('kindle','Books on the Kindle','') + sw('manga','Manga in Daf','') + sw('audio','Audiobooks','') + sw('article','Articles in Daf','') +
+    sw('paper','Paper books','') + sw('video','Videos','') + sw('podcast','Podcasts','Never counted', true) + '</div></section>' +
+    '<section class="card" id="reviewcard"><h2>Daily review</h2><div class="prow"><div class="d"><b>Highlights per day</b></div><select class="field" id="revsize" style="width:auto">' + [3,5,8,12].map(n => '<option' + (n === s.review_size ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div></section>' +
+    '<section class="card" id="readercard"><h2>Reader</h2><div class="prow"><div class="d"><b>Read-aloud voice</b></div><select class="field" id="ttsvoice" style="width:auto"><option value="' + esc(s.tts_voice || 'af_heart') + '">' + esc(Voices.label(s.tts_voice || 'af_heart')) + '</option></select><button class="btn sm" id="ttshear">Hear it</button></div>' +
     '<div class="prow"><div class="d"><b>Read-aloud speed</b></div><select class="field" id="ttsspeed" style="width:auto">' + [0.9, 1, 1.1, 1.25, 1.5].map(n => '<option value="' + n + '"' + (n === (s.tts_speed || 1) ? ' selected' : '') + '>' + n + '×</option>').join('') + '</select></div>' +
-    (document.documentElement.classList.contains('shell-android') ? '<div class="prow"><div class="d"><b>Volume buttons turn pages</b><span>In books and manga. While music or read-aloud plays they change the volume. On this device.</span></div><input type="checkbox" class="sw" id="volkeys"' + (lsGet('volumeKeys', false) ? ' checked' : '') + ' aria-label="Volume buttons turn pages"></div>' : '') +
-    '<div class="prow"><div class="d"><b>After Done or Later, open the next one</b><span>In an article, archiving it or moving it to Later opens the next item in the list instead of going back to the list. On this device.</span></div><input type="checkbox" class="sw" id="autoadv"' + (lsGet('autoAdvance', false) ? ' checked' : '') + ' aria-label="Open the next one"></div>' +
-    '<div class="prow"><div class="d"><b>The Feed lets go after</b><span>Unseen items older than this move to Seen, so the Feed never becomes a pile. A longer time brings back the unread ones FreshRSS still has.</span></div><select class="field" id="expire" style="width:auto">' + FEED_WINDOWS.concat(FEED_WINDOWS.some(w => w[0] === (s.feed_expire_days || 30)) ? [] : [[s.feed_expire_days, s.feed_expire_days + ' days']]).map(w => '<option value="' + w[0] + '"' + (w[0] === (s.feed_expire_days || 30) ? ' selected' : '') + '>' + w[1] + '</option>').join('') + '</select></div></section>' +
-    '<section class="card" id="dayscard"><h2>Days</h2><div class="prow"><div class="d"><b>Home time zone</b><span>Decides when a day starts and ends. Switch it when you travel.</span></div><select class="field" id="tz" style="width:auto">' + zones.map(z => '<option' + (z === s.home_tz ? ' selected' : '') + '>' + esc(z) + '</option>').join('') + '</select></div></section>' +
+    (document.documentElement.classList.contains('shell-android') ? '<div class="prow"><div class="d"><b>Volume buttons turn pages</b></div><input type="checkbox" class="sw" id="volkeys"' + (lsGet('volumeKeys', false) ? ' checked' : '') + ' aria-label="Volume buttons turn pages"></div>' : '') +
+    '<div class="prow"><div class="d"><b>After Done or Later, open the next one</b></div><input type="checkbox" class="sw" id="autoadv"' + (lsGet('autoAdvance', false) ? ' checked' : '') + ' aria-label="Open the next one"></div>' +
+    '<div class="prow"><div class="d"><b>The Feed lets go after</b></div><select class="field" id="expire" style="width:auto">' + FEED_WINDOWS.concat(FEED_WINDOWS.some(w => w[0] === (s.feed_expire_days || 30)) ? [] : [[s.feed_expire_days, s.feed_expire_days + ' days']]).map(w => '<option value="' + w[0] + '"' + (w[0] === (s.feed_expire_days || 30) ? ' selected' : '') + '>' + w[1] + '</option>').join('') + '</select></div></section>' +
+    '<section class="card" id="dayscard"><h2>Days</h2><div class="prow"><div class="d"><b>Home time zone</b></div><select class="field" id="tz" style="width:auto">' + zones.map(z => '<option' + (z === s.home_tz ? ' selected' : '') + '>' + esc(z) + '</option>').join('') + '</select></div></section>' +
     '<section class="card" id="phonecard"><h2>Phone</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="podcard"><h2>Podcasts</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="hccard"><h2>Hardcover</h2><span class="mute">Loading…</span></section>' +
@@ -890,13 +889,12 @@ async function renderPrefs(){
     '<section class="card" id="importcard"><h2>Import</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="fbcard"><h2>Feedback</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="tagscard"><h2>Library tags</h2><span class="mute">Loading…</span></section>' +
-    '<section class="card" id="tipscard"><h2>Tips</h2><span class="mute">Loading…</span></section>' +
     '<section class="card" id="acctcard"><h2>Account</h2>' +
-    '<form id="acctf" class="acct"><div class="prow"><div class="d"><b>Username</b><span>You sign in as <b>' + esc(S.user || '') + '</b>.</span></div><input class="field" id="au" autocomplete="username" autocapitalize="none" spellcheck="false" value="' + esc(S.user || '') + '"></div>' +
-    '<div class="prow"><div class="d"><b>New password</b><span>Optional. At least 10 characters. Changing it signs out every other browser.</span></div><input class="field" id="anp" type="password" autocomplete="new-password"></div>' +
-    '<div class="prow"><div class="d"><b>Current password</b><span>Needed for either change.</span></div><input class="field" id="acp" type="password" autocomplete="current-password" required></div>' +
+    '<form id="acctf" class="acct"><div class="prow"><div class="d"><b>Username</b></div><input class="field" id="au" autocomplete="username" autocapitalize="none" spellcheck="false" value="' + esc(S.user || '') + '"></div>' +
+    '<div class="prow"><div class="d"><b>New password</b></div><input class="field" id="anp" type="password" autocomplete="new-password"></div>' +
+    '<div class="prow"><div class="d"><b>Current password</b></div><input class="field" id="acp" type="password" autocomplete="current-password" required></div>' +
     '<div style="display:flex;justify-content:flex-end"><button class="btn primary" type="submit">Save</button></div></form>' +
-    '<div class="prow"><div class="d"><b>Other browsers</b><span>Signs out every browser except this one. The Kindle, the phone, the apps and AntennaPod use their own tokens and stay connected.</span></div><button class="btn sm" data-act="signoutothers">Sign them out</button></div>' +
+    '<div class="prow"><div class="d"><b>Other browsers</b></div><button class="btn sm" data-act="signoutothers">Sign them out</button></div>' +
     '<div id="devlist"></div>' +
     '<div class="prow"><div class="d"><b>Sign out</b><span>On this device</span></div><button class="btn sm" data-act="logout">Sign out</button></div></section></div>';
   organizePrefs();
@@ -909,7 +907,7 @@ const PREF_GROUPS = [
   ['Connections', [['phonecard', 'Phone'], ['podcard', 'Podcasts'], ['hccard', 'Hardcover'], ['nlcard', 'Newsletters'], ['digestcard', 'Morning email'], ['alcard', 'AniList'], ['gracard', 'Reader apps']]],
   ['AI', [['aicard', 'AI']]],
   ['Library', [['tagscard', 'Library tags'], ['importcard', 'Import']]],
-  ['Help', [['tipscard', 'Tips'], ['fbcard', 'Feedback']]],
+  ['Help', [['fbcard', 'Feedback']]],
   ['Account', [['acctcard', 'Account']]],
 ];
 function organizePrefs(){
@@ -953,14 +951,14 @@ async function drawDevices(token){
   const devLabel = n => label[n] || (/^android-./.test(n) ? 'Daf for Android · ' + n.slice(8).toUpperCase()
     : (/^(mac|safari|browser)-./.test(n) ? { mac:'Daf for Mac', safari:'Safari extension', browser:'Browser extension' }[n.split('-')[0]] + ' · ' + n.slice(n.indexOf('-') + 1) : n));
   const seen = d => 'Connected ' + epochDate(d.created) + (d.last_seen ? ', last used ' + ago(d.last_seen) : ', not used yet'), br = p.devices.find(d => d.name === 'browser');
-  box.innerHTML = '<div class="prow"><div class="d"><b>Connected devices</b><span>Each has its own token. Disconnecting one stops it until it connects again.</span></div></div>' +
+  box.innerHTML = '<div class="prow"><div class="d"><b>Connected devices</b></div></div>' +
     p.devices.filter(d => d.name !== 'browser').map(d => '<div class="prow sub"><div class="d"><b>' + esc(devLabel(d.name)) + '</b><span>' + seen(d) + '</span></div>' +
       '<button class="btn sm" data-act="devoff" data-name="' + esc(d.name) + '">Disconnect</button></div>').join('') +
     // The browser extension (extension/): a token for the device "browser", shown once, pasted into its options.
-    '<div class="prow sub"><div class="d"><b>Browser extension</b><span>' + (br ? seen(br) + '. A new token replaces it.' : 'Highlight on any web page and keep it in Daf. Make a token and paste it into the extension’s options.') +
-      ' Download it for <a href="/api/extension/daf-extension.zip" download>Chrome or Arc</a> or <a href="/api/extension/daf-extension.xpi" download>Firefox or Zen</a>.</span></div>' +
+    '<div class="prow sub"><div class="d"><b>Browser extension</b><span>' + (br ? seen(br) : 'Not connected') +
+      ' · <a href="/api/extension/daf-extension.zip" download>Chrome or Arc</a> · <a href="/api/extension/daf-extension.xpi" download>Firefox or Zen</a></span></div>' +
     '<button class="btn sm" id="brtoken">' + (br ? 'New token' : 'Make a token') + '</button>' + (br ? '<button class="btn sm" id="brmore">Another browser</button><button class="btn sm" data-act="devoff" data-name="browser">Disconnect</button>' : '') + '</div>' +
-    (token ? '<div class="kindlenote"><span class="mute tiny">Paste it into the extension’s options now; Daf only shows it once.</span><code class="tok">' + esc(token) + '</code></div>' : '');
+    (token ? '<div class="kindlenote"><span class="mute tiny">Token · shown once</span><code class="tok">' + esc(token) + '</code></div>' : '');
   const brNew = name => api('/api/devices', { method:'POST', body:JSON.stringify({ name }) }).then(r => drawDevices(r.token), e => toast(e.message));
   $('#brtoken').onclick = () => brNew('browser');
   // another browser (another account on the Mac, another computer) gets its own, so the first keeps working
@@ -972,15 +970,15 @@ async function drawNewsletters(fresh){
   let r;
   try { r = fresh ? Object.assign(await api('/api/newsletters'), await api('/api/newsletters/scan', { method:'POST' })) : await api('/api/newsletters'); }
   catch(e){ card.innerHTML = '<h2>Newsletters</h2><p class="mute" style="margin:0">' + esc(e.message) + '</p>'; return; }
-  if (!r.configured) { card.innerHTML = '<h2>Newsletters</h2><p class="mute" style="margin:0">Needs Proton Mail Bridge on the server (the office agent’s PROTON_USER and PROTON_BRIDGE_PASSWORD).</p>'; return; }
+  if (!r.configured) { card.innerHTML = '<h2>Newsletters</h2><p class="mute" style="margin:0">Proton Mail Bridge isn’t set up</p>'; return; }
   const chosen = new Set(r.chosen || []);
   const row = s => '<label class="nlrow"><input type="checkbox" data-nl="' + esc(s.address) + '"' + (chosen.has(s.address) ? ' checked' : '') + '><span><b>' + esc(s.name) + '</b> <span class="mute tiny">' + esc(s.address) + ' · ' + s.count + ' in 45 days</span><span class="mute tiny nlsub">' + esc(s.last_subject || '') + '</span></span></label>';
   const likely = r.senders.filter(s => s.likely || chosen.has(s.address)), rest = r.senders.filter(s => !s.likely && !chosen.has(s.address));
   card.innerHTML = '<div class="cardh"><h2>Newsletters</h2><button class="linkbtn tiny" data-act="nlscan">Look again</button></div>' +
-    '<p class="mute" style="margin:0">Daf reads your Proton mail through Bridge without marking anything read or moving it. Tick the senders whose emails belong in Daf, and their issues come into Library → Emails' + (r.count ? ' (' + r.count + ' so far)' : '') + '. Substack ones may already be in the Feed.</p>' +
+    (r.count ? '<p class="mute tiny" style="margin:0">' + r.count + ' in Emails</p>' : '') +
     '<input class="field sm" id="nlq" placeholder="Find a sender" autocomplete="off" style="width:100%">' +
     '<div class="nllist" id="nllist">' + likely.map(row).join('') + '</div>' +
-    (rest.length ? '<details class="nlmore"><summary class="mute tiny">Other mail with an unsubscribe link (' + rest.length + ')</summary><div class="nllist">' + rest.map(row).join('') + '</div></details>' : '') +
+    (rest.length ? '<details class="nlmore"><summary class="mute tiny">Other senders (' + rest.length + ')</summary><div class="nllist">' + rest.map(row).join('') + '</div></details>' : '') +
     '<div style="display:flex;justify-content:flex-end;gap:8px;align-items:center"><span class="mute tiny" id="nlstatus"></span><button class="btn primary sm" data-act="nlsave">Save</button></div>';
 }
 async function drawPod(token){
@@ -988,15 +986,14 @@ async function drawPod(token){
   const p = await api('/api/podcasts');
   const base = ((S.settings || {}).public_url || location.origin).replace(/\/$/, '');
   card.innerHTML = '<h2>Podcasts (AntennaPod)</h2>' +
-    '<div class="prow"><div class="d"><b>Sync</b><span>' + (p.last_sync ? 'Last sync ' + ago(p.last_sync) + ', ' + p.subs.length + ' subscriptions.' : 'Not connected yet.') + ' Listening shows on Today but never counts toward the hour.</span></div><button class="btn sm" data-act="podtoken">' + (p.device ? 'New password' : 'Make a password') + '</button></div>' +
-    (token ? '<div class="kindlenote"><span class="mute tiny">The AntennaPod password. Daf only shows it once.</span><code class="tok">' + esc(token) + '</code></div>' : '') +
+    '<div class="prow"><div class="d"><b>Sync</b><span>' + (p.last_sync ? 'Last sync ' + ago(p.last_sync) + ' · ' + p.subs.length + ' subscriptions' : 'Not connected') + '</span></div><button class="btn sm" data-act="podtoken">' + (p.device ? 'New password' : 'Make a password') + '</button></div>' +
+    (token ? '<div class="kindlenote"><span class="mute tiny">Password · shown once</span><code class="tok">' + esc(token) + '</code></div>' : '') +
     '<div class="prow"><div class="d"><b>Transcribe episodes I play or open</b></div>' +
       '<input type="checkbox" class="sw" id="podtr" aria-label="Transcribe episodes I play or open"' + (((S.settings || {}).podcasts || {}).transcribe !== false ? ' checked' : '') + '></div>' +
     '<details class="steps"' + (token ? ' open' : '') + '><summary>Set up AntennaPod</summary><ol>' +
     '<li>AntennaPod → Settings → <b>Synchronization</b> → <b>gpodder.net</b>.</li>' +
-    '<li>Server: <code>' + esc(base) + '</code> (AntennaPod may insist on https; then use the secure address once it exists). Username: <code>' + esc(S.user || 'reader') + '</code>. Password: the one above.</li>' +
-    '<li>Pick or create the device <b>AntennaPod</b>, and let it sync.</li>' +
-    '<li>To clip: in an episode, <b>Share → with position</b>, send it to Ezer. The minute before that point comes back transcribed, and lands in Highlights and the vault.</li></ol></details>';
+    '<li>Server: <code>' + esc(base) + '</code> · Username: <code>' + esc(S.user || 'reader') + '</code></li>' +
+    '<li>Device: <b>AntennaPod</b></li></ol></details>';
   if (S.route[1] === 'podcasts') setTimeout(() => card.scrollIntoView({ block: 'start' }), 300);
 }
 async function drawPhone(token){
@@ -1007,16 +1004,16 @@ async function drawPhone(token){
   const n = p.nudges;
   const base = (s.public_url || location.origin).replace(/\/$/, '');
   let h = '<h2>Phone</h2>';
-  h += '<div class="prow"><div class="d"><b>The evening nudge</b><span>' + (n.shown ? n.shown + ' shown this week, ' + n.followed + ' followed by reading within 30 minutes.' : 'Nothing shown this week yet.') + '</span></div></div>';
-  h += '<div class="prow"><div class="d"><b>Phone token</b><span>' + (phoneDev ? 'Made ' + epochDate(phoneDev.created) + (phoneDev.last_seen ? ', last used ' + ago(phoneDev.last_seen) : '') + '. A new one replaces it.' : 'For Tasker and the widget.') + '</span></div><button class="btn sm" data-act="phonetoken">' + (phoneDev ? 'New token' : 'Make a token') + '</button></div>';
-  if (token) h += '<div class="kindlenote"><span class="mute tiny">Copy it now; Daf only shows it once.</span><code class="tok">' + esc(token) + '</code></div>';
+  h += '<div class="prow"><div class="d"><b>The evening nudge</b><span>' + (n.shown ? n.shown + ' shown this week · ' + n.followed + ' followed by reading' : 'None this week') + '</span></div></div>';
+  h += '<div class="prow"><div class="d"><b>Phone token</b><span>' + (phoneDev ? 'Made ' + epochDate(phoneDev.created) + (phoneDev.last_seen ? ', last used ' + ago(phoneDev.last_seen) : '') : 'Not made yet') + '</span></div><button class="btn sm" data-act="phonetoken">' + (phoneDev ? 'New token' : 'Make a token') + '</button></div>';
+  if (token) h += '<div class="kindlenote"><span class="mute tiny">Token · shown once</span><code class="tok">' + esc(token) + '</code></div>';
   h += '<details class="steps"' + (token ? ' open' : '') + '><summary>Set up the nudge in Tasker</summary><ol>' +
     '<li><b>Profiles → + → Application</b>: tick Instagram, Reddit, X and Discord, then back. Long-press the profile → <b>Add → Time</b>, from 21:00 to 03:00.</li>' +
     '<li>New task, call it <b>Daf nudge</b>. Add <b>Net → HTTP Request</b>: Method <code>GET</code>, URL <code>' + esc(base) + '/api/phone/nudge</code>, Headers <code>Authorization:Bearer ' + esc(token || 'YOUR-TOKEN') + '</code>, and tick <b>Structure Output</b>.</li>' +
     '<li>Add <b>Task → If</b> <code>%http_data.show</code> <b>~</b> <code>true</code>.</li>' +
-    '<li>Add <b>Alert → Notify</b>: Title <code>%http_data.title</code>, Text <code>%http_data.text</code>. Under Actions, add <b>Net → Browse URL</b> <code>%http_data.url</code> so tapping it opens Daf.</li>' +
-    '<li>Add <b>Task → End If</b>. Daf decides the rest: at most one nudge every 25 minutes, none once the hour is done.</li></ol></details>';
-  h += '<div class="prow"><div class="d"><b>Install Daf as an app</b><span>' + (s.public_url ? 'Open ' + esc(s.public_url) + ' on the phone, then the browser menu → Install app. “Save to Daf” then shows up in the share menu.' : 'Needs HTTPS. Run <code>sudo tailscale set --operator=lander</code> on the server once, and Daf gets a secure address on your tailnet.') + '</span></div></div>';
+    '<li>Add <b>Alert → Notify</b>: Title <code>%http_data.title</code>, Text <code>%http_data.text</code>. Under Actions, add <b>Net → Browse URL</b> <code>%http_data.url</code>.</li>' +
+    '<li>Add <b>Task → End If</b>.</li></ol></details>';
+  h += '<div class="prow"><div class="d"><b>Install Daf as an app</b><span>' + (s.public_url ? esc(s.public_url) : 'Needs HTTPS') + '</span></div></div>';
   if (p.inbox.length) h += '<div class="prow"><div class="d"><b>Shared to Daf</b><span>' + p.inbox.slice(0, 5).map(x => esc(x.title || x.url)).join(' · ') + '</span></div></div>';
   card.innerHTML = h;
 }
@@ -1024,7 +1021,7 @@ function renderLogin(){
   clearInterval(S.timer);
   $('#app').classList.add('loggedout');
   $('#side').innerHTML = '';
-  $('#main').innerHTML = '<div class="login"><form id="loginf"><h1>Daf</h1><p class="mute" style="margin:0">One hour a day, Year 30.</p><label for="lu" class="mute tiny">Username</label><input class="field" id="lu" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required><label for="pw" class="mute tiny">Password</label><input class="field" id="pw" type="password" autocomplete="current-password" required><button class="btn primary" type="submit">Sign in</button><p class="mute tiny" id="loginerr" style="margin:0"></p></form></div>';
+  $('#main').innerHTML = '<div class="login"><form id="loginf"><h1>Daf</h1><label for="lu" class="mute tiny">Username</label><input class="field" id="lu" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required><label for="pw" class="mute tiny">Password</label><input class="field" id="pw" type="password" autocomplete="current-password" required><button class="btn primary" type="submit">Sign in</button><p class="mute tiny" id="loginerr" style="margin:0"></p></form></div>';
   $('#lu').focus();
 }
 
@@ -1037,10 +1034,9 @@ function openPaper(){
   m.innerHTML = '<h2>Log paper minutes</h2><label for="pmin" class="mute tiny">Minutes</label><input class="field" id="pmin" type="number" inputmode="numeric" min="1" max="720" value="30">' +
     '<div class="quick">' + [15,30,45,60,90].map(n => '<button class="btn sm" type="button" data-min="' + n + '">' + n + '</button>').join('') + '</div>' +
     '<span class="mute tiny">Which day</span><div class="seg" role="radiogroup">' + [['today','Today'],['yesterday','Yesterday'],['shabbat','Shabbat, ' + MONTHS[sat.getMonth()] + ' ' + sat.getDate()]].map(x => '<button type="button" role="radio" data-day="' + x[0] + '" class="' + (x[0] === def ? 'on' : '') + '" aria-checked="' + (x[0] === def) + '">' + esc(x[1]) + '</button>').join('') + '</div>' +
-    '<label for="ppages" class="mute tiny">Pages (optional, for a page goal)</label><input class="field" id="ppages" type="number" inputmode="numeric" min="0" max="2000" placeholder="0">' +
-    '<label for="pnote" class="mute tiny">Note (optional)</label><input class="field" id="pnote" placeholder="What you read">' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="savepaper">Log it</button></div>' +
-    '<span class="mute tiny">Goes into Reference/reading/Reading Log ' + (d ? d.today.slice(0, 4) : '') + '.md in the vault.</span>';
+    '<label for="ppages" class="mute tiny">Pages</label><input class="field" id="ppages" type="number" inputmode="numeric" min="0" max="2000" placeholder="0">' +
+    '<label for="pnote" class="mute tiny">Note</label><input class="field" id="pnote">' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="savepaper">Log it</button></div>' ;
   const i = $('#pmin'); i.focus(); i.select();
 }
 function closeModal(){ const m = $('#modal'); m.hidden = true; $('#scrim').hidden = true; m.classList.remove('wide', 'sheet'); m.onclick = m.onkeydown = null; }
@@ -1112,7 +1108,7 @@ function show(quiet){
 
 // The cards from their own files, and #prefs/<card> scrolls to one.
 function prefsMore(){
-  const D = window.DafCore, cards = { keys: [D.Keys, 'keyscard'], ai: [D.AI, 'aicard'], digest: [D.Digest, 'digestcard'], import: [D.Imports, 'importcard'], feedback: [D.Feedback, 'fbcard'], tags: [D.TagMan, 'tagscard'], tips: [D.Tips, 'tipscard'], anilist: [D.AniList, 'alcard'], readerapps: [D.ReaderApps, 'gracard'] };
+  const D = window.DafCore, cards = { keys: [D.Keys, 'keyscard'], ai: [D.AI, 'aicard'], digest: [D.Digest, 'digestcard'], import: [D.Imports, 'importcard'], feedback: [D.Feedback, 'fbcard'], tags: [D.TagMan, 'tagscard'], anilist: [D.AniList, 'alcard'], readerapps: [D.ReaderApps, 'gracard'] };
   for (const [name, [mod, id]] of Object.entries(cards)) {
     const card = $('#' + id); if (!mod || !card) continue;
     // The cards above it are still loading and push it down: once more after they've come.
@@ -1124,7 +1120,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.note) {
     const id = t.dataset.note; clearTimeout(noteTimers[id]);
-    noteTimers[id] = setTimeout(async () => { try { await api('/api/highlights/' + encodeURIComponent(id) + '/note', { method:'PUT', body:JSON.stringify({ note:t.value }) }); toast(t.value.trim() ? 'Note saved to the vault' : 'Note removed'); } catch(err){ toast(err.message); } }, 900);
+    noteTimers[id] = setTimeout(async () => { try { await api('/api/highlights/' + encodeURIComponent(id) + '/note', { method:'PUT', body:JSON.stringify({ note:t.value }) }); } catch(err){ toast(err.message); } }, 900);
   }
 });
 // What the popover held when this click began. A menu opened by this same click, from any script,
@@ -1179,7 +1175,7 @@ document.addEventListener('click', async e => {
       const r = await api('/api/paper', { method:'POST', body:JSON.stringify(body) }); closeModal(); toast('Logged ' + minutes + ' min for ' + shortDate(r.date)); await load();
     }
     else if (act === 'logout'){ await api('/api/logout', { method:'POST' }); renderLogin(); }
-    else if (act === 'signoutothers'){ if (!confirm('Sign out every other browser?')) return; await api('/api/account/signout-others', { method:'POST' }); toast('Every other browser is signed out'); }
+    else if (act === 'signoutothers'){ if (!confirm('Sign out every other browser?')) return; await api('/api/account/signout-others', { method:'POST' }); toast('Other browsers signed out'); }
     else if (act === 'rkeep') reviewAct('keep');
     else if (act === 'rless') reviewAct('less');
     else if (act === 'rnote'){ if (S.revNote) reviewAct('note'); else { S.revNote = true; drawReview(); } }
@@ -1218,7 +1214,7 @@ document.addEventListener('click', async e => {
     }
     else if (act === 'devoff'){
       const n = a.dataset.name;
-      if (!confirm(n === 'kindle' ? 'Disconnect the Kindle? It stops sending pages and highlights until you make a new token on the server (daf kindle-token kindle) and put it on the Kindle.' : 'Disconnect ' + n + '? It stops until it connects again.')) return;
+      if (!confirm(n === 'kindle' ? 'Disconnect the Kindle?' : 'Disconnect ' + n + '?')) return;
       await api('/api/devices/' + encodeURIComponent(n), { method:'DELETE' }); toast('Disconnected'); drawDevices(); if (n === 'phone') drawPhone();
     }
     else if (act === 'booknote'){ const v = $('#bnote').value.trim(); if (!v) return; const r = await api('/api/notes', { method:'POST', body:JSON.stringify({ text:v, book_id:a.dataset.id }) }); toast(r.vault === 'written' || r.vault === 'unchanged' ? 'Saved to the vault note' : 'Saved in Daf'); renderBook(a.dataset.id); }
@@ -1229,14 +1225,14 @@ document.addEventListener('change', async e => {
   try {
     if (t.dataset.count){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ count:{ [t.dataset.count]: t.checked } }) }); S.y29 = null; toast('Saved'); load(); }
     if (t.id === 'tz'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ home_tz:t.value }) }); S.y29 = null; toast('Days now follow ' + t.value); load(); }
-    if (t.id === 'podtr'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ podcasts:{ transcribe:t.checked } }) }); S.settings = Object.assign(S.settings || {}, { podcasts:{ transcribe:t.checked } }); toast(t.checked ? 'Episodes you play get transcripts' : 'Transcripts only when you ask'); }
+    if (t.id === 'podtr'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ podcasts:{ transcribe:t.checked } }) }); S.settings = Object.assign(S.settings || {}, { podcasts:{ transcribe:t.checked } }); toast('Saved'); }
     if (t.id === 'ttsvoice'){ await Voices.set(t.value); toast('Reading in ' + Voices.label(t.value)); }
-    if (t.id === 'volkeys'){ lsSet('volumeKeys', t.checked); window.dispatchEvent(new Event('daf-reading')); toast(t.checked ? 'The volume buttons turn pages, unless something is playing' : 'The volume buttons only change the volume'); }
+    if (t.id === 'volkeys'){ lsSet('volumeKeys', t.checked); window.dispatchEvent(new Event('daf-reading')); toast('Saved'); }
     if (t.id === 'ttsspeed'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ tts_speed:parseFloat(t.value) }) }); toast('Read-aloud at ' + t.value + '×'); }
-    if (t.id === 'expire'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ feed_expire_days:parseInt(t.value, 10) }) }); const w = FEED_WINDOWS.find(x => x[0] === +t.value); toast(+t.value === 3650 ? 'The Feed keeps unread items until you read them' : 'The Feed lets go after ' + (w ? w[1] : t.value + ' days') + (+t.value > 30 ? '. Older unread items come in on the next sync.' : '')); }
+    if (t.id === 'expire'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ feed_expire_days:parseInt(t.value, 10) }) }); toast('Saved'); }
     if (t.id === 'revsize'){ await api('/api/settings', { method:'PUT', body:JSON.stringify({ review_size:parseInt(t.value, 10) }) }); toast('From tomorrow: ' + t.value + ' a day'); }
     if (t.id === 'hlpriv'){ S.hlPrivate = t.checked; drawHighlights(); }
-    if (t.id === 'autoadv'){ lsSet('autoAdvance', t.checked); toast(t.checked ? 'Done and Later open the next item' : 'Done and Later go back to the list'); }
+    if (t.id === 'autoadv'){ lsSet('autoAdvance', t.checked); toast('Saved'); }
     if (t.id === 'hltag'){ S.hlTag = t.value; drawHighlights(); }
     if (t.id === 'hlsort'){ S.hlSort = t.value; drawHighlights(); }
   } catch(err){ toast(err.message); }
@@ -1248,7 +1244,7 @@ document.addEventListener('submit', async e => {
   if (u === (S.user || '') && !np) { toast('Nothing to change'); return; }
   try {
     const r = await api('/api/account', { method:'POST', body:JSON.stringify({ current:cp, user:u !== S.user ? u : '', password:np }) });
-    S.user = r.user; toast(r.signed_out_others ? 'Saved. Other browsers are signed out.' : 'Saved'); renderPrefs().then(() => { drawPhone(); drawPod(); drawDevices(); });
+    S.user = r.user; toast(r.signed_out_others ? 'Saved · other browsers signed out' : 'Saved'); renderPrefs().then(() => { drawPhone(); drawPod(); drawDevices(); });
   } catch(err){ toast(err.message); }
 });
 document.addEventListener('submit', async e => {

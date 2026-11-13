@@ -287,7 +287,7 @@ function drawAsk(){
   const q = $('#lnaskq'), typed = q ? q.value : '', had = q && document.activeElement === q;
   const tabs = $('#main .lnaskhome .lntabs'); if (tabs) tabs.outerHTML = homeTabs('ask');
   b.innerHTML = askView(H.data.chat, { sources: H.data.areas.map(a => ({ key: a.id, title: a.name, dot: a.color })), off: H.off, attr: 'data-ln-srca', anywhere: H.anywhere,
-    placeholder: 'Ask about what you’re learning' });
+    placeholder: 'Ask' });
   const q2 = $('#lnaskq'); if (q2) { q2.value = typed; if (had) q2.focus(); }
 }
 // Areas home's Add (an outside thing from an answer): which area it goes into
@@ -349,7 +349,7 @@ document.addEventListener('submit', async e => {
   e.preventDefault();
   const feed = e.target.id === 'lnfeed', i = feed ? $('#lnfeedurl') : $('#lnurl'), st = $('#lnstatus'), v = i.value.trim(); if (!v) return;
   st.textContent = feed ? 'Looking for its feed…' : 'Saving…';
-  try { await L.put(P.id, feed ? { feed: v } : { url: v }); st.textContent = feed ? 'Following it, in this area' : 'Saved, in this area'; i.value = ''; }
+  try { await L.put(P.id, feed ? { feed: v } : { url: v }); st.textContent = feed ? 'Following' : 'Saved'; i.value = ''; }
   catch(err){ st.textContent = err.message; }
 });
 // Add to an area, from anywhere (a book's page and ⋯, an article's or a video's ⋯, the rows picked in the
@@ -562,14 +562,14 @@ document.addEventListener('click', async e => {
     }
     else if (d.ln === 'delete') {
       const id = $('#modal').dataset.lnfor, a = (L.areas || []).find(x => x.id === id);
-      if (!confirm('Delete “' + (a ? a.name : '') + '”? What’s in it stays in Daf.')) return;
+      if (!confirm('Delete “' + (a ? a.name : '') + '”?')) return;
       await api('/api/areas/' + enc(id), { method: 'DELETE' }); C.closeModal(); await L.load(); location.hash = 'learn';
     }
     else if (d.lnPick) { t.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === t)); }
     else if (d.lnColor) { await api('/api/areas/' + enc(cardId.id), { method: 'PUT', body: JSON.stringify({ color: d.lnColor }) }); drawHome(await L.load()); }
     else if (d.lnDel !== undefined && cardId) {
       const a = (L.areas || []).find(x => x.id === cardId.id);
-      if (!confirm('Delete “' + (a ? a.name : '') + '”? What’s in it stays in Daf.')) return;
+      if (!confirm('Delete “' + (a ? a.name : '') + '”?')) return;
       await api('/api/areas/' + enc(cardId.id), { method: 'DELETE' }); drawHome(await L.load());
     }
     else if (d.lnMove) {

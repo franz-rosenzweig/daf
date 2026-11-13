@@ -31,7 +31,7 @@ function rowHTML(r){
   if (r.state === 'ready') {
     const read = r.service !== 'opml' && r.status && r.status.archive;
     return '<div class="imrow" data-imp="' + r.id + '">' + head +
-      (read ? '<label class="imopt"><input type="checkbox" data-imarch> Bring the ' + r.status.archive + ' read ones too, into the Archive</label>' : '') +
+      (read ? '<label class="imopt"><input type="checkbox" data-imarch> The ' + r.status.archive + ' read ones too</label>' : '') +
       (r.service === 'opml' && r.folders.length ? '<label class="imopt"><input type="checkbox" data-imfold checked> Into their folders</label>' : '') +
       '<div class="imacts"><button class="btn sm" data-imgo="drop">Never mind</button><button class="btn sm primary" data-imgo="start">Bring ' + (r.service === 'opml' ? 'them' : 'it') + ' in</button></div></div>';
   }
@@ -46,8 +46,7 @@ function rowHTML(r){
 async function prefs(card){
   const r = await api('/api/imports');
   card.innerHTML = '<h2>Import</h2>' +
-    '<p class="mute" style="margin:0">Bring your library over from another app. Drop its export file here and Daf shows what’s in it before anything happens. Links go to the Library with when you saved them, whether you read them, stars and tags.</p>' +
-    '<label class="adddrop" id="imdrop"><input type="file" id="imfile" accept=".csv,.json,.html,.htm,.opml,.xml,.zip,.txt" hidden><b>Drop an export file here</b><span class="mute tiny">or click to choose it</span></label>' +
+    '<label class="adddrop" id="imdrop"><input type="file" id="imfile" accept=".csv,.json,.html,.htm,.opml,.xml,.zip,.txt" hidden><b>Drop an export file here</b></label>' +
     '<div id="imlist">' + r.imports.map(rowHTML).join('') + '</div>' +
     '<details class="steps"><summary>Where each app keeps its export</summary><ul class="imapps">' + APPS.map(a => '<li><b>' + esc(a[0]) + '</b>: ' + esc(a[1]) + '</li>').join('') + '</ul></details>';
   watch(r.imports);
@@ -83,7 +82,7 @@ document.addEventListener('click', async e => {
     if (go === 'start') {
       const a = row.querySelector('[data-imarch]'), f = row.querySelector('[data-imfold]');
       await api('/api/import/' + id + '/start', { method: 'POST', body: JSON.stringify({ archived: !!(a && a.checked), folders: !f || f.checked }) });
-      toast('Bringing it in. You can leave this page; it goes on.');
+      toast('Importing');
     } else if (go === 'stop') await api('/api/import/' + id + '/stop', { method: 'POST' });
     else if (go === 'drop') await api('/api/import/' + id, { method: 'DELETE' });
   } catch(err){ toast(err.message); }

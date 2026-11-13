@@ -19,7 +19,7 @@ function open(q){
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false; m.classList.add('wide');
   m.innerHTML = '<h2>Add a book</h2>' +
     '<input class="field" id="abq" placeholder="Title, author or ISBN" autocomplete="off" value="' + esc(q || '') + '">' +
-    '<div id="abres" class="abres"><p class="mute tiny" style="margin:0">From Hardcover. A book you already have says so.</p></div>' +
+    '<div id="abres" class="abres"></div>' +
     '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" data-ab="close">Cancel</button></div>';
   const inp = $('#abq'); inp.focus();
   if (q) find(q);
@@ -28,7 +28,7 @@ function open(q){
 async function find(q){
   const box = $('#abres'); if (!box) return;
   if (!q.trim()) { box.innerHTML = ''; return; }
-  box.innerHTML = '<p class="mute tiny" style="margin:0">Asking Hardcover…</p>';
+  box.innerHTML = '<p class="mute tiny" style="margin:0">Searching…</p>';
   try {
     const r = await api('/api/books/find?q=' + encodeURIComponent(q.trim()));
     if (($('#abq') || {}).value !== q) return;            // typed on since
@@ -40,7 +40,7 @@ async function find(q){
         (h.image ? '<img src="' + esc(h.image) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="abnoimg"></span>') +
         '<span class="abt"><b>' + esc(h.title) + '</b><span class="mute tiny">' + esc([h.author, h.year].filter(Boolean).join(' · ')) + '</span>' +
         '<span class="tiny">' + [have && esc(have), shelf && esc(shelf), h.readers && '<span class="mute">' + h.readers.toLocaleString() + (h.readers === 1 ? ' reader' : ' readers') + '</span>'].filter(Boolean).join(' · ') + '</span></span></button>';
-    }).join('') : '<p class="mute" style="margin:0">Nothing on Hardcover by that name.</p>';
+    }).join('') : '<p class="mute" style="margin:0">Nothing found</p>';
   } catch(e){ box.innerHTML = '<p class="mute" style="margin:0">' + esc(e.message) + '</p>'; }
 }
 
@@ -51,13 +51,13 @@ function choose(i){
   const m = $('#modal');
   const st = h.status_id ? 0 : 1;                          // already on a Hardcover shelf: leave it there
   m.innerHTML = '<h2>' + esc(h.title) + '</h2><span class="mute">' + esc([h.author, h.year].filter(Boolean).join(' · ')) + '</span>' +
-    (h.status ? '<p class="mute tiny" style="margin:0">On Hardcover already: ' + esc(h.status) + '. That stays as it is.</p>' :
-      '<div class="prow"><div class="d"><b>On Hardcover</b><span>Where it goes on your Hardcover shelves.</span></div>' +
+    (h.status ? '<p class="mute tiny" style="margin:0">On Hardcover: ' + esc(h.status) + '</p>' :
+      '<div class="prow"><div class="d"><b>On Hardcover</b></div>' +
       '<div class="seg" role="radiogroup" aria-label="On Hardcover">' + [[1, 'Want to read'], [2, 'Reading'], [0, 'Not on Hardcover']].map(x =>
         '<button type="button" role="radio" aria-checked="' + (x[0] === st) + '" class="' + (x[0] === st ? 'on' : '') + '" data-abst="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>') +
-    '<div class="prow"><div class="d"><b>The book’s file</b><span>Optional. EPUB is best; it goes into Calibre, and Daf can open it. You can add it later from the book’s page.</span></div>' +
+    '<div class="prow"><div class="d"><b>The book’s file</b></div>' +
       '<label class="btn sm">' + '<span id="abfname">Choose a file</span><input type="file" id="abfile" accept=".epub,.kepub,.mobi,.azw3,.fb2,.cbz,.pdf" hidden></label></div>' +
-    '<div class="prow" id="abkindle" hidden><div class="d"><b>Put it on the Kindle</b><span>It downloads on the Kindle’s next Wi-Fi sync, once Calibre has it.</span></div>' +
+    '<div class="prow" id="abkindle" hidden><div class="d"><b>Put it on the Kindle</b></div>' +
       '<select class="field" id="abshelf" style="width:auto"><option value="">Not now</option></select></div>' +
     '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" data-ab="back">Back</button><button class="btn primary" data-ab="add">' + (h.book_id ? 'Add the file' : 'Add to Daf') + '</button></div>';
   A.status = h.status ? 0 : st;
@@ -71,7 +71,7 @@ async function add(btn){
     const bid = h.book_id || (await api('/api/books/add', { method: 'POST', body: JSON.stringify({ hc_book_id: h.id, status: A.status, kindle_shelf: shelf || null }) })).book_id;
     if (A.file) await upload(bid, A.file, false, shelf);
     closeModal();
-    toast(A.file ? 'Added. The file’s on its way into Calibre.' : 'Added to Daf' + (A.status === 1 ? ' and Want to read' : A.status === 2 ? ' and Reading' : ''));
+    toast(A.file ? 'Added' : 'Added to Daf' + (A.status === 1 ? ' and Want to read' : A.status === 2 ? ' and Reading' : ''));
     location.hash = 'book/' + encodeURIComponent(bid);
   } catch(e){ toast(e.message); btn.disabled = false; btn.textContent = 'Add to Daf'; }
 }
@@ -98,23 +98,23 @@ function kindleSection(b){
   if (!b.has_file && !(b.file && !b.file.error) && !k) return '';
   let state, acts = '';
   if (k && k.delivered) { state = 'On the Kindle, in ' + esc(k.shelf) + ', since ' + esc(C.ago(k.delivered)) + '.'; acts = '<button class="btn sm" data-kput="' + esc(b.id) + '" data-again="' + esc(k.shelf) + '">Send it again</button>'; }
-  else if (k && k.after_file) { state = 'Goes to the Kindle, in ' + esc(k.shelf) + ', once Calibre has the file.'; acts = '<button class="btn sm" data-kcancel="' + esc(b.id) + '">Don’t</button>'; }
+  else if (k && k.after_file) { state = 'Waiting for Calibre · ' + esc(k.shelf); acts = '<button class="btn sm" data-kcancel="' + esc(b.id) + '">Don’t</button>'; }
   else if (k && k.error) { state = 'The Kindle couldn’t take it: ' + esc(k.error) + '.'; acts = '<button class="btn sm" data-kput="' + esc(b.id) + '" data-again="' + esc(k.shelf) + '">Try again</button><button class="btn sm" data-kcancel="' + esc(b.id) + '">Forget it</button>'; }
-  else if (k) { state = 'Waiting for the Kindle’s next Wi-Fi sync; it goes in ' + esc(k.shelf) + '.'; acts = '<button class="btn sm" data-kcancel="' + esc(b.id) + '">Cancel</button>'; }
-  else { state = 'Put it on the Kindle: it downloads on the Kindle’s next Wi-Fi sync, into the shelf you pick.';
+  else if (k) { state = 'Waiting for the Kindle · ' + esc(k.shelf); acts = '<button class="btn sm" data-kcancel="' + esc(b.id) + '">Cancel</button>'; }
+  else { state = '';
     acts = '<select class="field" id="kshelf" style="width:auto"><option>Books</option></select><button class="btn sm primary" data-kput="' + esc(b.id) + '">Put it on the Kindle</button>';
     kindleShelves().then(list => { const sel = $('#kshelf'); if (sel) sel.innerHTML = shelfOptions(list, list.includes('Books') ? 'Books' : list[0]); }); }
-  return '<section class="card" id="bkindle"><div class="cardh"><h2>The Kindle</h2></div><p class="mute" style="margin:0">' + state + '</p>' +
+  return '<section class="card" id="bkindle"><div class="cardh"><h2>The Kindle</h2></div>' + (state ? '<p class="mute" style="margin:0">' + state + '</p>' : '') +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' + acts + '</div></section>';
 }
 // When it has no file: add one, and how the last one is getting on.
 function fileSection(b){
   if (b.has_file) return '';
   const f = b.file;
-  const state = !f ? 'Daf has this book from ' + (b.vault_path ? 'its note' : 'Hardcover') + ', without its file. Add one and it goes into Calibre, so you can read it in Daf.'
-    : f.error ? 'The file you sent didn’t make it: ' + esc(f.error) + '. Try again, maybe as an EPUB.'
-    : f.cal_id ? 'Calibre has it now; it opens here at the next sync, in a few minutes.'
-    : 'Sent ' + esc(C.ago(f.created)) + ' as “' + esc(f.name) + '”. Calibre-Web takes it in within a few minutes.';
+  const state = !f ? 'No file'
+    : f.error ? 'The file didn’t make it: ' + esc(f.error)
+    : f.cal_id ? 'In Calibre'
+    : 'Sent ' + esc(C.ago(f.created)) + ' · “' + esc(f.name) + '”';
   return '<section class="card" id="bfile"><div class="cardh"><h2>The book’s file</h2></div><p class="mute" style="margin:0">' + state + '</p>' +
     '<label class="btn sm" style="align-self:flex-start">Add the file<input type="file" data-bfile="' + esc(b.id) + '" accept=".epub,.kepub,.mobi,.azw3,.fb2,.cbz,.pdf" hidden></label></section>';
 }
@@ -134,7 +134,7 @@ document.addEventListener('change', async e => {
   }
   const bid = e.target.dataset && e.target.dataset.bfile;
   if (bid && e.target.files[0]) {
-    try { await upload(bid, e.target.files[0]); toast('The file’s on its way into Calibre'); C.load(true); }
+    try { await upload(bid, e.target.files[0]); toast('Sent to Calibre'); C.load(true); }
     catch(err){ toast(err.message); }
   }
 });
@@ -142,10 +142,10 @@ document.addEventListener('click', async e => {
   const k = e.target.closest && e.target.closest('[data-kput],[data-kcancel]');
   if (k) {
     try {
-      if (k.dataset.kcancel) { await api('/api/books/' + encodeURIComponent(k.dataset.kcancel) + '/kindle', { method: 'DELETE' }); toast('It won’t go to the Kindle'); }
+      if (k.dataset.kcancel) { await api('/api/books/' + encodeURIComponent(k.dataset.kcancel) + '/kindle', { method: 'DELETE' }); toast('Cancelled'); }
       else { const shelf = k.dataset.again || (($('#kshelf') || {}).value || 'Books');
         const r = await api('/api/books/' + encodeURIComponent(k.dataset.kput) + '/kindle', { method: 'POST', body: JSON.stringify({ shelf }) });
-        toast(r.kindle && r.kindle.after_file ? 'It goes to the Kindle once Calibre has the file' : 'It goes to the Kindle on its next Wi-Fi sync, in ' + shelf); }
+        toast(r.kindle && r.kindle.after_file ? 'Waiting for Calibre' : 'Queued for the Kindle'); }
       C.load(true);
     } catch(err){ toast(err.message); }
     return;

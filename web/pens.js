@@ -495,11 +495,11 @@ const KIND_ROW = (cur, size) => WRITING.map(k => '<button class="kind" data-kind
 function panelHTML(tool, parts){
   parts = parts || ['kinds', 'size', 'opacity', 'colors', 'under', 'fav'];
   let h = '';
-  if (tool === 'lasso') return '<div class="pnrow">Draw round handwriting with the lasso to read it as text or erase it.</div><div class="pnrow"><button class="linkbtn" data-hw="all">' + IC.text + 'Read all the handwriting here</button></div>';
+  if (tool === 'lasso') return '<div class="pnrow"><button class="linkbtn" data-hw="all">' + IC.text + 'Read all handwriting</button></div>';
   if (tool === 'eraser') {
     h += '<div class="pnrow seg2">' + [['stroke', 'Whole strokes'], ['area', 'What it passes over']].map(m => '<button data-er="' + m[0] + '" aria-pressed="' + (T.eraser.mode === m[0]) + '">' + m[1] + '</button>').join('') + '</div>';
     h += '<label class="pnrow"><span>Size</span><input type="range" min="8" max="80" value="' + T.eraser.size + '" data-set="esize" aria-label="Eraser size"><b>' + T.eraser.size + '</b></label>';
-    h += '<div class="pnrow"><button class="linkbtn" data-er="all">Erase everything written here</button></div>';
+    h += '<div class="pnrow"><button class="linkbtn" data-er="all">Erase all</button></div>';
     return h;
   }
   const pen = tool === 'highlighter' ? 'highlighter' : T.pen, p = T.pens[pen], cur = pen === 'highlighter' ? hlColor() : p.color;
@@ -513,13 +513,13 @@ function panelHTML(tool, parts){
   }
   if (tool === 'pen' && parts.includes('under')) h += '<div class="pnrow seg2 under" role="group" aria-label="Underline"><span>Underline</span>' +
     [['highlight', 'Highlight'], ['ask', 'Ask'], ['ink', 'Ink']].map(m => '<button data-ul="' + m[0] + '" aria-pressed="' + (T.under === m[0]) + '">' + m[1] + '</button>').join('') + '</div>';
-  if (parts.includes('fav') && tool !== 'eraser') h += '<div class="pnrow"><button class="linkbtn" data-fav="+">' + IC.plus + 'Keep this pen as a favourite</button></div>';
+  if (parts.includes('fav') && tool !== 'eraser') h += '<div class="pnrow"><button class="linkbtn" data-fav="+">' + IC.plus + 'Add to favourites</button></div>';
   return h;
 }
 function wirePanel(el, after){
   el.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.hw === 'all') { closePop(); closeRound(); const s = P.surface; if (s) { const all = s.all(); if (all.length) readout(s, all); else C.toast('There’s no handwriting here to read.'); } return; }
+    if (b.dataset.hw === 'all') { closePop(); closeRound(); const s = P.surface; if (s) { const all = s.all(); if (all.length) readout(s, all); else C.toast('No handwriting here'); } return; }
     if (b.dataset.kind) choose('pen', b.dataset.kind);
     else if (b.dataset.c) setColor(b.dataset.c);
     else if (b.dataset.er === 'all') { if (P.surface && P.surface.eraseAll) P.surface.eraseAll(); }
@@ -640,7 +640,7 @@ async function readInk(strokes, lang){
   const ink = strokes.filter(s => s && s.length).map((pts, i) => ({ id: 's' + i, tool: 'pen', pts: pts.flat() }));
   if (!ink.length) return [];
   if (lang !== 'he') return (await hwrAsk({ type: 'read', ink })).map(l => l.text).filter(t => t.trim());
-  if (!hebrew()) throw new Error('Hebrew handwriting is read in the Android app');
+  if (!hebrew()) throw new Error('Hebrew needs the Android app');
   const lines = await hwrAsk({ type: 'lines', ink }), out = [];
   for (const line of lines) {
     const xy = line.strokes.map(pts => { const a = []; for (let i = 0; i + 1 < pts.length; i += 3) a.push([pts[i], pts[i + 1]]); return a; });
@@ -655,7 +655,7 @@ window.__dafInkStatus = t => { if (P.ro) { P.ro.note = t; drawReadout(); } };
 // What the lasso holds, marked, with what can be done with it beside it.
 function hold(surf, strokes, loop){
   unhold();
-  if (!strokes.length) { C.toast('There’s no writing inside that.'); return; }
+  if (!strokes.length) { C.toast('No writing inside'); return; }
   surf.mark(strokes, true);
   let x2 = -Infinity, y1 = Infinity, y2 = -Infinity;
   for (const p of loop) { x2 = Math.max(x2, p[0]); y1 = Math.min(y1, p[1]); y2 = Math.max(y2, p[1]); }
@@ -680,7 +680,7 @@ function unhold(){ const h = P.held; if (!h) return; P.held = null; try { h.surf
 // in its place, or copied.
 function readout(surf, strokes){
   const pen = strokes.filter(writingOf);
-  if (!pen.length) { C.toast('There’s no handwriting there to read.'); return; }
+  if (!pen.length) { C.toast('No handwriting there'); return; }
   closeReadout();
   const langs = languages(), want = get('readLang', 'en'), lang = langs.includes(want) ? want : 'en';
   const r = P.ro = { surf, strokes: pen, lang, status: 'reading', text: '', note: '' };
@@ -696,8 +696,8 @@ async function read(){
   try {
     const lines = await readInk(r.surf.inkOf(r.strokes), lang);
     if (!still()) return;
-    Object.assign(r, { status: 'done', text: lines.join('\n'), note: lines.length ? '' : 'Nothing could be read there.' });
-  } catch(e){ if (still()) Object.assign(r, { status: 'failed', note: 'It couldn’t be read: ' + e.message }); }
+    Object.assign(r, { status: 'done', text: lines.join('\n'), note: lines.length ? '' : 'Nothing to read' });
+  } catch(e){ if (still()) Object.assign(r, { status: 'failed', note: 'Couldn’t read it: ' + e.message }); }
   drawReadout();
 }
 function drawReadout(){
@@ -710,7 +710,7 @@ function drawReadout(){
       (r.note ? '<div class="ronote mute">' + esc(r.note) + '</div>' : '') +
       '<textarea class="field" rows="' + Math.min(8, Math.max(2, r.text.split('\n').length + 1)) + '" aria-label="The text"' + (r.lang === 'he' ? ' dir="rtl"' : '') + '>' + esc(r.text) + '</textarea>' +
       '<div class="roacts">' + (r.surf.noteOnPassage ? '<button class="btn primary" data-ro="note"' + dis + '>Note on the passage</button>' : '') + '<button class="btn' + (r.surf.noteOnPassage ? '' : ' primary') + '" data-ro="typed"' + dis + '>Typed, in its place</button><button class="btn" data-ro="copy"' + dis + '>Copy</button></div>' +
-      (r.surf.noteOnPassage ? '<div class="mute tiny">A note on the passage goes with the words beside it, as a highlight’s note, in the Notebook and the vault, and the handwriting stays. Typed, in its place, the handwriting goes.</div>' : ''));
+      '');
 }
 async function onReadout(e){
   const b = e.target.closest('[data-ro], [data-lang]'), r = P.ro; if (!b || !r) return;
@@ -721,7 +721,7 @@ async function onReadout(e){
   if (!text) return;
   b.disabled = true;
   try {
-    if (k === 'note') { await r.surf.noteOnPassage(r.strokes, text); C.toast('A note on the passage, in the Notebook and the vault'); }
+    if (k === 'note') { await r.surf.noteOnPassage(r.strokes, text); C.toast('Note saved'); }
     else if (k === 'typed') r.surf.typed(r.strokes, text);
     closeReadout(); unhold();
   } catch(err){ b.disabled = false; C.toast(err.message); }
@@ -730,7 +730,7 @@ function closeReadout(){ if (P.ro && P.ro.el) P.ro.el.remove(); P.ro = null; }
 async function copy(text){
   try { await navigator.clipboard.writeText(text); C.toast('Copied'); return; } catch(e){}
   const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
-  try { document.execCommand('copy'); C.toast('Copied'); } catch(e){ C.toast('It couldn’t be copied here.'); }
+  try { document.execCommand('copy'); C.toast('Copied'); } catch(e){ C.toast('Couldn’t copy'); }
   t.remove();
 }
 

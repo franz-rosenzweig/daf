@@ -12,7 +12,7 @@ const words = w => 'q:' + encodeURIComponent(w);
 function readings(){
   const now = when(), list = P.readings.slice().sort((a, b) => (b.when === now) - (a.when === now));
   const head = { morning: 'This morning', day: 'Today', evening: 'Tonight' }[now];
-  return '<section class="card"><div class="cardh"><h2>' + head + '</h2><span class="mute tiny">Steps 10 and 11, in your Big Book</span></div>' +
+  return '<section class="card"><div class="cardh"><h2>' + head + '</h2></div>' +
     list.map(r => '<a class="nrow tr rcread' + (r.when === now ? ' now' : '') + '" href="' + (P.book ? open(P.book.id, words(r.find)) : '#recovery') + '">' +
       '<b>' + esc(r.title) + '</b><span class="mute tiny">' + esc(r.step) + ' · page ' + esc(r.page) + '</span></a>').join('') + '</section>';
 }
@@ -24,12 +24,12 @@ function chapters(){
     : '<a class="rch" href="' + open(P.book.id, encodeURIComponent(c.href)) + '"><span class="rcn">' + esc(c.n || '') + '</span><span class="rct">' + esc(c.title) + '</span>' +
       '<span class="rcp mute tiny">' + (c.page ? 'p. ' + esc(c.page) : '') + '</span>' + bar(c.read) + '</a>').join('');
   return '<div class="seg rcseg" role="tablist">' + names.map((n, i) => '<button type="button" role="tab" data-rcpart="' + i + '" class="' + (i === part ? 'on' : '') + '" aria-selected="' + (i === part) + '">' + n + '</button>').join('') + '</div>' +
-    '<div class="rchs">' + (rows || '<span class="mute tiny">Nothing here in this copy.</span>') + '</div>';
+    '<div class="rchs">' + (rows || '<span class="mute tiny">Nothing here</span>') + '</div>';
 }
 
 function book(){
   const b = P.book;
-  if (!b) return '<section class="card"><h2>The Big Book</h2><p class="mute" style="margin:0">Add your copy to Calibre (an EPUB), and its chapters show up here.</p></section>';
+  if (!b) return '<section class="card"><h2>The Big Book</h2><p class="mute" style="margin:0">Not in Calibre</p></section>';
   return '<section class="card"><div class="rcbook">' + cover(b, 'cv') +
     '<div class="rcbt"><b>Alcoholics Anonymous</b><span class="mute tiny">Fourth Edition</span>' +
     '<span class="tiny mute">' + bar(b.progress) + ' ' + Math.round(b.progress) + '%</span>' +
@@ -78,7 +78,7 @@ function found(q){
 }
 
 C.views.recovery = async () => {
-  $('#main').innerHTML = '<div class="top"><h1>Recovery</h1><span class="spacer"></span><span class="mute tiny rcp-hint">Private: never in the review, Signal or on the Kindle</span>' + C.Find.html('recovery', 'Search Recovery', draw) + '</div><div class="page rcp-page" id="rcpage"><span class="mute">Loading…</span></div>';
+  $('#main').innerHTML = '<div class="top"><h1>Recovery</h1><span class="spacer"></span><span class="mute tiny rcp-hint">Private</span>' + C.Find.html('recovery', 'Search Recovery', draw) + '</div><div class="page rcp-page" id="rcpage"><span class="mute">Loading…</span></div>';
   P = await C.swr('/api/recovery');
   if (!P.now && P.first.length) part = 0;
   draw();

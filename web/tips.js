@@ -99,7 +99,9 @@ function busy(){
 function why(){
   return !T.state ? 'not loaded' : T.state.off ? 'off' : T.shown ? 'one is up' : T.viewKey === location.hash ? 'one this view' : busy() ? 'busy' : '';
 }
+// The pointing tips are off for good (2026-11-12): app screens carry labels only.
 function check(){
+  return;
   if (why()) return;
   const v = view();
   for (const t of TIPS) {
