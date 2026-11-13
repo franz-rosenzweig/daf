@@ -72,6 +72,8 @@ Click any book, anywhere, and you get its page.
 ![A book's page](images/book.png)
 *A book's page: the time with it, its shelves and Hardcover; the highlights are further down.*
 
+Under the book's head, a book from Calibre has its **details**: the description from Calibre (bold, italics and lists as Calibre keeps them; a long one is cut to a few lines with **More**), then its series and its number in it, its tags, who published it and when, its pages, its rating, its language, the formats Calibre has it in, and links out to Hardcover, Goodreads, Amazon or Google Books by the identifiers Calibre keeps for it, with its ISBN. Tapping the series or a tag opens All books searched for just that series or tag. They're changed with **Edit details**, as before.
+
 At the top: the progress on the Kindle, in Daf and in the audiobook, when you last opened it, **Read in Daf** (or **Continue in Daf** with the percent), and **Put on the nightstand** or **Take off the nightstand**. A book with its audiobook in Audiobookshelf also has **Listen** and **Listen from here** (see below).
 
 The **Reading** card adds up the time across the Kindle, Daf and the audiobook, the number of sittings and on how many days, how many Kindle pages you read in an hour, and the time left, with a finish date at your recent pace. Under it is a bar for each of the last 30 days.

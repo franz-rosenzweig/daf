@@ -746,6 +746,46 @@ function bookStats(st){
     (st.pages_per_hour ? '<span><b>' + st.pages_per_hour + '</b><span class="mute tiny">Kindle pages an hour</span></span>' : '') + left + '</div>' +
     '<div class="b30" role="img" aria-label="The last 30 days">' + bars + '</div><span class="tiny mute">The last 30 days' + (st.recent_per_day ? ' · about ' + st.recent_per_day + ' minutes a day lately' : '') + '</span></section>';
 }
+// A Calibre book's own record, under its head: the description, then its details as label and value
+// (catalog.card_details). A series or a tag opens All books searched for it.
+const LANGS = { eng: 'English', heb: 'Hebrew', deu: 'German', ger: 'German', fra: 'French', fre: 'French', pol: 'Polish', spa: 'Spanish', ita: 'Italian', yid: 'Yiddish', ara: 'Arabic', rus: 'Russian', lat: 'Latin', grc: 'Ancient Greek' };
+function starsSvg(v){
+  const star = 'M10 2.6l2.3 4.7 5.2.8-3.8 3.6.9 5.1L10 14.4l-4.6 2.4.9-5.1-3.8-3.6 5.2-.8z';
+  return '<span class="bdstars" aria-label="' + v + ' of 5 stars">' + [1, 2, 3, 4, 5].map(n => {
+    const f = v >= n ? 1 : v >= n - .5 ? .5 : 0;
+    return '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><defs><clipPath id="bdh' + n + '"><rect width="' + (20 * f) + '" height="20"/></clipPath></defs>' +
+      '<path d="' + star + '" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>' + (f ? '<path d="' + star + '" fill="currentColor" clip-path="url(#bdh' + n + ')"/>' : '') + '</svg>';
+  }).join('') + '</span>';
+}
+function bookDetails(x){
+  if (!x) return '';
+  const exact = v => '"=' + String(v).replace(/"/g, '\\"') + '"';
+  const chip = (t, q) => '<button type="button" class="bdchip" data-catq="' + esc(q) + '">' + esc(t) + '</button>';
+  const num = n => Number.isInteger(+n) ? String(+n) : String(+n).replace(/0+$/, '');
+  const row = (label, val) => val ? '<div class="bdr"><span class="bdl">' + label + '</span><span class="bdv">' + val + '</span></div>' : '';
+  const year = (x.published || '').slice(0, 4), when = x.published && x.published > '0101' ? new Date(x.published + 'T12:00:00') : null;
+  const pub = [x.publisher ? esc(x.publisher) : '', when && !isNaN(when) ? (x.published.slice(5) === '01-01' ? year : when.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })) : ''].filter(Boolean).join(' · ');
+  const rows = row('Series', x.series ? chip(x.series, 'series:' + exact(x.series)) + '<span class="bdn">#' + num(x.series_index || 1) + (x.series_count > 1 ? ' · ' + x.series_count + ' books' : '') + '</span>' : '') +
+    row('Tags', x.tags.length ? '<span class="bdchips">' + x.tags.map(t => chip(t, 'tags:' + exact(t))).join('') + '</span>' : '') +
+    row('Published', pub) +
+    row('Pages', x.pages ? esc(String(x.pages)) : '') +
+    row('Rating', x.rating ? starsSvg(x.rating) : '') +
+    row('Language', x.languages.length ? esc(x.languages.map(l => LANGS[l] || l.toUpperCase()).join(', ')) : '') +
+    row('Formats', x.formats.length ? '<span class="bdchips">' + x.formats.map(f => '<span class="bdfmt">' + esc(f) + '</span>').join('') + '</span>' : '') +
+    row('Links', (x.links.length || x.isbn) ? '<span class="bdchips">' + x.links.map(l => '<a class="bdchip out" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>').join('') +
+      (x.isbn ? '<span class="bdisbn">ISBN ' + esc(x.isbn) + '</span>' : '') + '</span>' : '');
+  if (!x.description && !rows) return '';
+  const long = x.description && x.description.replace(/<[^>]+>/g, '').length > 420;
+  return '<section class="card bdcard" aria-label="Details">' +
+    (x.description ? '<div class="bddesc' + (long ? ' clamp' : '') + '">' + x.description + '</div>' + (long ? '<button type="button" class="linkbtn bdmore" data-act="bdmore">More</button>' : '') : '') +
+    (rows ? '<div class="bdrows">' + rows + '</div>' : '') + '</section>';
+}
+document.addEventListener('click', e => {
+  const q = e.target.closest && e.target.closest('.bdcard [data-catq]');
+  if (q) { if (window.DafCore.Catalog) window.DafCore.Catalog.search(q.dataset.catq); return; }
+  const m = e.target.closest && e.target.closest('[data-act="bdmore"]');
+  if (m) { const d = m.previousElementSibling, open = d.classList.toggle('open'); m.textContent = open ? 'Less' : 'More'; }
+});
 async function renderBook(id, hl){
   $('#main').innerHTML = '<div class="top"><a class="btn sm" href="#books">' + I.back + '</a><h1>Book</h1></div><div class="page"><span class="mute">Loading…</span></div>';
   const b = await api('/api/books/' + encodeURIComponent(id));
@@ -757,6 +797,7 @@ async function renderBook(id, hl){
     (b.url ? '<a class="btn" href="' + esc(b.url) + '" target="_blank" rel="noopener">Open original</a>' : '') +
     (/^cal:\d+$/.test(b.id) && window.DafCore.BookEdit ? '<button class="btn" data-act="bookedit" data-id="' + esc(b.id) + '">Edit details</button>' : '') + '</div>' +
     (b.vault_path ? '<span class="tiny mute l2vault" data-vname="' + esc(b.vault_name || '') + '">Vault: <code>' + esc(b.vault_path) + '</code></span>' : '<span class="tiny mute">No vault note yet</span>') + '</div></div>';
+  h += bookDetails(b.details);
   if (b.stats) h += bookStats(b.stats);
   if (window.DafCore.AddBook) h += window.DafCore.AddBook.sections(b);
   if (b.kind === 'book') h += '<section class="card" id="bshelves"></section>';
