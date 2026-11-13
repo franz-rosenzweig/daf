@@ -2642,3 +2642,66 @@ a.catchkrow:hover{background:var(--hover)}
 .befcv.on{border-color:var(--accent);background:var(--accent-weak)}
 .befcvwait{display:flex;align-items:center;justify-content:center;aspect-ratio:2/3;border-radius:6px;background:var(--hover);margin:6px}
 .befcvwait::after{content:"";width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--fg-3);border-radius:50%;animation:dafspin .8s linear infinite}
+
+/* All books laid out like Calibre's main window (catalog.js): the toolbar, the search row, the Tag
+   browser | the books | Book details, and the status bar with the switches */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.main > .top.caltop{display:block;padding-top:6px;padding-bottom:0;min-height:0}
+.caltools{display:flex;align-items:stretch;gap:2px;overflow-x:auto;scrollbar-width:none;padding:2px 0 6px}
+.caltools::-webkit-scrollbar{display:none}
+.caltool{all:unset;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:74px;padding:7px 8px 6px;border-radius:10px;font-size:12px;line-height:1.2;color:var(--fg);cursor:pointer;white-space:nowrap;flex:none;text-align:center}
+.caltool svg{color:var(--fg-2)}
+.caltool:hover{background:var(--hover)}
+.caltool:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.caltool:disabled{opacity:.36;cursor:default} .caltool:disabled:hover{background:none}
+.caltool.end{margin-left:auto}
+.calsearch{flex:none;display:flex;align-items:center;gap:8px;padding:0 20px 10px;border-bottom:1px solid var(--line)}
+.calsearch .catq{flex:1;width:auto;min-width:0}
+.catdet{display:none;width:300px;flex:none;border-left:1px solid var(--line);background:var(--panel);overflow:auto;overscroll-behavior:contain;padding:18px 18px 40px;position:relative}
+.catpage.det .catdet{display:block}
+.catdet:empty{background:var(--panel)}
+.catdx{position:absolute;top:10px;right:10px;display:none}
+.cdcov{display:block;width:min(180px,70%);margin:0 auto 14px}
+.cdcov img,.cdcov .cv{display:block;width:100%;height:auto;aspect-ratio:2/3;object-fit:cover;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.cdt{font-size:17px;line-height:1.3;margin:0 0 4px;text-align:center}
+.cdt a{color:var(--fg);text-decoration:none} .cdt a:hover{text-decoration:underline}
+.cda{text-align:center;color:var(--fg-2);font-size:14px;margin-bottom:12px}
+.cda .linkbtn{font-size:14px}
+.cdacts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.cdprog{display:flex;align-items:center;gap:8px;margin:0 0 12px} .cdprog .pbar{flex:1}
+.catdet .bdcard{padding:0;border:0;background:none;box-shadow:none;margin:0}
+.calstatus{flex:none;display:flex;align-items:center;gap:10px;padding:4px 12px 4px 20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--fg-2);background:var(--panel);min-height:34px}
+.calstatus #calsel{display:flex;align-items:center;gap:10px} .calstatus #calsel b{color:var(--fg);font-weight:600}
+.calstatus .linkbtn{font-size:12.5px}
+.calsw{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;cursor:pointer;color:var(--fg-2);white-space:nowrap}
+.calsw:hover{background:var(--hover)} .calsw:focus-visible{outline:2px solid var(--accent)}
+.calsw[aria-pressed="true"]{background:var(--active);color:var(--fg)}
+.calgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:22px 16px;padding:18px 20px 40px}
+.calcell{display:flex;flex-direction:column;gap:4px;padding:8px;border-radius:10px;cursor:pointer;min-width:0;outline:none}
+.calcell:hover{background:var(--hover)} .calcell:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.calcell.sel{background:var(--active)}
+.calcv{position:relative;display:block}
+.calcv img,.calcv .cv{display:block;width:100%;height:auto;aspect-ratio:2/3;object-fit:cover;border-radius:5px;box-shadow:0 3px 10px rgba(0,0,0,.16)}
+.calcv input{position:absolute;top:6px;left:6px;width:18px;height:18px;margin:0;accent-color:var(--accent);opacity:0}
+.calcell:hover .calcv input,.calcell.sel .calcv input,.calgrid:has(.sel) .calcv input{opacity:1}
+.calct{font-size:13px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.calca{font-size:12px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calcell.priv .calct{font-style:italic}
+.catgh svg:nth-of-type(2){color:var(--fg-3);flex:none}
+@media (pointer:coarse){ .calcv input{opacity:1;width:22px;height:22px} .caltool{min-width:80px;padding:9px 8px 8px} .calsw{padding:7px 10px} }
+/* below a laptop's width Book details is a sheet over the books, like the Tag browser */
+@media (max-width:1100px){
+  .catpage.det .catshade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:43}
+  .catdet{position:fixed;left:0;right:0;bottom:0;width:auto;max-height:78vh;z-index:44;border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;padding:22px 20px calc(22px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(0,0,0,.18)}
+  .catpage.det .catdet:empty{display:none}
+  .catdx{display:inline-flex}
+  .cdcov{width:130px}
+}
+@media (max-width:700px){
+  .calsearch{padding:0 14px 8px}
+  .calsearch .catb{width:34px;padding:0} .calsearch .catb span{display:none}
+  .caltool{min-width:64px;font-size:11px}
+  .calsw span{display:none}
+  .catdet{bottom:calc(64px + env(safe-area-inset-bottom,0px));max-height:72vh}
+  .calgrid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:16px 10px;padding:12px}
+}

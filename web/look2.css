@@ -477,3 +477,4 @@ html.l2-side .l2brand{gap:10px}
 
 /* All books: its bar as wide as its table (the table fills the sheet, edge to edge) */
 html[data-look="2"]:not(.l2-phone) .main > .top.cattop{padding-inline:20px}
+html[data-look="2"] .main > .top.caltop{padding-inline:12px}

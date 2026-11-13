@@ -1369,7 +1369,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest && e.target.closest('a[data-swap]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault(); swap(a.getAttribute('href'));
 });
-window.DafCore = { api, swr, outbox, keepOffline, errs: ERRS, esc, toast, $, $$, epochDate, ago, shortTitle, shortDate, cover, bar, ring, bookRow, I, S, renderSide, load, yearCards: () => { if (S.data) renderToday(true); return S.yearsHTML || ''; }, pinsOn, PINS, lsGet, lsSet, atWord, closeModal, hlCard, colorDots, HL_COLORS, drawHighlights: () => drawHighlights(), views: {}, navExtra: null, Voices, swap };
+window.DafCore = { api, swr, outbox, keepOffline, errs: ERRS, esc, toast, $, $$, epochDate, ago, shortTitle, shortDate, cover, bar, ring, bookRow, I, S, renderSide, load, yearCards: () => { if (S.data) renderToday(true); return S.yearsHTML || ''; }, pinsOn, PINS, lsGet, lsSet, atWord, closeModal, hlCard, colorDots, HL_COLORS, drawHighlights: () => drawHighlights(), views: {}, navExtra: null, Voices, swap, bookDetails };
 window.addEventListener('daf-hl-changed', () => { if (S.route[0] === 'review' && S.rev) drawReview(); });
 
 async function start(){
