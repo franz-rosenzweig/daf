@@ -2582,3 +2582,10 @@ a.rcrow:hover,a.rcrow:hover + .rcrow{box-shadow:none}
 .bdisbn{font-size:13px;color:var(--fg-3);font-variant-numeric:tabular-nums;align-self:center}
 .bdstars{display:inline-flex;gap:2px;color:var(--accent)}
 @media (max-width:600px){ .bdrows{grid-template-columns:1fr;row-gap:4px} .bdl{padding-top:8px} .bddesc{font-size:15.5px} }
+
+/* Add a book → Public domain (addbook.js findFree) */
+#modal .absrc{align-self:flex-start}
+.abhit.fbhit{cursor:default}
+.abhit.fbhit:hover{background:none}
+.abhit.fbhit .abt{flex:1}
+.abhit.fbhit .btn{flex:none;margin-left:auto}

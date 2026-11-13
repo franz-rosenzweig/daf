@@ -17,6 +17,8 @@ Putting a fourth book on asks "Which one steps off?", which is the whole point: 
 
 **Add a book**, at the top of **Books**, searches Hardcover by title, author or ISBN. Each result says what I already have of it: "In your library" (Calibre has the file), "In Daf, no file yet", and its Hardcover shelf if it's on one. Study guides and "summary of" knock-offs sink to the bottom, because the results go by how many people read them. Picking one I already have just opens it.
 
+**Public domain**, the other side of Add a book, searches Standard Ebooks and Project Gutenberg together, for the classics and anything old enough to be free. Standard Ebooks comes first, since its editions are proofread and typeset; a Gutenberg result that's the same book is left out. **Add** puts the book's EPUB straight into Calibre, the way a dropped EPUB goes, and it shows up in Books once Calibre has filed it, ready to read in Daf or send to the Kindle. A book Calibre has already says **Open** instead; one that looks like a book I have asks before adding another edition.
+
 For a new one I choose where it goes on Hardcover (**Want to read**, **Reading**, or **Not on Hardcover**), and I can give it its file right there. Then:
 
 - It's in Daf at once, with its cover, and its Hardcover status is set, privately if the title is on my private list. Its 📚 note in the vault comes from the Hardcover sync within half an hour, the same way as a book added on Hardcover itself.
