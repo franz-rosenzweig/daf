@@ -14,6 +14,7 @@ import android.os.Message;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.webkit.CookieManager;
@@ -28,6 +29,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 import android.window.OnBackInvokedDispatcher;
 
@@ -241,6 +243,7 @@ public class MainActivity extends Activity {
 
     /** Whatever is open closes, then Daf goes back; only with nowhere to go does Back leave. */
     private void back() {
+        if (fullOff()) return;
         if (web == null) {
             moveTaskToBack(true);
             return;
@@ -433,7 +436,47 @@ public class MainActivity extends Activity {
     @Override
     public void onWindowFocusChanged(boolean focus) {
         super.onWindowFocusChanged(focus);
+        if (focus && fullView != null) bars(false);
         if (focus && immersive) screen(true, (getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0);
+    }
+
+    // ---- a video's full screen (YouTube's button, the player's own) ----
+
+    private View fullView;                        // the video, over everything, while it's full screen
+    private WebChromeClient.CustomViewCallback fullDone;
+    private boolean fullAwake;                    // the screen was kept on before it
+
+    private void bars(boolean show) {
+        WindowInsetsController c = getWindow().getInsetsController();
+        if (c == null) return;
+        c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        if (show) c.show(WindowInsets.Type.systemBars()); else c.hide(WindowInsets.Type.systemBars());
+    }
+
+    private void fullOn(View view, WebChromeClient.CustomViewCallback done) {
+        if (fullView != null) { done.onCustomViewHidden(); return; }
+        fullView = view;
+        fullDone = done;
+        view.setBackgroundColor(android.graphics.Color.BLACK);
+        ((ViewGroup) getWindow().getDecorView()).addView(view, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        fullAwake = (getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0;
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        bars(false);
+    }
+
+    /** Out of a video's full screen. → false when there was none. */
+    private boolean fullOff() {
+        if (fullView == null) return false;
+        View v = fullView;
+        WebChromeClient.CustomViewCallback done = fullDone;
+        fullView = null;
+        fullDone = null;
+        ((ViewGroup) getWindow().getDecorView()).removeView(v);
+        if (!fullAwake) getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        bars(immersive ? false : true);
+        if (done != null) done.onCustomViewHidden();
+        return true;
     }
 
     // ---- the window ----
@@ -624,6 +667,17 @@ public class MainActivity extends Activity {
     }
 
     private final class Chrome extends WebChromeClient {
+        /** A video's full-screen button. */
+        @Override
+        public void onShowCustomView(View view, CustomViewCallback callback) {
+            fullOn(view, callback);
+        }
+
+        @Override
+        public void onHideCustomView() {
+            fullOff();
+        }
+
         /** The microphone (the Sketchbook's dictation): askMic. Anything else the page asks for, no. */
         @Override
         public void onPermissionRequest(PermissionRequest request) {
