@@ -35,7 +35,7 @@ Kindle, audiobooks in Audiobookshelf, podcasts in AntennaPod.
 |---|---|---|
 | KOReader → vault highlights | `.claude/scripts/koreader-sync.sh`, `koreader-parse.py`, `koreader-merge.py` (cron, every 10 min) | Book highlights. Keeps running; Daf reads them, never rewrites that region. |
 | KoInsight | `/srv/docker/koinsight/prod.sqlite3` (`page_stat`, `annotation`) | Year 29 history and early reading time, read-only. |
-| Calibre libraries | `/srv/docker/cwa-library/metadata.db` (245), `cwa-libros` (181) | Book metadata and covers, read-only. |
+| Calibre library | `/srv/docker/cwa-library/metadata.db` (245; the older `cwa-libros` library was retired in November 2026) | Book metadata and covers, read-only. |
 | Audiobookshelf | `/srv/docker/audiobookshelf/config/absdatabase.sqlite` | Listening time, progress, bookmarks, read-only (same way `audiobookshelf-sync.py` reads it). |
 | FreshRSS | `freshrss` container, Google Reader API enabled | The Feed: items, folders, read state. |
 | Karakeep | `docker-web-1`, keep.tiresia.xyz, REST API + Meilisearch | The Library: saving, archived text, highlights, search. |

@@ -68,6 +68,32 @@ class ReadColumn(unittest.TestCase):
         self.assertEqual(conflicts[0]["calibre"], "Planning")
 
 
+class KOReaderColumns(unittest.TestCase):
+    def test_progress_and_status_only_where_they_differ(self):
+        with tempfile.TemporaryDirectory() as d:
+            db = Path(d) / "metadata.db"
+            calibre(db, [(1, "A", None), (2, "B", None), (3, "C", None), (4, "D", None)])
+            c = sqlite3.connect(db)
+            c.executescript("INSERT INTO custom_columns VALUES (7, 'ko_progfloat', 'float', '{}');"
+                            "INSERT INTO custom_columns VALUES (8, 'ko_status', 'text', '{}');"
+                            "CREATE TABLE custom_column_7 (id INTEGER PRIMARY KEY, book INTEGER, value REAL);"
+                            "CREATE TABLE custom_column_8 (id INTEGER PRIMARY KEY, book INTEGER, value TEXT);"
+                            "INSERT INTO custom_column_7 (book, value) VALUES (1, 0.2501), (2, 0.1);"
+                            "INSERT INTO custom_column_8 (book, value) VALUES (1, 'reading'), (3, 'reading');")
+            c.commit(); c.close()
+            dc = sqlite3.connect(":memory:")
+            dc.execute("CREATE TABLE books (calibre_id INTEGER, status TEXT, progress REAL)")
+            dc.executemany("INSERT INTO books VALUES (?, ?, ?)", [(1, "reading", 25.0), (2, "read", 100.0), (3, "to-read", 0.7), (4, "paused", 40.0), (9, "reading", 5.0)])
+            with mock.patch.object(config, "CALIBRE_DBS", [db]):
+                ops = calibrekeep.ko_plan(dc, {})
+        got = {o["ids"][0]: o["fields"] for o in ops}
+        self.assertNotIn(1, got)                                   # the same already
+        self.assertEqual(got[2], {"#ko_progfloat": 1.0, "#ko_status": "complete"})
+        self.assertEqual(got[3], {"#ko_progfloat": 0.007})         # To read: the status is left alone
+        self.assertEqual(got[4], {"#ko_progfloat": 0.4, "#ko_status": "abandoned"})
+        self.assertNotIn(9, got)                                   # not in this library
+
+
 class Pages(unittest.TestCase):
     def test_counts_the_text(self):
         buf = io.BytesIO()
