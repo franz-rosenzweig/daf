@@ -318,6 +318,12 @@ function mine(e, doc, surf){
   const t = e.target;
   return !!(t && t.closest) && !t.closest(SKIP) && surf.takes(t, doc);
 }
+// Somewhere the surface in use takes ink: not the tools, a field or a menu.
+function onInk(doc, t){
+  if (!t || !t.closest || t.closest(SKIP)) return false;
+  const ss = doc.__dafSurfs || [], s = ss.includes(P.surface) ? P.surface : ss.find(x => x.live());
+  return !s || s.takes(t, doc);
+}
 function seenPen(){ P.lastPen = Date.now(); if (!P.seen) { P.seen = true; put('seen', true); P.docs.forEach(arm); redraw(); } }
 function feed(e, off){
   const L = P.live, evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
@@ -431,7 +437,9 @@ function arm(doc){
   win.addEventListener('touchstart', e => {
     if (!writing()) return;
     if (stylus(e)) { if (P.live) { e.preventDefault(); e.stopImmediatePropagation(); } return; }
-    if (P.live || Date.now() - P.near < 350) { e.preventDefault(); e.stopImmediatePropagation(); }
+    // A hand near the pen touches nothing where the pen writes. Android's Chrome doesn't call the
+    // pen's own touch a stylus, so on the pen's menus, panels and buttons it must stay a tap.
+    if (P.live || (Date.now() - P.near < 350 && onInk(doc, e.target))) { e.preventDefault(); e.stopImmediatePropagation(); }
   }, { capture: true, passive: false });
   win.addEventListener('touchmove', e => { if (writing() && P.live) { e.preventDefault(); e.stopImmediatePropagation(); } }, { capture: true, passive: false });
 }
