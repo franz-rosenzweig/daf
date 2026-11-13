@@ -2338,7 +2338,7 @@ body[data-view="catalog"] #main{display:flex;flex-direction:column;overflow:hidd
 .catrs::after{content:"";position:absolute;left:4px;top:9px;bottom:9px;width:1px;background:var(--line)}
 .cattable th.dropl{box-shadow:inset 3px 0 0 var(--accent)} .cattable th.dropr{box-shadow:inset -3px 0 0 var(--accent)}
 .cattable th.dragging{opacity:.5}
-.cattable td{padding:0 10px;height:36px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.cattable td{padding:0 10px;height:36px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;background:var(--bg)}  /* solid: a room's texture doesn't show through the rows */
 .cattable td.num{text-align:right;font-variant-numeric:tabular-nums}
 .cattable tbody tr:hover td{background:var(--hover)}
 .cattable tbody tr.sel td{background:var(--active)}
@@ -2611,9 +2611,24 @@ a.rcrow:hover,a.rcrow:hover + .rcrow{box-shadow:none}
 .befrnew{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:600px){ .befrrow{grid-template-columns:1fr} }
 /* Check library (catalog.js) */
-.catck{display:flex;flex-direction:column;max-height:min(60vh,560px);overflow:auto;margin-top:6px}
-.catck h3{font-size:14px;margin:14px 0 4px}
-.catckrow{display:flex;justify-content:space-between;gap:12px;padding:7px 8px;border-radius:8px;color:inherit;text-decoration:none;font-size:14px}
-a.catckrow:hover{background:var(--hover)}
-.catckrow .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;overflow-wrap:anywhere}
-.catckbtns{display:flex;justify-content:flex-end;margin-top:12px}
+.catchk{display:flex;flex-direction:column;max-height:min(60vh,560px);overflow:auto;margin-top:6px}
+.catchk h3{font-size:14px;margin:14px 0 4px}
+.catchkrow{display:flex;justify-content:space-between;gap:12px;padding:7px 8px;border-radius:8px;color:inherit;text-decoration:none;font-size:14px}
+a.catchkrow:hover{background:var(--hover)}
+.catchkrow .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;overflow-wrap:anywhere}
+.catchkbtns{display:flex;justify-content:flex-end;margin-top:12px}
+
+/* All books on a phone: a list, each book (its cover and title) over the next column (the author, as
+   the columns come), with its box; the rest of the columns are for wider screens. */
+@media (max-width:600px){
+  .cattable{width:100%!important;table-layout:auto}
+  .cattable colgroup{display:none}
+  .cattable thead tr,.cattable tbody tr{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center}
+  .cattable th,.cattable td{display:none;position:static!important;box-shadow:none!important;width:auto}
+  .cattable th.catck,.cattable th:nth-child(2){display:flex;align-items:center}
+  .cattable th.catck{justify-content:center}
+  .cattable td.catck{display:flex;align-items:center;justify-content:center;grid-row:span 2;align-self:stretch;height:auto}
+  .cattable td:nth-child(2){display:block;height:auto;padding:10px 14px 1px 0;border-bottom:0;font-size:15px;font-weight:600}
+  .cattable td:nth-child(3){display:block;height:auto;padding:0 14px 10px 0;font-size:13px;color:var(--fg-3)}
+  .cattable td:nth-child(2) img{width:26px;height:38px}
+}

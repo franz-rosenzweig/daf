@@ -252,14 +252,14 @@ async function checkLibrary(){
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false; m.classList.add('wide');
   m.innerHTML = '<h2>Check library</h2><p class="mute">Checking…</p>';
   let r;
-  try { r = await api('/api/catalog/check'); } catch(e){ m.innerHTML = '<h2>Check library</h2><p class="mute">' + esc(e.message) + '</p><div class="catckbtns"><button class="btn" data-ckclose>Close</button></div>'; return; }
+  try { r = await api('/api/catalog/check'); } catch(e){ m.innerHTML = '<h2>Check library</h2><p class="mute">' + esc(e.message) + '</p><div class="catchkbtns"><button class="btn" data-ckclose>Close</button></div>'; return; }
   const groups = CHECKS.filter(([k]) => (r[k] || []).length);
-  const item = x => x.id ? '<a class="catckrow" href="#book/cal:' + x.id + '" data-ckclose><span>' + esc(x.title) + '</span><span class="mute tiny">' + esc(x.format || x.file || '') + '</span></a>'
-    : '<div class="catckrow"><span class="mono">' + esc(x.path) + '</span></div>';
+  const item = x => x.id ? '<a class="catchkrow" href="#book/cal:' + x.id + '" data-ckclose><span>' + esc(x.title) + '</span><span class="mute tiny">' + esc(x.format || x.file || '') + '</span></a>'
+    : '<div class="catchkrow"><span class="mono">' + esc(x.path) + '</span></div>';
   m.innerHTML = '<h2>Check library</h2><span class="mute tiny">' + r.books + ' books</span>' +
-    (groups.length ? '<div class="catck">' + groups.map(([k, l]) => '<h3>' + l + ' <span class="mute tiny">' + r[k].length + '</span></h3>' + r[k].slice(0, 200).map(item).join('')).join('') + '</div>'
+    (groups.length ? '<div class="catchk">' + groups.map(([k, l]) => '<h3>' + l + ' <span class="mute tiny">' + r[k].length + '</span></h3>' + r[k].slice(0, 200).map(item).join('')).join('') + '</div>'
       : '<p>Nothing wrong</p>') +
-    '<div class="catckbtns"><button class="btn" data-ckclose>Close</button></div>';
+    '<div class="catchkbtns"><button class="btn" data-ckclose>Close</button></div>';
 }
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-ckclose]')) C.closeModal ? C.closeModal() : ($('#modal').hidden = $('#scrim').hidden = true); });
 
