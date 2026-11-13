@@ -309,7 +309,6 @@ html[data-look="2"] #main :is(
   .top .find:not(.open),
   .top a[href="#catalog"], .top [data-act="addbook"], #shelfsec [data-shelf="new"], .bcell [data-act="standon"],
   #bacts [data-abk="here"], #bacts [data-act="bookedit"], #bacts a[target="_blank"], .bookhead .l2vault, .bookhead .tiny.mute:has(code),
-  [data-act="cat:cols"], [data-act="cat:views"], [data-act="cat:more"],
   .top [data-home="config"],
   .lvmain > .top [data-ract="saveview"], .lvmain > .top [data-ract="rmview"], .lvmain > .top [data-ract="selmode"]:not(.on), .lvmain > .top #lsort, .lvmain > .top #tagf, .lvmain > .top [data-ract="lmore"],
   .top a[href="#edition/taste"], .top [data-ed="kindle"], .top [data-ed="again"],

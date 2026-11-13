@@ -2669,6 +2669,9 @@ a.catchkrow:hover{background:var(--hover)}
 .cda .linkbtn{font-size:14px}
 .cdacts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
 .cdprog{display:flex;align-items:center;gap:8px;margin:0 0 12px} .cdprog .pbar{flex:1}
+#catdet .bdcard{padding:0;border:0;background:none;box-shadow:none;margin:0;backdrop-filter:none}
+#catdet .bddesc{font-family:inherit;font-size:14px;line-height:1.55}
+#catdet .bdrows{column-gap:14px;font-size:13.5px}
 .catdet .bdcard{padding:0;border:0;background:none;box-shadow:none;margin:0}
 .calstatus{flex:none;display:flex;align-items:center;gap:10px;padding:4px 12px 4px 20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--fg-2);background:var(--panel);min-height:34px}
 .calstatus #calsel{display:flex;align-items:center;gap:10px} .calstatus #calsel b{color:var(--fg);font-weight:600}
