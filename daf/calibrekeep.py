@@ -172,9 +172,11 @@ def keep_pages(conn, settings):
     finally:
         c.close()
     counts = pages_for(todo)
+    n = write_pages(counts)          # first: calibrewrite then updates Daf's rows on a connection of its own
     skip |= {cid for cid in todo if cid not in counts}
     conn.execute("INSERT INTO kv (k, v) VALUES ('calibre_pages_skip', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", (json.dumps(sorted(skip)),))
-    return write_pages(counts)
+    conn.commit()
+    return n
 
 
 def run(conn, settings):
@@ -183,6 +185,7 @@ def run(conn, settings):
         return ""
     out = []
     n = keep_read(conn, settings)
+    conn.commit()                    # what it noted, before the next change opens its own connection (calibrewrite._follow)
     if n:
         out.append(f"Read column {n}")
     p = keep_pages(conn, settings)
