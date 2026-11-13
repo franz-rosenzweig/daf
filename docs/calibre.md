@@ -6,11 +6,15 @@ My books live in Calibre. Calibre-Web Automated runs it on the server, takes in 
 
 ## All books
 
-**All books**, at the top of **Books**, is the whole library as a spreadsheet: one row a book, with the columns I choose. Every book Calibre has is there, including the ones without a file yet, and next to Calibre's own fields it has what Daf knows: the status from the book's vault note, how far along I am, when I last read it, how many highlights it has, and which shelves it's on. Private books stay out unless I turn on **Show private books** in the **⋯** menu.
+**All books**, at the top of **Books**, is laid out like Calibre's own main window, because that's the layout my hands know. Across the top is Calibre's toolbar: **Add books**, **Edit metadata**, **Convert books**, **Read**, **Find details** (Calibre's Download metadata), **Shelves**, **Merge books**, **Download** (Calibre's Save to disk), **Remove books**, and at the far end **Library**, with Check library, the tags, authors and series, writing details into the files, Count pages, the CSV export, private books and Calibre's trash. The buttons that need a book light up once I've chosen one. Under the toolbar is the search, with **Views**, **Sort** and **Columns** beside it.
+
+Below that are Calibre's three panels: the **Tag browser** on the left, the books in the middle, and **Book details** on the right, which shows the book I chose last: its cover, title and author, **Read** (or **Continue** with how far I am), **Edit metadata**, how far along I am, and then the description, series, tags, publisher, pages, languages, formats and links, the same card as on the book's own page. Tapping an author, a tag or a series there searches for it. At the bottom is the status bar, with how many books there are and how many I've chosen, and the three switches Calibre has in that corner: **Tag browser**, **Book details** and **Cover grid**, which shows the books as covers instead of rows. On the Mac, a laptop or the tablet sideways, the panels sit side by side; on the tablet upright and the phone, the Tag browser and Book details open as sheets from the bottom.
+
+The books themselves are a spreadsheet: one row a book, with the columns I choose. Every book Calibre has is there, including the ones without a file yet, and next to Calibre's own fields it has what Daf knows: the status from the book's vault note, how far along I am, when I last read it, how many highlights it has, and which shelves it's on. Private books stay out unless I turn on **Show private books** in the **Library** menu.
 
 Clicking a column's name sorts by it, and clicking again turns the order around. It opens on **Added**, newest first, so whatever came in lately is at the top. Dragging the edge of a column's name makes it wider or narrower, and on the Mac or a laptop I can drag the name itself to move the column. **Columns** lists everything there is: Calibre's fields (title, authors, series, tags, rating, the dates, publisher, language, formats, size, ISBN, identifiers, cover), my own Calibre columns (Read, Pages, Collections and the KOReader ones), and Daf's. I tick the ones I want and drag them into order there too, which is the way to do it on the tablet.
 
-The title opens the book's page in Daf, and so does a double-click anywhere on the row. When I come back, the table is where I left it.
+A click or a tap on a row chooses that book alone, as in Calibre, and shows it in Book details; the box at the start of the row (or Cmd or Ctrl and a click) adds a book to the ones chosen or takes it out, and Shift chooses everything from the last one. The title opens the book's page in Daf, and so does a double-click anywhere on the row. When I come back, the table is where I left it.
 
 ## Searching the way Calibre does
 
@@ -26,9 +30,9 @@ The search box understands Calibre's search language, so anything I'd type in Ca
 
 If Daf can't make sense of something, like a date it doesn't know, the box goes red and the page says what it didn't understand.
 
-## Filter
+## The Tag browser
 
-**Filter** opens Calibre's tag browser beside the table, and on the tablet and phone as a sheet from the bottom. It has quick ones (**Added** this week, this month, the last 30 days, this year or last year, and **Missing**: no file, no cover, no tags, no rating, no series) and then every status, tag, author, series, format, language, publisher, rating, shelf and Calibre column, each with how many books have it. **Find a value** narrows the long lists.
+The **Tag browser** is Calibre's, in Calibre's order: Authors, Languages, Series, Formats, Publishers, Rating and Tags, then my own Calibre columns, then **Saved searches** (my views), each with how many books have each value. After those come Daf's own: status, shelves, **Added** (this week, this month, the last 30 days, this year or last year), **Missing** (no file, no cover, no tags, no rating, no series) and **Tidy**. **Find** at the top narrows the long lists.
 
 Clicking a value adds it to the search, so I can see exactly what it did and change it by hand. Clicking it a second time turns it into "not that" (it gets a minus and a line through it), and a third click takes it out again. **Clear** empties the search.
 
@@ -50,17 +54,17 @@ The left side has the cover and the files. **Change cover** takes an image from 
 
 ## Shelves and collections
 
-Rows can be dragged onto shelves and onto Calibre's Collections: one row, or every chosen row at once. **Shelves** in the bar at the bottom ticks them on and off instead. [Books and shelves](books-and-shelves.md#dragging-books-onto-shelves) has the details.
+Rows can be dragged onto shelves and onto Calibre's Collections: one row, or every chosen row at once. **Shelves** in the toolbar ticks them on and off instead. [Books and shelves](books-and-shelves.md#dragging-books-onto-shelves) has the details.
 
 ## Several books at once
 
 In All books, each row has a box at its left. A click on a row chooses it the way a spreadsheet does: on its own, with ⌘ (or Ctrl) one more, and with Shift every row from the last one I clicked. On the tablet and the phone a tap adds the row or takes it out. The box in the header chooses everything the table shows.
 
-When anything is chosen, a bar comes up at the bottom with **Edit N books**. That sheet changes them all at once: the authors, the series (with **Number them from 1 in the table's order**, which is how I put a series in order: sort the table the way I want and then number), **Add tags** and **Remove tags** (the ones already on the chosen books are offered), the rating or **No rating**, the publisher, the date, the languages, and my own columns. Anything I leave empty stays as it is on each book.
+With several books chosen, **Edit metadata** in the toolbar opens the sheet for all of them, which changes them all at once: the authors, the series (with **Number them from 1 in the table's order**, which is how I put a series in order: sort the table the way I want and then number), **Add tags** and **Remove tags** (the ones already on the chosen books are offered), the rating or **No rating**, the publisher, the date, the languages, and my own columns. Anything I leave empty stays as it is on each book.
 
 In that sheet, **Series**, **Publisher** and **Languages** each have **None**, which clears that field on every chosen book. **Find and replace**, at the bottom, changes words in the title, the authors, the series, the tags or the publisher of every chosen book: what to find, what to put instead, and **Regular expression** and **Match case** when I want them. Under it, before anything is saved, each book that would change is listed with its old value struck through and its new one beside it.
 
-The bar's **⋯** has **Convert to** EPUB, AZW3, KEPUB, MOBI or PDF for every chosen book, each from its best file (a book that has the format already is left alone; a toast says when they're done), and **Download**, which gives each book's EPUB (or its best other file): one book as itself, several in a zip.
+**Convert books** in the toolbar turns every chosen book into EPUB, AZW3, KEPUB, MOBI or PDF, each from its best file (a book that has the format already is left alone; a toast says when they're done), and **Download** gives each book's EPUB (or its best other file): one book as itself, several in a zip.
 
 ## Find details
 
@@ -72,7 +76,7 @@ Picking an answer puts it side by side with what the book has now, one row a fie
 
 ## Find details for many books
 
-With books chosen in All books, **Find details** in the bar at the bottom looks all of them up at once and fills in only what each one is missing. I tick what to fill in (publisher, date, description, tags, series, languages, identifiers, pages and cover), and **Look up** goes through the books four at a time, asking Calibre's sources the way its own bulk Download metadata does (every source it has on), then Hardcover. For a book without a cover, Calibre picks the best cover from all its cover sources. It takes several seconds a book.
+With several books chosen in All books, **Find details** in the toolbar looks all of them up at once and fills in only what each one is missing. I tick what to fill in (publisher, date, description, tags, series, languages, identifiers, pages and cover), and **Look up** goes through the books four at a time, asking Calibre's sources the way its own bulk Download metadata does (every source it has on), then Hardcover. For a book without a cover, Calibre picks the best cover from all its cover sources. It takes several seconds a book.
 
 It only takes an answer when it's surely the same book: the same title (subtitles aside) by the same author, so a study guide or a different book with a similar name never gets in. A field the book already has is never changed, tags are only added to a book that has none, and identifiers only add kinds the book doesn't have, so a wrong ISBN stays until I fix it myself. The results list each book with what would go in and where it came from. I untick any I don't want, and nothing changes until **Save**. Books with nothing to fill in are listed at the bottom, with why.
 
@@ -92,13 +96,13 @@ A book that's already on the Kindle keeps its old copy until it's sent again.
 
 The **Filter** panel has a **Tidy** group next to **Missing**. **Possible duplicates** finds books with the same title (subtitles and punctuation aside) by the same author. **Odd characters** finds titles with garbled letters, like "â€™" where an apostrophe should be. **Last name first** finds authors written as "Patai, Raphael", which Calibre then files under a folder of that name. To fix those in one go, I choose them all and tick **Turn "Last, First" names around** in the multi-book editor. Names like "…, Inc." or "…, Ph.D." are left alone.
 
-With two or more books chosen, the bar at the bottom also has **Merge** and **Remove**. **Merge** is for copies of one book. I pick the copy to keep (Daf suggests the one with a cover and the most files), and it takes the others' files it doesn't have yet, their tags and identifiers, and anything else it was missing. Then the others go. In Daf, their highlights, shelves, notes and my place in them move over to the kept copy. **Remove** takes books out of Calibre, and so does **Remove from Calibre** at the bottom of the edit sheet. Daf says first if a book has highlights, which stay in Daf.
+With two or more books chosen, **Merge books** and **Remove books** in the toolbar work on them. **Merge books** is for copies of one book. I pick the copy to keep (Daf suggests the one with a cover and the most files), and it takes the others' files it doesn't have yet, their tags and identifiers, and anything else it was missing. Then the others go. In Daf, their highlights, shelves, notes and my place in them move over to the kept copy. **Remove** takes books out of Calibre, and so does **Remove from Calibre** at the bottom of the edit sheet. Daf says first if a book has highlights, which stay in Daf.
 
 Nothing is lost straight away. Removed and merged books go to Calibre's own trash, and **⋯ › Calibre's trash** lists what's there, newest first, with **Put back**, which returns a book exactly as it was, files and all. Calibre empties its trash after a couple of weeks.
 
 ## Check library
 
-**⋯ › Check library**, at the top of All books, compares Calibre's records with its folders, the way Calibre's own Check library does, and changes nothing: files a book lists that aren't there, books without a file, covers missing, a book's folder missing, book files in a folder that its book doesn't list, and folders no book points to. Each book in the list opens its page.
+**Library › Check library**, in the toolbar, compares Calibre's records with its folders, the way Calibre's own Check library does, and changes nothing: files a book lists that aren't there, books without a file, covers missing, a book's folder missing, book files in a folder that its book doesn't list, and folders no book points to. Each book in the list opens its page.
 
 Under those it lists what Calibre's Quality Check plugin would: books with no description, no ISBN, no page count or no language, titles in capitals, and books by "Unknown". And **Read column differs from Daf** lists the books where Calibre's Read column and the book's status in Daf disagree (Calibre says Dropped, Daf says To read), with both, to settle by hand.
 
@@ -108,7 +112,7 @@ At each sync Daf keeps a few things in Calibre in step, through Calibre itself:
 
 - **The Read column** follows each book's status in Daf (which follows Hardcover and the book's note): To read is Planning, Reading is Reading, Read is Finished, Paused is Paused, Dropped is Dropped. A book with nothing in the column gets Daf's status, and from then on, when the status changes in Daf (I start a book, finish it), the column follows. Where the two already disagreed, Daf leaves the column alone and Check library lists the book. Maybe counts as agreeing with To read.
 - **The KOReader columns**, the two that Calibre's KOReader Sync plugin fills: **KOReader Progress** shows how far I am in each book, the way Daf knows it from everywhere I read (the Kindle, Daf's own reader), and **Reading** shows the status in KOReader's words: reading, complete, or abandoned (KOReader's On hold) for a paused book. To read and Dropped have no KOReader word, so Daf leaves that column alone for those books.
-- **Page counts**: a book with an EPUB and nothing in the Pages column gets one, counted the way Calibre's Count Pages plugin does by default (its text, about 2,170 characters a page), a few books each sync. For any chosen books, the bar's **⋯ › Count pages** counts them again.
+- **Page counts**: a book with an EPUB and nothing in the Pages column gets one, counted the way Calibre's Count Pages plugin does by default (its text, about 2,170 characters a page), a few books each sync. For any chosen books, **Library › Count pages** counts them again.
 
 `calibre_keep: false` in the settings turns all of it off.
 
