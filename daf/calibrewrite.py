@@ -219,6 +219,32 @@ def main():
                     out["books"][str(i)] = None
                 out["done"].append(k)
                 continue
+            elif k == "add_empty":                      # books with no file, as Calibre's Add empty book makes them
+                from calibre.ebooks.metadata.book.base import Metadata
+                todo = []
+                for b in op["books"]:                   # every value checked before the first book is made
+                    extra = {f: val(f, v) for f, v in (b.get("fields") or {}).items()}
+                    todo.append((b, extra))
+                added = []
+                for b, extra in todo:
+                    mi = Metadata(str(b.get("title") or "").strip() or "Unknown", list(val("authors", b.get("authors") or [])) or ["Unknown"])
+                    if b.get("series"):
+                        mi.series = str(b["series"]).strip()
+                        mi.series_index = float(b["series_index"]) if b.get("series_index") not in (None, "") else None
+                    if b.get("pubdate"):
+                        mi.pubdate = day(b["pubdate"])
+                    if b.get("identifiers"):
+                        mi.set_identifiers(val("identifiers", b["identifiers"]))
+                    if b.get("tags"):
+                        mi.tags = list(val("tags", b["tags"]))
+                    i = d.create_book_entry(mi)         # Calibre's own: the folder, the sorts, its new-book tags
+                    for f, v in extra.items():
+                        d.set_field(f, {i: v})
+                    added.append(i)
+                    touched.add(i)
+                out["added"] = added
+                out["done"].append(k)
+                continue
             else:
                 raise ValueError("unknown op " + k)
             touched.update(ids)
@@ -267,6 +293,8 @@ def run(ops, timeout=120):
         embed_later([i for i, b in books.items() if b])
     if "trash" in out:
         books["trash"] = out["trash"]
+    if "added" in out:                              # add_empty's new books, in the order given
+        books["added"] = out["added"]
     return books
 
 
