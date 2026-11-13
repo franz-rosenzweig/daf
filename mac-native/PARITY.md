@@ -188,3 +188,11 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - not yet: the Details card on a book's page (app.js bookDetails, from catalog.card_details on GET /api/books/<id>): the description as Calibre's HTML, series with its number and a link to All books searched for it, tag chips that search, publisher and date, pages, rating in stars, language, formats, links out by identifier, ISBN
 - not yet: Add a book → Public domain (addbook.js findFree, /api/free/search + /api/free/add): Standard Ebooks and Project Gutenberg together, Add puts the EPUB into Calibre's import folder, Open for one Calibre has
 - not yet: Add a book → Shelfmark (addbook.js findShelf/showReleases, /api/shelfmark/*): Shelfmark's metadata search and releases, Download queues the chosen release with Shelfmark, Open for one Calibre has; **Find with Shelfmark** on a no-file book's page opens the same search with its title and author
+
+## Calibre: the library gaps (2026-11-12)
+
+- not yet: Edit details: half stars (left half of a star), Title sort and Author sort, the description edited with Bold/Italic/List and saved as Calibre's HTML (comments_html)
+- not yet: Edit N books: None for Series/Publisher/Languages; Find and replace (title, authors, series, tags, publisher; regular expression, match case; preview) sent as `each` to /api/catalog/bulk
+- not yet: the chosen books' ⋯: Convert to (POST /api/catalog/convert-many, poll /api/catalog/convert-many/<job>) and Download (/api/catalog/download?ids=)
+- not yet: ⋯ › Check library (GET /api/catalog/check)
+

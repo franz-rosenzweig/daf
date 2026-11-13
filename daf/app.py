@@ -1314,9 +1314,91 @@ def bulk_catalog(b=Depends(json_body)):
     rem = [str(t).strip() for t in b.get("remove_tags") or [] if str(t).strip()]
     if add or rem:
         ops.append({"op": "tags", "ids": ids, "add": add, "remove": rem})
+    each = b.get("each") or {}                      # find and replace: each book its own new values, after the rest
+    if not isinstance(each, dict):
+        raise HTTPException(400, "each: an object")
+    keys = _custom_keys() if each else set()
+    for cid, f in list(each.items())[:1000]:
+        if str(cid).isdigit() and int(cid) in ids and isinstance(f, dict):
+            got = _edit_fields({k: v for k, v in f.items() if k in ("title", "authors", "series", "tags", "publisher")}, keys)
+            if got:
+                ops.append({"op": "set", "ids": [int(cid)], "fields": got})
     if ops:
         _calibre(ops, timeout=600)
     return {"ok": True, "books": len(ids)}
+
+
+@app.get("/api/catalog/check", dependencies=[Depends(user)])
+def get_catalog_check():
+    """Check library (catalog.check_library): read only."""
+    return catalog.check_library()
+
+
+@app.post("/api/catalog/convert-many", dependencies=[Depends(user)])
+def post_convert_many(b=Depends(json_body)):
+    """The chosen books into one format, one after another, each from its best file; a book that has
+    the format already is left as it is. → {job, total, have}."""
+    from . import calibrewrite
+    to = str((b or {}).get("to") or "").upper()
+    if to not in CONVERT_TO:
+        raise HTTPException(400, "Daf converts to " + ", ".join(CONVERT_TO))
+    ids = [int(i) for i in (b or {}).get("ids") or [] if str(i).isdigit()][:500]
+    if not ids:
+        raise HTTPException(400, "No books")
+    todo, have = [], 0
+    for cid in ids:
+        fmts = catalog.formats_of(cid)
+        if to in fmts:
+            have += 1
+            continue
+        src = next((f for f in ("EPUB", "AZW3", "MOBI", "KEPUB", "FB2", "DOCX", "PDF") if f in fmts), fmts[0] if fmts else None)
+        if src:
+            todo.append((cid, src))
+    job = calibrewrite.start_convert_many(todo, to) if todo else None
+    return {"job": job, "total": len(todo), "have": have}
+
+
+@app.get("/api/catalog/convert-many/{jid}", dependencies=[Depends(user)])
+def get_convert_many(jid: str):
+    from . import calibrewrite
+    j = calibrewrite.job(jid)
+    if not j:
+        raise HTTPException(404, "No such job")
+    return j
+
+
+@app.get("/api/catalog/download", dependencies=[Depends(user)])
+def get_catalog_download(ids: str = ""):
+    """The chosen books' files: each book's EPUB, else its best other file; one book as itself,
+    several in a zip."""
+    import os
+    import tempfile
+    import zipfile
+    cids = [int(i) for i in ids.split(",") if i.strip().isdigit()][:500]
+    files = []
+    for cid in cids:
+        fmts = catalog.formats_of(cid)
+        fmt = next((f for f in ("EPUB", "AZW3", "MOBI", "KEPUB", "PDF", "FB2", "CBZ") if f in fmts), fmts[0] if fmts else None)
+        path = catalog.book_file(cid, fmt) if fmt else None
+        if path and path.exists():
+            files.append(path)
+    if not files:
+        raise HTTPException(404, "None of those books has a file")
+    if len(files) == 1:
+        return FileResponse(files[0], filename=files[0].name)
+    tmp = tempfile.NamedTemporaryFile(prefix="daf-books-", suffix=".zip", delete=False, dir=str(config.STATE.parent))
+    names = set()
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as z:
+        for f in files:
+            n, k = f.name, 2
+            while n in names:
+                n, k = f"{f.stem} ({k}){f.suffix}", k + 1
+            names.add(n)
+            z.write(f, n)
+    tmp.close()
+    from starlette.background import BackgroundTask
+    return FileResponse(tmp.name, filename=f"{len(files)} books.zip", media_type="application/zip",
+                        background=BackgroundTask(lambda: os.unlink(tmp.name)))
 
 
 def _image(data):

@@ -195,19 +195,58 @@ async function bulk(ids){
     '<div class="bebody one"><div class="beform">' +
       row('Authors', inp('authors', '', ' list="dl-authors" autocomplete="off" placeholder="No change"') + dl('dl-authors', d.choices.authors)) +
       '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="flip"> Turn “Last, First” names around</label></div>' +
-      row('Series', inp('series', '', ' list="dl-series" autocomplete="off" placeholder="No change"') + dl('dl-series', d.choices.series)) +
+      row('Series', '<span class="beclr">' + inp('series', '', ' list="dl-series" autocomplete="off" placeholder="No change"') + '<label class="benone"><input type="checkbox" data-f2="clear_series"> None</label></span>' + dl('dl-series', d.choices.series)) +
       '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="number"> Number them from <input class="field benum" data-f2="start" type="number" value="1" step="any" inputmode="decimal"> in the table’s order</label></div>' +
       row('Add tags', chips('add_tags', [], d.choices.tags), 'betop') +
       row('Remove tags', chips('remove_tags', [], theirTags), 'betop') +
       row('Rating', '<span class="bestarrow">' + stars('rating', null) + '<label class="benone"><input type="checkbox" data-f2="norating"> No rating</label></span>') +
-      row('Publisher', inp('publisher', '', ' list="dl-publisher" autocomplete="off" placeholder="No change"') + dl('dl-publisher', d.choices.publisher)) +
+      row('Publisher', '<span class="beclr">' + inp('publisher', '', ' list="dl-publisher" autocomplete="off" placeholder="No change"') + '<label class="benone"><input type="checkbox" data-f2="clear_publisher"> None</label></span>' + dl('dl-publisher', d.choices.publisher)) +
       row('Published', inp('published', '', ' type="date"')) +
-      row('Languages', inp('languages', '', ' list="dl-languages" autocomplete="off" placeholder="No change"') + dl('dl-languages', d.choices.languages)) +
+      row('Languages', '<span class="beclr">' + inp('languages', '', ' list="dl-languages" autocomplete="off" placeholder="No change"') + '<label class="benone"><input type="checkbox" data-f2="clear_languages"> None</label></span>' + dl('dl-languages', d.choices.languages)) +
       (d.custom || []).filter(c => c.key !== '#isbn' && c.dtype !== 'comments').map(c => row(c.label, customCtl(c, null, true))).join('') +
+      '<h3 class="befrh">Find and replace</h3>' +
+      row('In', '<select class="field" data-fr="field">' + FR.map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('') + '</select>') +
+      row('Find', '<input class="field" data-fr="find" autocomplete="off" autocapitalize="off" spellcheck="false">') +
+      row('Replace with', '<input class="field" data-fr="with" autocomplete="off" autocapitalize="off" spellcheck="false">') +
+      '<div class="berow becheck"><span></span><span class="bectl befropts"><label><input type="checkbox" data-fr="re"> Regular expression</label><label><input type="checkbox" data-fr="case"> Match case</label></span></div>' +
+      '<div class="berow betop"><span></span><div class="bectl"><div class="befrprev" id="befrprev"></div></div></div>' +
     '</div></div>');
   s.dataset.mode = 'bulk';
   E.orig = values(s);
 }
+// Find and replace over the chosen books: the new value of the field for each book it changes, worked
+// out here from the table's values (so the preview is exactly what's saved).
+const FR = [['title', 'Title'], ['authors', 'Authors'], ['series', 'Series'], ['tags', 'Tags'], ['publisher', 'Publisher']];
+function frChanges(){
+  const s = $('#bedit'); if (!s || !E.ids) return { list: [] };
+  const get = k => $('[data-fr="' + k + '"]', s), field = get('field').value, find = get('find').value, to = get('with').value;
+  if (!find) return { list: [] };
+  let re;
+  try { re = new RegExp(get('re').checked ? find : find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g' + (get('case').checked ? '' : 'i')); }
+  catch(e){ return { list: [], bad: true }; }
+  const rep = v => get('re').checked ? String(v).replace(re, to) : String(v).replace(re, () => to);
+  const books = (C.Catalog && C.Catalog.books ? C.Catalog.books() : []).filter(b => E.ids.includes(String(b.calibre_id)));
+  const list = [];
+  for (const b of books) {
+    const cur = b[field], multi = Array.isArray(cur);
+    if (cur == null || cur === '' || (multi && !cur.length)) continue;
+    const next = multi ? [...new Set(cur.map(rep).map(x => x.trim()).filter(Boolean))] : rep(cur).trim();
+    if (JSON.stringify(next) !== JSON.stringify(cur)) list.push({ id: String(b.calibre_id), title: b.title, from: cur, to: next, field });
+  }
+  return { list };
+}
+function frPreview(){
+  const box = $('#befrprev'); if (!box) return;
+  const r = frChanges(), show = v => Array.isArray(v) ? v.join(', ') : v;
+  if (r.bad) { box.innerHTML = '<span class="mute tiny">Not a valid pattern</span>'; return; }
+  if (!($('#bedit [data-fr="find"]') || {}).value) { box.innerHTML = ''; return; }
+  box.innerHTML = '<span class="mute tiny">' + (r.list.length ? r.list.length + ' book' + (r.list.length === 1 ? '' : 's') : 'No match') + '</span>' +
+    r.list.slice(0, 40).map(x => '<div class="befrrow"><span class="befrt">' + esc(x.title) + '</span><span class="befrold">' + esc(show(x.from)) + '</span><span class="befrnew">' + esc(show(x.to) || '—') + '</span></div>').join('') +
+    (r.list.length > 40 ? '<span class="mute tiny">' + (r.list.length - 40) + ' more</span>' : '');
+}
+document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#bedit [data-fr]')) frPreview(); });
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('#bedit [data-fr]')) frPreview(); });
+
 async function saveBulk(){
   const s = $('#bedit'), btn = $('[data-be="save"]', s), ch = changed();
   const add = ch.add_tags || [], rem = ch.remove_tags || [];
@@ -217,13 +256,16 @@ async function saveBulk(){
   if ($('[data-f2="norating"]', s).checked) fields.rating = null;
   if ($('[data-f2="number"]', s).checked) { fields.series_number = +$('[data-f2="start"]', s).value || 1; }
   if ($('[data-f2="flip"]', s).checked && fields.authors === undefined) fields.authors_flip = true;
-  if (!Object.keys(fields).length && !add.length && !rem.length) { close(true); return; }
+  for (const k of ['series', 'publisher', 'languages']) if ($('[data-f2="clear_' + k + '"]', s).checked) fields[k] = k === 'languages' ? [] : null;
+  const each = {};
+  for (const x of frChanges().list) each[x.id] = Object.assign(each[x.id] || {}, { [x.field]: x.to });
+  if (!Object.keys(fields).length && !add.length && !rem.length && !Object.keys(each).length) { close(true); return; }
   if (fields.authors !== undefined) fields.authors = String(fields.authors).split('&').map(x => x.trim()).filter(Boolean);
   // In the table's order, for numbering a series.
   const order = C.Catalog && C.Catalog.books ? C.Catalog.books().map(b => String(b.calibre_id)).filter(id => E.ids.includes(id)) : E.ids;
   E.busy = true; btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    await api('/api/catalog/bulk', { method: 'POST', body: JSON.stringify({ ids: order.length === E.ids.length ? order : E.ids, fields, add_tags: add, remove_tags: rem }) });
+    await api('/api/catalog/bulk', { method: 'POST', body: JSON.stringify({ ids: order.length === E.ids.length ? order : E.ids, fields, add_tags: add, remove_tags: rem, each }) });
     toast(E.ids.length + ' books changed in Calibre'); close(true); after();
   } catch(e){ toast(e.message); btn.disabled = false; btn.textContent = 'Save'; }
   E.busy = false;

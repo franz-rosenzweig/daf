@@ -44,6 +44,8 @@ When I have a search, an order and a set of columns I'll want again, **Views ›
 
 **Edit details** is on every Calibre book's page in Daf, and in All books when I right-click a row (or hold it on the tablet). It has everything Calibre's own edit window has: the title, the authors (separated by "&", the way Calibre does it), the series and the book's number in it, the tags, my rating, the publisher, the date it was published, the languages, the identifiers (one per line, like `isbn: 978…`), the description, and my own Calibre columns (Read, Pages, Collections and the rest). The tags are little chips: I type one and press Enter or a comma, pick one from the list Calibre already has, or press the × to take one off. Nothing changes until I press **Save** (or ⌘↩), and only the fields I actually touched are sent.
 
+The rating takes half stars: a tap on the left half of a star gives half of it. **Title sort** and **Author sort**, under the title and the authors, are what Calibre sorts by; Calibre fills them in by itself, and they're there for the times its guess is wrong ("Handbook, The"). The **description** is edited as it looks, with **Bold**, **Italic** and **List** above it, and it's saved as Calibre keeps it, so a description with italics and lists keeps them after an edit.
+
 The left side has the cover and the files. **Change cover** takes an image from the device, and **Cover from a link** takes the address of one on the web. Under **Files**, each format has a download button and a **⋯** menu with **Convert to** EPUB, AZW3, KEPUB, MOBI or PDF, and **Remove**. **Add a file** puts another format on the same book, or replaces the one it has. A conversion takes from a few seconds to a minute, and the file shows up in the list when Calibre is done.
 
 ## Shelves and collections
@@ -55,6 +57,10 @@ Rows can be dragged onto shelves and onto Calibre's Collections: one row, or eve
 In All books, each row has a box at its left. A click on a row chooses it the way a spreadsheet does: on its own, with ⌘ (or Ctrl) one more, and with Shift every row from the last one I clicked. On the tablet and the phone a tap adds the row or takes it out. The box in the header chooses everything the table shows.
 
 When anything is chosen, a bar comes up at the bottom with **Edit N books**. That sheet changes them all at once: the authors, the series (with **Number them from 1 in the table's order**, which is how I put a series in order: sort the table the way I want and then number), **Add tags** and **Remove tags** (the ones already on the chosen books are offered), the rating or **No rating**, the publisher, the date, the languages, and my own columns. Anything I leave empty stays as it is on each book.
+
+In that sheet, **Series**, **Publisher** and **Languages** each have **None**, which clears that field on every chosen book. **Find and replace**, at the bottom, changes words in the title, the authors, the series, the tags or the publisher of every chosen book: what to find, what to put instead, and **Regular expression** and **Match case** when I want them. Under it, before anything is saved, each book that would change is listed with its old value struck through and its new one beside it.
+
+The bar's **⋯** has **Convert to** EPUB, AZW3, KEPUB, MOBI or PDF for every chosen book, each from its best file (a book that has the format already is left alone; a toast says when they're done), and **Download**, which gives each book's EPUB (or its best other file): one book as itself, several in a zip.
 
 ## Find details
 
@@ -87,6 +93,10 @@ The **Filter** panel has a **Tidy** group next to **Missing**. **Possible duplic
 With two or more books chosen, the bar at the bottom also has **Merge** and **Remove**. **Merge** is for copies of one book. I pick the copy to keep (Daf suggests the one with a cover and the most files), and it takes the others' files it doesn't have yet, their tags and identifiers, and anything else it was missing. Then the others go. In Daf, their highlights, shelves, notes and my place in them move over to the kept copy. **Remove** takes books out of Calibre, and so does **Remove from Calibre** at the bottom of the edit sheet. Daf says first if a book has highlights, which stay in Daf.
 
 Nothing is lost straight away. Removed and merged books go to Calibre's own trash, and **⋯ › Calibre's trash** lists what's there, newest first, with **Put back**, which returns a book exactly as it was, files and all. Calibre empties its trash after a couple of weeks.
+
+## Check library
+
+**⋯ › Check library**, at the top of All books, compares Calibre's records with its folders, the way Calibre's own Check library does, and changes nothing: files a book lists that aren't there, books without a file, covers missing, a book's folder missing, book files in a folder that its book doesn't list, and folders no book points to. Each book in the list opens its page.
 
 ## How Daf changes Calibre
 
