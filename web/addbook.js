@@ -2,10 +2,11 @@
    author or ISBN; each result says what Daf and Hardcover already have of it. Picking one puts it on
    Hardcover (Want to read or Reading, or not at all) and in Daf at once, with its file if you give it
    one, which goes into Calibre with the book's Hardcover id and ISBN inside. A book without its file
-   has "Add the file" on its page, and says how the file it was sent is getting on. */
+   has "Find with Shelfmark" and "Add the file" on its page, and says how the file it was sent is getting on. */
 (function(){
 const C = window.DafCore, { $, esc, api, toast, closeModal } = C;
-const A = { hits: [], pick: null, timer: 0, file: null, shelves: null, src: 'hc', free: [], freeN: 0 };
+const A = { hits: [], pick: null, timer: 0, file: null, shelves: null, src: 'hc', free: [], freeN: 0,
+  sm: [], smN: 0, smBook: null, smReleases: [] };
 
 // The Kindle's shelves (its home folder's folders, as its plugin reported them), Books first.
 async function kindleShelves(){
@@ -14,11 +15,12 @@ async function kindleShelves(){
 }
 const shelfOptions = (list, pick) => list.map(s => '<option' + (s === pick ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
 
-function open(q){
+function open(q, src){
+  if (src) A.src = src;
   A.pick = null; A.file = null;
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false; m.classList.add('wide');
   m.innerHTML = '<h2>Add a book</h2>' +
-    '<div class="seg absrc" role="radiogroup" aria-label="Where">' + [['hc', 'Hardcover'], ['free', 'Public domain']].map(x =>
+    '<div class="seg absrc" role="radiogroup" aria-label="Where">' + [['hc', 'Hardcover'], ['free', 'Public domain'], ['sm', 'Shelfmark']].map(x =>
       '<button type="button" role="radio" aria-checked="' + (A.src === x[0]) + '" class="' + (A.src === x[0] ? 'on' : '') + '" data-absrc="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>' +
     '<input class="field" id="abq" placeholder="' + (A.src === 'free' ? 'Title or author' : 'Title, author or ISBN') + '" autocomplete="off" value="' + esc(q || '') + '">' +
     '<div id="abres" class="abres"></div>' +
@@ -31,6 +33,7 @@ async function find(q){
   const box = $('#abres'); if (!box) return;
   if (!q.trim()) { box.innerHTML = ''; return; }
   if (A.src === 'free') return findFree(q);
+  if (A.src === 'sm') return findShelf(q);
   box.innerHTML = '<p class="mute tiny" style="margin:0">Searching…</p>';
   try {
     const r = await api('/api/books/find?q=' + encodeURIComponent(q.trim()));
@@ -86,6 +89,57 @@ async function addFree(btn, force){
     if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : r.statusText);
     btn.textContent = 'Added'; toast('Added');
   } catch(e){ btn.disabled = false; btn.textContent = 'Add'; toast(e.message); }
+}
+
+// Shelfmark (shelfmark.py): its book search, then one of the releases it can send to Calibre.
+function drawShelf(){
+  const box = $('#abres'); if (!box || A.src !== 'sm') return;
+  box.innerHTML = A.sm.length ? A.sm.map((x, i) => {
+    const detail = [x.format, x.language, x.size, x.source, x.downloads > 0 && x.downloads.toLocaleString() + ' downloads']
+      .filter(v => v !== false && v != null && v !== '').join(' · ');
+    const body = (x.cover ? '<img src="' + esc(x.cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'abnoimg\'}))">' : '<span class="abnoimg"></span>') +
+      '<span class="abt"><b>' + esc(x.title) + '</b><span class="mute tiny">' + esc([x.author, x.year].filter(Boolean).join(' · ')) + '</span>' +
+      (detail ? '<span class="mute tiny">' + esc(detail) + '</span>' : '') + '</span>';
+    return x.have ? '<div class="abhit fbhit">' + body + '<a class="btn sm" href="#book/' + encodeURIComponent(x.have) + '" data-ab="close">Open</a></div>'
+      : x.release_id ? '<div class="abhit fbhit">' + body + '<button class="btn sm" data-smquick="' + i + '">Download</button></div>'
+      : '<button class="abhit" data-smbook="' + i + '">' + body + '</button>';
+  }).join('') : '<p class="mute" style="margin:0">Nothing found</p>';
+}
+async function findShelf(q){
+  const box = $('#abres'), n = ++A.smN;
+  box.innerHTML = '<p class="mute tiny" style="margin:0">Searching…</p>';
+  try {
+    const r = await api('/api/shelfmark/search?q=' + encodeURIComponent(q.trim()));
+    if (n !== A.smN || ($('#abq') || {}).value !== q || A.src !== 'sm') return;
+    A.sm = r.hits; A.smBook = null; drawShelf();
+  } catch(e){ if (n === A.smN && A.src === 'sm') box.innerHTML = '<p class="mute" style="margin:0">' + esc(e.message) + '</p>'; }
+}
+const releaseHead = b => '<div style="display:flex;align-items:center;gap:10px"><button class="btn sm" data-smback>Back</button>' +
+  '<span class="abt"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc(b.author) + '</span></span></div>';
+async function showReleases(i){
+  const b = A.sm[i]; if (!b) return;
+  A.smBook = b; A.smReleases = [];
+  const box = $('#abres'), n = ++A.smN;
+  box.innerHTML = releaseHead(b) + '<p class="mute tiny" style="margin:0">Finding releases…</p>';
+  try {
+    const r = await api('/api/shelfmark/releases?provider=' + encodeURIComponent(b.provider) + '&book_id=' + encodeURIComponent(b.id) +
+      '&title=' + encodeURIComponent(b.title) + '&author=' + encodeURIComponent(b.author));
+    if (n !== A.smN || A.smBook !== b || A.src !== 'sm') return;
+    A.smReleases = r.releases;
+    box.innerHTML = releaseHead(b) + (r.errors.length ? '<p class="mute tiny" style="margin:0">Some sources didn’t answer</p>' : '') +
+      (r.releases.length ? r.releases.map((x, j) => '<div class="abhit fbhit smrel"><span class="abt"><b>' + esc(x.title) + '</b>' +
+        '<span class="mute tiny">' + esc([x.format, x.language, x.size, x.source, x.seeders != null && x.seeders + ' seeders',
+          x.downloads > 0 && x.downloads.toLocaleString() + ' downloads'].filter(v => v !== false && v != null && v !== '').join(' · ')) + '</span></span>' +
+        '<button class="btn sm" data-smadd="' + j + '">Download</button></div>').join('') : '<p class="mute" style="margin:0">Nothing found</p>');
+  } catch(e){ if (n === A.smN && A.smBook === b && A.src === 'sm') box.innerHTML = releaseHead(b) + '<p class="mute" style="margin:0">' + esc(e.message) + '</p>'; }
+}
+async function downloadShelf(btn, x){
+  if (!x) return;
+  btn.disabled = true; btn.textContent = 'Queueing…';
+  try {
+    await api('/api/shelfmark/download', { method: 'POST', body: JSON.stringify({ id: x.release_id || x.id }) });
+    btn.textContent = 'Queued'; toast('Queued in Shelfmark');
+  } catch(e){ btn.disabled = false; btn.textContent = 'Download'; toast(e.message); }
 }
 
 function choose(i){
@@ -160,7 +214,8 @@ function fileSection(b){
     : f.cal_id ? 'In Calibre'
     : 'Sent ' + esc(C.ago(f.created)) + ' · “' + esc(f.name) + '”';
   return '<section class="card" id="bfile"><div class="cardh"><h2>The book’s file</h2></div><p class="mute" style="margin:0">' + state + '</p>' +
-    '<label class="btn sm" style="align-self:flex-start">Add the file<input type="file" data-bfile="' + esc(b.id) + '" accept=".epub,.kepub,.mobi,.azw3,.fb2,.cbz,.pdf" hidden></label></section>';
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-smfind="' + esc([b.title, b.author].filter(Boolean).join(' ')) + '">Find with Shelfmark</button>' +
+    '<label class="btn sm">Add the file<input type="file" data-bfile="' + esc(b.id) + '" accept=".epub,.kepub,.mobi,.azw3,.fb2,.cbz,.pdf" hidden></label></div></section>';
 }
 
 document.addEventListener('input', e => {
@@ -201,6 +256,16 @@ document.addEventListener('click', async e => {
     const inp = $('#abq'); inp.placeholder = A.src === 'free' ? 'Title or author' : 'Title, author or ISBN'; inp.focus();
     find(inp.value); return;
   }
+  const smf = e.target.closest && e.target.closest('[data-smfind]');
+  if (smf) { open(smf.dataset.smfind, 'sm'); return; }
+  const smback = e.target.closest && e.target.closest('[data-smback]');
+  if (smback) { A.smBook = null; A.smReleases = []; A.smN++; drawShelf(); return; }
+  const smb = e.target.closest && e.target.closest('[data-smbook]');
+  if (smb) { showReleases(+smb.dataset.smbook); return; }
+  const sma = e.target.closest && e.target.closest('[data-smadd]');
+  if (sma) { downloadShelf(sma, A.smReleases[+sma.dataset.smadd]); return; }
+  const smq = e.target.closest && e.target.closest('[data-smquick]');
+  if (smq) { downloadShelf(smq, A.sm[+smq.dataset.smquick]); return; }
   const fb = e.target.closest && e.target.closest('[data-fbadd]');
   if (fb) { addFree(fb); return; }
   const t = e.target.closest && e.target.closest('[data-ab],[data-abi],[data-abst],[data-act="addbook"]'); if (!t) return;

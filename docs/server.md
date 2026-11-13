@@ -33,10 +33,11 @@ bin/daf set-password --user yourname
 | `DAF_HOSTS`, `DAF_PORT` | the addresses and port to listen on | localhost and my tailnet address, 8440 |
 | `DAF_FRESHRSS_URL` | FreshRSS, for the Feed (until Daf reads the feeds itself: `daf feeds-import`) | `http://127.0.0.1:8080` |
 | `DAF_CWA_INGEST` | Calibre-Web-Automated's import folder, for books you add | `/srv/docker/cwa-ingest` |
+| `DAF_SHELFMARK_URL` | Shelfmark, for finding and downloading books in Add a book | `http://127.0.0.1:8084` |
 | `DAF_KINDLE_DIR` | where Send to Kindle writes, synced to the Kindle | a `Daf` folder in the Kindle's books |
 | `DAF_KOMGA_CONF`, `DAF_MANGA_ROOT` | Komga's address and keys, and the manga folder | my manga setup |
 
-Passwords and keys go in a file called `daf.env` in the state folder, one `NAME=value` per line: `DAF_FRESHRSS_USER` and `DAF_FRESHRSS_PASS` (FreshRSS's API password), `DAF_KARAKEEP_KEY`, `HARDCOVER_API_KEY`, and `DAF_CLAUDE_MODEL` if you want a different model (**Preferences → AI** can pick one too).
+Passwords and keys go in a file called `daf.env` in the state folder, one `NAME=value` per line: `DAF_FRESHRSS_USER` and `DAF_FRESHRSS_PASS` (FreshRSS's API password), `DAF_KARAKEEP_KEY`, `HARDCOVER_API_KEY`, `SHELFMARK_API_KEY`, and `DAF_CLAUDE_MODEL` if you want a different model (**Preferences → AI** can pick one too). Shelfmark's key can instead live on its own in `shelfmark/daf-api.env` beside the state folder, shared with Shelfmark's container; `DAF_SHELFMARK_KEY_FILE` points somewhere else.
 
 The rest is set at the top of `daf/config.py`: where to find KoInsight's database, Audiobookshelf's database and user, the Calibre libraries, and Karakeep. A few tools are set where they're used: the Claude command-line tool (in `ai.py` and `paper_pages.py`), yt-dlp (`media.py`), the Kokoro read-aloud server, which Daf finds as a Docker container named `kokoro-tts`, and the headless Chrome that reads pages a plain download can't, a Docker container named `docker-chrome-1` (`browser.py`). The newsletters and the morning email go through Proton Mail Bridge (`sources/newsletters.py` and `digest.py`), and **Send feedback** files its issue with the GitHub command-line tool, `gh` (`feedback.py`).
 

@@ -17,7 +17,9 @@ Putting a fourth book on asks "Which one steps off?", which is the whole point: 
 
 **Add a book**, at the top of **Books**, searches Hardcover by title, author or ISBN. Each result says what I already have of it: "In your library" (Calibre has the file), "In Daf, no file yet", and its Hardcover shelf if it's on one. Study guides and "summary of" knock-offs sink to the bottom, because the results go by how many people read them. Picking one I already have just opens it.
 
-**Public domain**, the other side of Add a book, searches Standard Ebooks and Project Gutenberg together, for the classics and anything old enough to be free. Standard Ebooks comes first, since its editions are proofread and typeset; a Gutenberg result that's the same book is left out. **Add** puts the book's EPUB straight into Calibre, the way a dropped EPUB goes, and it shows up in Books once Calibre has filed it, ready to read in Daf or send to the Kindle. A book Calibre has already says **Open** instead; one that looks like a book I have asks before adding another edition.
+**Public domain**, another side of Add a book, searches Standard Ebooks and Project Gutenberg together, for the classics and anything old enough to be free. Standard Ebooks comes first, since its editions are proofread and typeset; a Gutenberg result that's the same book is left out. **Add** puts the book's EPUB straight into Calibre, the way a dropped EPUB goes, and it shows up in Books once Calibre has filed it, ready to read in Daf or send to the Kindle. A book Calibre has already says **Open** instead; one that looks like a book I have asks before adding another edition.
+
+**Shelfmark** is there too. In Universal mode it searches the book metadata I've set up in Shelfmark, and picking a book shows the releases Shelfmark can get. In Direct mode the results are releases already, with **Download** right beside them. Format, language, size and source show either way. **Download** puts the one I pick in Shelfmark's queue. It lands in the same Calibre import folder as a dropped EPUB, so it comes into Books ready to read, with Shelfmark still handling the sources and the download itself. A book Calibre has already says **Open**.
 
 For a new one I choose where it goes on Hardcover (**Want to read**, **Reading**, or **Not on Hardcover**), and I can give it its file right there. Then:
 
@@ -26,7 +28,7 @@ For a new one I choose where it goes on Hardcover (**Want to read**, **Reading**
 - When the file arrives, the book in Daf becomes the Calibre one and keeps everything: its shelves, its place on the nightstand, where I am in it and my notes. It's still one book, not two.
 - If Calibre already has the book, Daf says so instead of sending it a second time.
 
-A book without its file has **The book's file** on its page: **Add the file** sends one, and the card says how it's going ("Sent 2 minutes ago", "Calibre has it now", or why Calibre-Web couldn't take it).
+A book without its file has **The book's file** on its page: **Find with Shelfmark** searches for that title and author right there, so a Want to read book can get its file without going back to Books. **Add the file** sends one yourself, and the card says how it's going ("Sent 2 minutes ago", "Calibre has it now", or why Calibre-Web couldn't take it).
 
 ## The Kindle
 

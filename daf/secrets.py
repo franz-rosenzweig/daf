@@ -6,6 +6,8 @@
 - Karakeep: the vault's KARAKEEP_API_KEY, else the homepage's key.
 - Audiobookshelf: its own AUDIOBOOKSHELF_API_KEY, else the homepage's HOMEPAGE_VAR_ABS_KEY (absapi.py).
   It stays on the server: the browser gets the audio and covers through Daf.
+- Shelfmark: SHELFMARK_API_KEY, or DAF_SHELFMARK_KEY; it can live alone in STATE/../shelfmark/daf-api.env
+  (DAF_SHELFMARK_KEY_FILE overrides that path). It stays on the server too (shelfmark.py).
 - /srv/docker/daf/daf.env, if present, overrides any of these by the same names.
 """
 import re
@@ -51,6 +53,12 @@ def karakeep_key():
 def abs_key():
     e = env()
     return e.get("DAF_ABS_KEY") or e.get("AUDIOBOOKSHELF_API_KEY") or e.get("HOMEPAGE_VAR_ABS_KEY") or ""
+
+
+def shelfmark_key():
+    e = env()
+    shared = _read(config.setting("DAF_SHELFMARK_KEY_FILE", str(config.STATE.parent / "shelfmark" / "daf-api.env")))
+    return e.get("DAF_SHELFMARK_KEY") or e.get("SHELFMARK_API_KEY") or shared.get("SHELFMARK_API_KEY") or ""
 
 
 def claude_model():

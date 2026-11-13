@@ -2805,6 +2805,40 @@ def post_free_add(b=Depends(json_body), c=Depends(conn)):
     return {"name": name}
 
 
+@app.get("/api/shelfmark/search", dependencies=[Depends(user)])
+def get_shelfmark_search(q: str = ""):
+    """Shelfmark's book metadata search, for Add a book → Shelfmark."""
+    from . import shelfmark
+    try:
+        return shelfmark.search(q)
+    except shelfmark.Unavailable as e:
+        raise HTTPException(502, str(e))
+
+
+@app.get("/api/shelfmark/releases", dependencies=[Depends(user)])
+def get_shelfmark_releases(provider: str = "", book_id: str = "", title: str = "", author: str = ""):
+    """The releases Shelfmark can get for one book; their source URLs stay on the server."""
+    from . import shelfmark
+    try:
+        return shelfmark.releases(provider, book_id, title, author)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except shelfmark.Unavailable as e:
+        raise HTTPException(502, str(e))
+
+
+@app.post("/api/shelfmark/download", dependencies=[Depends(user)])
+def post_shelfmark_download(b=Depends(json_body)):
+    """Queue a release Shelfmark returned: {id}. Calibre-Web imports it when it arrives."""
+    from . import shelfmark
+    try:
+        return shelfmark.download(str((b or {}).get("id") or ""))
+    except KeyError:
+        raise HTTPException(404, "Those releases are out of date; find the book again")
+    except shelfmark.Unavailable as e:
+        raise HTTPException(502, str(e))
+
+
 @app.post("/api/add/file", dependencies=[Depends(user)])
 async def add_file(request: Request, c=Depends(conn)):
     """A file dropped on Daf. Books go to Calibre through Calibre-Web-Automated's ingest folder
