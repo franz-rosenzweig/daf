@@ -31,6 +31,7 @@ const TOOLS = [
   ['edit', 'Edit metadata', TB('<path d="M4 16l1-4 8-8 3 3-8 8z"/><path d="M11.5 5.5l3 3"/>'), 'n'],
   ['conv', 'Convert books', TB('<path d="M4 7h11l-3-3M16 13H5l3 3"/>'), 'n'],
   ['read', 'Read', TB('<path d="M10 5.5C8.5 4.3 6.5 4 3 4v11c3.5 0 5.5.3 7 1.5 1.5-1.2 3.5-1.5 7-1.5V4c-3.5 0-5.5.3-7 1.5z"/><path d="M10 5.5v11"/>'), 1],
+  ['ebook', 'Edit book', TB('<path d="M7 6.5L3.5 10 7 13.5M13 6.5l3.5 3.5-3.5 3.5M11.2 4.5l-2.4 11"/>'), 1],      // ebookedit.js
   ['find', 'Find details', TB('<circle cx="8.5" cy="8.5" r="5"/><path d="M12.2 12.2L17 17"/><path d="M8.5 6v5M6 8.5h5"/>'), 'n'],
   ['shelves', 'Shelves', TB('<path d="M6 3h8v14l-4-3-4 3z"/>'), 'n'],
   ['merge', 'Merge books', TB('<path d="M5 3v3.5c0 3 5 4 5 7V17M15 3v3.5c0 3-5 4-5 7"/>'), 2],
@@ -482,6 +483,7 @@ document.addEventListener('click', e => {
     else if (k === 'edit' && C.BookEdit) { if (ids.length === 1 || t.closest('#catdet')) C.BookEdit.open(one.calibre_id); else C.BookEdit.bulk(ids); }
     else if (k === 'conv') openPop(tool, ['EPUB', 'AZW3', 'KEPUB', 'MOBI', 'PDF'].map(f => '<button data-catm="conv" data-to="' + f + '"><i></i>' + f + '</button>').join(''));
     else if (k === 'read' && one) location.hash = 'ebook/' + encodeURIComponent(one.id);
+    else if (k === 'ebook' && one && C.EbookEdit) C.EbookEdit.open(one.calibre_id);
     else if (k === 'find' && C.BookEdit) {
       if (chosen.length === 1) Promise.resolve(C.BookEdit.open(one.calibre_id)).then(() => { const f = $('#bedit [data-be="find"]'); if (f) f.click(); });
       else C.BookEdit.fill(chosen); }

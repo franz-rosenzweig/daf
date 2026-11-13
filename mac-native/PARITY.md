@@ -198,3 +198,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - not yet: the chosen books' ⋯ › Count pages (POST /api/catalog/count-pages, GET /api/catalog/job/<id>); Check library's Quality groups and "Read column differs from Daf" (read_differs)
 - not yet: Open with (All books' toolbar, `dafShell.openWith({url, name, mime})`, docs/SHELL.md): a book's file opened in another Mac app, with the Finder's Open With list
 - not yet: ⋯ › Import list (importlist.js; GET /api/catalog/importlist, POST /api/catalog/importlist/read, /match, GET /search, POST /apply then GET /api/catalog/job/<id>): text, CSV/TSV with its columns, a web page (the plugin's sites or XPath), a Hardcover list or shelf; the matches with edit, pick by hand, untick; empty books with tag, Read: Planning and a shelf, tag and shelf for the ones already there; Show in All books chooses the new ones
+
+## Edit book (2026-11-13)
+
+- not yet: Edit book (ebookedit.js, /api/ebookedit/<id>/…): the working copy's files grouped like Calibre's, a code editor with syntax colours, the live preview, find and replace (current file, all text, all styles; regex, match case), Contents (edit, move, add, Generate), Check book with Fix all, Polish's tools, add/rename/remove files, checkpoints, Save and Discard

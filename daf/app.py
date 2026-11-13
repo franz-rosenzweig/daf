@@ -1895,6 +1895,143 @@ def post_importlist_apply(b=Depends(json_body), c=Depends(conn)):
     return {"job": calibrewrite.start_job(work)}
 
 
+# ---- Edit book: a Calibre book's insides, on a working copy (ebookedit.py, web/ebookedit.js) ----
+# Calibre's slow parts (opening, the checker, the contents, Polish's tools, Save) are jobs:
+# {job}, then GET /api/catalog/jobs/{job} → {running, done, error}.
+def _ebx(fn, *a):
+    from . import ebookedit
+    try:
+        return fn(*a)
+    except ebookedit.EditError as e:
+        raise HTTPException(400, str(e))
+
+
+def _ebx_job(fn, *a):
+    from . import calibrewrite
+    return {"job": calibrewrite.start_job(lambda: fn(*a))}
+
+
+@app.get("/api/ebookedit/{cid}", dependencies=[Depends(user)])
+def get_ebookedit(cid: int, c=Depends(conn)):
+    """{title, formats it can open, copy (its meta) | None, stale, daf_id}."""
+    from . import ebookedit
+    r = _ebx(ebookedit.status, cid)
+    row = c.execute("SELECT id FROM books WHERE calibre_id = ?", (cid,)).fetchone()
+    r["daf_id"] = row[0] if row else None
+    return r
+
+
+@app.post("/api/ebookedit/{cid}/open", dependencies=[Depends(user)])
+def post_ebookedit_open(cid: int, b=Depends(json_body)):
+    from . import ebookedit
+    return _ebx_job(ebookedit.open_copy, cid, str((b or {}).get("fmt") or "") or None)
+
+
+@app.get("/api/ebookedit/{cid}/files", dependencies=[Depends(user)])
+def get_ebookedit_files(cid: int):
+    from . import ebookedit
+    r = _ebx(ebookedit.files, cid)
+    r["meta"], r["checkpoints"] = ebookedit.meta(cid), ebookedit.checkpoints(cid)
+    return r
+
+
+@app.get("/api/ebookedit/{cid}/text", dependencies=[Depends(user)])
+def get_ebookedit_text(cid: int, name: str):
+    from . import ebookedit
+    return {"name": name, "text": _ebx(ebookedit.read_text, cid, name)}
+
+
+@app.put("/api/ebookedit/{cid}/text", dependencies=[Depends(user)])
+def put_ebookedit_text(cid: int, b=Depends(json_body)):
+    from . import ebookedit
+    b = b if isinstance(b, dict) else {}
+    return {"changed": _ebx(ebookedit.write_text, cid, str(b.get("name") or ""), b.get("text"))}
+
+
+@app.get("/api/ebookedit/{cid}/raw/{name:path}", dependencies=[Depends(user)])
+def get_ebookedit_raw(cid: int, name: str):
+    """A file of the working copy as itself, for the preview (its CSS and pictures come the same way).
+    The book's own scripts never run: the preview's frame is sandboxed, and so is this answer."""
+    from . import ebookedit
+    p, mt = _ebx(ebookedit.raw, cid, name)
+    return FileResponse(p, media_type=mt, headers={"Cache-Control": "no-store",
+                                                   "Content-Security-Policy": "sandbox allow-same-origin; script-src 'none'; object-src 'none'"})
+
+
+@app.get("/api/ebookedit/{cid}/ids", dependencies=[Depends(user)])
+def get_ebookedit_ids(cid: int, name: str):
+    from . import ebookedit
+    return {"ids": _ebx(ebookedit.ids, cid, name)}
+
+
+@app.post("/api/ebookedit/{cid}/find", dependencies=[Depends(user)])
+def post_ebookedit_find(cid: int, b=Depends(json_body)):
+    """{find, regex, case, where: file | text | styles, name} → {total, files, matches}."""
+    from . import ebookedit
+    return _ebx(ebookedit.find, cid, b if isinstance(b, dict) else {})
+
+
+@app.post("/api/ebookedit/{cid}/replace", dependencies=[Depends(user)])
+def post_ebookedit_replace(cid: int, b=Depends(json_body)):
+    """The same, with {replace}: every match, or with {at} the one match starting there."""
+    from . import ebookedit
+    return _ebx(ebookedit.replace, cid, b if isinstance(b, dict) else {})
+
+
+@app.post("/api/ebookedit/{cid}/calibre", dependencies=[Depends(user)])
+def post_ebookedit_calibre(cid: int, b=Depends(json_body)):
+    """One of Calibre's tools on the copy, as a job: {op: check | fix | toc | toc_generate {kind} |
+    toc_save {toc, title} | polish {tool} | remove {names} | rename {map}}."""
+    from . import ebookedit
+    b = dict(b) if isinstance(b, dict) else {}
+    op = str(b.pop("op", ""))
+    _ebx(ebookedit._need, cid)
+    return _ebx_job(ebookedit.tool, cid, op, b)
+
+
+@app.post("/api/ebookedit/{cid}/add", dependencies=[Depends(user)])
+async def post_ebookedit_add(cid: int, request: Request, name: str = ""):
+    """A file for the book (the body, named by ?name=), as a job."""
+    from . import ebookedit
+    data = await request.body()
+    await run_in_threadpool(_ebx, ebookedit._need, cid)
+    return _ebx_job(ebookedit.add_file, cid, name, data)
+
+
+@app.get("/api/ebookedit/{cid}/checkpoints", dependencies=[Depends(user)])
+def get_ebookedit_checkpoints(cid: int):
+    from . import ebookedit
+    return {"checkpoints": ebookedit.checkpoints(cid)}
+
+
+@app.post("/api/ebookedit/{cid}/checkpoints/{n}", dependencies=[Depends(user)])
+def post_ebookedit_restore(cid: int, n: int):
+    from . import ebookedit
+    return _ebx(ebookedit.restore, cid, n)
+
+
+@app.post("/api/ebookedit/{cid}/save", dependencies=[Depends(user)])
+def post_ebookedit_save(cid: int):
+    """The copy, built again by Calibre, in place of the book's file in Calibre (a job)."""
+    from . import ebookedit
+    _ebx(ebookedit._need, cid)
+    return _ebx_job(ebookedit.save, cid)
+
+
+@app.post("/api/ebookedit/{cid}/close", dependencies=[Depends(user)])
+def post_ebookedit_close(cid: int):
+    from . import ebookedit
+    return ebookedit.close(cid)
+
+
+@app.delete("/api/ebookedit/{cid}", dependencies=[Depends(user)])
+def delete_ebookedit(cid: int):
+    """Discard: the working copy goes, and Calibre's book stays as it was."""
+    from . import ebookedit
+    ebookedit.discard(cid)
+    return {"ok": True}
+
+
 @app.put("/api/nightstand", dependencies=[Depends(user)])
 async def put_nightstand(request: Request, c=Depends(conn)):
     body = await request.json()
