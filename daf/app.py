@@ -2781,6 +2781,30 @@ async def add_feed(request: Request, c=Depends(conn)):
 BOOK_EXTS = {".epub", ".kepub", ".mobi", ".azw3", ".azw", ".fb2", ".cbz"}
 
 
+@app.get("/api/free/search", dependencies=[Depends(user)])
+def get_free_search(q: str = ""):
+    """Standard Ebooks' and Project Gutenberg's searches (freebooks.py)."""
+    from . import freebooks
+    return freebooks.search(q)
+
+
+@app.post("/api/free/add", dependencies=[Depends(user)])
+def post_free_add(b=Depends(json_body), c=Depends(conn)):
+    """A public-domain book into Calibre: {source: se|pg, id, title, author, force}."""
+    from . import freebooks
+    b = b or {}
+    try:
+        name = freebooks.add(c, str(b.get("source") or ""), str(b.get("id") or ""), str(b.get("title") or ""),
+                             str(b.get("author") or ""), force=bool(b.get("force")))
+    except freebooks.Exists as e:
+        return JSONResponse({"detail": str(e), "book": e.book_id}, status_code=409)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except OSError as e:
+        raise HTTPException(502, f"The download didn't work: {e}")
+    return {"name": name}
+
+
 @app.post("/api/add/file", dependencies=[Depends(user)])
 async def add_file(request: Request, c=Depends(conn)):
     """A file dropped on Daf. Books go to Calibre through Calibre-Web-Automated's ingest folder

@@ -5,7 +5,7 @@
    has "Add the file" on its page, and says how the file it was sent is getting on. */
 (function(){
 const C = window.DafCore, { $, esc, api, toast, closeModal } = C;
-const A = { hits: [], pick: null, timer: 0, file: null, shelves: null };
+const A = { hits: [], pick: null, timer: 0, file: null, shelves: null, src: 'hc', free: [] };
 
 // The Kindle's shelves (its home folder's folders, as its plugin reported them), Books first.
 async function kindleShelves(){
@@ -18,7 +18,9 @@ function open(q){
   A.pick = null; A.file = null;
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false; m.classList.add('wide');
   m.innerHTML = '<h2>Add a book</h2>' +
-    '<input class="field" id="abq" placeholder="Title, author or ISBN" autocomplete="off" value="' + esc(q || '') + '">' +
+    '<div class="seg absrc" role="radiogroup" aria-label="Where">' + [['hc', 'Hardcover'], ['free', 'Public domain']].map(x =>
+      '<button type="button" role="radio" aria-checked="' + (A.src === x[0]) + '" class="' + (A.src === x[0] ? 'on' : '') + '" data-absrc="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>' +
+    '<input class="field" id="abq" placeholder="' + (A.src === 'free' ? 'Title or author' : 'Title, author or ISBN') + '" autocomplete="off" value="' + esc(q || '') + '">' +
     '<div id="abres" class="abres"></div>' +
     '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" data-ab="close">Cancel</button></div>';
   const inp = $('#abq'); inp.focus();
@@ -28,6 +30,7 @@ function open(q){
 async function find(q){
   const box = $('#abres'); if (!box) return;
   if (!q.trim()) { box.innerHTML = ''; return; }
+  if (A.src === 'free') return findFree(q);
   box.innerHTML = '<p class="mute tiny" style="margin:0">Searching…</p>';
   try {
     const r = await api('/api/books/find?q=' + encodeURIComponent(q.trim()));
@@ -42,6 +45,39 @@ async function find(q){
         '<span class="tiny">' + [have && esc(have), shelf && esc(shelf), h.readers && '<span class="mute">' + h.readers.toLocaleString() + (h.readers === 1 ? ' reader' : ' readers') + '</span>'].filter(Boolean).join(' · ') + '</span></span></button>';
     }).join('') : '<p class="mute" style="margin:0">Nothing found</p>';
   } catch(e){ box.innerHTML = '<p class="mute" style="margin:0">' + esc(e.message) + '</p>'; }
+}
+
+// Public domain (freebooks.py): Standard Ebooks and Project Gutenberg, each book straight into Calibre.
+const SRC = { se: 'Standard Ebooks', pg: 'Project Gutenberg' };
+async function findFree(q){
+  const box = $('#abres');
+  box.innerHTML = '<p class="mute tiny" style="margin:0">Searching…</p>';
+  try {
+    const r = await api('/api/free/search?q=' + encodeURIComponent(q.trim()));
+    if (($('#abq') || {}).value !== q || A.src !== 'free') return;
+    A.free = r.results;
+    box.innerHTML = (r.failed.length ? '<p class="mute tiny" style="margin:0">' + esc(r.failed.join(' and ')) + ' didn’t answer</p>' : '') +
+      (r.results.length ? r.results.map((x, i) => '<div class="abhit fbhit">' +
+        (x.cover ? '<img src="' + esc(x.cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'abnoimg\'}))">' : '<span class="abnoimg"></span>') +
+        '<span class="abt"><b>' + esc(x.title) + '</b><span class="mute tiny">' + esc([x.author, SRC[x.source]].filter(Boolean).join(' · ')) + '</span></span>' +
+        (x.have ? '<a class="btn sm" href="#book/' + encodeURIComponent(x.have) + '" data-ab="close">Open</a>' : '<button type="button" class="btn sm" data-fbadd="' + i + '">Add</button>') +
+        '</div>').join('') : '<p class="mute" style="margin:0">Nothing found</p>');
+  } catch(e){ box.innerHTML = '<p class="mute" style="margin:0">' + esc(e.message) + '</p>'; }
+}
+async function addFree(btn, force){
+  const x = A.free[+btn.dataset.fbadd]; if (!x) return;
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    const r = await fetch('/api/free/add', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: x.source, id: x.id, title: x.title, author: x.author, force: !!force }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 409) {
+      if (confirm(j.detail + '.\n\nAdd this edition too?')) return addFree(btn, true);
+      btn.disabled = false; btn.textContent = 'Add'; return;
+    }
+    if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : r.statusText);
+    btn.textContent = 'Added'; toast('Added');
+  } catch(e){ btn.disabled = false; btn.textContent = 'Add'; toast(e.message); }
 }
 
 function choose(i){
@@ -150,6 +186,15 @@ document.addEventListener('click', async e => {
     } catch(err){ toast(err.message); }
     return;
   }
+  const sw = e.target.closest && e.target.closest('[data-absrc]');
+  if (sw) {
+    A.src = sw.dataset.absrc;
+    sw.parentNode.querySelectorAll('button').forEach(b => { const on = b === sw; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+    const inp = $('#abq'); inp.placeholder = A.src === 'free' ? 'Title or author' : 'Title, author or ISBN'; inp.focus();
+    find(inp.value); return;
+  }
+  const fb = e.target.closest && e.target.closest('[data-fbadd]');
+  if (fb) { addFree(fb); return; }
   const t = e.target.closest && e.target.closest('[data-ab],[data-abi],[data-abst],[data-act="addbook"]'); if (!t) return;
   if (t.dataset.act === 'addbook') { open(''); return; }
   if (t.dataset.abi != null) { choose(+t.dataset.abi); return; }
