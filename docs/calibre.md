@@ -102,12 +102,13 @@ Under those it lists what Calibre's Quality Check plugin would: books with no de
 
 ## What Daf keeps up in Calibre
 
-At each sync Daf keeps two things in Calibre in step, through Calibre itself:
+At each sync Daf keeps a few things in Calibre in step, through Calibre itself:
 
 - **The Read column** follows each book's status in Daf (which follows Hardcover and the book's note): To read is Planning, Reading is Reading, Read is Finished, Paused is Paused, Dropped is Dropped. A book with nothing in the column gets Daf's status, and from then on, when the status changes in Daf (I start a book, finish it), the column follows. Where the two already disagreed, Daf leaves the column alone and Check library lists the book. Maybe counts as agreeing with To read.
+- **The KOReader columns**, the two that Calibre's KOReader Sync plugin fills: **KOReader Progress** shows how far I am in each book, the way Daf knows it from everywhere I read (the Kindle, Daf's own reader), and **Reading** shows the status in KOReader's words: reading, complete, or abandoned (KOReader's On hold) for a paused book. To read and Dropped have no KOReader word, so Daf leaves that column alone for those books.
 - **Page counts**: a book with an EPUB and nothing in the Pages column gets one, counted the way Calibre's Count Pages plugin does by default (its text, about 2,170 characters a page), a few books each sync. For any chosen books, the bar's **⋯ › Count pages** counts them again.
 
-`calibre_keep: false` in the settings turns both off.
+`calibre_keep: false` in the settings turns all of it off.
 
 ## How Daf changes Calibre
 

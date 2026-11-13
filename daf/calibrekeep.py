@@ -8,6 +8,11 @@ Calibre makes the change):
   changes, the column follows. Where the two disagreed before Daf first looked (the column says Dropped,
   Daf says To read), nothing is changed: Check library lists them, to decide by hand. "Maybe" counts as
   agreeing with To read.
+- The KOReader columns, the ones Calibre's KOReader Sync plugin fills (`#ko_progfloat` and `#ko_status`
+  unless settings say `calibre_progress_column` / `calibre_status_column`): how far I am in each book,
+  as Daf knows it from every place I read (the Kindle, Daf's reader…), as a fraction like the plugin's;
+  and the status in KOReader's words: Reading → reading, Read → complete, Paused → abandoned (KOReader's
+  On hold). To read and Dropped have no KOReader word, so the status column is left as it is for them.
 - Page counts: a book with an EPUB and no count in the Pages column (`#pages`) gets one, the way Calibre's
   Count Pages plugin counts by default (about 2,170 characters a page), a few books a sync. All books →
   the chosen books' ⋯ → Count pages counts any book again.
@@ -105,6 +110,52 @@ def keep_read(conn, settings):
     return n
 
 
+KO_STATUS = {"reading": "reading", "read": "complete", "paused": "abandoned"}
+
+
+def ko_plan(conn, settings):
+    """→ (ops, n) for the KOReader columns: only what differs from what Calibre has now."""
+    pcol = settings.get("calibre_progress_column") or "#ko_progfloat"
+    scol = settings.get("calibre_status_column") or "#ko_status"
+    c = _ro()
+    try:
+        pc = _column(c, pcol, "float")
+        sc = _column(c, scol, "text")
+        have_p = dict(c.execute(f"SELECT book, value FROM custom_column_{pc[0]}")) if pc else {}
+        have_s = {}
+        if sc:
+            try:
+                have_s = dict(c.execute(f"SELECT book, value FROM custom_column_{sc[0]}"))
+            except sqlite3.OperationalError:          # a text column Calibre keeps in a link table
+                have_s = dict(c.execute(f"SELECT l.book, v.value FROM books_custom_column_{sc[0]}_link l JOIN custom_column_{sc[0]} v ON v.id = l.value"))
+        known = {r[0] for r in c.execute("SELECT id FROM books")}
+    finally:
+        c.close()
+    ops = []
+    for cid, status, progress in conn.execute("SELECT calibre_id, status, progress FROM books WHERE calibre_id IS NOT NULL"):
+        if cid not in known:
+            continue
+        fields = {}
+        if pc and progress:
+            f = round(min(100.0, max(0.0, float(progress))) / 100, 4)
+            if have_p.get(cid) is None or abs(float(have_p[cid]) - f) > 0.0005:
+                fields["#" + pcol.lstrip("#")] = f
+        want = KO_STATUS.get(status or "")
+        if sc and want and have_s.get(cid) != want:
+            fields["#" + scol.lstrip("#")] = want
+        if fields:
+            ops.append({"op": "set", "ids": [cid], "fields": fields})
+    return ops
+
+
+def keep_ko(conn, settings):
+    ops = ko_plan(conn, settings)
+    if ops:
+        from . import calibrewrite
+        calibrewrite.run(ops, timeout=300)
+    return len(ops)
+
+
 def epub_pages(path):
     """Pages in an EPUB, as Count Pages counts them by default: its text, about 2,170 characters a page."""
     with zipfile.ZipFile(path) as z:
@@ -188,6 +239,9 @@ def run(conn, settings):
     conn.commit()                    # what it noted, before the next change opens its own connection (calibrewrite._follow)
     if n:
         out.append(f"Read column {n}")
+    k = keep_ko(conn, settings)
+    if k:
+        out.append(f"KOReader columns {k}")
     p = keep_pages(conn, settings)
     if p:
         out.append(f"pages {p}")
