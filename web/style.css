@@ -2754,6 +2754,7 @@ a.catchkrow:hover{background:var(--hover)}
 @media (max-width:700px){
   .ilrow{grid-template-columns:22px minmax(0,1fr);row-gap:8px} .ilmatch{grid-column:2}
   .iltext,.illist .field.sm,.ilfind .field.sm{font-size:16px}
+}
 
 /* Edit book (ebookedit.js): a book's insides, full screen over the page */
 #ebx{position:fixed;inset:0;z-index:57;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
