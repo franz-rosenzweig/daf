@@ -195,4 +195,4 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - not yet: Edit N books: None for Series/Publisher/Languages; Find and replace (title, authors, series, tags, publisher; regular expression, match case; preview) sent as `each` to /api/catalog/bulk
 - not yet: the chosen books' ⋯: Convert to (POST /api/catalog/convert-many, poll /api/catalog/convert-many/<job>) and Download (/api/catalog/download?ids=)
 - not yet: ⋯ › Check library (GET /api/catalog/check)
-
+- not yet: the chosen books' ⋯ › Count pages (POST /api/catalog/count-pages, GET /api/catalog/job/<id>); Check library's Quality groups and "Read column differs from Daf" (read_differs)
