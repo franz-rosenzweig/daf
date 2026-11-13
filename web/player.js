@@ -135,7 +135,7 @@ audio.addEventListener('timeupdate', () => {
   const now = Date.now();
   if (!audio.paused && now - lastTick > 15000) { lastTick = now; tell('tick', { at: time() }); }
   if (sleepAt && now > sleepAt) { sleepAt = 0; audio.pause(); C.toast('Sleep timer: stopped'); }
-  if (sleepEnd) { const ch = chapterAt(time()), nx = Pl.cur.chapters && Pl.cur.chapters[ch + 1]; if (nx && time() >= nx.t - 0.3) { sleepEnd = false; audio.pause(); C.toast('Sleep timer: the end of the chapter'); } }
+  if (sleepEnd) { const ch = chapterAt(time()), nx = Pl.cur.chapters && Pl.cur.chapters[ch + 1]; if (nx && time() >= nx.t - 0.3) { sleepEnd = false; audio.pause(); C.toast('Sleep timer: stopped'); } }
   tickUI();
   window.dispatchEvent(new CustomEvent('daf-player-time', { detail: { id: Pl.cur.id, t: time() } }));
 });

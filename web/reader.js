@@ -96,9 +96,8 @@ function openAdd(file, url){
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false;
   m.innerHTML = '<h2>Add to Daf</h2>' +
     '<form id="addlink" class="addrow"><input class="field" id="addurl" type="url" inputmode="url" placeholder="Paste a link" autocomplete="off" value="' + esc(url || '') + '"><button class="btn primary" type="submit">Save</button></form>' +
-    '<span class="mute tiny">Links go to the Library, and Daf reads the page.</span>' +
-    '<div class="addfeed"><span class="mute tiny">Or follow the site in the Feed, in</span><select class="field sm" id="addfolder" aria-label="Feed folder"><option value="">no folder</option></select><button class="btn sm" type="button" id="addfollow">Follow</button></div>' +
-    '<label class="adddrop" id="adddrop"><input type="file" id="addfile" accept=".epub,.kepub,.mobi,.azw3,.azw,.fb2,.cbz,.pdf" multiple hidden><b>Drop books or PDFs here</b><span class="mute tiny">or click to choose. EPUB, MOBI, AZW3 and FB2 go into Calibre, then Books, where Daf opens them. PDFs go straight into the Library.</span></label>' +
+    '<div class="addfeed"><span class="mute tiny">Feed folder</span><select class="field sm" id="addfolder" aria-label="Feed folder"><option value="">no folder</option></select><button class="btn sm" type="button" id="addfollow">Follow</button></div>' +
+    '<label class="adddrop" id="adddrop"><input type="file" id="addfile" accept=".epub,.kepub,.mobi,.azw3,.azw,.fb2,.cbz,.pdf" multiple hidden><b>Drop books or PDFs here</b><span class="mute tiny">or click to choose</span></label>' +
     '<div id="addstatus" class="tiny" role="status"></div><div style="display:flex;justify-content:flex-end"><button class="btn" data-act="close">Close</button></div>';
   if (C.Learn) C.Learn.addPicker(m);                 // Learn: which area it goes into (learn.js)
   if (file) uploadFiles(Array.isArray(file) ? file : [file]); else $('#addurl').focus();
@@ -107,9 +106,9 @@ function openAdd(file, url){
 document.addEventListener('click', async e => {
   if (e.target.id !== 'addfollow') return;
   const url = $('#addurl').value.trim(), st = $('#addstatus');
-  if (!url) { st.textContent = 'Paste the site’s address or its feed first.'; $('#addurl').focus(); return; }
+  if (!url) { st.textContent = 'Paste a link first'; $('#addurl').focus(); return; }
   st.textContent = byDaf() ? 'Looking for its feed…' : 'Asking FreshRSS…'; e.target.disabled = true;
-  try { const r = await api('/api/add/feed', { method:'POST', body:JSON.stringify({ url, folder:$('#addfolder').value }) }); st.innerHTML = 'Following <b>' + esc(r.name) + '</b>. New posts show up in the Feed after the next sync.';
+  try { const r = await api('/api/add/feed', { method:'POST', body:JSON.stringify({ url, folder:$('#addfolder').value }) }); st.innerHTML = 'Following <b>' + esc(r.name) + '</b>';
     const area = C.Learn && C.Learn.chosen(); if (area) await C.Learn.put(area, { feed: url }).catch(() => {});
     $('#addurl').value = ''; }
   catch(err){ st.textContent = err.message; }
@@ -132,8 +131,8 @@ async function uploadFile(f, line){
   try {
     const r = await fetch('/api/add/file', { method:'POST', body:fd, credentials:'same-origin' });
     const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.statusText);
-    if (j.where === 'books') st.innerHTML = '<b>' + esc(j.name) + '</b> is on its way into Calibre. It shows up under Books in a few minutes, once Calibre-Web has taken it in and Daf has synced.';
-    else { st.innerHTML = 'Saved to the Library. ' + (j.id ? '<a href="#read/' + encodeURIComponent(j.id) + '" data-act="close">Open it</a>' : 'It shows up in the Library after the next sync.'); refreshCounts(); }
+    if (j.where === 'books') st.innerHTML = '<b>' + esc(j.name) + '</b> · on its way into Calibre';
+    else { st.innerHTML = 'Saved to the Library. ' + (j.id ? '<a href="#read/' + encodeURIComponent(j.id) + '" data-act="close">Open it</a>' : ''); refreshCounts(); }
   } catch(e){ st.textContent = e.message; }
 }
 document.addEventListener('submit', async e => {
@@ -143,7 +142,7 @@ document.addEventListener('submit', async e => {
   try {
     const r = await api('/api/add/link', { method:'POST', body:JSON.stringify({ url }) });
     const area = C.Learn && C.Learn.chosen(); if (area) await C.Learn.put(area, r.id ? { ref: 'doc:' + r.id } : { url }).catch(() => {});
-    st.innerHTML = r.where === 'library' ? 'Saved to the Library. ' + (r.id ? '<a href="#read/' + encodeURIComponent(r.id) + '" data-act="close">Open it</a>' : '') : 'It didn’t save just now, so it waits in Daf’s inbox and goes in on the next sync.';
+    st.innerHTML = r.where === 'library' ? 'Saved to the Library. ' + (r.id ? '<a href="#read/' + encodeURIComponent(r.id) + '" data-act="close">Open it</a>' : '') : 'Saves on the next sync';
     $('#addurl').value = ''; refreshCounts();
     if (R.list && R.list.where === 'library') listView(R.list.where, R.list.arg);
   } catch(err){ st.textContent = err.message; }
@@ -335,7 +334,7 @@ async function listView(where, arg){
   const sort = R.view && R.view.sort ? R.view.sort : store.get('sort.' + key, 'new');
   $('#main').innerHTML = '<div class="lv"><div class="lvmain"><div class="top"><h1' + dirAttr(title) + '>' +
     (where === 'feed' && !R.view ? '<button class="srcpick" data-ract="sources" aria-haspopup="dialog" title="Choose a folder or a feed"><span id="ltitle">' + esc(title) + '</span>' + ICON.chev + '</button>' : esc(title)) + '</h1><div class="tabs" role="tablist">' +
-    (arg === KIND_STAR ? '<span class="mute tiny">Starred, until you archive them</span>' : tabs.map(t => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" role="tab" aria-selected="' + (tab === t[0]) + '" data-tab="' + t[0] + '">' + t[1] + '</button>').join('')) +
+    (arg === KIND_STAR ? '' : tabs.map(t => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" role="tab" aria-selected="' + (tab === t[0]) + '" data-tab="' + t[0] + '">' + t[1] + '</button>').join('')) +
     '</div><span class="spacer"></span>' + (where === 'library' ? '<span id="tagf"></span>' : '') +
     (R.view ? '<button class="btn sm" data-ract="rmview" title="Remove this saved view">Remove view</button>' : '<button class="btn sm" data-ract="saveview" title="Keep this list, with its tab, tag and order, in the sidebar">Save view</button>') +
     '<button class="btn sm' + (Object.keys(curFilter()).length ? ' on' : '') + '" data-ract="lfilter" title="Filter by source, author, length, date">Filter' + (Object.keys(curFilter()).length ? ' · ' + Object.keys(curFilter()).length : '') + '</button>' +
@@ -408,13 +407,13 @@ function drawRows(){
   if (!L.items.length && C.Find.q(findKey(L.where, L.arg))) { rows.innerHTML = findScope() + C.Find.none(); $('#lvinfo').innerHTML = ''; drawBulk(); return; }
   if (!L.items.length) {
     const c = R.counts || {};
-    rows.innerHTML = '<div class="empty"><b>Nothing here</b><span>' + (L.where === 'feed' && R.tabs.feed === 'unseen' ? 'You’re through the last two weeks of the Feed.' + (c.freshrss_unread ? ' FreshRSS still counts ' + c.freshrss_unread.toLocaleString() + ' unread, mostly older; Daf leaves anything past 14 days in Seen.' : '') : L.where === 'library' && R.tabs.library === 'later' ? 'Things you mark Later wait here.' : 'Nothing to show.') + '</span></div>';
+    rows.innerHTML = '<div class="empty"><b>' + (L.where === 'feed' && R.tabs.feed === 'unseen' ? 'All caught up' : 'Nothing here') + '</b></div>';
     $('#lvinfo').innerHTML = '';
     return;
   }
   let extra = '';
   if (L.where === 'feed' && R.tabs.feed === 'seen' && R.counts && R.counts.freshrss_unread > (R.counts.feed_total || 0)) {
-    extra = '<div class="notice" style="margin:10px 12px"><span style="flex:1">FreshRSS still counts ' + R.counts.freshrss_unread.toLocaleString() + ' unread, most of them older than two weeks. Daf already treats those as seen.</span><button class="btn sm" data-act="expirefr">Mark them read in FreshRSS too</button></div>';
+    extra = '<div class="notice" style="margin:10px 12px"><span style="flex:1">' + R.counts.freshrss_unread.toLocaleString() + ' unread in FreshRSS</span><button class="btn sm" data-act="expirefr">Mark read in FreshRSS</button></div>';
   }
   const items = R.tag ? L.items.filter(d => tagsOf(d).includes(R.tag)) : L.items;
   const tf = $('#tagf'); if (tf) tf.outerHTML = tagSelect(L);
@@ -451,7 +450,7 @@ async function keepOnDevice(id, on){
   try {
     await dafShell.offline({ op: 'doc', id, on });
     await deviceList(true);
-    toast(on ? 'On this device, also with no network' : 'Removed from this device');
+    toast(on ? 'Kept on this device' : 'Removed from this device');
   } catch(e){ await deviceList(true); toast(e.message); }
   markOnDevice();
 }
@@ -525,7 +524,7 @@ function sourcesHTML(s){
     (s.hidden && s.hidden.length ? '<div class="srow"><a class="sgo mute" href="#feeds/hidden" data-act="close">' + CHEVR + '<span class="sn">Hidden</span><span class="ct">' + s.hidden.length + (s.hidden.length === 1 ? ' folder' : ' folders') + '</span></a></div>' : '') +
     '<div class="sfoot"><label class="shide"><input type="checkbox" data-srchide' + (hide ? ' checked' : '') + '> Hide feeds with nothing new</label>' +
     '<button class="btn sm" data-act="add">Follow a site</button></div>' +
-    (s.stale && !byDaf() ? '<p class="mute tiny">FreshRSS didn’t answer; this is the list from before.</p>' : '');
+    (s.stale && !byDaf() ? '<p class="mute tiny">FreshRSS didn’t answer</p>' : '');
 }
 async function openSources(){
   const m = $('#modal'); $('#scrim').hidden = false; m.hidden = false; m.classList.add('sheet');
@@ -548,10 +547,10 @@ function openFeedEdit(id){
     '<label class="fl">Name<input class="field" id="fename" value="' + esc(feed.title) + '" autocomplete="off"></label>' +
     '<label class="fl">Folder<select class="field" id="fefolder">' + folders.map(f => '<option' + (f === feed.folder ? ' selected' : '') + '>' + esc(f) + '</option>').join('') +
     '<option value="" ' + (feed.folder ? '' : 'selected') + '>No folder</option><option value="" data-new="1">A new folder…</option></select></label>' +
-    '<input class="field" id="fenew" placeholder="The new folder’s name" hidden autocomplete="off">' +
+    '<input class="field" id="fenew" placeholder="Folder name" hidden autocomplete="off">' +
     '<label class="shide fsw"><input type="checkbox" id="fefull"' + (feed.full ? ' checked' : '') + '> Always load the full article</label>' +
     '<label class="shide fsw"><input type="checkbox" id="fenotify"' + (feed.notify ? ' checked' : '') + '> Notify me of new posts' +
-      (window.dafShell ? '' : ' <span class="mute">(in the Daf apps)</span>') + '</label>' +
+      '</label>' +
     (host ? '<p class="mute tiny">From <a href="' + esc(feed.site || feed.url) + '" target="_blank" rel="noopener">' + esc(host) + '</a>' + (feed.count ? ' · ' + feed.count + ' unseen' : '') + '</p>' : '') +
     '<div class="ferow"><button class="btn primary" data-fe="save" data-id="' + esc(id) + '">Save</button><button class="btn" data-fe="back">Back</button><span class="spacer"></span>' +
     '<button class="btn" data-fe="unfollow" data-id="' + esc(id) + '">Unfollow</button></div>';
@@ -574,7 +573,7 @@ async function feedEditAct(a, id){
   }
   if (a === 'unfollow') {
     const name = feedTitle(id);
-    if (!confirm('Unfollow “' + name + '”? ' + (byDaf() ? 'Daf' : 'FreshRSS') + ' stops fetching it, and what’s unseen from it leaves the Feed.')) return;
+    if (!confirm('Unfollow “' + name + '”?')) return;
     try {
       await api('/api/feed/sources?feed=' + encodeURIComponent(id), { method: 'DELETE' });
       R.sources = null; toast('Unfollowed ' + name); refreshCounts();
@@ -625,7 +624,7 @@ async function refreshList(){
   const L = R.list; if (!L || refreshList.busy) return;
   refreshList.busy = true; pullShow(70, true);
   try {
-    if (L.where === 'feed') { const r = await api('/api/feed/refresh', { method: 'POST' }); toast(r.busy ? 'Daf is already syncing; try again in a moment' : r.new ? r.new + ' new' : 'Nothing new'); }
+    if (L.where === 'feed') { const r = await api('/api/feed/refresh', { method: 'POST' }); toast(r.busy ? 'Already syncing' : r.new ? r.new + ' new' : 'Nothing new'); }
     else { await api('/api/sync', { method: 'POST' }); toast('Synced'); }
     R.sources = null;
     if (R.list === L) await listView(L.where, L.arg);
@@ -747,10 +746,10 @@ function pick(id, on){
 }
 // Send to the Kindle: one EPUB (a digest for several) into the folder Syncthing shares with it.
 async function sendToKindle(ids){
-  toast('Making the EPUB, images and all…');
+  toast('Making the EPUB…');
   try {
     const r = await api('/api/kindle/send', { method:'POST', body:JSON.stringify({ ids }) });
-    toast((r.count > 1 ? 'A digest of ' + r.count : 'It') + ' goes to the Kindle (Libros/Daf) next time it’s online' + (r.skipped.length ? ' · ' + r.skipped.length + ' had no text yet' : ''));
+    toast((r.count > 1 ? 'A digest of ' + r.count + ' on its way to the Kindle' : 'On its way to the Kindle') + (r.skipped.length ? ' · ' + r.skipped.length + ' had no text yet' : ''));
     return r;
   } catch(e){ toast(e.message); return null; }
 }
@@ -812,7 +811,7 @@ async function docAct(act, id){
       const before = d.status;
       await api('/api/docs/' + encodeURIComponent(id) + '/status', { method:'POST', body:JSON.stringify({ status }) });
       const hls = (R.doc && R.doc.id === id ? R.doc.highlights.length : d.highlights) || 0;
-      undoToast({ seen:'Marked seen', unseen:'Back in Unseen', later:'Moved to Later', archive:'Archived', inbox:'Back in Inbox', deleted: hls ? 'Deleted. Its highlights stay in Highlights' : 'Deleted' }[status],
+      undoToast({ seen:'Marked seen', unseen:'Back in Unseen', later:'Moved to Later', archive:'Archived', inbox:'Back in Inbox', deleted: 'Deleted' }[status],
         () => api('/api/docs/' + encodeURIComponent(id) + '/status', { method:'POST', body:JSON.stringify({ status: before }) }));
       if (R.doc && R.doc.id === id && (status === 'seen' || status === 'archive' || status === 'deleted' || (status === 'later' && store.get('autoAdvance', false)))) {
         stopTTS();
@@ -1053,7 +1052,7 @@ function moreAct(a){
   else if (a === 'area' && C.Learn) toArea([d.id], d.title);
   else if (['save', 'seen', 'later', 'archive', 'delete', 'star'].includes(a)) docAct(a, d.id);
   else if (a === 'focus' && C.Focus) C.Focus.toggle();
-  else if (a === 'reset') api('/api/docs/' + encodeURIComponent(d.id) + '/progress', { method:'DELETE' }).then(() => { d.progress = 0; $('#main').scrollTo({ top:0, behavior:'smooth' }); toast('Back to the start; progress cleared'); }).catch(e => toast(e.message));
+  else if (a === 'reset') api('/api/docs/' + encodeURIComponent(d.id) + '/progress', { method:'DELETE' }).then(() => { d.progress = 0; $('#main').scrollTo({ top:0, behavior:'smooth' }); toast('Back to the start'); }).catch(e => toast(e.message));
   else if (a === 'open' && d.url) window.open(d.url, '_blank', 'noopener');
   else if (a === 'copy' && d.url) navigator.clipboard && navigator.clipboard.writeText(d.url).then(() => toast('Link copied'), () => {});
   else if (a === 'vault' && d.vault_path) location.href = 'obsidian://open?vault=' + encodeURIComponent(d.vault_name || 'vault') + '&file=' + encodeURIComponent(d.vault_path.replace(/\.md$/, ''));
@@ -1065,7 +1064,7 @@ function editMeta(){
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false;
   m.innerHTML = '<h2>Edit title and author</h2><label class="mute tiny" for="mtitle">Title</label><input class="field" id="mtitle" value="' + esc(d.title || '') + '"' + dirAttr(d.title) + '>' +
     '<label class="mute tiny" for="mauthor">Author</label><input class="field" id="mauthor" value="' + esc(d.author || '') + '">' +
-    (byDaf() ? '' : '<span class="mute tiny">Stays this way after FreshRSS syncs.</span>') + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="msave">Save</button></div>';
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="msave">Save</button></div>';
   const t = $('#mtitle'); t.focus(); t.select();
   const save = async () => {
     try { const r = await api('/api/docs/' + encodeURIComponent(d.id) + '/meta', { method:'PUT', body:JSON.stringify({ title:$('#mtitle').value, author:$('#mauthor').value }) });
@@ -1082,7 +1081,7 @@ function tagDoc(id, anchor){
   api('/api/docs/tags').then(r => H.tagEditor({ id, tags: tagsOf(d) }, anchor.getBoundingClientRect(), x => {
     for (const y of [d, R.doc, ...(R.list ? R.list.items : [])]) if (y && y.id === id) y.tags = x.tags;
     const info = $('#lvinfo'); if (info && R.sel === id) info.innerHTML = infoHTML(d);
-  }, { url: '/api/docs/' + encodeURIComponent(id) + '/tags', all: r.tags, plain: true, hint: 'Enter adds a tag · kept in Daf' })).catch(e => toast(e.message));
+  }, { url: '/api/docs/' + encodeURIComponent(id) + '/tags', all: r.tags, plain: true })).catch(e => toast(e.message));
 }
 async function readView(id){
   stopSel();
@@ -1106,13 +1105,13 @@ async function readView(id){
   if (d.kind === 'tweet') { const seen = {}; d.blocks.forEach(b => { if (b.t === 'img') seen[b.src] = (seen[b.src] || 0) + 1; }); R.avatars = new Set(Object.keys(seen).filter(k => seen[k] > 1)); } else R.avatars = null;
   if (!d.blocks.length && d.reel) { /* reelHead says where it is */ }
   else if (!d.blocks.length && d.episode) { /* podHead says where its transcript is */ }
-  else if (!d.blocks.length && d.kind === 'video') h += '<div class="placeholder" id="trstatus">No transcript yet. <button class="btn sm" data-tr="captions">Get YouTube’s captions</button> <button class="btn sm" data-tr="whisper">Transcribe on the server (slow)</button></div>';
-  else if (!d.blocks.length && d.kind === 'pdf') h += '<div class="placeholder">' + (d.preparing ? '<span id="trstatus">Reading the PDF on the server. The text appears here in a moment.</span>' : 'Couldn’t read this PDF: ' + esc(d.content_error || '') + '.') + ' <a href="/api/docs/' + encodeURIComponent(d.id) + '/pdf" target="_blank" rel="noopener">Open the original layout</a></div>';
-  else if (!d.blocks.length && d.preparing) h += '<div class="placeholder"><span id="trstatus">Reading the page on the server. The text appears here in a moment.</span> <a href="' + esc(d.url || '#') + '" target="_blank" rel="noopener">Open the original</a></div>';
-  else if (!d.blocks.length) h += '<div class="placeholder">' + (d.content_error ? (/^Daf /.test(d.content_error) ? esc(d.content_error) : 'Karakeep didn’t answer: ' + esc(d.content_error)) : d.kind === 'pdf' ? 'PDFs open in the reader in a later round. For now, open the original.' : d.kind === 'podcast' ? 'A podcast episode. Listen in AntennaPod, and share it to Ezer with its position to clip the minute before.' : 'There’s no saved text for this one.') + (d.url ? ' <a href="' + esc(d.url) + '" target="_blank" rel="noopener">Open the original</a>' : '') + '</div>';
+  else if (!d.blocks.length && d.kind === 'video') h += '<div class="placeholder" id="trstatus">No transcript yet <button class="btn sm" data-tr="captions">Get captions</button> <button class="btn sm" data-tr="whisper">Transcribe</button></div>';
+  else if (!d.blocks.length && d.kind === 'pdf') h += '<div class="placeholder">' + (d.preparing ? '<span id="trstatus">Reading the PDF…</span>' : 'Couldn’t read this PDF: ' + esc(d.content_error || '') + '.') + ' <a href="/api/docs/' + encodeURIComponent(d.id) + '/pdf" target="_blank" rel="noopener">Open the original</a></div>';
+  else if (!d.blocks.length && d.preparing) h += '<div class="placeholder"><span id="trstatus">Reading the page…</span> <a href="' + esc(d.url || '#') + '" target="_blank" rel="noopener">Open the original</a></div>';
+  else if (!d.blocks.length) h += '<div class="placeholder">' + (d.content_error ? (/^Daf /.test(d.content_error) ? esc(d.content_error) : 'Karakeep didn’t answer: ' + esc(d.content_error)) : d.kind === 'pdf' ? 'No text' : d.kind === 'podcast' ? 'Podcast episode' : 'No saved text') + (d.url ? ' <a href="' + esc(d.url) + '" target="_blank" rel="noopener">Open the original</a>' : '') + '</div>';
   else h += '<div class="body" id="docbody">' + d.blocks.map(blockHTML).join('') + '</div>';
   // A feed that sends only the start: the page has the rest (daf/fulltext.py)
-  if (d.where_ === 'feed' && d.url && !d.full && (d.words || 0) < 220 && !d.episode) h += '<div class="fullnote" id="fullnote"><span>' + (d.blocks.length ? 'That’s what the feed sends.' : 'The feed sent no text.') +
+  if (d.where_ === 'feed' && d.url && !d.full && (d.words || 0) < 220 && !d.episode) h += '<div class="fullnote" id="fullnote"><span>' + (d.blocks.length ? '' : 'No text from the feed') +
     '</span><button class="btn sm" data-ract="full">Load the full article</button></div>';
   h += '</article>' + (d.mins && d.kind !== 'video' && !d.episode && d.blocks.length ? '<div class="rleft" id="rleft" aria-live="off">' + d.mins + ' min left</div>' : '') + '</div><aside class="rpanel" id="rpanel"></aside></div></div>';
   $('#main').innerHTML = h;
@@ -1161,16 +1160,16 @@ function drawPanel(){
   const tabs = (C.Sketch ? [['notebook', 'Notebook']] : []).concat([['info', 'Info'], ['ask', 'Ask']]);
   let h = '<div class="ptabs" role="tablist">' + tabs.map(t => '<button class="ptab' + (R.panel === t[0] ? ' on' : '') + '" data-ptab="' + t[0] + '" role="tab">' + t[1] + '</button>').join('') + '<button class="ib pclose" data-ract="panel" aria-label="Close">' + ICON.close + '</button></div>';
   if (R.panel === 'info') {
-    h += '<div class="pbody"><div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="docnote">Document note</label><input class="field" id="docnote" placeholder="Why you saved this, in a line" value="' + esc(d.note || '') + '"></div>' +
+    h += '<div class="pbody"><div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="docnote">Document note</label><input class="field" id="docnote" placeholder="Note" value="' + esc(d.note || '') + '"></div>' +
       (d.vault_path ? '<div class="vault"><b>In your vault</b><code>' + esc(d.vault_path) + '</code><a class="tiny" href="obsidian://open?vault=' + encodeURIComponent(d.vault_name || 'vault') + '&file=' + encodeURIComponent(d.vault_path.replace(/\.md$/, '')) + '">Open in Obsidian</a></div>' : '') + '</div>' +
       infoHTML(d).replace(/<a class="btn primary"[^>]*>(Read|Watch)<\/a>/, '');
   } else {
     const chips = d.questions || ['Summarize this', 'What’s the main argument?', 'What should I remember from this?'];   // Preferences → AI
-    h += '<div class="pbody"><span class="mute tiny">Answers come from this document and your highlights in it.</span>' +
+    h += '<div class="pbody">' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' + chips.map(c => '<button class="chip" data-askq="' + esc(c) + '">' + esc(c) + '</button>').join('') + '</div>' +
       d.asks.map(a => '<div class="qa"><div class="q">' + esc(a.q) + '</div>' + (a.quote ? '<q class="mute tiny">' + esc(a.quote) + '</q>' : '') + '<div class="a">' + esc(a.a).replace(/\n/g, '<br>') + '</div></div>').join('') +
       (R.asking ? '<div class="qa"><div class="q">' + esc(R.asking) + '</div><div class="a mute">Thinking…</div></div>' : '') +
-      '<form id="askf" style="display:flex;gap:6px"><input class="field" id="askin" placeholder="Ask about this…" aria-label="Question"><button class="btn primary" type="submit"' + (R.asking ? ' disabled' : '') + '>Ask</button></form></div>';
+      '<form id="askf" style="display:flex;gap:6px"><input class="field" id="askin" placeholder="Ask" aria-label="Question"><button class="btn primary" type="submit"' + (R.asking ? ' disabled' : '') + '>Ask</button></form></div>';
   }
   p.innerHTML = h;
 }
@@ -1297,12 +1296,12 @@ async function clipVideo(sec){
   const d = R.doc, now = curTime(); if (!d) return;
   const cues = d.blocks.map((b, i) => [b, i]).filter(x => x[0].t === 'cue' && x[0].ts >= now - sec && x[0].ts <= now);
   if (!cues.length && d.episode && now > 3) { podClip(d, now, sec); return; }
-  if (!cues.length) { toast(d.episode ? 'Play it first; Clip takes the last 30 seconds.' : 'Play the video first; Clip takes the last 30 seconds.'); return; }
+  if (!cues.length) { toast(d.episode ? 'Play it first' : 'Play the video first'); return; }
   for (const [b, i] of cues) {
     const el = $('#docbody [data-i="' + i + '"]'); const txt = el ? el.textContent.replace(/^\S+\s/, b.spk ? '' : '') : b.x;
     await highlight({ b:i, s:0, e:(el ? el.textContent.length : b.x.length), text:(el ? el.textContent : b.x).trim(), t:b.ts }, false, true);
   }
-  toast('Clipped ' + fmtT(cues[0][0].ts) + '–' + fmtT(now) + ' · in the Notebook and the vault');
+  toast('Clipped ' + fmtT(cues[0][0].ts) + '–' + fmtT(now));
 }
 
 /* ---------- podcast episodes (episodes.py): Daf's player over the transcript ---------- */
@@ -1406,7 +1405,7 @@ document.addEventListener('change', e => {
 async function podClip(d, now, sec){
   try {
     await api('/api/podcasts/clip', { method: 'POST', body: JSON.stringify({ doc: d.id, t: now, sec }) });
-    toast('Clipping ' + fmtT(Math.max(0, now - sec)) + '–' + fmtT(now) + '. It’s in the Notebook in a minute.');
+    toast('Clipping ' + fmtT(Math.max(0, now - sec)) + '–' + fmtT(now) + '…');
     const had = d.highlights.length;
     let n = 0;
     const look = async () => {
@@ -1515,7 +1514,7 @@ async function highlight(info, withNote, quiet){
     if (!d.vault_path) d.vault_path = 'Reference/clippings/…';
     drawToc();
     if (r.saved_as) movedToLibrary(d, r.saved_as);
-    else if (r.save_error) toast('Highlighted, but the page wasn’t saved to the Library: ' + r.save_error);
+    else if (r.save_error) toast('Not saved to the Library: ' + r.save_error);
     if (C.Sketch) C.Sketch.hlChanged(h.id);          // its card, on the Notebook's page
     if (withNote) openNoteA(h);
     else { drawPanel(); if (!quiet) showHlBar(h); }
@@ -1708,7 +1707,7 @@ new MutationObserver(() => { const p = $('#pop'); if (p.hidden) p.classList.remo
 let palItems = [], palIdx = 0, palT = null;
 function openPalette(){
   const p = $('#palette'); $('#scrim').hidden = false; p.hidden = false;
-  p.innerHTML = '<input id="palq" placeholder="Search articles, books, highlights and the vault, or go somewhere" aria-label="Search" autocomplete="off"><div class="pres" id="pres"></div>';
+  p.innerHTML = '<input id="palq" placeholder="Search" aria-label="Search" autocomplete="off"><div class="pres" id="pres"></div>';
   $('#palq').focus(); palResults('');
 }
 async function palResults(q){
@@ -1760,8 +1759,8 @@ async function saveViews(list){ R.views = (await api('/api/views', { method:'PUT
 loadViews();
 
 /* ---------- the Library home: shelves of cards ---------- */
-const SHELVES = [['continue', 'Continue reading', 'Books and articles you’re partway through'], ['recent', 'Recently added', 'Saved in the past week, not archived'],
-  ['quick', 'Quick reads', 'Ten minutes or less'], ['long', 'Long reads', 'Half an hour or more'], ['highlighted', 'Recently highlighted', 'Highlighted in the past three weeks'], ['feed', 'New in the Feed', 'Unseen, newest first']];
+const SHELVES = [['continue', 'Continue reading'], ['recent', 'Recently added'],
+  ['quick', 'Quick reads'], ['long', 'Long reads'], ['highlighted', 'Recently highlighted'], ['feed', 'New in the Feed']];
 function ringSVG(p){ const r = 7, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, (p || 0) / 100)); return '<svg class="mring" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="' + r + '" fill="none" stroke="var(--active)" stroke-width="2.5"/><circle cx="9" cy="9" r="' + r + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="' + (c * f).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 9 9)" stroke-linecap="round"/></svg>'; }
 function homeCard(c){
   const t = c.kind === 'tweet' ? tweetParts(c) : { title: c.title };
@@ -1784,8 +1783,8 @@ function drawHome(){
   const h = R.home, box = $('#homepage'); if (!h || !box) return;
   const hidden = store.get('homeHidden', []);
   const html = SHELVES.filter(s => !hidden.includes(s[0]) && (h[s[0]] || []).length).map(s =>
-    '<section class="shelf"><div class="shelfh"><h2>' + s[1] + '</h2><span class="mute tiny">' + s[2] + '</span></div><div class="shelfrow">' + h[s[0]].map(homeCard).join('') + '</div></section>').join('');
-  box.innerHTML = html || '<p class="mute">Nothing here yet. Save something to the Library, or open a book.</p>';
+    '<section class="shelf"><div class="shelfh"><h2>' + s[1] + '</h2></div><div class="shelfrow">' + h[s[0]].map(homeCard).join('') + '</div></section>').join('');
+  box.innerHTML = html || '<p class="mute">Nothing here yet</p>';
 }
 // Home's search: the whole Library, every kind and every tab, under a heading for each tab. Its rows
 // only open; what's done to one is done in its list.
@@ -1897,7 +1896,7 @@ document.addEventListener('click', e => {
     }
     if (a === 'rmview' && R.view) {
       const v = R.view;
-      if (!confirm('Remove the view “' + v.name + '”? The documents stay where they are.')) return;
+      if (!confirm('Remove the view “' + v.name + '”?')) return;
       saveViews((R.views || []).filter(x => x.id !== v.id)).then(() => { R.view = null; toast('View removed'); location.hash = v.where === 'feed' ? 'feed' : 'library/' + (v.arg || 'article'); }).catch(err => toast(err.message));
       return;
     }
@@ -1970,7 +1969,7 @@ document.addEventListener('click', e => {
   const sk = t.closest('[data-seek]'); if (sk) { seek(+sk.dataset.seek); return; }
   const vc = t.closest('[data-vclip]'); if (vc) { clipVideo(+vc.dataset.vclip); return; }
   const tr = t.closest('[data-tr]');
-  if (tr && R.doc) { const d = R.doc; api('/api/docs/' + encodeURIComponent(d.id) + '/transcript', { method:'POST', body:JSON.stringify({ whisper: tr.dataset.tr === 'whisper' }) }).then(() => { $('#trstatus').innerHTML = 'Working on it on the server' + (tr.dataset.tr === 'whisper' ? ' (whisper takes a while for a long video)' : '') + '. This page fills in when it’s ready.'; pollTranscript(d.id); }).catch(err => toast(err.message)); return; }
+  if (tr && R.doc) { const d = R.doc; api('/api/docs/' + encodeURIComponent(d.id) + '/transcript', { method:'POST', body:JSON.stringify({ whisper: tr.dataset.tr === 'whisper' }) }).then(() => { $('#trstatus').innerHTML = tr.dataset.tr === 'whisper' ? 'Transcribing…' : 'Getting captions…'; pollTranscript(d.id); }).catch(err => toast(err.message)); return; }
   const pi = t.closest('[data-pi]'); if (pi) { palGo(+pi.dataset.pi); return; }
   const act = t.closest('[data-act]');
   if (act && act.dataset.act === 'palette') { openPalette(); return; }
@@ -2029,12 +2028,12 @@ let noteT = {};
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'palq') { clearTimeout(palT); palT = setTimeout(() => palResults(t.value), 180); return; }
-  if (t.id === 'docnote' && R.doc) { clearTimeout(noteT.doc); const d = R.doc; noteT.doc = setTimeout(() => api('/api/docs/' + encodeURIComponent(d.id) + '/note', { method:'PUT', body:JSON.stringify({ note:t.value }) }).then(() => toast('Saved to the vault note')).catch(err => toast(err.message)), 900); return; }
+  if (t.id === 'docnote' && R.doc) { clearTimeout(noteT.doc); const d = R.doc; noteT.doc = setTimeout(() => api('/api/docs/' + encodeURIComponent(d.id) + '/note', { method:'PUT', body:JSON.stringify({ note:t.value }) }).then(() => toast('Saved')).catch(err => toast(err.message)), 900); return; }
   if (t.dataset.note && R.doc && C.S.route[0] === 'read') {
     const id = t.dataset.note; const h = R.doc.highlights.find(x => x.id === id); if (h) h.user_note = t.value;
     const m = $$('mark[data-h="' + id + '"]'); m.forEach(x => x.classList.toggle('has-note', !!t.value.trim()));
     e.stopImmediatePropagation();
-    clearTimeout(noteT[id]); noteT[id] = setTimeout(() => api('/api/highlights/' + encodeURIComponent(id) + '/note', { method:'PUT', body:JSON.stringify({ note:t.value }) }).then(() => toast('Note saved to the vault')).catch(err => toast(err.message)), 900);
+    clearTimeout(noteT[id]); noteT[id] = setTimeout(() => api('/api/highlights/' + encodeURIComponent(id) + '/note', { method:'PUT', body:JSON.stringify({ note:t.value }) }).then(() => toast('Note saved')).catch(err => toast(err.message)), 900);
   }
 }, true);
 function pollTranscript(id){
@@ -2048,7 +2047,7 @@ function pollTranscript(id){
       }
       if (st.ready || (st.page && ['done', 'failed'].includes(st.page.status) && !st.pdf) || (st.reel && ['done', 'failed'].includes(st.reel.status))) { readView(id); return; }
       const j = st.pdf || st.whisper || st.captions;
-      if (j && j.status === 'failed') { $('#trstatus').innerHTML = 'That didn’t work: ' + esc(j.error || '') + ' <button class="btn sm" data-tr="whisper">Transcribe on the server instead</button>'; return; }
+      if (j && j.status === 'failed') { $('#trstatus').innerHTML = 'That didn’t work: ' + esc(j.error || '') + ' <button class="btn sm" data-tr="whisper">Transcribe</button>'; return; }
     } catch(e){}
     pollTranscript(id);
   }, 5000);

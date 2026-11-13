@@ -257,7 +257,7 @@ async function find(title, author){
   sheet('<div class="behead"><h2>Find details</h2><span class="spacer"></span><button class="btn sm" data-be="findback">Back</button></div>' +
     '<div class="bebody one befind"><form class="befq" data-be="findform"><input class="field" name="t" value="' + esc(title || F.snap.title || d.title) + '" aria-label="Title">' +
     '<input class="field" name="a" value="' + esc(author || (F.snap.authors || '').split('&')[0].trim()) + '" aria-label="Author"><button class="btn sm">Search</button></form>' +
-    '<div id="befres"><p class="mute">Asking Hardcover and Calibre’s sources…</p></div></div>');
+    '<div id="befres"><p class="mute">Searching…</p></div></div>');
   try {
     const body = title ? { title, authors: author ? [author] : [] } : {};
     const { job } = await api('/api/catalog/book/' + d.calibre_id + '/find', { method: 'POST', body: JSON.stringify(body) });
@@ -280,7 +280,7 @@ function list(errs){
       (x.cover ? '<img src="' + far(x.cover) + '" alt="" loading="lazy">' : '<span class="befnc"></span>') +
       '<span class="befct"><b>' + esc(x.title || '') + '</b><span>' + esc((x.authors || []).join(', ')) + '</span>' +
       '<span class="mute tiny">' + [yr(x), x.publisher, x.series ? x.series + (x.series_index ? ' #' + x.series_index : '') : '', x.pages ? x.pages + ' pages' : ''].filter(Boolean).map(esc).join(' · ') + '</span></span>' +
-      '<span class="befsrc">' + esc(x.source) + '</span></button>').join('') + '</div>' : '<p class="mute">Nothing found. Try the title alone, or another spelling.</p>') +
+      '<span class="befsrc">' + esc(x.source) + '</span></button>').join('') + '</div>' : '<p class="mute">Nothing found</p>') +
     errs.map(e => '<p class="mute tiny">' + esc(e) + '</p>').join('');
 }
 // One answer beside what the book has now: tick what to take.
@@ -338,7 +338,7 @@ async function take(){
   const cov = on('cover') && x.cover;
   backToForm(v); F.snap = null;
   if (cov) await cover(JSON.stringify({ url: x.cover }), 'application/json');
-  toast('Check the details, then Save');
+  toast('Details filled in');
 }
 
 /* ---------- the chips, the stars ---------- */
@@ -584,7 +584,7 @@ function drawFill(){
       '<span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc((b.authors || []).join(' & ')) + '</span>' +
       '<span class="befills">' + Object.entries(b.fill).filter(([k]) => k !== 'cover' && k !== 'series_index').map(([k, v]) => '<span class="befx" data-fillx="' + b.id + '|' + esc(k) + '" role="checkbox" aria-checked="true" tabindex="0"><i>' + esc((FILL.find(f => f[0] === k) || [k, k])[1]) + '</i> ' + esc(showVal(k, v)) + (k === 'series' && b.fill.series_index != null ? ' #' + esc(b.fill.series_index) : '') + '</span>').join('') +
       (b.fill.cover ? '<span class="befx" data-fillx="' + b.id + '|cover" role="checkbox" aria-checked="true" tabindex="0"><i>Cover</i></span>' : '') + '</span><span class="mute tiny">' + esc([...new Set(Object.values(b.from))].join(', ')) + '</span></span></label>').join('') +
-    (none.length ? '<h3>Nothing to fill in</h3>' + none.map(b => '<div class="befnone"><b>' + esc(b.title) + '</b> <span class="mute tiny">' + (b.found ? 'Nothing missing that was found' : 'No answer surely the same book') + '</span></div>').join('') : '');
+    (none.length ? '<h3>Nothing to fill in</h3>' + none.map(b => '<div class="befnone"><b>' + esc(b.title) + '</b> <span class="mute tiny">' + (b.found ? 'Nothing new' : 'No sure match') + '</span></div>').join('') : '');
 }
 async function fillSave(){
   // A line taken out (tapped, so it's crossed out) stays as the book has it.

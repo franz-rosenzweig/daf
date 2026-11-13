@@ -173,7 +173,7 @@ async function erased(L){
   }
   if (a.del || a.add || a.unhl) act(a);
 }
-function eraseAll(){ if (!K.strokes.length) return; const all = K.strokes.slice(); K.strokes = []; render(); act({ del: all }); toast('Everything written here is erased. Undo brings it back.'); }
+function eraseAll(){ if (!K.strokes.length) return; const all = K.strokes.slice(); K.strokes = []; render(); act({ del: all }); toast('Erased'); }
 
 /* ---------- the highlighter over words ---------- */
 // Along a line: the words between its ends. Down several lines: from where it started to where
@@ -276,7 +276,7 @@ async function flush(){
   try {
     const r = await api('/api/docs/' + encodeURIComponent(d.id) + '/ink', { method: 'POST', body: JSON.stringify(body) });
     if (r && r.saved_as && C.Reader) C.Reader.moved(d, r.saved_as);
-    else if (r && r.save_error) toast('Written on, but the page wasn’t saved to the Library: ' + r.save_error);
+    else if (r && r.save_error) toast('Not saved to the Library: ' + r.save_error);
   } catch(e){ toast(e.message); }
 }
 
@@ -312,7 +312,7 @@ function boxOf(list){
 function removeAll(list){ const ids = new Set(list.map(s => s.id)); K.strokes = K.strokes.filter(s => !ids.has(s.id)); list.forEach(s => unpaint(s.id)); act({ del: list }); }
 // The handwriting swapped for typed text saying the same, where it began, about its size.
 function typed(list, text){
-  const b = boxOf(list), at = anchorAt(b.x1, b.y1); if (!at) throw new Error('There’s no paragraph here to keep it by.');
+  const b = boxOf(list), at = anchorAt(b.x1, b.y1); if (!at) throw new Error('No paragraph here');
   const lines = text.split('\n').length, fs = Math.round(Math.max(13, Math.min(30, (b.y2 - b.y1) / lines * 0.62)));
   const first = list.find(Pens.writingOf) || list[0];
   const t = { id: newId(), v: 2, tool: 'text', text, fs, w: r1(Math.max(60, b.x2 - b.x1)), color: first.color || 'ink', size: 1, o: 1, at, pts: [[0, 0, 0.5]] };
@@ -325,7 +325,7 @@ function typed(list, text){
 async function noteOnPassage(list, text){
   if (!C.Reader) throw new Error('Not in an article');
   const b = boxOf(list), cy = (b.y1 + b.y2) / 2;
-  const el = blockNear((b.x1 + b.x2) / 2, cy); if (!el || !el.matches('[data-i]')) throw new Error('There’s no passage beside it to keep the note with.');
+  const el = blockNear((b.x1 + b.x2) / 2, cy); if (!el || !el.matches('[data-i]')) throw new Error('No passage beside it');
   const br = el.getBoundingClientRect(), full = el.textContent;
   const p = caret(Math.max(br.left + 4, Math.min(br.right - 4, (b.x1 + b.x2) / 2)), Math.max(br.top + 2, Math.min(br.bottom - 2, cy)));
   let at = 0;
@@ -357,7 +357,7 @@ const surface = {
   highlight: toHighlight, underline,
   palHost: () => (K.wrap && K.wrap.closest('.rv')) || document.body,
   canUndo: () => K.done.length > 0, canRedo: () => K.undone.length > 0, undo, redo,
-  extras: () => window.innerWidth >= 700 ? [{ k: 'margin', label: 'Room to write in the margin', on: K.mOn }] : [],
+  extras: () => window.innerWidth >= 700 ? [{ k: 'margin', label: 'Writing margin', on: K.mOn }] : [],
   extra(k){ if (k === 'margin') { const on = !K.mOn; K.margin = on; store.set('margin', on); setMargin(on); } },
   select, mark, typed, noteOnPassage, remove: removeAll,
   all: () => K.strokes.filter(s => Pens.writingOf(s) && K.geo.has(s.id)),

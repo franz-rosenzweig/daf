@@ -30,9 +30,9 @@ HC.section = async (bookId, box) => {
   catch(e){ box.innerHTML = '<div class="cardh"><h2>Hardcover</h2></div><p class="mute tiny" style="margin:0">' + esc(e.message) + '</p>'; return; }
   let h = '<div class="cardh"><h2>Hardcover</h2>' + (s.url ? '<a class="tiny" href="' + esc(s.url) + '" target="_blank" rel="noopener">Open on Hardcover</a>' : '') + '</div>';
   if (!s.linked) {
-    h += '<p class="mute" style="margin:0">This book isn’t linked to Hardcover yet.</p><div><button class="btn sm" data-hc="find" data-id="' + esc(bookId) + '">Find it on Hardcover</button></div><div id="hcfind"></div>';
+    h += '<p class="mute" style="margin:0">Not linked</p><div><button class="btn sm" data-hc="find" data-id="' + esc(bookId) + '">Find it on Hardcover</button></div><div id="hcfind"></div>';
   } else if (!s.on_shelf) {
-    h += '<p class="mute" style="margin:0">On Hardcover, but not on your shelves.</p><div class="hcrow">' +
+    h += '<p class="mute" style="margin:0">Not on your shelves</p><div class="hcrow">' +
       '<button class="btn sm" data-hc="add" data-s="1" data-id="' + esc(bookId) + '">Add as Want to read</button><button class="btn sm" data-hc="add" data-s="2" data-id="' + esc(bookId) + '">Add as Reading</button></div>';
   } else {
     h += '<div class="hcrow"><select class="field sm" data-hcstatus="' + esc(bookId) + '" aria-label="Status on Hardcover">' + STATUS.map(x => '<option value="' + x[0] + '"' + (x[0] === s.status_id ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select>' +
@@ -59,7 +59,6 @@ HC.finish = (bookId, title, after) => {
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false;
   let rating = 0;
   m.innerHTML = '<h2>Finished ' + esc(shortTitle(title || 'this book')) + '</h2>' +
-    '<p class="mute" style="margin:0">Marks it Read on Hardcover, with the date. The vault note follows on its next sync.</p>' +
     '<div class="hcrow"><span class="mute tiny">Your rating</span><span id="hcfinstars">' + stars(0, true) + '</span><button class="linkbtn tiny" id="hcnorate">No rating</button></div>' +
     '<label class="mute tiny" for="hcfdate">Finished on</label><input class="field" id="hcfdate" type="date" value="' + new Date().toISOString().slice(0, 10) + '" style="max-width:200px">' +
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="hcfinish">Mark it read</button></div>';
@@ -67,7 +66,7 @@ HC.finish = (bookId, title, after) => {
   sb.onclick = e => { const v = starValue(sb, e); if (v != null) { rating = v; sb.innerHTML = stars(rating, true); } };
   $('#hcnorate').onclick = () => { rating = 0; sb.innerHTML = stars(0, true); };
   $('#hcfinish').onclick = async () => {
-    const b = $('#hcfinish'); b.disabled = true; b.textContent = 'Telling Hardcover…';
+    const b = $('#hcfinish'); b.disabled = true; b.textContent = 'Saving…';
     try { await api('/api/hardcover/book/' + encodeURIComponent(bookId) + '/finish', { method: 'POST', body: JSON.stringify({ rating: rating || null, date: $('#hcfdate').value }) });
       C.closeModal(); toast('Read, on Hardcover' + (rating ? ' · ' + rating + ' stars' : '')); after && after(); }
     catch(e){ toast(e.message); b.disabled = false; b.textContent = 'Mark it read'; }
@@ -87,7 +86,7 @@ HC.shelf = async box => {
     return '<a class="libcard" href="' + esc(href || '#books') + '"' + (!b.daf_id && b.url ? ' target="_blank" rel="noopener"' : '') + ' title="' + esc(b.title) + '">' + img + '<b>' + esc(shortTitle(b.title)) + '</b><span class="mute tiny">' + esc(b.author || '') + '</span>' + (b.readable ? '<span class="tiny hcread">Read in Daf</span>' : '') + '</a>';
   };
   const all = HC.wantAll;
-  box.innerHTML = '<div class="cardh"><h2>Want to read</h2><span class="mute tiny">From Hardcover · ' + r.books.length + ' books, ' + n + ' you can open in Daf</span></div>' +
+  box.innerHTML = '<div class="cardh"><h2>Want to read</h2><span class="mute tiny">' + r.books.length + ' books · ' + n + ' in Daf</span></div>' +
     '<div class="libgrid">' + (all ? r.books : r.books.slice(0, 12)).map(card).join('') + '</div>' +
     (!all && r.books.length > 12 ? '<button class="btn" data-hc="wantall" style="align-self:flex-start">Show all ' + r.books.length + '</button>' : '');
 };
@@ -124,7 +123,7 @@ document.addEventListener('change', async e => {
 document.addEventListener('submit', e => { const f = e.target.closest('.hcq'); if (!f) return; e.preventDefault(); find(f.dataset.id, f.querySelector('input').value.trim()); });
 
 /* ---------- Today: the Kindle reached the end ---------- */
-HC.todayNotice = d => (d.hc_finished || []).map(b => '<div class="notice"><span style="color:var(--accent)">' + C.I.books + '</span><span style="flex:1">You reached the end of <b>' + esc(shortTitle(b.title)) + '</b> on the Kindle. Mark it read on Hardcover?</span>' +
+HC.todayNotice = d => (d.hc_finished || []).map(b => '<div class="notice"><span style="color:var(--accent)">' + C.I.books + '</span><span style="flex:1">Finished <b>' + esc(shortTitle(b.title)) + '</b> on the Kindle</span>' +
   '<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm primary" data-hc="done" data-id="' + esc(b.id) + '" data-title="' + esc(b.title) + '">Mark it read</button><button class="btn sm" data-hc="notyet" data-id="' + esc(b.id) + '">Not yet</button></span></div>').join('');
 
 /* ---------- Preferences ---------- */
@@ -132,13 +131,13 @@ HC.prefs = async box => {
   if (!box) return;
   let r;
   try { r = await api('/api/hardcover'); } catch(e){ box.innerHTML = '<h2>Hardcover</h2><p class="mute">' + esc(e.message) + '</p>'; return; }
-  if (!r.connected) { box.innerHTML = '<h2>Hardcover</h2><p class="mute" style="margin:0">Not connected: Daf needs HARDCOVER_API_KEY in the vault’s settings file (see docs/OPERATIONS.md).</p>'; return; }
+  if (!r.connected) { box.innerHTML = '<h2>Hardcover</h2><p class="mute" style="margin:0">Not connected</p>'; return; }
   const s = C.S.settings || {};
-  const sw = (k, label, desc) => '<div class="prow"><div class="d"><b>' + label + '</b><span>' + desc + '</span></div><input type="checkbox" class="sw" data-hcset="' + k + '"' + (s[k] !== false ? ' checked' : '') + ' aria-label="' + esc(label) + '"></div>';
+  const sw = (k, label) => '<div class="prow"><div class="d"><b>' + label + '</b></div><input type="checkbox" class="sw" data-hcset="' + k + '"' + (s[k] !== false ? ' checked' : '') + ' aria-label="' + esc(label) + '"></div>';
   const c = r.counts || {};
-  box.innerHTML = '<h2>Hardcover</h2><div class="prow"><div class="d"><b>@' + esc(r.user) + '</b><span>' + ['Want to read', 'Reading', 'Read', 'Paused', 'Did not finish'].filter(k => c[k]).map(k => c[k] + ' ' + k.toLowerCase()).join(' · ') + '. ' + r.linked + ' of your books are linked, through the vault notes.</span></div></div>' +
-    sw('hc_progress', 'Send progress from Daf’s reader', 'Forward only, never to a book you’ve finished. The Kindle’s progress already goes up through the vault’s own Hardcover sync.') +
-    sw('hc_autostart', 'Start books as Reading', 'A Want to read book you begin in Daf moves to Reading on Hardcover.') +
+  box.innerHTML = '<h2>Hardcover</h2><div class="prow"><div class="d"><b>@' + esc(r.user) + '</b><span>' + ['Want to read', 'Reading', 'Read', 'Paused', 'Did not finish'].filter(k => c[k]).map(k => c[k] + ' ' + k.toLowerCase()).join(' · ') + ' · ' + r.linked + ' linked</span></div></div>' +
+    sw('hc_progress', 'Send progress from Daf’s reader') +
+    sw('hc_autostart', 'Start books as Reading') +
     (r.last ? '<p class="mute tiny" style="margin:0">Last sent ' + C.ago(r.last.at) + ': ' + r.last.items.map(x => esc(x.did)).join(', ') + '</p>' : '');
 };
 document.addEventListener('change', async e => {

@@ -335,7 +335,7 @@ async function highlight(info, withNote){
 }
 function editNote(h){
   const m = $('#modal'); $('#scrim').hidden = false; m.hidden = false;
-  m.innerHTML = '<h2>A note</h2><q class="pnq">' + esc(h.text.slice(0, 280)) + '</q><textarea class="field" id="pnote" rows="4" placeholder="Your thought">' + esc(h.user_note || '') + '</textarea>' +
+  m.innerHTML = '<h2>A note</h2><q class="pnq">' + esc(h.text.slice(0, 280)) + '</q><textarea class="field" id="pnote" rows="4" placeholder="Note">' + esc(h.user_note || '') + '</textarea>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="pnsave">Save</button></div>';
   const t = $('#pnote'); t.focus();
   $('#pnsave').onclick = async () => {
@@ -383,7 +383,7 @@ const ACT = {
   rm: ctx => removeHl(ctx.h),
   define: ctx => { H.hide(); C.lookup && C.lookup({ text: ctx.text, rect: $('#selbar').getBoundingClientRect() }, ctx.text, false); },
   translate: ctx => { H.hide(); C.lookup && C.lookup({ text: ctx.text, rect: $('#selbar').getBoundingClientRect() }, ctx.text, true); },
-  ask: () => { H.hide(); if (P.src.book) { toast('Ask works in a book’s text, not on a PDF’s pages'); return; } toast('Ask works in the text view'); location.hash = 'read/' + encodeURIComponent(P.id); },
+  ask: () => { H.hide(); if (P.src.book) { toast('Not on PDF pages'); return; } toast('Text view'); location.hash = 'read/' + encodeURIComponent(P.id); },
   notebook: ctx => { H.hide(); if (C.Sketch && ctx && ctx.h) C.Sketch.reveal({ hl: ctx.h.id }); },
   changed: h => { const pl = placeOf(h); if (pl) drawMarks(pl.pg); },
   deselect: () => window.getSelection().removeAllRanges(),
@@ -510,7 +510,7 @@ async function thumb(n, gen){
 // The PDF's own contents (its bookmarks), each with its page.
 async function drawContents(b){
   if (P.outline === null) { b.innerHTML = '<p class="mute pse">Reading the contents…</p>'; try { P.outline = (await P.pdf.getOutline()) || []; } catch(e){ P.outline = []; } if (V.tab !== 'contents') return; }
-  if (!P.outline.length) { b.innerHTML = '<p class="mute pse">This PDF has no contents.</p>'; return; }
+  if (!P.outline.length) { b.innerHTML = '<p class="mute pse">No contents</p>'; return; }
   const flat = []; (function walk(items, d){ for (const it of items) { flat.push({ it, d }); if (it.items && it.items.length) walk(it.items, d + 1); } })(P.outline, 0);
   P.flatOut = flat;
   b.innerHTML = '<div class="ptoc">' + flat.map((x, i) => '<button class="pto d' + Math.min(x.d, 3) + '" data-goout="' + i + '"><span>' + esc(x.it.title || '—') + '</span><em data-outpg="' + i + '"></em></button>').join('') + '</div>';
@@ -544,14 +544,14 @@ function markContents(){
 // The highlights on these pages, in page order; one made in the text view is found on the page when chosen.
 function drawHls(b){
   const hs = (P.d && P.d.highlights || []).map(h => ({ h, pl: placeOf(h) })).sort((a, b) => (a.pl ? a.pl.pg : 1e9) - (b.pl ? b.pl.pg : 1e9));
-  if (!hs.length) { b.innerHTML = '<p class="mute pse">No highlights yet.</p>'; return; }
+  if (!hs.length) { b.innerHTML = '<p class="mute pse">No highlights yet</p>'; return; }
   b.innerHTML = '<div class="phls">' + hs.map(({ h, pl }) => '<button class="phl" data-gohl="' + esc(h.id) + '"><i data-color="' + esc(h.color || 'yellow') + '"></i><span>' + esc((h.text || '').slice(0, 220)) +
     ((h.user_note || '').trim() ? '<b>' + esc(h.user_note.slice(0, 160)) + '</b>' : '') + '</span><em>' + (pl ? esc(label(pl.pg)) : '') + '</em></button>').join('') + '</div>';
 }
 
 // Search: every page's words, read once; the pages it's on, a few words round each.
 function drawFind(b){
-  b.innerHTML = '<div class="psq"><span class="ic">' + IC.search + '</span><input id="pfind" placeholder="Search in the PDF" autocomplete="off" value="' + esc(P.find ? P.find.raw : '') + '"></div>' +
+  b.innerHTML = '<div class="psq"><span class="ic">' + IC.search + '</span><input id="pfind" placeholder="Search" autocomplete="off" value="' + esc(P.find ? P.find.raw : '') + '"></div>' +
     '<div id="pfres">' + (P.find ? '<p class="mute pse" id="pfstat">Searching…</p><div class="pfl" id="pfl"></div>' : '') + '</div>';
   const inp = $('#pfind');
   let t = 0;

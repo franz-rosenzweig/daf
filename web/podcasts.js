@@ -426,7 +426,7 @@ document.addEventListener('click', async e => {
       delete P.kept['/api/podcasts/shows'];
       if (P.show && P.show.feed === t.dataset.pcfollow) P.show.following = on;
       if (on && P.show && P.show.feed === t.dataset.pcfollow && !P.show.episodes.length) showPage(P.show.feed);   // a feed added by its address: its episodes now
-      toast(on ? 'Following. AntennaPod gets it at its next sync.' : 'Not following. AntennaPod drops it at its next sync.');
+      toast(on ? 'Following' : 'Not following');
     }
     else if (t.dataset.pcmore) await moreEpisodes(t);
     else if ('pcshown' in t.dataset) { P.showN = (P.showN || 80) + 120; drawShow(); }

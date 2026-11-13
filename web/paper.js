@@ -45,7 +45,7 @@ function drawList(){
   const r = P.list, box = $('#pplist'); if (!r || !box) return;
   const q = C.Find.q('paper'), pages = r.pages.filter(p => C.Find.match(q, p.book && p.book.title, p.book && p.book.author, p.page ? 'p. ' + p.page + ' ' + p.page : '', statusLine(p)));
   let h = '';
-  if (!r.pages.length) h += '<section class="card"><h2>Pencil marks, kept</h2><p style="margin:0">Photograph a page you marked. Send it to Ezer with the caption <b>page</b> (or <b>page 112 middlemarch</b>), share it to Daf from the gallery, or add it here. Daf reads the page, keeps the lines you marked as highlights, and writes them into the book’s note. Anything in the margin becomes the highlight’s note.</p></section>';
+  if (!r.pages.length) h += '<p class="mute">Nothing here yet</p>';
   else if (!pages.length) h += C.Find.none();
   else h += '<div class="ppgrid">' + pages.map(p => '<a class="ppcard" href="#paper/' + esc(p.id) + '"><img src="/api/paper/pages/' + esc(p.id) + '/photo" alt="" loading="lazy"><span class="pt"><b>' + esc(p.book ? short(p.book.title) : 'Which book?') + '</b><span class="mute tiny">' + (p.page ? 'p. ' + p.page + ' · ' : '') + esc(statusLine(p)) + ' · ' + ago(p.created) + '</span></span></a>').join('') + '</div>';
   box.innerHTML = h;
@@ -54,14 +54,14 @@ function drawList(){
 function bookBox(){
   const b = P.book, nt = P.newTitle;
   return '<div class="ppbook"><span class="mute tiny">Book</span>' +
-    (b || nt ? '<div class="ppchosen"><b>' + esc(b ? b.title : nt) + '</b>' + (b && b.author ? '<span class="mute tiny">' + esc(b.author) + '</span>' : nt ? '<span class="mute tiny">New paper book; Daf makes its note</span>' : '') + '<button class="btn sm" data-pp="changebook">Change</button></div>'
-      : '<input class="field" id="ppq" placeholder="Search your books" autocomplete="off"><div id="ppres" class="ppres"></div>') + '</div>';
+    (b || nt ? '<div class="ppchosen"><b>' + esc(b ? b.title : nt) + '</b>' + (b && b.author ? '<span class="mute tiny">' + esc(b.author) + '</span>' : nt ? '<span class="mute tiny">New paper book</span>' : '') + '<button class="btn sm" data-pp="changebook">Change</button></div>'
+      : '<input class="field" id="ppq" placeholder="Search books" autocomplete="off"><div id="ppres" class="ppres"></div>') + '</div>';
 }
 async function searchBooks(q){
   const r = await api('/api/booksearch?q=' + encodeURIComponent(q));
   const box = $('#ppres'); if (!box) return;
   box.innerHTML = r.books.slice(0, q.trim() ? 8 : 5).map(b => '<button class="ppopt" data-ppbook="' + esc(b.id) + '" data-t="' + esc(b.title) + '" data-a="' + esc(b.author || '') + '"><b>' + esc(short(b.title)) + '</b><span class="mute tiny">' + esc(b.author || '') + '</span></button>').join('') +
-    (q.trim().length > 2 ? '<button class="ppopt" data-ppnew="' + esc(q.trim()) + '"><b>New paper book: “' + esc(q.trim()) + '”</b><span class="mute tiny">Not in Calibre or the vault yet</span></button>' : '');
+    (q.trim().length > 2 ? '<button class="ppopt" data-ppnew="' + esc(q.trim()) + '"><b>New paper book: “' + esc(q.trim()) + '”</b></button>' : '');
 }
 function drawLines(){
   const p = P.page, box = $('#pplines'); if (!box) return;
@@ -78,11 +78,10 @@ async function pageView(id){
   $('#pph').textContent = (p.page ? 'Page ' + p.page : 'A page') + (p.book ? ' · ' + short(p.book.title) : '');
   const reading = p.status === 'new' || (p.job && (p.job.status === 'queued' || p.job.status === 'running'));
   let right;
-  if (reading) right = '<section class="card"><h2>Reading the page…</h2><p class="mute" style="margin:0">Reading the marked lines on the server. About fifteen seconds.</p></section>';
+  if (reading) right = '<section class="card"><h2>Reading the page…</h2></section>';
   else if (p.status === 'error') right = '<section class="card"><h2>Couldn’t read it</h2><p class="mute" style="margin:0">' + esc(p.error || '') + '</p><button class="btn" data-pp="reread" style="align-self:flex-start">Try again</button></section>';
   else right = '<section class="card ppform">' + bookBox() +
     '<div class="pprow"><label class="mute tiny" for="pppg">Page</label><input class="field" id="pppg" type="number" inputmode="numeric" value="' + (p.page || '') + '" style="width:110px"></div>' +
-    '<div class="cardh"><span class="mute tiny">Tap the lines to keep. Lines next to each other become one highlight. ✎ = marked on the page.</span></div>' +
     '<div id="pplines" class="pplines"></div>' +
     '<div class="ppfoot"><span class="mute tiny" id="ppcount"></span><span class="spacer"></span><button class="btn sm" data-pp="reread">Read again</button><button class="btn sm rm" data-pp="delete">Delete</button><button class="btn primary" data-pp="save">Save</button></div></section>';
   $('#pppage').innerHTML = '<div class="pptwo"><a class="ppphoto" href="/api/paper/pages/' + esc(p.id) + '/photo" target="_blank" rel="noopener"><img src="/api/paper/pages/' + esc(p.id) + '/photo" alt="The page photo"></a><div>' + right + '</div></div>';
@@ -115,7 +114,7 @@ document.addEventListener('click', async e => {
     a.disabled = true;
     try {
       const r = await api('/api/paper/pages/' + encodeURIComponent(id), { method:'POST', body:JSON.stringify({ chosen:[...P.chosen], book_id:P.book ? P.book.id : null, new_title:P.newTitle, page:$('#pppg').value }) });
-      toast(r.highlights ? 'Saved ' + r.highlights + ' highlight' + (r.highlights === 1 ? '' : 's') + ' · in the book’s note' : 'Saved. No lines kept from this page.');
+      toast(r.highlights ? 'Saved ' + r.highlights + ' highlight' + (r.highlights === 1 ? '' : 's') : 'Saved');
       location.hash = '#paper';
     } catch(err){ toast(err.message); a.disabled = false; }
   }

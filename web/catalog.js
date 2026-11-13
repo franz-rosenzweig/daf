@@ -276,7 +276,7 @@ document.addEventListener('click', async e => {
     else if (k === 'trash') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.trash(P.priv); }
     else if (k === 'items') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.items('tags'); }
     else if (k === 'embedall') { $('#pop').hidden = true;
-      if (confirm('Write the details into the files of all ' + (P.data ? P.data.total : '') + ' books? Calibre rewrites each file; it takes a few minutes.'))
+      if (confirm('Write the details into the files of all ' + (P.data ? P.data.total : '') + ' books?'))
         api('/api/catalog/embed', { method: 'POST', body: JSON.stringify({ all: true }) }).then(r => toast('Writing details into ' + r.pending + ' books’ files')).catch(err => toast(err.message)); }
     else if (k === 'priv') { P.priv = !P.priv; keep(); $('#pop').hidden = true; P.facets = null; load(true).then(() => { if (P.side) drawSide(); }); }
     else if (k === 'reset') { $('#pop').hidden = true; Object.assign(P, { q: '', sort: 'added', desc: true, cols: null, widths: {}, view: null }); keep(); const box = $('#catq'); if (box) box.value = ''; load(); if (P.side) drawSide(); }

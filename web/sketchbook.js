@@ -639,7 +639,7 @@ const surface = {
     const ms = cur(), gone = ms.filter(m => m.kind === 'stroke' || (m.kind === 'ink'));
     if (!gone.length) return;
     setCur(ms.filter(m => !gone.includes(m))); render(); act({ del: gone });
-    toast('Everything written on this page is erased. Undo brings it back.');
+    toast('Erased');
   },
   highlight: () => false,
   palHost: () => S.el.querySelector('.skpens'),
@@ -934,7 +934,7 @@ async function dictate(){
       if (!res.ok) throw new Error((out && out.detail) || res.statusText || 'It couldn’t be written down');
       if (out.text && out.text.trim()) putText(out.text.trim(), into);
       else toast('Nothing was heard');
-    } catch(e){ toast(navigator.onLine ? e.message : 'Dictation needs Daf on the server'); }
+    } catch(e){ toast(navigator.onLine ? e.message : 'Offline'); }
     S.hearing = false; drawTools();
   };
   r.start(1000);
@@ -1003,7 +1003,7 @@ async function take(box){
   if (!box) {                                         // the whole page: what fills the screen most (a spread's two pages)
     const most = Math.max(0, ...parts.map(p => p.seen));
     parts = parts.filter(p => p.seen >= most * 0.6);
-    if (!parts.length) { toast('There’s no page here to take'); return; }
+    if (!parts.length) { toast('No page here'); return; }
     box = parts.map(p => meet(p.rect, view)).reduce((a, b) => ({ left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom) }));
     box.width = box.right - box.left; box.height = box.bottom - box.top;
   }

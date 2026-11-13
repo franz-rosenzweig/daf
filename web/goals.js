@@ -1,11 +1,10 @@
-/* Goals: Preferences → Goals (a card per goal, presets, a live preview while you drag), the
+/* Goals: Preferences → Goals (a card per goal, presets), the
    main goal's ring on Today with the others beside it, and a small celebration when a goal
    or a milestone is reached. The server keeps each goal's history, so changing a target
    never rewrites how earlier days did. */
 (() => {
 const C = window.DafCore, { api, esc, toast, $, $$ } = C;
 const G = C.Goals = {};
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const KIND_ICON = {
   minutes: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10 6v4.3l2.8 1.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
   pages: '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3.5h7l3 3v10H5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 9.5h4.5M8 12.5h4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
@@ -24,43 +23,6 @@ G.atWord = goalMin => +goalMin === 60 ? 'at the hour' : 'at your goal';
 G.metWord = (g) => g.kind === 'minutes' && g.period === 'day' && g.target === 60 ? 'That’s the hour.' :
   g.period === 'day' ? 'That’s today’s goal.' : g.period === 'week' ? 'That’s this week’s goal.' : g.period === 'month' ? 'That’s this month’s goal.' : 'Goal met.';
 
-/* ---------- the preview: what a target means at your pace --------- */
-function perDay(kind, period, t){ return period === 'day' ? t : period === 'week' ? t / 7 : period === 'month' ? t / 30 : t; }
-function preview(g, p){
-  const t = g.target, mpb = p.minutes_per_book || 540;
-  if (g.kind === 'minutes') {
-    const d = perDay('minutes', g.period, t), books = Math.round(d * 365 / mpb);
-    const typical = /typical/.test(p.book_basis || '');
-    let s = 'That’s ' + hrs(d * 7) + ' a week, about ' + books + ' ' + (typical ? plural(books, 'nine-hour book') : plural(books, 'book') + ' at your pace') + ' a year';
-    if (p.nightstand_left > 0 && d > 0) {
-      const when = new Date(); when.setDate(when.getDate() + Math.ceil(p.nightstand_left / d));
-      s += '. You’d finish the nightstand by ' + (when.getFullYear() === new Date().getFullYear() && when.getMonth() === new Date().getMonth() ? 'the end of the month' : MONTHS[when.getMonth()] + (when.getFullYear() !== new Date().getFullYear() ? ' ' + when.getFullYear() : ''));
-    }
-    s += '.';
-    if (p.avg_day >= 1) {
-      const r = d / p.avg_day;
-      s += r >= 1.8 ? ' Lately it’s been about ' + Math.round(p.avg_day) + ' minutes a day, so this is a stretch.' : r <= 0.8 ? ' Lately you’ve averaged ' + Math.round(p.avg_day) + ' minutes a day, so this one is gentle.' : ' About what you’ve read lately.';
-    }
-    return s;
-  }
-  if (g.kind === 'pages') {
-    const m = t / (p.pages_per_minute || 0.8);
-    return 'About ' + hrs(m) + ' of Kindle reading ' + (g.period === 'day' ? 'a day' : 'a week') + ' at your pace (' + fmt(p.pages_per_minute) + (p.pages_per_minute === 1 ? ' page' : ' pages') + ' a minute).';
-  }
-  if (g.kind === 'books') {
-    const days = g.period === 'by35' ? p.days_to_35 : g.period === 'y30' ? p.y30_days_left : 365;
-    const so = g.period === 'by35' ? p.books_since30 : p.books_y30;
-    const left = Math.max(0, t - so), every = left ? days / left : 0;
-    const perday = left ? left * mpb / days : 0;
-    return (left ? 'One every ' + (every >= 2 ? Math.round(every) + ' days' : fmt(every) + ' days') + ', about ' + Math.round(perday) + ' minutes a day for ' + p.book_basis + '.' : 'Already there.') +
-      (so ? ' ' + so + ' finished so far.' : '');
-  }
-  if (g.kind === 'days') return (t === 7 ? 'Every day. ' : t <= 3 ? 'Room for the busy days. ' : '') + 'Lately you’ve read on about ' + fmt(p.days_week) + ' days a week.';
-  if (g.kind === 'streak') return 'A day counts when it reaches the daily goal. Your best run so far is ' + p.best_streak + ' ' + plural(p.best_streak, 'day') + (p.streak ? ', and you’re on ' + p.streak + ' now.' : '.');
-  if (g.kind === 'highlights') return 'Lately about ' + fmt(p.highlights_week) + ' a week.';
-  if (g.kind === 'reviews') return 'Lately the review on about ' + fmt(p.reviews_week) + ' days a week.';
-  return '';
-}
 
 /* ---------- Preferences → Goals ---------- */
 let D = null, saveT = 0;
@@ -83,7 +45,6 @@ function goalCard(g){
         '<input type="range" class="grange" min="' + lo + '" max="' + hi + '" step="' + step + '" value="' + g.target + '" aria-label="Target"></div>' +
       periods +
       (g.kind === 'books' ? '<label class="gopt"><input type="checkbox" class="sw" data-gmanga' + (D.goals.find(x => x.id === 'books').manga ? ' checked' : '') + '> Manga and comic volumes count as books</label>' : '') +
-      '<p class="gprev" data-gprev>' + esc(preview(g, D.pace)) + '</p>' +
       '<div class="gprog"><span class="pbar"><i style="width:' + g.pct + '%"></i></span><span class="tiny ' + (g.met ? 'gmet' : 'mute') + '">' + esc(g.text) + (g.met ? ' · met' : '') + '</span></div>' +
     '</div>' : '') + '</div>';
 }
@@ -100,7 +61,7 @@ function milestones(){
 }
 function draw(card){
   const preset = Object.entries(D.presets).map(([id, p]) => '<button type="button" class="gpre" data-gpreset="' + id + '"><b>' + esc(p.label) + '</b><span>' + esc(p.text) + '</span></button>').join('');
-  card.innerHTML = '<div class="cardh"><h2>Goals</h2><span class="mute tiny">Changes count from today. Earlier days keep the goal they had.</span></div>' +
+  card.innerHTML = '<div class="cardh"><h2>Goals</h2></div>' +
     '<div class="gpres" aria-label="Start from">' + preset + '</div>' +
     '<div class="goals">' + D.goals.map(goalCard).join('') + '</div>' + milestones();
   bind(card);
@@ -158,7 +119,6 @@ function setTarget(box, g, v){
   box.querySelector('[data-gval]').textContent = v;
   box.querySelector('[data-gunit]').textContent = v === 1 ? k.unit[0] : k.unit[1];
   const r = box.querySelector('.grange'); if (r && +r.value !== v) r.value = v;
-  box.querySelector('[data-gprev]').textContent = preview(g, D.pace);
 }
 
 /* ---------- Today: the main goal's ring, and the others ---------- */
@@ -174,7 +134,7 @@ G.ringCard = (d, ring, srcRows) => {
   }
   const others = gl.filter(g => !g.main);
   const chips = others.length ? '<div class="gchips">' + others.map(g => '<a class="gchip' + (g.met ? ' met' : '') + '" href="#prefs/goals" title="' + esc(g.label) + '"><span class="gi">' + KIND_ICON[g.kind] + '</span><span>' + esc(g.text) + '</span></a>').join('') + '</div>' : '';
-  const pend = d.pendingMin >= 1 ? '<div class="mute tiny" style="margin-top:6px">' + Math.round(d.pendingMin) + ' min of these are on this device, not yet synced</div>' : '';
+  const pend = d.pendingMin >= 1 ? '<div class="mute tiny" style="margin-top:6px">' + Math.round(d.pendingMin) + ' min not synced yet</div>' : '';
   return '<section class="card" aria-label="Today’s goal"><div class="ringrow"><a href="#prefs/goals" class="ringlink" title="Goals">' + head.replace(/^(<svg[\s\S]*?<\/svg>)/, '$1</a>') + '</div>' + chips + '<div class="rows">' + srcRows + '</div>' + pend + '</section>';
 };
 

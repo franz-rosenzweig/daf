@@ -30,7 +30,7 @@ function continueCard(s){
 // The search in the bar finds a series by its name, on the page (every series is here already).
 let shelf = null;
 async function shelfView(){
-  $('#main').innerHTML = '<div class="top"><h1>Manga</h1><span class="spacer"></span>' + C.Find.html('manga', 'Search manga', drawShelf) + '</div><div class="page"><span class="mute">Asking Komga…</span></div>';
+  $('#main').innerHTML = '<div class="top"><h1>Manga</h1><span class="spacer"></span>' + C.Find.html('manga', 'Search manga', drawShelf) + '</div><div class="page"><span class="mute">Loading…</span></div>';
   try { shelf = await C.swr('/api/manga'); }
   catch(e){ $('#main .page').innerHTML = '<p class="mute">Komga didn’t answer: ' + esc(e.message) + '</p>'; return; }
   drawShelf();
@@ -42,8 +42,7 @@ function drawShelf(){
   page.innerHTML =
     (cont.length ? '<section class="card"><div class="cardh"><h2>Keep reading</h2></div><div class="mconts">' + cont.map(continueCard).join('') + '</div></section>' : '') +
     (series.length || !q ? '<section class="card"><div class="cardh"><h2>' + (q ? 'Series' : 'All series') + '</h2><span class="mute tiny">' + series.length + '</span></div><div class="mgrid">' + series.map(seriesCard).join('') + '</div></section>' : '') +
-    (q && !cont.length && !series.length ? F.none() : '') +
-    (q ? '' : '<p class="mute tiny">From Komga. Reading here moves the Kindle and AniList along too.</p>');
+    (q && !cont.length && !series.length ? F.none() : '');
 }
 
 /* ---------- one series ---------- */
@@ -54,7 +53,7 @@ async function seriesView(sid){
     $$('.mvols > *').forEach(v => { v.hidden = !C.Find.match(vq, v.textContent); });
     const none = $('.mvols + .findnone'); if (none) none.remove();
     if (vq && !$$('.mvols > :not([hidden])').length) $('.mvols').insertAdjacentHTML('afterend', C.Find.none());
-  }) + '</div><div class="page"><span class="mute">Asking Komga…</span></div>';
+  }) + '</div><div class="page"><span class="mute">Loading…</span></div>';
   let s;
   try { s = await C.swr('/api/manga/series/' + encodeURIComponent(sid)); }
   catch(e){ $('#main .page').innerHTML = '<p class="mute">' + esc(e.message) + '</p>'; return; }
@@ -103,10 +102,10 @@ document.addEventListener('click', async e => {
   e.preventDefault(); e.stopPropagation();
   const id = b.dataset.mdl, st = b.dataset.state;
   if (st === 'loading' || st === 'waiting') return;
-  if (st === 'done' && !confirm('Remove this volume from the device? Komga keeps it.')) return;
+  if (st === 'done' && !confirm('Remove this volume from the device?')) return;
   try {
     await dafShell.offline({ op: 'manga', id, on: st !== 'done', size: M.downloadSize() });
-    toast(st === 'done' ? 'Removed from this device' : 'Downloading; it reads without Wi-Fi once it’s done');
+    toast(st === 'done' ? 'Removed from this device' : 'Downloading');
   } catch(err){ toast(err.message); }
   drawDownloads();
 });

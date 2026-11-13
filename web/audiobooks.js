@@ -98,7 +98,7 @@ function start(bookId, place){
   return starts[k];
 }
 async function listenFrom(bookId, item, place){
-  const t = setTimeout(() => toast('Finding the place in the audiobook…'), 400);
+  const t = setTimeout(() => toast('Finding the place…'), 400);
   try {
     const r = await start(bookId, place);
     clearTimeout(t);

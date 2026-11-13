@@ -169,7 +169,7 @@ function drawTaste(){
       '<button class="linkbtn tiny" data-poolmute="' + esc(c.folder) + '" data-on="' + (c.muted ? '0' : '1') + '">' + (c.muted ? 'Unmute' : 'Mute') + '</button></div>').join('') +
       '</div></section>' : '') +
     '<section class="card"><h2>Sources</h2><div class="edsrcs">' + srcs + '</div>' +
-    '<div class="edmute"><input class="field" id="edmutein" aria-label="Mute a source" placeholder="Source, or folder:Name"><button class="btn sm" data-ed="mute">Mute</button></div>' +
+    '<div class="edmute"><input class="field" id="edmutein" aria-label="Mute a source" placeholder="Source"><button class="btn sm" data-ed="mute">Mute</button></div>' +
     (muted ? '<h3 class="edmh">Muted</h3><div class="edsrcs">' + muted + '</div>' : '') + '</section>';
 }
 async function put(body){

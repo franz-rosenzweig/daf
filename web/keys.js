@@ -100,7 +100,6 @@ K.prefs = card => {
   if (!card) return;
   const scopes = Object.keys(DEFS);
   card.innerHTML = '<div class="cardh"><h2>Keyboard</h2><button class="linkbtn tiny" data-kreset' + (Object.keys(mine).length ? '' : ' hidden') + '>Back to Daf’s keys</button></div>' +
-    '<p class="mute" style="margin:0">Click a shortcut and press the key you want instead. Backspace leaves an action without one. With a Hebrew keyboard on, the keys still work by where they are.</p>' +
     scopes.map(s => '<details class="kscope"><summary>' + esc(DEFS[s][0]) + '</summary><div class="krows">' + DEFS[s][1].map(a => {
       const own = mine[s] && Object.prototype.hasOwnProperty.call(mine[s], a[0]);
       return '<div class="krow"><span>' + esc(a[1]) + '</span><button class="kbtn' + (own ? ' own' : '') + '" data-kscope="' + s + '" data-kact="' + a[0] + '" title="Change it">' + (esc(K.label(s, a[0])) || '<span class="mute">none</span>') + '</button></div>';
@@ -119,7 +118,7 @@ document.addEventListener('click', e => {
     b.innerHTML = '<span class="mute">Press a key…</span>'; b.classList.add('wait');
     return;
   }
-  if (e.target.closest('[data-kreset]')) { save({}); toast('Daf’s own keys again'); return; }
+  if (e.target.closest('[data-kreset]')) { save({}); toast('Reset'); return; }
   if (capture && !e.target.closest('.kbtn')) { capture.btn.classList.remove('wait'); capture.btn.textContent = K.label(capture.scope, capture.act) || 'none'; capture = null; }
 });
 document.addEventListener('keydown', e => {
