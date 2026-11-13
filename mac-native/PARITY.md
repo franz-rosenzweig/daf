@@ -196,3 +196,4 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - not yet: the chosen books' ⋯: Convert to (POST /api/catalog/convert-many, poll /api/catalog/convert-many/<job>) and Download (/api/catalog/download?ids=)
 - not yet: ⋯ › Check library (GET /api/catalog/check)
 - not yet: the chosen books' ⋯ › Count pages (POST /api/catalog/count-pages, GET /api/catalog/job/<id>); Check library's Quality groups and "Read column differs from Daf" (read_differs)
+- not yet: Open with (All books' toolbar, `dafShell.openWith({url, name, mime})`, docs/SHELL.md): a book's file opened in another Mac app, with the Finder's Open With list

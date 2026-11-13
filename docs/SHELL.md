@@ -35,6 +35,7 @@ video) can't call the app. Calls made before the port arrives wait for it.
 | `share({text?, url?, png?, name?})` | The system share sheet. `png` is base64 without the `data:` prefix. | Promise → `true`, or `false` if nothing was shared |
 | `download(url)` or `download({name, mime, base64})` | Saves a file through the save panel (Mac) or the create-document screen (Android). A URL is fetched with the window's own cookie. | Promise → `true`, or `false` if cancelled |
 | `openExternal(url)` | Opens `http`, `https`, `mailto` or `obsidian` links in the browser or the app they belong to. | Promise → `true` |
+| `openWith({url, name, mime})` | Android, 0.6.2 and later: Calibre's Open With. A Daf file (`url` starts with `/`, fetched with the window's cookie) goes into the app's cache (`cache/share/<id>/<name>`, served read-only by `ShareProvider`), then Android's Open with chooser offers it to the apps that open `mime`. All books shows **Open with** in its toolbar only where the shell has it. The Mac app will do it with the Finder's Open With. | Promise → `true` once the chooser is up; fails with "No app here opens it" |
 | `notify({title, text, route})` | A system notification; tapping it opens `#route`. Not built: nothing in the page needs it yet. | Promise → `true` |
 | `fullscreen()` | Mac: the window's own full screen (macOS full screen), for the manga reader's Full screen; leaving the reader leaves it again. Android doesn't list it: the reader is already immersive there. | Promise → `true` when it went full screen |
 | `alerts()` | Notifications for new posts in the feeds set to notify (the sources sheet's feed editor). The shell asks the system for permission once; from then on the app asks `/api/phone/feed-news` with its token (Android every 15 minutes, the Mac with the menu bar's five-minute look) and posts one notification a post, which opens it in Daf. It stops by itself once no feed is set to notify. | Promise → `true` if the system lets Daf notify |
@@ -48,7 +49,7 @@ video) can't call the app. Calls made before the port arrives wait for it.
 
 `dafShell.version` is the shell's version and `dafShell.platform` is `"mac"` or `"android"`.
 
-Both shells answer `share`, `download`, `openExternal`, `alerts` and `offline`; the Mac `fullscreen`; Android `haptic`, `media`, `screen`, `bars`, `reading`, `ink` and `instagram`. The Mac needs no `bars`: its title bar is see-through, so the page's own colours are the window's.
+Both shells answer `share`, `download`, `openExternal`, `alerts` and `offline`; the Mac `fullscreen`; Android `haptic`, `media`, `screen`, `bars`, `reading`, `ink`, `instagram` and `openWith`. The Mac needs no `bars`: its title bar is see-through, so the page's own colours are the window's.
 
 In the manga reader, Android's volume keys reach the page as `window`'s `daf-volume` event (`detail.dir` 1 for down, -1 for up), so the reader's own "Volume keys" setting decides; the Mac's Next and Previous menu items send PageDown and PageUp. While the reader is open, the Mac turns off the two-finger Back swipe, and Android keeps the middle of each side edge (200dp) for the page's own swipes.
 

@@ -17,7 +17,7 @@ import java.io.OutputStream;
 import java.util.UUID;
 
 /**
- * window.dafShell's Android half (docs/SHELL.md §2): share, download, openExternal, haptic,
+ * window.dafShell's Android half (docs/SHELL.md §2): share, download, openWith, openExternal, haptic,
  * ink (handwriting read as text by Google's reader: InkReader.java), media (what read-aloud is
  * doing, for listening with the screen off: Listen.java), offline
  * (books kept on the phone: Offline.java), screen (the manga reader's whole screen), and alerts
@@ -87,6 +87,9 @@ final class Shell {
                     break;
                 case "download":
                     download(p, id, a);
+                    break;
+                case "openWith":
+                    openWith(p, id, a);
                     break;
                 case "media":
                     String state = a.optString("state", "stopped");
@@ -175,6 +178,44 @@ final class Shell {
         }
         activity.startActivity(Intent.createChooser(send, null));
         return true;
+    }
+
+    /** Calibre's Open With: a book's file from Daf (its address, with the window's cookie) into the
+     *  app's cache, then Android's own Open with, so another app (KOReader, a PDF reader) opens it. */
+    private void openWith(WebMessagePort p, int id, JSONObject a) {
+        String url = a.optString("url");
+        if (!url.startsWith("/")) { fail(p, id, "only Daf's own files"); return; }
+        String full = Server.base(activity) + url;
+        String name = a.optString("name", "book").replace("/", "-");
+        String mime = a.optString("mime");
+        new Thread(() -> {
+            try {
+                File dir = new File(new File(activity.getCacheDir(), "share"), UUID.randomUUID().toString());
+                if (!dir.mkdirs()) throw new Exception("no room in the cache");
+                File f = new File(dir, name.isEmpty() ? "book" : name);
+                java.net.HttpURLConnection h = (java.net.HttpURLConnection) new java.net.URL(full).openConnection();
+                String cookie = android.webkit.CookieManager.getInstance().getCookie(full);
+                if (cookie != null) h.setRequestProperty("Cookie", cookie);
+                if (h.getResponseCode() != 200) throw new Exception("Daf answered " + h.getResponseCode());
+                try (java.io.InputStream in = h.getInputStream(); OutputStream out = new FileOutputStream(f)) {
+                    byte[] chunk = new byte[65536];
+                    for (int n; (n = in.read(chunk)) > 0; ) out.write(chunk, 0, n);
+                }
+                Intent view = new Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(ShareProvider.uriFor(activity, f), mime.isEmpty() ? "application/octet-stream" : mime)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                main.post(() -> {
+                    try {
+                        activity.startActivity(Intent.createChooser(view, "Open with"));
+                        reply(p, id, true);
+                    } catch (android.content.ActivityNotFoundException e) {
+                        fail(p, id, "No app here opens it");
+                    }
+                });
+            } catch (Exception e) {
+                main.post(() -> fail(p, id, String.valueOf(e.getMessage())));
+            }
+        }).start();
     }
 
     /** A Daf address with the window's cookie, or bytes (a blob link, through shell.js). */
