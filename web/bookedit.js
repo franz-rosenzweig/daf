@@ -377,8 +377,15 @@ function foundVal(x, k){
   if (k === '#pages') return x.pages ? String(x.pages) : '';
   return x[k] || '';
 }
+// The description's HTML as text, a blank line between paragraphs, to set beside a found one.
+function htmlText(h){
+  const t = document.createElement('textarea');
+  t.innerHTML = String(h || '').replace(/<\/(p|li|blockquote)>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+  return t.value.replace(/\n{2,}/g, '\n').trim().replace(/\n/g, '\n\n');
+}
 function nowVal(k){
   const v = F.snap;
+  if (k === 'comments') return htmlText(v.comments);
   if (k === 'series') return v.series ? v.series + (v.series_index ? ' #' + v.series_index : '') : '';
   return v[k] == null ? '' : v[k];
 }
@@ -441,7 +448,7 @@ async function take(){
   if (on('publisher')) v.publisher = x.publisher || '';
   if (on('published')) v.published = (x.published || '').slice(0, 10);
   if (on('languages')) v.languages = (x.languages || []).join(', ');
-  if (on('comments')) v.comments = x.comments || '';
+  if (on('comments')) v.comments = x.comments_html ? cleanHTML(x.comments_html) : (x.comments || '').split(/\n{2,}/).map(p => '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>').join('');
   if (on('#pages')) v['#pages'] = String(x.pages || '');
   if (on('identifiers')) {
     const have = {}; String(v.identifiers || '').split('\n').forEach(l => { const m = l.match(/^\s*([^:\s]+)\s*:\s*(.+?)\s*$/); if (m) have[m[1]] = m[2]; });
