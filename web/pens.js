@@ -400,6 +400,7 @@ function listen(doc, surf){
     P.live = null; P.penUp = Date.now(); P.near = Date.now(); clearTimeout(L.stillT);
     e.preventDefault(); dry();
     if (!surf.live()) return;
+    if (!L.moved && e.type === 'pointercancel') return;      // taken away (a scroll, the system): not a tap
     if (!L.moved && Date.now() - L.t0 < 450) { if (L.tool !== 'eraser') { if (surf.tap) surf.tap(e.clientX, e.clientY); else tap(doc, e.clientX, e.clientY); } return; }
     if (L.tool === 'eraser') { surf.erased(L); return; }
     if (L.tool === 'lasso') { hold(surf, surf.select(L.pts), L.pts); return; }
@@ -412,7 +413,7 @@ function listen(doc, surf){
   doc.addEventListener('pointerup', up, true);
   doc.addEventListener('pointercancel', up, true);
   // a pen that's just written doesn't also click what it wrote on (a mouse-like pen sends one)
-  doc.addEventListener('click', e => { if (e.isTrusted && !P.tapping && Date.now() - P.penUp < 500 && writing() && e.target && e.target.closest && !e.target.closest(SKIP) && here().takes(e.target, doc)) { e.preventDefault(); e.stopPropagation(); } }, true);
+  doc.addEventListener('click', e => { if (e.isTrusted && !P.tapping && Date.now() - P.penUp < 500 && P.on && e.target && e.target.closest && !e.target.closest(SKIP) && here().takes(e.target, doc)) { e.preventDefault(); e.stopPropagation(); } }, true);
   doc.addEventListener('contextmenu', e => { if (Date.now() - P.lastPen < 800 && writing()) e.preventDefault(); }, true);
   if (P.seen) arm(doc);
 }
@@ -435,13 +436,16 @@ function arm(doc){
   doc.__dafArmed = true;
   const win = doc.defaultView, stylus = e => [...e.changedTouches].some(t => t.touchType === 'stylus');
   win.addEventListener('touchstart', e => {
+    // a stroke under way (its pointerdown came first): nothing scrolls, whichever surface the tools
+    // are on just now (the pen moving between a video's page and the Notebook switches them)
+    if (P.live) { e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (!writing()) return;
     if (stylus(e)) { if (P.live) { e.preventDefault(); e.stopImmediatePropagation(); } return; }
     // A hand near the pen touches nothing where the pen writes. Android's Chrome doesn't call the
     // pen's own touch a stylus, so on the pen's menus, panels and buttons it must stay a tap.
     if (P.live || (Date.now() - P.near < 350 && onInk(doc, e.target))) { e.preventDefault(); e.stopImmediatePropagation(); }
   }, { capture: true, passive: false });
-  win.addEventListener('touchmove', e => { if (writing() && P.live) { e.preventDefault(); e.stopImmediatePropagation(); } }, { capture: true, passive: false });
+  win.addEventListener('touchmove', e => { if (P.live) { e.preventDefault(); e.stopImmediatePropagation(); } }, { capture: true, passive: false });
 }
 
 /* ---------- the tools on the screen's edge ---------- */
