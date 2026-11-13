@@ -544,7 +544,6 @@ function screenItems(){
     const bid = decodeURIComponent(r[1] || ''); if (bid && C.Learn) add('Add to an area', 'area', { fn: () => C.Learn.pick('book:' + bid, (q('.btitle') || {}).textContent) });
     const vl = q('.l2vault code'); if (vl) add('Open the note in Obsidian', 'external', { href: 'obsidian://open?vault=' + encodeURIComponent(q('.l2vault').dataset.vname || '') + '&file=' + encodeURIComponent(vl.textContent.trim()) });
   }
-  else if (v === 'catalog') { pr('Columns', 'columns', '[data-act="cat:cols"]'); pr('Views', 'views', '[data-act="cat:views"]'); }
   else if (v === 'library' && !r[1]) pr('Arrange Home', 'grid', '[data-home="config"]');
   else if (v === 'edition') { pr('Taste', 'taste', '.top a[href="#edition/taste"]'); pr('Send to the Kindle', 'kindle', '[data-ed="kindle"]'); pr('Make it again', 'refresh', '[data-ed="again"]'); }
   else if (v === 'highlights') pr('Export', 'export', '[data-act="hlexport"]');

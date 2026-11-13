@@ -139,7 +139,7 @@ function draw(){
   } else {
     const total = cols.reduce((s, c) => s + widthOf(c), 0) + CK;
     const allOn = r.books.length && r.books.every(b => P.sel.has(b.calibre_id));
-    h = '<table class="cattable" style="width:' + total + 'px"><colgroup><col style="width:' + CK + 'px">' + cols.map(c => '<col style="width:' + widthOf(c) + 'px">').join('') + '</colgroup><thead><tr>' +
+    h = '<table class="cattable" style="width:' + total + 'px;min-width:100%"><colgroup><col style="width:' + CK + 'px">' + cols.map(c => '<col style="width:' + widthOf(c) + 'px">').join('') + '</colgroup><thead><tr>' +
       '<th class="catck"><input type="checkbox" data-catall' + (allOn ? ' checked' : '') + ' aria-label="Choose all"></th>' +
       cols.map(c => '<th data-ck="' + esc(c.key) + '" class="' + (NUMERIC.has(c.type) ? 'num ' : '') + (P.sort === c.key ? 'on' : '') + '" aria-sort="' + (P.sort === c.key ? (P.desc ? 'descending' : 'ascending') : 'none') + '">' +
         '<button class="catsort" data-catsort="' + esc(c.key) + '">' + esc(c.label) + (P.sort === c.key ? '<i>' + (P.desc ? '↓' : '↑') + '</i>' : '') + '</button><span class="catrs" data-catrs="' + esc(c.key) + '"></span></th>').join('') +
