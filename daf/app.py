@@ -2321,6 +2321,9 @@ def get_doc(doc_id: str, prefetch: int = 0, c=Depends(conn)):
     d["kindle_sent"] = kindlesend.sent(c, doc_id)
     d["questions"] = ai.questions()
     d["in_library"] = reader.library_copy(c, d)          # saved already: the reader opens that copy
+    if d.get("kind") in ("video", "podcast") or d.get("reel"):
+        r = c.execute("SELECT v FROM kv WHERE k = ?", ("vidat:" + doc_id,)).fetchone()
+        d["video_at"] = float(r[0]) if r and r[0] else 0      # where it was stopped (reader.js keepAt)
     return d
 
 
@@ -3047,9 +3050,22 @@ def delete_highlight(hl_id: str, c=Depends(conn)):
     return {"ok": True}
 
 
+@app.post("/api/docs/{doc_id}/video-at", dependencies=[Depends(user)])
+async def post_video_at(doc_id: str, request: Request, c=Depends(conn)):
+    """Where a video was stopped, in seconds (POST, so a page going away can send it as a beacon)."""
+    b = await _body(request)
+    try:
+        at = max(0.0, float(b.get("at") or 0))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "at: seconds")
+    c.execute("INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", ("vidat:" + doc_id, str(at)))
+    return {"ok": True}
+
+
 @app.delete("/api/docs/{doc_id}/progress", dependencies=[Depends(user)])
 def reset_doc_progress(doc_id: str, c=Depends(conn)):
     c.execute("UPDATE docs SET progress = 0 WHERE id = ?", (doc_id,))
+    c.execute("DELETE FROM kv WHERE k = ?", ("vidat:" + doc_id,))
     return {"ok": True}
 
 
