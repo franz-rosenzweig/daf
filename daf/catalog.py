@@ -685,6 +685,8 @@ def clean_html(src):
                 out.append("<br>" if tag == "br" else f"<{tag}>")
             elif tag in _HEAD:
                 out.append("<p><b>")
+            elif tag == "div":
+                out.append("<p>")
 
         def handle_startendtag(self, tag, attrs):
             if tag == "br":
@@ -697,6 +699,8 @@ def clean_html(src):
                 out.append(f"</{tag}>")
             elif tag in _HEAD:
                 out.append("</b></p>")
+            elif tag == "div":
+                out.append("</p>")
 
         def handle_data(self, data):
             if not skip[0]:
@@ -705,7 +709,21 @@ def clean_html(src):
     p = P(convert_charrefs=True)
     p.feed(src or "")
     p.close()
-    h = re.sub(r"<p>\s*</p>", "", "".join(out)).strip()
+    # a div round paragraphs: one paragraph each, never one inside another, no closing left over
+    bal, inside = [], False
+    for part in re.split(r"(</?p>)", "".join(out)):
+        if part == "<p>":
+            bal.append("</p><p>" if inside else "<p>")
+            inside = True
+        elif part == "</p>":
+            if inside:
+                bal.append("</p>")
+            inside = False
+        else:
+            bal.append(part)
+    if inside:
+        bal.append("</p>")
+    h = re.sub(r"<p>\s*</p>", "", "".join(bal)).strip()
     if h and not h.startswith("<"):
         h = "<p>" + h + "</p>"
     return h
