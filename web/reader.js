@@ -1289,7 +1289,7 @@ function syncCue(){
   const i = cueAt(curTime()); if (i === V.cur) return;
   V.cur = i; $$('#docbody .tl.now').forEach(x => x.classList.remove('now'));
   const el = $('#docbody .tl[data-li="' + i + '"]');
-  if (el) { el.classList.add('now'); if (V.follow && V.playing) { const r = el.getBoundingClientRect(); const top = ($('.vhead') || { getBoundingClientRect: () => ({ bottom: 0 }) }).getBoundingClientRect().bottom; if (r.top < top + 10 || r.bottom > window.innerHeight - 60) $('#main').scrollBy({ top: r.top - top - 100, behavior: 'smooth' }); } }
+  if (el) { el.classList.add('now'); if (V.follow && V.playing && !(C.Pens && C.Pens.busy())) { const r = el.getBoundingClientRect(); const top = ($('.vhead') || { getBoundingClientRect: () => ({ bottom: 0 }) }).getBoundingClientRect().bottom; if (r.top < top + 10 || r.bottom > window.innerHeight - 60) $('#main').scrollBy({ top: r.top - top - 100, behavior: 'smooth' }); } }
 }
 function seek(t){ if (V.player && V.player.seekTo) { V.player.seekTo(t, true); if (!V.playing && V.player.playVideo) V.player.playVideo(); } }
 async function clipVideo(sec){
