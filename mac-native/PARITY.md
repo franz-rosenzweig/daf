@@ -182,3 +182,7 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - not yet: Margin (study.js): the page over to the left and a margin beside it with a line for each highlight in its colour, its note and the Notebook's words under it, a tap opens the highlight
 - not yet: Side by side (study.js): a second reader on the right half of the window, its back a ×, reading time for the side touched last
 - not yet: the Notebook as the side panel's first tab beside Info and Ask, one bar button opening the tab used last (sketchbook.js panelTab, 2026-11-11)
+
+## A book's details (2026-11-12)
+
+- not yet: the Details card on a book's page (app.js bookDetails, from catalog.card_details on GET /api/books/<id>): the description as Calibre's HTML, series with its number and a link to All books searched for it, tag chips that search, publisher and date, pages, rating in stars, language, formats, links out by identifier, ISBN

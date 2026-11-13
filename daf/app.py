@@ -1829,6 +1829,11 @@ def get_book(book_id: str, c=Depends(conn)):
     card = _book_card(b)
     card["private"] = bool(b["private"])
     card["minutes_kindle"] = round(sum(r[1] for r in secs) / 60) if secs else 0
+    if re.match(r"^cal:\d+$", book_id):
+        try:
+            card["details"] = catalog.card_details(c, int(book_id[4:]))
+        except Exception:  # noqa: BLE001 - Calibre unreadable must not break the book's page
+            card["details"] = None
     card["highlights"] = _hl_rows(c, " AND h.book_id = ?", (book_id,))
     card["notes"] = [dict(r) for r in c.execute("SELECT * FROM reading_notes WHERE book_id = ? ORDER BY created DESC", (book_id,))]
     card["bookmarks"] = [dict(r) for r in c.execute("SELECT * FROM audio_bookmarks WHERE book_id = ? ORDER BY at", (book_id,))]

@@ -666,6 +666,83 @@ def details(conn, cid, settings=None):
                 "custom": [{"key": col["key"], "label": col["label"], "dtype": col["dtype"], "multi": col["multi"], "enum": col.get("enum")} for col in custom]}
 
 
+_KEEP = {"p", "br", "b", "strong", "i", "em", "ul", "ol", "li", "blockquote"}
+_HEAD = {"h1", "h2", "h3", "h4", "h5", "h6"}
+
+
+def clean_html(src):
+    """A Calibre description as safe HTML for a book's page: paragraphs, line breaks, bold, italics,
+    lists and quotes are kept, without their attributes; headings become bold paragraphs; anything
+    else keeps only its words."""
+    from html.parser import HTMLParser
+    out, skip = [], [0]
+
+    class P(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style"):
+                skip[0] += 1
+            elif tag in _KEEP:
+                out.append("<br>" if tag == "br" else f"<{tag}>")
+            elif tag in _HEAD:
+                out.append("<p><b>")
+
+        def handle_startendtag(self, tag, attrs):
+            if tag == "br":
+                out.append("<br>")
+
+        def handle_endtag(self, tag):
+            if tag in ("script", "style"):
+                skip[0] = max(0, skip[0] - 1)
+            elif tag in _KEEP and tag != "br":
+                out.append(f"</{tag}>")
+            elif tag in _HEAD:
+                out.append("</b></p>")
+
+        def handle_data(self, data):
+            if not skip[0]:
+                out.append(html.escape(data))
+
+    p = P(convert_charrefs=True)
+    p.feed(src or "")
+    p.close()
+    h = re.sub(r"<p>\s*</p>", "", "".join(out)).strip()
+    if h and not h.startswith("<"):
+        h = "<p>" + h + "</p>"
+    return h
+
+
+LINKS = [("hardcover", "Hardcover", "https://hardcover.app/books/{}"), ("goodreads", "Goodreads", "https://www.goodreads.com/book/show/{}"),
+         ("amazon", "Amazon", "https://www.amazon.com/dp/{}"), ("google", "Google Books", "https://books.google.com/books?id={}"),
+         ("openlibrary", "Open Library", "https://openlibrary.org/books/{}")]
+
+
+def card_details(conn, cid, settings=None):
+    """What a book's page shows of its Calibre record (web/app.js bookDetails): the description as
+    safe HTML, the series with its place and how many of it Calibre has, tags, rating, publisher,
+    date, languages, pages, formats and links out by its identifiers."""
+    d = details(conn, cid, settings)
+    if not d:
+        return None
+    n = 0
+    if d.get("series"):
+        c = read_only(config.CALIBRE_DBS[0])
+        try:
+            n = c.execute("SELECT count(*) FROM books_series_link l JOIN series s ON s.id = l.series WHERE s.name = ?",
+                          (d["series"],)).fetchone()[0]
+        finally:
+            c.close()
+    ids = d.get("identifiers") or {}
+    links = []
+    for k, label, url in LINKS:
+        v = ids.get(k)
+        if v and not (k == "hardcover" and str(v).isdigit()):       # Hardcover's page is by its slug, not its number
+            links.append({"label": label, "url": url.format(v)})
+    return {"description": clean_html(d.get("comments_html") or ""), "series": d.get("series"), "series_index": d.get("series_index"),
+            "series_count": n, "tags": d.get("tags") or [], "rating": d.get("rating"), "publisher": d.get("publisher"),
+            "published": d.get("published"), "languages": d.get("languages") or [], "pages": d.get("#pages"),
+            "formats": d.get("formats") or [], "links": links, "isbn": d.get("isbn")}
+
+
 def comments_html(text):
     """Plain text from the Edit sheet → Calibre's HTML description: a paragraph each."""
     paras = [p.strip() for p in re.split(r"\n\s*\n", text or "") if p.strip()]

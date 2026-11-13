@@ -2558,3 +2558,27 @@ a.rcrow:hover,a.rcrow:hover + .rcrow{box-shadow:none}
 .rcw{font-size:13px;color:var(--fg-3);font-variant-numeric:tabular-nums;align-self:center}
 .rcmore{display:flex;justify-content:center;margin:4px 0 28px}
 @media (max-width:600px){ .rcrow{grid-template-columns:48px minmax(0,1fr) auto;gap:12px;padding:8px 6px} .rcpw{width:48px} .rcpic{width:48px;height:36px} }
+
+/* ---------- a book's details (app.js bookDetails) ---------- */
+.bdcard{display:flex;flex-direction:column;gap:14px}
+.bddesc{font-family:var(--serif);font-size:16px;line-height:1.6;color:var(--fg-2);max-width:70ch;overflow-wrap:anywhere}
+.bddesc p{margin:0 0 .7em} .bddesc p:last-child{margin-bottom:0}
+.bddesc ul,.bddesc ol{margin:0 0 .7em;padding-left:1.4em}
+.bddesc blockquote{margin:0 0 .7em;padding-left:12px;border-left:3px solid var(--line)}
+.bddesc.clamp{max-height:9.6em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
+.bddesc.clamp.open{max-height:none;-webkit-mask-image:none;mask-image:none}
+.bdmore{align-self:flex-start;margin-top:-8px;font-size:13.5px}
+.bdrows{display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:22px;row-gap:10px;border-top:1px solid var(--line);padding-top:14px}
+.bdcard > .bdrows:first-child{border-top:0;padding-top:0}
+.bdr{display:contents}
+.bdl{font-size:13px;font-weight:600;color:var(--fg-3);padding-top:4px}
+.bdv{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0;font-size:14.5px;color:var(--fg);min-height:28px}
+.bdchips{display:flex;flex-wrap:wrap;gap:6px}
+.bdchip{display:inline-flex;align-items:center;height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-size:13.5px;cursor:pointer;text-decoration:none;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.bdchip:hover{background:var(--hover)}
+.bdchip.out::after{content:"↗";margin-left:5px;font-size:12px;color:var(--fg-3)}
+.bdn{font-size:13.5px;color:var(--fg-3);font-variant-numeric:tabular-nums}
+.bdfmt{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:6px;background:color-mix(in srgb,var(--fg) 7%,transparent);font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--fg-2)}
+.bdisbn{font-size:13px;color:var(--fg-3);font-variant-numeric:tabular-nums;align-self:center}
+.bdstars{display:inline-flex;gap:2px;color:var(--accent)}
+@media (max-width:600px){ .bdrows{grid-template-columns:1fr;row-gap:4px} .bdl{padding-top:8px} .bddesc{font-size:15.5px} }
