@@ -1783,6 +1783,118 @@ def get_catalog_job(jid: str):
     return j
 
 
+# ---- Import list (importlist.py, web/importlist.js): a list of books from elsewhere, matched against Calibre ----
+def _il(fn, *a):
+    from . import hardcover, importlist
+    try:
+        return fn(*a)
+    except importlist.ListError as e:
+        raise HTTPException(400, str(e))
+    except hardcover.HardcoverError as e:
+        raise HTTPException(502, f"Hardcover: {e}")
+
+
+def _il_books():
+    return list(catalog.calibre_rows()[0].values())
+
+
+@app.get("/api/catalog/importlist", dependencies=[Depends(user)])
+def get_importlist(c=Depends(conn)):
+    """What the sheet offers: the predefined web pages, my Hardcover lists and shelves (null without
+    Hardcover), Calibre's Read column with its To read choice (null without one), Daf's shelves (not the Kindle's)."""
+    from . import hardcover, importlist
+    try:
+        hc = importlist.hardcover_sources() if hardcover._key() else None
+    except Exception:  # noqa: BLE001 - the other ways in still work
+        hc = None
+    shelves = [{"id": s["id"], "name": s["name"], "hardcover": s["hardcover"]} for s in _shelf_list(c) if s["kindle"] is None]
+    return {"sites": importlist.sites(), "hardcover": hc, "read": importlist.read_column(config.load_settings()), "shelves": shelves}
+
+
+@app.post("/api/catalog/importlist/read", dependencies=[Depends(user)])
+def post_importlist_read(b=Depends(json_body)):
+    """The list in: {source: text {text, form, pattern} | table {data (base64) or text, delimiter,
+    columns, headings} | web {url, config, xpaths} | hardcover {list}} → {rows, each matched} or
+    {table} (a table without columns yet: its first rows and a guess)."""
+    from . import importlist
+    r = _il(importlist.read, b)
+    if "rows" in r:
+        r["rows"] = _il(importlist.prepare, r["rows"], _il_books())
+    return r
+
+
+@app.post("/api/catalog/importlist/match", dependencies=[Depends(user)])
+def post_importlist_match(b=Depends(json_body)):
+    """Rows changed by hand, matched again: {rows} → {rows}."""
+    from . import importlist
+    return {"rows": importlist.match(importlist.clean_rows((b or {}).get("rows")), _il_books())}
+
+
+@app.get("/api/catalog/importlist/search", dependencies=[Depends(user)])
+def get_importlist_search(q: str = ""):
+    """A row's book picked by hand: the library's books with every word in the title, authors or series."""
+    from . import importlist
+    s = config.load_settings()
+    return {"books": [x for x in importlist.search(_il_books(), q[:200], 60) if not library.is_private(x["title"], s)][:30]}
+
+
+@app.post("/api/catalog/importlist/apply", dependencies=[Depends(user)])
+def post_importlist_apply(b=Depends(json_body), c=Depends(conn)):
+    """The list's books, all at once, as a job (GET /api/catalog/job/{job}): {add: [rows] → empty books
+    with add_tag and add_read (the Read column's To read choice), have: [calibre ids] with have_tag;
+    add_shelf and have_shelf put them on a Daf shelf}. Its done: {added: [ids], tagged, shelved, failed}."""
+    from . import calibrewrite, importlist
+    b = b if isinstance(b, dict) else {}
+    add = importlist.clean_rows(b.get("add"))[:1000]
+    have = list(dict.fromkeys(int(i) for i in b.get("have") or [] if str(i).isdigit()))[:2000]
+    add_tags, have_tags = importlist.tags_from(b.get("add_tag")), importlist.tags_from(b.get("have_tag"))
+    read = None
+    if b.get("add_read") and add:
+        rc = importlist.read_column(config.load_settings())
+        if not rc:
+            raise HTTPException(400, "Calibre has no Read column with a To read choice")
+        read = {rc["key"]: rc["choice"]}
+    shelves = {}
+    for k in ("add_shelf", "have_shelf"):
+        sid = str(b.get(k) or "") or None
+        if sid and not c.execute("SELECT 1 FROM shelves WHERE id = ? AND kindle IS NULL", (sid,)).fetchone():
+            raise HTTPException(400, "No such shelf")
+        shelves[k] = sid
+    if not have_tags and not shelves["have_shelf"]:
+        have = []
+    if not add and not have:
+        raise HTTPException(400, "Nothing to do")
+    names = {cid: (x.get("title"), x.get("authors") or []) for cid, x in catalog.calibre_rows()[0].items() if cid in set(have)}
+
+    def work():
+        ops = []
+        if add:
+            ops.append({"op": "add_empty", "books": importlist.empty_books(add, add_tags, read)})
+        if have and have_tags:
+            ops.append({"op": "tags", "ids": have, "add": have_tags})
+        res = calibrewrite.run(ops, timeout=900) if ops else {}
+        added = res.get("added") or []
+        out = {"added": added, "tagged": len(have) if have_tags else 0, "shelved": 0, "failed": []}
+        c2 = db.connect()
+        try:
+            importlist.add_daf_rows(c2, {i: (res[i]["title"], res[i]["authors"]) for i in added if res.get(i)} | names, config.load_settings())
+            c2.commit()
+            for sid, ids in ((shelves["add_shelf"], added), (shelves["have_shelf"], have)):
+                for cid in ids if sid else []:
+                    try:
+                        _shelf_put(c2, sid, f"cal:{cid}")
+                        out["shelved"] += 1
+                    except HTTPException as e:
+                        out["failed"].append({"id": cid, "error": e.detail})
+                    c2.commit()
+        finally:
+            c2.close()
+        if added:
+            _after_removal({})                  # Daf's book list built again, away from here (as after a restore)
+        return out
+    return {"job": calibrewrite.start_job(work)}
+
+
 @app.put("/api/nightstand", dependencies=[Depends(user)])
 async def put_nightstand(request: Request, c=Depends(conn)):
     body = await request.json()

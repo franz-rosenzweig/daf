@@ -2709,3 +2709,49 @@ a.catchkrow:hover{background:var(--hover)}
   .catdet{bottom:calc(64px + env(safe-area-inset-bottom,0px));max-height:72vh}
   .calgrid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:16px 10px;padding:12px}
 }
+
+/* Import list (importlist.js): a sheet like the edit sheet's */
+.ilbody{display:flex;flex-direction:column;gap:12px}
+.ilbody h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);margin:10px 0 0}
+.ilsheet .mono{font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.iltext{min-height:240px;resize:vertical;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;line-height:1.55;white-space:pre;overflow:auto}
+.ilerr{margin:0;padding:10px 14px;color:var(--bad)}
+.ilfile{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ilxp summary{cursor:pointer;color:var(--fg-2);font-size:13.5px;padding:6px 0;min-height:30px}
+.ilxpb{display:flex;flex-direction:column;gap:8px;padding-top:6px}
+.illists{display:flex;flex-direction:column}
+.ilpick{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--line);font-size:14.5px;cursor:pointer}
+.ilpick span{flex:1;min-width:0} .ilpick b{font-weight:400;color:var(--fg-3);font-size:12.5px;font-variant-numeric:tabular-nums}
+.ilpick input,.ilck input,.ilrow > input,.ilfilter > input{accent-color:var(--accent);width:18px;height:18px;margin:0;flex:none}
+.ilck{display:flex;align-items:center;gap:10px;font-size:14.5px;min-height:36px;cursor:pointer}
+.ilprev{overflow:auto;border:1px solid var(--line);border-radius:9px;max-height:280px}
+.ilprev table{border-collapse:collapse;font-size:13px}
+.ilprev td{padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.ilprev tr.ilhead td{font-weight:600;background:var(--panel)}
+.ilfilter{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ilfilter .bemtabs b{font-weight:400;color:var(--fg-3);font-size:12px;margin-left:2px}
+.ilrows{display:flex;flex-direction:column}
+.ilrow{display:grid;grid-template-columns:22px minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line)}
+.ilrow > input{margin-top:7px}
+.ilrow.off .illist,.ilrow.off .ilmatch{opacity:.45}
+.illist{display:flex;flex-direction:column;gap:5px;min-width:0}
+.illist .field.sm{width:100%;min-height:34px}
+.ilmatch{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:14px;padding-top:3px}
+.ilmatch b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.ilmatch > span.mute{overflow:hidden;text-overflow:ellipsis}
+.ilmatch select.field{min-height:32px;padding:4px 10px;font-size:13px;margin-top:2px}
+.ilnew{color:var(--fg-2)}
+.ilhow{font-size:11.5px;color:var(--fg-2);border:1px solid var(--line-2);border-radius:10px;padding:1px 8px}
+.ilmhead{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:30px}
+.ilmhead .linkbtn{font-size:13.5px;padding:5px 2px;min-height:30px}
+.ilfind{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.ilfind .field.sm{width:100%;min-height:34px;margin-bottom:4px}
+.ilhit{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:1px;padding:8px;border-radius:8px;font-size:13.5px;min-height:40px}
+.ilhit:hover,.ilhit:focus-visible{background:var(--hover)}
+.ilhit b{font-weight:600}
+.ilnewshelf{margin-top:8px}
+.ilsum{display:flex;flex-direction:column;gap:6px;font-size:15px}
+@media (max-width:700px){
+  .ilrow{grid-template-columns:22px minmax(0,1fr);row-gap:8px} .ilmatch{grid-column:2}
+  .iltext,.illist .field.sm,.ilfind .field.sm{font-size:16px}
+}

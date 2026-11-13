@@ -336,7 +336,7 @@ async function moreMenu(anchor){
     (emb.pending ? '<button disabled><i></i>Writing details into files · ' + emb.pending + ' left</button>' : '<button data-catm="embedall"><i></i>Write details into every file</button>') + '<hr>' +
     '<a href="/api/catalog/export?' + qs.toString() + '" download><i></i>Export as CSV</a>' +
     '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>' +
-    '<hr><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>');
+    '<hr><button data-catm="import"><i></i>Import list</button><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>');
 }
 // Many books into one format: one job on the server, a book at a time; the toast says when it's done.
 async function convertMany(ids, to){
@@ -445,6 +445,7 @@ document.addEventListener('click', async e => {
     else if (k === 'conv') { $('#pop').hidden = true; convertMany([...P.sel], m.dataset.to); }
     else if (k === 'dl') { $('#pop').hidden = true; const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + [...P.sel].join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
     else if (k === 'check') { $('#pop').hidden = true; checkLibrary(); }
+    else if (k === 'import') { $('#pop').hidden = true; if (C.ImportList) C.ImportList.open(); }
     else if (k === 'pages') { $('#pop').hidden = true; countPages([...P.sel]); }
     else if (k === 'embedall') { $('#pop').hidden = true;
       if (confirm('Write the details into the files of all ' + (P.data ? P.data.total : '') + ' books?'))
@@ -598,5 +599,11 @@ C.Catalog = {
   rowMenu: (tr, x, y) => { held = Date.now(); rowMenu(tr, x, y); },
   // What a drag from this row carries: every chosen row when it's one of them, else just it.
   dragBooks: tr => { const id = +tr.dataset.cal; return P.data ? P.data.books.filter(b => P.sel.has(id) && P.sel.size > 1 ? P.sel.has(b.calibre_id) : b.calibre_id === id) : []; },
-  search: q => { if (C.S.route[0] !== 'catalog') { P.q = q; keep(); location.hash = 'catalog'; } else setQ(q); }, reload: () => { P.info.clear(); const d = $('#catdet'); if (d) d.dataset.cal = ''; if (C.S.route[0] === 'catalog') load(true).then(() => { if (P.side) drawSide(); }); }, books: () => (P.data && P.data.books) || [] };
+  search: q => { if (C.S.route[0] !== 'catalog') { P.q = q; keep(); location.hash = 'catalog'; } else setQ(q); },
+  // These Calibre books, shown and chosen (Import list's new books, ready for Find details).
+  choose: ids => { const q = ids.length && ids.length <= 300 ? ids.map(i => 'id:' + i).join(' or ') : 'added:today';
+    if (C.S.route[0] !== 'catalog') { C.Catalog.search(q); return; }
+    P.q = q; P.view = dirtyView(); keep(); const box = $('#catq'); if (box) box.value = q;
+    load().then(() => { ids.forEach(i => P.sel.add(i)); draw(); }); },
+  reload: () => { P.info.clear(); const d = $('#catdet'); if (d) d.dataset.cal = ''; if (C.S.route[0] === 'catalog') load(true).then(() => { if (P.side) drawSide(); }); }, books: () => (P.data && P.data.books) || [] };
 })();
