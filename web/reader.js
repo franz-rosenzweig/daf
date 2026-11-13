@@ -1229,7 +1229,23 @@ function setFocus(i, scroll){
 }
 
 /* ---------- video (YouTube's privacy-mode player, synced to the transcript) ---------- */
-const V = { player: null, playing: false, follow: true, timer: null, cur: -1 };
+const V = { player: null, playing: false, follow: true, timer: null, cur: -1, doc: null, keptT: 0, kept: 0 };
+// Where a video was stopped (kv vidat:<id>, on the doc as video_at): kept every ten seconds while it
+// plays, when it's paused and when Daf goes to the background, and it's cued there next time. Near
+// its end it's kept as the start, so a finished video starts over.
+function keepAt(beacon){
+  const d = V.doc; if (!d || d.episode || !V.player) return;
+  let t = Math.floor(curTime()), dur = 0;
+  try { dur = V.player.getDuration ? V.player.getDuration() || 0 : 0; } catch(e){}
+  if (!t && !beacon) return;
+  if (dur && t > dur - 15) t = 0;
+  if (t === V.kept) return;
+  V.kept = t; d.video_at = t;
+  const url = '/api/docs/' + encodeURIComponent(d.id) + '/video-at', body = JSON.stringify({ at: t });
+  if (beacon && navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+  else api(url, { method: 'POST', body }).catch(() => {});
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && V.doc) keepAt(true); });
 const ytId = u => (String(u || '').match(/(?:v=|youtu\.be\/|\/shorts\/|\/embed\/)([A-Za-z0-9_-]{11})/) || [])[1];
 // A reel (social.py): Daf's own copy, standing up, in a <video>; V.player speaks the YouTube player's
 // few words (getCurrentTime, seekTo, playVideo, pauseVideo), so the transcript, Clip and the keys
@@ -1244,9 +1260,11 @@ function reelHead(d){
 }
 function startReel(){
   const el = $('#lvp'); if (!el) return;
-  V.player = { getCurrentTime: () => el.currentTime || 0, seekTo: t => { el.currentTime = t; },
+  V.player = { getCurrentTime: () => el.currentTime || 0, getDuration: () => el.duration || 0, seekTo: t => { el.currentTime = t; },
                playVideo: () => { const p = el.play(); if (p && p.catch) p.catch(() => {}); }, pauseVideo: () => el.pause() };
-  const on = () => { V.playing = !el.paused && !el.ended; R.lastActive = Date.now(); };
+  const on = e => { V.playing = !el.paused && !el.ended; R.lastActive = Date.now(); if (e && e.type === 'pause') keepAt(); };
+  const was = V.doc && V.doc.video_at > 5 ? V.doc.video_at : 0;
+  if (was) el.addEventListener('loadedmetadata', () => { if (!el.currentTime) el.currentTime = was; }, { once: true });
   ['play', 'playing', 'pause', 'ended'].forEach(ev => el.addEventListener(ev, on));
   // a post that's square or wide (Instagram's feed has both) gets a frame its own shape
   el.addEventListener('loadedmetadata', () => {
@@ -1264,17 +1282,18 @@ function videoHead(d){
     (id ? '<a class="tiny" href="https://tube.tiresia.xyz/watch/' + id + '" target="_blank" rel="noopener">Watch in Materialious</a>' : '') + '</div></div>';
 }
 function startPlayer(d){
-  clearInterval(V.timer); V.player = null; V.cur = -1; V.playing = false;
+  if (V.doc && V.doc !== d) keepAt();
+  clearInterval(V.timer); V.player = null; V.cur = -1; V.playing = false; V.doc = d; V.kept = d.video_at || 0;
   if (d.reel) { startReel(); return; }
   const id = ytId(d.url); if (!id) return;
   // opened at a moment (#read/<id>/t:<seconds>, from Learn's Ask): it starts there, its line in view
-  const at = !d.episode && R.podAt != null ? Math.floor(R.podAt) : 0;
+  const at = !d.episode && R.podAt != null ? Math.floor(R.podAt) : !d.episode && d.video_at > 5 ? Math.floor(d.video_at) : 0;
   if (!d.episode) { R.podAt = null; R.podPlay = false; }
   if (at) setTimeout(() => { const i = cueAt(at); if (i >= 0) setFocus(i, true); }, 300);
   const make = () => {
     V.player = new YT.Player('ytp', { videoId: id, host: 'https://www.youtube-nocookie.com', width: '100%', height: '100%',
       playerVars: Object.assign({ rel: 0, modestbranding: 1, playsinline: 1 }, at ? { start: at } : {}),
-      events: { onStateChange: e => { V.playing = e.data === 1; R.lastActive = Date.now(); } } });
+      events: { onStateChange: e => { V.playing = e.data === 1; R.lastActive = Date.now(); if (e.data === 2 || e.data === 0) keepAt(); } } });
     V.timer = setInterval(syncCue, 500);
   };
   if (window.YT && window.YT.Player) make();
@@ -1285,7 +1304,7 @@ function cueAt(t){ const d = R.doc; let best = -1; if (!d) return -1; d.blocks.f
 function syncCue(){
   if (C.S.route[0] !== 'read' || !R.doc || !['video', 'podcast'].includes(R.doc.kind) || (P.doc && R.doc.id !== P.doc.id)) {
     clearInterval(V.timer); P.doc = null; return; }
-  if (V.playing) R.lastActive = Date.now();
+  if (V.playing) { R.lastActive = Date.now(); if (Date.now() - V.keptT > 10000) { V.keptT = Date.now(); keepAt(); } }
   const i = cueAt(curTime()); if (i === V.cur) return;
   V.cur = i; $$('#docbody .tl.now').forEach(x => x.classList.remove('now'));
   const el = $('#docbody .tl[data-li="' + i + '"]');
