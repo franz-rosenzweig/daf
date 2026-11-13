@@ -5,7 +5,7 @@
    has "Add the file" on its page, and says how the file it was sent is getting on. */
 (function(){
 const C = window.DafCore, { $, esc, api, toast, closeModal } = C;
-const A = { hits: [], pick: null, timer: 0, file: null, shelves: null, src: 'hc', free: [] };
+const A = { hits: [], pick: null, timer: 0, file: null, shelves: null, src: 'hc', free: [], freeN: 0 };
 
 // The Kindle's shelves (its home folder's folders, as its plugin reported them), Books first.
 async function kindleShelves(){
@@ -50,19 +50,27 @@ async function find(q){
 // Public domain (freebooks.py): Standard Ebooks and Project Gutenberg, each book straight into Calibre.
 const SRC = { se: 'Standard Ebooks', pg: 'Project Gutenberg' };
 async function findFree(q){
-  const box = $('#abres');
+  const box = $('#abres'), n = ++A.freeN, by = { se: null, pg: null }, failed = [];
   box.innerHTML = '<p class="mute tiny" style="margin:0">Searching…</p>';
-  try {
-    const r = await api('/api/free/search?q=' + encodeURIComponent(q.trim()));
-    if (($('#abq') || {}).value !== q || A.src !== 'free') return;
-    A.free = r.results;
-    box.innerHTML = (r.failed.length ? '<p class="mute tiny" style="margin:0">' + esc(r.failed.join(' and ')) + ' didn’t answer</p>' : '') +
-      (r.results.length ? r.results.map((x, i) => '<div class="abhit fbhit">' +
+  const draw = () => {
+    if (n !== A.freeN || ($('#abq') || {}).value !== q || A.src !== 'free') return;
+    const se = by.se || [], keys = new Set(se.map(x => x.key));
+    const list = se.concat((by.pg || []).filter(x => !keys.has(x.key))).map((x, i) => [x, i]).sort((a, b) => a[0].rank - b[0].rank || a[1] - b[1]).map(p => p[0]);
+    const waiting = !by.se || !by.pg;
+    A.free = list;
+    box.innerHTML = (failed.length ? '<p class="mute tiny" style="margin:0">' + esc(failed.join(' and ')) + ' didn’t answer</p>' : '') +
+      list.map((x, i) => '<div class="abhit fbhit">' +
         (x.cover ? '<img src="' + esc(x.cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'abnoimg\'}))">' : '<span class="abnoimg"></span>') +
         '<span class="abt"><b>' + esc(x.title) + '</b><span class="mute tiny">' + esc([x.author, SRC[x.source]].filter(Boolean).join(' · ')) + '</span></span>' +
         (x.have ? '<a class="btn sm" href="#book/' + encodeURIComponent(x.have) + '" data-ab="close">Open</a>' : '<button type="button" class="btn sm" data-fbadd="' + i + '">Add</button>') +
-        '</div>').join('') : '<p class="mute" style="margin:0">Nothing found</p>');
-  } catch(e){ box.innerHTML = '<p class="mute" style="margin:0">' + esc(e.message) + '</p>'; }
+        '</div>').join('') +
+      (waiting ? '<p class="mute tiny" style="margin:0">Searching…</p>' : list.length ? '' : '<p class="mute" style="margin:0">Nothing found</p>');
+  };
+  for (const site of ['pg', 'se']) {
+    api('/api/free/search?site=' + site + '&q=' + encodeURIComponent(q.trim()))
+      .then(r => { by[site] = r.results; failed.push(...r.failed); }, e => { by[site] = []; failed.push(SRC[site]); })
+      .then(draw);
+  }
 }
 async function addFree(btn, force){
   const x = A.free[+btn.dataset.fbadd]; if (!x) return;

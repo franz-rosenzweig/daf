@@ -2782,10 +2782,10 @@ BOOK_EXTS = {".epub", ".kepub", ".mobi", ".azw3", ".azw", ".fb2", ".cbz"}
 
 
 @app.get("/api/free/search", dependencies=[Depends(user)])
-def get_free_search(q: str = ""):
-    """Standard Ebooks' and Project Gutenberg's searches (freebooks.py)."""
+def get_free_search(q: str = "", site: str | None = None):
+    """Standard Ebooks' and Project Gutenberg's searches (freebooks.py): site=se or pg for one."""
     from . import freebooks
-    return freebooks.search(q)
+    return freebooks.search(q, site)
 
 
 @app.post("/api/free/add", dependencies=[Depends(user)])
