@@ -367,5 +367,22 @@ def start_convert(cid, src, to):
     return jid
 
 
+def start_convert_many(todo, to):
+    """[(cid, from)] into `to`, one after another, in one job: {running, done, total, failed: [{id, error}]}."""
+    jid = uuid.uuid4().hex[:12]
+    j = _jobs[jid] = {"running": True, "started": time.time(), "done": 0, "total": len(todo), "failed": [], "to": to}
+
+    def work():
+        for cid, src in todo:
+            try:
+                run([{"op": "convert", "id": cid, "from": src, "to": to}], timeout=1000)
+            except Exception as e:  # noqa: BLE001 - one book's failure doesn't stop the rest
+                j["failed"].append({"id": cid, "error": str(e)[:300]})
+            j["done"] += 1
+        j["running"] = False
+    threading.Thread(target=work, daemon=True).start()
+    return jid
+
+
 def job(jid):
     return _jobs.get(jid)

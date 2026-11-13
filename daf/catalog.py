@@ -767,6 +767,63 @@ def comments_html(text):
     return "".join("<p>" + html.escape(p).replace("\n", "<br>") + "</p>" for p in paras)
 
 
+EBOOK_EXTS = {"epub", "kepub", "mobi", "azw", "azw3", "kfx", "pdf", "fb2", "cbz", "cbr", "djvu", "docx", "rtf", "txt", "lit", "pdb", "htmlz", "lrf"}
+
+
+def check_library():
+    """Calibre's records against its folders, read only (All books → ⋯ → Check library): files a book
+    lists that aren't there, books with no file, covers missing, folders missing, book files in a
+    book's folder that it doesn't list, and folders that no book points to."""
+    db = config.CALIBRE_DBS[0]
+    lib = db.parent
+    c = read_only(db)
+    try:
+        books = c.execute("SELECT id, title, path, has_cover FROM books ORDER BY title COLLATE NOCASE").fetchall()
+        data = c.execute("SELECT book, format, name FROM data").fetchall()
+    finally:
+        c.close()
+    files = {}
+    for b, f, n in data:
+        files.setdefault(b, []).append((f.upper(), n))
+    out = {k: [] for k in ("missing_files", "no_files", "missing_cover", "missing_folder", "extra_files", "unknown_folders")}
+    known = set()
+    for bid, title, path, cover in books:
+        known.add(path)
+        folder = lib / path
+        if not folder.is_dir():
+            out["missing_folder"].append({"id": bid, "title": title})
+            continue
+        listed = set()
+        if not files.get(bid):
+            out["no_files"].append({"id": bid, "title": title})
+        for fmt, name in files.get(bid, []):
+            fn = f"{name}.{fmt.lower()}"
+            listed.add(fn)
+            if not (folder / fn).exists():
+                out["missing_files"].append({"id": bid, "title": title, "format": fmt})
+        if cover and not (folder / "cover.jpg").exists():
+            out["missing_cover"].append({"id": bid, "title": title})
+        for f in sorted(folder.iterdir()):
+            if f.is_file() and f.suffix.lower().lstrip(".") in EBOOK_EXTS and f.name not in listed:
+                out["extra_files"].append({"id": bid, "title": title, "file": f.name})
+    for a in sorted(lib.iterdir()):
+        if a.is_dir() and not a.name.startswith("."):
+            for t in sorted(a.iterdir()):
+                if t.is_dir() and f"{a.name}/{t.name}" not in known:
+                    out["unknown_folders"].append({"path": f"{a.name}/{t.name}"})
+    out["books"] = len(books)
+    return out
+
+
+def formats_of(cid):
+    """A Calibre book's formats, upper case."""
+    c = read_only(config.CALIBRE_DBS[0])
+    try:
+        return [r[0].upper() for r in c.execute("SELECT format FROM data WHERE book = ? ORDER BY format", (cid,))]
+    finally:
+        c.close()
+
+
 def book_file(cid, fmt):
     """The host path of a book's file in one format, or None."""
     db = config.CALIBRE_DBS[0]

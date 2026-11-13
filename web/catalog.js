@@ -115,7 +115,7 @@ function bulkBar(){
   const n = P.sel.size, all = P.data ? P.data.books.length : 0;
   bar.hidden = false;
   bar.innerHTML = '<b>' + n + ' chosen</b><span class="spacer"></span>' + (n < all ? '<button class="btn sm" data-catb="all">Choose all ' + all + '</button>' : '') +
-    '<button class="btn sm" data-catb="none">Clear</button><button class="btn sm" data-catb="shelves">Shelves</button><button class="btn sm" data-catb="fill">Find details</button>' + (n > 1 ? '<button class="btn sm" data-catb="merge">Merge</button>' : '') + '<button class="btn sm danger" data-catb="remove">Remove</button>' +
+    '<button class="btn sm" data-catb="none">Clear</button><button class="btn sm" data-catb="shelves">Shelves</button><button class="btn sm" data-catb="fill">Find details</button><button class="btn sm ib" data-catb="more" aria-label="More">' + IC.dots + '</button>' + (n > 1 ? '<button class="btn sm" data-catb="merge">Merge</button>' : '') + '<button class="btn sm danger" data-catb="remove">Remove</button>' +
     '<button class="btn sm primary" data-catb="edit">' + (n === 1 ? 'Edit details' : 'Edit ' + n + ' books') + '</button>';
 }
 function choose(id, on){
@@ -228,8 +228,41 @@ async function moreMenu(anchor){
     (emb.pending ? '<button disabled><i></i>Writing details into files · ' + emb.pending + ' left</button>' : '<button data-catm="embedall"><i></i>Write details into every file</button>') + '<hr>' +
     '<a href="/api/catalog/export?' + qs.toString() + '" download><i></i>Export as CSV</a>' +
     '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>' +
-    '<hr><button data-catm="trash"><i></i>Calibre’s trash</button>');
+    '<hr><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>');
 }
+// Many books into one format: one job on the server, a book at a time; the toast says when it's done.
+async function convertMany(ids, to){
+  let r;
+  try { r = await api('/api/catalog/convert-many', { method: 'POST', body: JSON.stringify({ ids, to }) }); } catch(e){ toast(e.message); return; }
+  if (!r.job) { toast(r.have ? 'All ' + r.have + ' have ' + to : 'No file to convert'); return; }
+  toast('Converting ' + r.total + ' to ' + to);
+  const poll = async () => {
+    let j; try { j = await api('/api/catalog/convert-many/' + r.job); } catch(e){ return; }
+    if (j.running) { setTimeout(poll, 4000); return; }
+    const ok = j.total - j.failed.length;
+    toast(ok + ' converted to ' + to + (j.failed.length ? ' · ' + j.failed.length + ' didn’t' : ''));
+    if (C.S.route[0] === 'catalog') load(true);
+  };
+  setTimeout(poll, 4000);
+}
+// Check library (catalog.check_library): what doesn't match between Calibre's records and its folders.
+const CHECKS = [['missing_files', 'Files missing'], ['no_files', 'Books without a file'], ['missing_cover', 'Covers missing'], ['missing_folder', 'Folders missing'],
+  ['extra_files', 'Files Calibre doesn’t list'], ['unknown_folders', 'Folders Calibre doesn’t know']];
+async function checkLibrary(){
+  $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false; m.classList.add('wide');
+  m.innerHTML = '<h2>Check library</h2><p class="mute">Checking…</p>';
+  let r;
+  try { r = await api('/api/catalog/check'); } catch(e){ m.innerHTML = '<h2>Check library</h2><p class="mute">' + esc(e.message) + '</p><div class="catckbtns"><button class="btn" data-ckclose>Close</button></div>'; return; }
+  const groups = CHECKS.filter(([k]) => (r[k] || []).length);
+  const item = x => x.id ? '<a class="catckrow" href="#book/cal:' + x.id + '" data-ckclose><span>' + esc(x.title) + '</span><span class="mute tiny">' + esc(x.format || x.file || '') + '</span></a>'
+    : '<div class="catckrow"><span class="mono">' + esc(x.path) + '</span></div>';
+  m.innerHTML = '<h2>Check library</h2><span class="mute tiny">' + r.books + ' books</span>' +
+    (groups.length ? '<div class="catck">' + groups.map(([k, l]) => '<h3>' + l + ' <span class="mute tiny">' + r[k].length + '</span></h3>' + r[k].slice(0, 200).map(item).join('')).join('') + '</div>'
+      : '<p>Nothing wrong</p>') +
+    '<div class="catckbtns"><button class="btn" data-ckclose>Close</button></div>';
+}
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-ckclose]')) C.closeModal ? C.closeModal() : ($('#modal').hidden = $('#scrim').hidden = true); });
+
 async function saveViews(views){
   const r = await api('/api/catalog/views', { method: 'PUT', body: JSON.stringify({ views }) });
   P.data.views = r.views;
@@ -275,6 +308,9 @@ document.addEventListener('click', async e => {
     else if (k === 'colsreset') { P.cols = null; P.widths = {}; P.view = dirtyView(); keep(); draw(); $('#pop').hidden = true; }
     else if (k === 'trash') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.trash(P.priv); }
     else if (k === 'items') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.items('tags'); }
+    else if (k === 'conv') { $('#pop').hidden = true; convertMany([...P.sel], m.dataset.to); }
+    else if (k === 'dl') { $('#pop').hidden = true; const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + [...P.sel].join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
+    else if (k === 'check') { $('#pop').hidden = true; checkLibrary(); }
     else if (k === 'embedall') { $('#pop').hidden = true;
       if (confirm('Write the details into the files of all ' + (P.data ? P.data.total : '') + ' books?'))
         api('/api/catalog/embed', { method: 'POST', body: JSON.stringify({ all: true }) }).then(r => toast('Writing details into ' + r.pending + ' books’ files')).catch(err => toast(err.message)); }
@@ -309,6 +345,8 @@ document.addEventListener('click', e => {
     else if (k === 'fill' && C.BookEdit) C.BookEdit.fill(P.data.books.filter(x => P.sel.has(x.calibre_id)));
     else if (k === 'shelves' && C.DragBooks) C.DragBooks.sheet(P.data.books.filter(x => P.sel.has(x.calibre_id)), b);
     else if (k === 'remove' && C.BookEdit) C.BookEdit.remove(P.data.books.filter(x => P.sel.has(x.calibre_id))).then(done => { if (done) P.sel.clear(); });
+    else if (k === 'more') openPop(b, ['EPUB', 'AZW3', 'KEPUB', 'MOBI', 'PDF'].map(f => '<button data-catm="conv" data-to="' + f + '"><i></i>Convert to ' + f + '</button>').join('') +
+      '<hr><button data-catm="dl"><i></i>Download</button>');
     else if (k === 'none') { P.sel.clear(); draw(); }
     else if (k === 'all') { P.data.books.forEach(x => P.sel.add(x.calibre_id)); draw(); }
     return; }
