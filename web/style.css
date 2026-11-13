@@ -2632,3 +2632,13 @@ a.catchkrow:hover{background:var(--hover)}
   .cattable td:nth-child(3){display:block;height:auto;padding:0 14px 10px 0;font-size:13px;color:var(--fg-3)}
   .cattable td:nth-child(2) img{width:26px;height:38px}
 }
+
+/* Find details: Calibre's covers for an answer (bookedit.js drawCovers) */
+.befch{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3);margin:4px 0 8px}
+.befcovs{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px;margin-bottom:18px;align-items:start}
+.befcv{display:flex;flex-direction:column;gap:3px;align-items:stretch;padding:6px;border-radius:10px;border:1px solid transparent;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;min-width:0}
+.befcv img,.befcv .befnc{width:100%;aspect-ratio:2/3;object-fit:contain;background:var(--hover);border-radius:6px}
+.befcv .tiny{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.befcv.on{border-color:var(--accent);background:var(--accent-weak)}
+.befcvwait{display:flex;align-items:center;justify-content:center;aspect-ratio:2/3;border-radius:6px;background:var(--hover);margin:6px}
+.befcvwait::after{content:"";width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--fg-3);border-radius:50%;animation:dafspin .8s linear infinite}

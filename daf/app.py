@@ -1472,10 +1472,13 @@ async def put_catalog_cover(cid: int, request: Request):
     """A new cover: the image itself as the body, or {url} for one found online."""
     from . import calibrewrite
     if request.headers.get("content-type", "").startswith("application/json"):
-        url = str((await request.json()).get("url") or "")
-        if not re.match(r"^https?://", url):
+        j = await request.json()
+        url = str(j.get("url") or "")
+        if j.get("found"):
+            url = "found:" + str(j["found"])
+        elif not re.match(r"^https?://", url):
             raise HTTPException(400, "A cover's address starts with http")
-        data = await run_in_threadpool(_remote_image, url)
+        data = await run_in_threadpool(_cover_data, url)
     else:
         data = await request.body()
     await run_in_threadpool(_calibre, [{"op": "cover", "id": cid, "data": calibrewrite.b64(_image(data))}])
@@ -1537,6 +1540,45 @@ def find_catalog_book(cid: int, b=Depends(json_body), c=Depends(conn)):
     authors = [str(a)[:200] for a in authors][:5]
     q = f"{title} {authors[0] if authors else ''}".strip() if b.get("title") else None
     return {"job": calibrefind.start(db.connect, cid, d["id"], title, authors, ids, q)}
+
+
+@app.post("/api/catalog/book/{cid}/covers", dependencies=[Depends(user)])
+def find_catalog_covers(cid: int, b=Depends(json_body), c=Depends(conn)):
+    """Calibre's covers for {title, authors, identifiers} (an answer of Find details; the book's own by
+    default), from every cover source, as a job: GET /api/catalog/jobs/{job} has {covers} when done."""
+    from . import calibrefind
+    d = catalog.details(c, cid)
+    if not d:
+        raise HTTPException(404, "Calibre has no such book")
+    b = b if isinstance(b, dict) else {}
+    title = str(b.get("title") or d["title"])[:300]
+    authors = [str(a)[:200] for a in (b.get("authors") if isinstance(b.get("authors"), list) else d["authors"])][:5]
+    ids = dict(d["identifiers"] or {})
+    for k, v in (b.get("identifiers") or {}).items() if isinstance(b.get("identifiers"), dict) else []:
+        if re.fullmatch(r"[a-z0-9_:-]{1,30}", str(k)) and v:
+            ids[str(k)] = str(v)[:100]
+    return {"job": calibrefind.covers_start(cid, title, authors, ids)}
+
+
+@app.get("/api/catalog/found/{jid}/{name}", dependencies=[Depends(user)])
+def get_found_cover(jid: str, name: str, thumb: int = 0):
+    """A cover Calibre found (calibrefind.found_file), small for the list or as it came."""
+    from . import calibrefind
+    f = calibrefind.found_file(f"{jid}/{name}", thumb=bool(thumb))
+    if not f:
+        raise HTTPException(404, "No such cover")
+    return FileResponse(f, headers={"Cache-Control": "private, max-age=86400"})
+
+
+def _cover_data(u):
+    """A cover to take: one Calibre found ('found:jid/name') or an address."""
+    if str(u).startswith("found:"):
+        from . import calibrefind
+        f = calibrefind.found_file(str(u)[6:])
+        if not f:
+            raise HTTPException(400, "That cover is gone: find it again")
+        return f.read_bytes()
+    return _remote_image(str(u))
 
 
 def _after_removal(moves):
@@ -1699,7 +1741,7 @@ def apply_catalog_fill(b=Depends(json_body)):
                     if f:
                         ops.append({"op": "set", "ids": [cid], "fields": f})
                     if x["fill"].get("cover"):
-                        ops.append({"op": "cover", "id": cid, "data": calibrewrite.b64(_remote_image(str(x["fill"]["cover"])))})
+                        ops.append({"op": "cover", "id": cid, "data": calibrewrite.b64(_image(_cover_data(x["fill"]["cover"])))})
                 except Exception as e:  # noqa: BLE001 - one book's cover or field mustn't stop the rest
                     job["failed"].append({"id": cid, "error": getattr(e, "detail", None) or str(e)})
             try:
