@@ -326,13 +326,16 @@ async function convert(src, to){
   if (E.d && E.d.calibre_id === cid) refreshFiles();
 }
 
-/* ---------- Find details: Hardcover and Calibre's own sources (calibrefind.py) ---------- */
-const F = { snap: null, orig: null, results: null, pick: null, seq: 0 };
+/* ---------- Find details: Calibre's own Download metadata, and Hardcover (calibrefind.py) ---------- */
+const F = { snap: null, orig: null, results: null, pick: null, seq: 0, covs: {}, cov: null };
 const far = u => '/api/catalog/coverproxy?u=' + encodeURIComponent(u);          // through the server
+// A cover to show: one Calibre found and keeps (found:job/name), small, or an address, through the server.
+const coverSrc = u => String(u).startsWith('found:') ? '/api/catalog/found/' + String(u).slice(6) + '?thumb=1' : far(u);
 function leaveForm(){ F.snap = values($('#bedit')); F.orig = E.orig; }
 function backToForm(v){ draw(); restore(v || F.snap); E.orig = F.orig; }
 async function find(title, author){
   if (!F.snap) leaveForm();
+  F.covs = {};
   const n = ++F.seq, d = E.d;
   sheet('<div class="behead"><h2>Find details</h2><span class="spacer"></span><button class="btn sm" data-be="findback">Back</button></div>' +
     '<div class="bebody one befind"><form class="befq" data-be="findform"><input class="field" name="t" value="' + esc(title || F.snap.title || d.title) + '" aria-label="Title">' +
@@ -381,6 +384,7 @@ function nowVal(k){
 }
 function compare(i){
   const x = F.results[i]; F.pick = i;
+  F.cov = E.d.cover ? 'now' : (x.cover ? x.cover : null);
   const has = k => k !== '#pages' || ('#pages' in F.snap);
   const show = v => Array.isArray(v) ? v.join(', ') : String(v);
   const rows = FIELDS.filter(([k]) => has(k)).map(([k, label]) => {
@@ -394,9 +398,38 @@ function compare(i){
   }).join('');
   sheet('<div class="behead"><h2>' + esc(x.source) + '</h2><span class="spacer"></span><button class="btn sm" data-be="findlist">Back</button><button class="btn sm primary" data-be="take">Use these</button></div>' +
     '<div class="bebody one befind">' +
-    (x.cover ? '<div class="befcov"><figure>' + (E.d.cover ? '<img src="/api/cover/' + encodeURIComponent(E.d.id) + '?v=' + (E.coverV || 0) + '" alt="">' : '<span class="befnc"></span>') + '<figcaption class="mute tiny">Now</figcaption></figure>' +
-      '<figure><img src="' + far(x.thumb || x.cover) + '" alt=""><figcaption><label><input type="checkbox" data-take="cover"' + (E.d.cover ? '' : ' checked') + '> Use this cover</label></figcaption></figure></div>' : '') +
+    '<h3 class="befch">Cover</h3><div class="befcovs" id="befcovs"></div>' +
     '<div class="befhead"><span></span><span>Now</span><span>Found</span></div>' + rows + '</div>');
+  drawCovers(i);
+  findCovers(i);
+}
+// Every cover source for this answer, the way Calibre's cover grid shows them: the source, the size.
+async function findCovers(i){
+  if (F.covs[i]) return;
+  const x = F.results[i], n = F.seq, st = F.covs[i] = { state: 'running', covers: [] };
+  try {
+    const { job } = await api('/api/catalog/book/' + E.d.calibre_id + '/covers', { method: 'POST', body: JSON.stringify({ title: x.title, authors: x.authors || [], identifiers: x.identifiers || {} }) });
+    for (;;) {
+      await new Promise(r => setTimeout(r, 1500));
+      if (n !== F.seq || !E.d) return;
+      const j = await api('/api/catalog/jobs/' + job);
+      if (j.state === 'running') continue;
+      st.state = j.state; st.covers = (j.covers || []).map(c => Object.assign({ ref: 'found:' + job + '/' + c.name }, c));
+      break;
+    }
+  } catch(e){ st.state = 'failed'; }
+  if (!E.d.cover && F.pick === i && st.covers[0] && (!F.cov || F.cov === x.cover)) F.cov = st.covers[0].ref;
+  if (F.pick === i) drawCovers(i);
+}
+function drawCovers(i){
+  const box = $('#befcovs'); if (!box) return;
+  const x = F.results[i], st = F.covs[i] || { state: 'running', covers: [] };
+  const tile = (ref, img, a, b) => '<button class="befcv' + (F.cov === ref ? ' on' : '') + '" data-cov="' + esc(ref) + '" aria-pressed="' + (F.cov === ref) + '">' +
+    (img ? '<img src="' + img + '" alt="" loading="lazy">' : '<span class="befnc"></span>') + '<span class="tiny">' + esc(a) + '</span>' + (b ? '<span class="tiny mute">' + esc(b) + '</span>' : '') + '</button>';
+  box.innerHTML = (E.d.cover ? tile('now', '/api/cover/' + encodeURIComponent(E.d.id) + '?v=' + (E.coverV || 0), 'Now', '') : '') +
+    (x.cover && !st.covers.length ? tile(x.cover, far(x.cover), x.source, '') : '') +
+    st.covers.map(c => tile(c.ref, coverSrc(c.ref), c.source.replace(/ covers$/, ''), c.width && c.height ? c.width + ' × ' + c.height : '')).join('') +
+    (st.state === 'running' ? '<span class="befcvwait"></span>' : '');
 }
 async function take(){
   const x = F.results[F.pick], v = Object.assign({}, F.snap);
@@ -415,9 +448,9 @@ async function take(){
     for (const [a, b] of Object.entries(x.identifiers || {})) if (!have[a]) have[a] = b;
     v.identifiers = Object.entries(have).map(([a, b]) => a + ': ' + b).join('\n');
   }
-  const cov = on('cover') && x.cover;
-  backToForm(v); F.snap = null;
-  if (cov) await cover(JSON.stringify({ url: x.cover }), 'application/json');
+  const cov = F.cov && F.cov !== 'now' ? F.cov : null;
+  backToForm(v); F.snap = null; F.covs = {};
+  if (cov) await cover(JSON.stringify(cov.startsWith('found:') ? { found: cov.slice(6) } : { url: cov }), 'application/json');
   toast('Details filled in');
 }
 
@@ -445,6 +478,7 @@ document.addEventListener('click', e => {
   }
   if (t.closest('[data-unchip]')) { t.closest('.bechip').remove(); return; }
   const fc = t.closest('[data-befc]'); if (fc) { compare(+fc.dataset.befc); return; }
+  const pickCov = t.closest('[data-cov]'); if (pickCov) { F.cov = pickCov.dataset.cov; drawCovers(F.pick); return; }
   const cv = t.closest('[data-beconv]'); if (cv) { $('#pop').hidden = true; const [a, b] = cv.dataset.beconv.split('>'); convert(a, b); return; }
   const rm = t.closest('[data-berm]');
   if (rm) { $('#pop').hidden = true; const fmt = rm.dataset.berm;
@@ -663,7 +697,7 @@ function drawFill(){
   head.innerHTML = '<h2>' + some.length + ' of ' + L.res.length + ' with something to fill in</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button>' +
     (some.length ? '<button class="btn sm primary" data-befill="save">Save</button>' : '');
   body.innerHTML = some.map(b => '<label class="befrow2"><input type="checkbox" data-fillbook="' + b.id + '" checked>' +
-      (b.fill.cover ? '<img src="/api/catalog/coverproxy?u=' + encodeURIComponent(b.fill.cover) + '" alt="" loading="lazy">' : '<span class="befnc"></span>') +
+      (b.fill.cover ? '<img src="' + coverSrc(b.fill.cover) + '" alt="" loading="lazy">' : '<span class="befnc"></span>') +
       '<span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc((b.authors || []).join(' & ')) + '</span>' +
       '<span class="befills">' + Object.entries(b.fill).filter(([k]) => k !== 'cover' && k !== 'series_index').map(([k, v]) => '<span class="befx" data-fillx="' + b.id + '|' + esc(k) + '" role="checkbox" aria-checked="true" tabindex="0"><i>' + esc((FILL.find(f => f[0] === k) || [k, k])[1]) + '</i> ' + esc(showVal(k, v)) + (k === 'series' && b.fill.series_index != null ? ' #' + esc(b.fill.series_index) : '') + '</span>').join('') +
       (b.fill.cover ? '<span class="befx" data-fillx="' + b.id + '|cover" role="checkbox" aria-checked="true" tabindex="0"><i>Cover</i></span>' : '') + '</span><span class="mute tiny">' + esc([...new Set(Object.values(b.from))].join(', ')) + '</span></span></label>').join('') +

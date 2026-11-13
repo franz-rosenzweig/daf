@@ -1,22 +1,27 @@
 """Find details: a Calibre book's details and covers as others have them, for the Edit sheet to
-compare and take from. Two places are asked at once:
+compare and take from. As much as possible it is Calibre's own Download metadata, run by Calibre in
+Calibre-Web Automated's container (Daf's own Calibre settings, /config/.daf-calibre), only reading:
 
-- Calibre's own metadata sources (Google, Amazon.com, and the plugins installed in Daf's Calibre
-  settings: Goodreads, Goodreads More Tags, Apple Books covers), run by Calibre in Calibre-Web
-  Automated's container the same way calibrewrite.py runs changes, only reading. A source that only
-  has covers (Apple Books) comes back as answers with just a title, an author and a cover.
-- Hardcover, through Daf's own connection (hardcover.py): its matches for the ISBN, then the title.
+- Calibre's search over every metadata source it has on (Google, Amazon.com, and the plugins in Daf's
+  Calibre settings: Goodreads, Goodreads More Tags), its answers merged and in Calibre's order, with
+  Calibre's built-in sources kept up to date the way the Calibre app keeps them (update_sources, daily).
+- Calibre's covers: every cover source (Amazon, Google, Goodreads, Open Library, Apple Books covers…)
+  for the chosen answer, downloaded and measured the way Calibre's cover grid shows them, kept a day
+  under the settings folder's found/ for the page to show and take.
+- Hardcover, through Daf's own connection (hardcover.py), after Calibre's answers.
 
-Each answer comes back in the shape of the Edit sheet's fields. It takes 10–40 seconds, so it's a
-job the page asks about (calibrewrite's jobs)."""
+It takes 10–40 seconds, so it's a job the page asks about (calibrewrite's jobs)."""
 import html
 import json
 import logging
+import os
 import re
+import shutil
 import subprocess
 import threading
 import time
 import uuid
+from pathlib import Path
 
 from . import calibrewrite as W
 
@@ -29,51 +34,106 @@ def main():
     from threading import Event
     from calibre.utils.logging import ThreadSafeLog
     from calibre.ebooks.metadata.sources.identify import identify
+    from calibre.ebooks.metadata.sources.update import patch_plugins
+    from calibre.ebooks.metadata.sources.prefs import msprefs
     from calibre.customize.ui import metadata_plugins
+    patch_plugins()                                  # Calibre's sources as last updated (update_sources)
     job = json.loads(sys.stdin.read())
     log = ThreadSafeLog(level=ThreadSafeLog.ERROR)
     out = []
     try:
         res = identify(log, Event(), title=job.get("title") or None, authors=job.get("authors") or None,
-                       identifiers=job.get("identifiers") or {}, timeout=job.get("timeout", 25),
+                       identifiers=job.get("identifiers") or {}, timeout=job.get("timeout", 30),
                        allowed_plugins=set(job["plugins"]) if job.get("plugins") else None)
-        plugins = list(metadata_plugins(["identify"]))
-        for r in res[:10]:
-            cover, src = None, None
+        prio = msprefs["cover_priorities"]
+        plugins = sorted(metadata_plugins(["identify"]), key=lambda p: prio.get(p.name, 1))
+        keys = {"goodreads": "Goodreads", "google": "Google", "amazon": "Amazon.com", "edelweiss": "Edelweiss",
+                "openlibrary": "Open Library", "isbndb": "ISBNDB", "hardcover": "Hardcover"}
+        for r in res[:12]:
+            cover = None
             for p in plugins:
                 try:
                     u = p.get_cached_cover_url(r.identifiers)
                 except Exception:
                     u = None
-                if u and not cover:
+                if u:
                     cover = u
-                if not src and any(k in (r.identifiers or {}) for k in (p.name.lower().split(".")[0], p.name.lower().replace(" ", ""))):
-                    src = p.name
-            out.append({"source": src, "title": r.title, "authors": list(r.authors or []), "publisher": r.publisher,
+                    break
+            ids = dict(r.identifiers or {})
+            srcs = [v for k, v in keys.items() if k in ids]
+            out.append({"source": " · ".join(srcs) or "Calibre", "sources": srcs, "title": r.title, "authors": list(r.authors or []), "publisher": r.publisher,
                         "published": r.pubdate.isoformat()[:10] if r.pubdate and r.pubdate.year > 101 else None,
-                        "tags": list(r.tags or []), "comments": r.comments or "", "identifiers": dict(r.identifiers or {}),
+                        "tags": list(r.tags or []), "comments": r.comments or "", "identifiers": ids,
                         "languages": list(r.languages or []), "series": r.series, "series_index": r.series_index if r.series else None,
                         "rating": r.rating or None, "cover": cover})
-        if job.get("covers"):
-            for p in metadata_plugins(["cover"]):
-                # Apple Books covers: its search gives the covers' addresses (its download_cover fetches the images themselves)
-                if "identify" in p.capabilities or not hasattr(p, "_find_covers"):
-                    continue
-                try:
-                    found = p._find_covers(log, job.get("title"), tuple(job.get("authors") or ()), job.get("cover_ids") or {})
-                except Exception:
-                    found = []
-                for c in list(found)[:3]:
-                    u = getattr(c, "artwork_url", None)
-                    if u:
-                        out.append({"source": p.name.replace(" covers", ""), "title": getattr(c, "title", ""), "authors": [getattr(c, "author", "")],
-                                    "publisher": None, "published": None, "tags": [], "comments": "", "identifiers": {}, "languages": [],
-                                    "series": None, "series_index": None, "rating": None, "cover": u,
-                                    "thumb": u.rsplit("/", 1)[0] + "/600x600bb.jpg" if u.endswith("bb.jpg") else u})
     except Exception as e:
         print("DAFRESULT " + json.dumps({"ok": False, "error": str(e)}))
         return
     print("DAFRESULT " + json.dumps({"ok": True, "results": out}))
+main()
+'''
+
+# Calibre's covers for a book: every cover source (best=False, as the cover grid), or the one Calibre
+# would pick (best=True, as bulk download). Each image goes to job["dir"] with a small copy for the page.
+COVERS = r'''
+def main():
+    import json, os, sys, time
+    from queue import Queue, Empty
+    from threading import Event, Thread
+    from calibre.utils.logging import ThreadSafeLog
+    from calibre.ebooks.metadata.sources.update import patch_plugins
+    from calibre.ebooks.metadata.sources.covers import run_download, download_cover
+    from calibre.ebooks.metadata.sources.prefs import msprefs
+    from calibre.utils.img import image_from_data, scale_image, image_to_data
+    patch_plugins()
+    job = json.loads(sys.stdin.read())
+    log = ThreadSafeLog(level=ThreadSafeLog.ERROR)
+    d = job["dir"]
+    os.makedirs(d, exist_ok=True)
+    got = []
+    try:
+        kw = dict(title=job.get("title") or None, authors=job.get("authors") or None, identifiers=job.get("identifiers") or {}, timeout=job.get("timeout", 30))
+        if job.get("best"):
+            r = download_cover(log, **kw)
+            got = [r] if r else []
+        else:
+            q, abort = Queue(), Event()
+            t = Thread(target=run_download, args=(log, q, abort), kwargs=kw, daemon=True)
+            t.start()
+            t.join(kw["timeout"] + 30)
+            abort.set()
+            while True:
+                try:
+                    got.append(q.get_nowait())
+                except Empty:
+                    break
+    except Exception as e:
+        print("DAFRESULT " + json.dumps({"ok": False, "error": str(e)}))
+        return
+    prio = msprefs["cover_priorities"]
+    got = [g for g in got if g and g[4]]
+    got.sort(key=lambda g: (prio.get(g[0].name, 1), -(g[1] or 0) * (g[2] or 0)))
+    out = []
+    for n, (plugin, w, h, fmt, data) in enumerate(got):
+        name = "%s-%d" % (job.get("prefix", "c"), n)
+        with open(os.path.join(d, name + "." + (fmt or "jpg")), "wb") as f:
+            f.write(data)
+        try:
+            _w, _h, small = scale_image(data, width=360, height=540, compression_quality=82)
+        except Exception:
+            small = data
+        with open(os.path.join(d, name + ".thumb.jpg"), "wb") as f:
+            f.write(small)
+        out.append({"name": name, "fmt": fmt or "jpg", "source": plugin.name, "width": w, "height": h})
+    print("DAFRESULT " + json.dumps({"ok": True, "covers": out}))
+main()
+'''
+
+UPDATE = r'''
+def main():
+    from calibre.ebooks.metadata.sources.update import main as update
+    update()
+    print("DAFRESULT {\"ok\": true}")
 main()
 '''
 
@@ -86,10 +146,8 @@ def _text(h):
     return re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]+", " ", t)).strip()
 
 
-def calibre_sources(title, authors, identifiers, timeout=25, plugins=None, covers=None):
-    """covers: the identifiers to ask cover-only sources with as well (None: not asked)."""
-    job = json.dumps({"title": title, "authors": authors, "identifiers": identifiers, "timeout": timeout, "plugins": plugins,
-                      "covers": covers is not None, "cover_ids": covers or {}})
+def calibre_sources(title, authors, identifiers, timeout=30, plugins=None):
+    job = json.dumps({"title": title, "authors": authors, "identifiers": identifiers, "timeout": timeout, "plugins": plugins})
     try:
         r = subprocess.run(RUN + [W.DEBUG, "-c", IDENTIFY], input=job, capture_output=True, text=True, timeout=timeout + 60)
     except (subprocess.TimeoutExpired, OSError) as e:
@@ -104,6 +162,74 @@ def calibre_sources(title, authors, identifiers, timeout=25, plugins=None, cover
         x["comments"] = _text(x["comments"])
         x["source"] = x["source"] or "Calibre"
     return out["results"]
+
+
+# Where Calibre leaves the covers it found: the same folder seen from the container and from here.
+FOUND_IN = os.environ.get("DAF_CALIBRE_FOUND_IN", "/config/.daf-calibre/found")
+FOUND = Path(os.environ.get("DAF_CALIBRE_FOUND", "/srv/docker/cwa/.daf-calibre/found"))
+
+
+def _run(script, job, timeout):
+    try:
+        r = subprocess.run(RUN + [W.DEBUG, "-c", script], input=json.dumps(job), capture_output=True, text=True, timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError) as e:
+        raise RuntimeError(f"Calibre didn't answer: {e}")
+    line = next((x for x in reversed(r.stdout.splitlines()) if x.startswith("DAFRESULT ")), None)
+    if not line:
+        raise RuntimeError("Calibre didn't answer")
+    out = json.loads(line[len("DAFRESULT "):])
+    if not out.get("ok"):
+        raise RuntimeError(out.get("error") or "Calibre said no")
+    return out
+
+
+def _tidy_found():
+    """Covers found more than a day ago go."""
+    try:
+        for d in FOUND.iterdir():
+            if d.is_dir() and time.time() - d.stat().st_mtime > 86400:
+                shutil.rmtree(d, ignore_errors=True)
+    except OSError:
+        pass
+
+
+def calibre_covers(jid, title, authors, identifiers, best=False, prefix="c", timeout=30):
+    """Calibre's covers for a book (COVERS) → [{name, fmt, source, width, height}], the files in FOUND/jid."""
+    job = {"title": title, "authors": authors, "identifiers": identifiers, "timeout": timeout, "best": best,
+           "dir": f"{FOUND_IN}/{jid}", "prefix": prefix}
+    return _run(COVERS, job, timeout + 90)["covers"]
+
+
+def found_file(ref, thumb=False):
+    """'jid/name' → the cover's file here, or None."""
+    m = re.fullmatch(r"([0-9a-f]{12})/([A-Za-z0-9_-]{1,40})", ref or "")
+    if not m:
+        return None
+    d = FOUND / m.group(1)
+    if thumb:
+        f = d / f"{m.group(2)}.thumb.jpg"
+        return f if f.exists() else None
+    return next((f for f in d.glob(m.group(2) + ".*") if not f.name.endswith(".thumb.jpg")), None) if d.is_dir() else None
+
+
+def covers_start(cid, title, authors, identifiers):
+    """Every cover source for this book, as a job: {state, covers}."""
+    jid = uuid.uuid4().hex[:12]
+    W._jobs[jid] = {"state": "running", "started": time.time(), "id": cid, "kind": "covers", "covers": []}
+    _tidy_found()
+
+    def work():
+        try:
+            W._jobs[jid].update(state="done", covers=calibre_covers(jid, title, authors, identifiers))
+        except Exception as e:  # noqa: BLE001
+            W._jobs[jid].update(state="failed", error=str(e))
+    threading.Thread(target=work, daemon=True).start()
+    return jid
+
+
+def update_sources():
+    """Calibre's built-in metadata sources, updated from calibre's own server the way the app does it."""
+    _run(UPDATE, {}, 300)
 
 
 HC_BOOK = """query($id:Int!){ books_by_pk(id:$id){ id title subtitle description release_date pages image { url } cached_tags cached_contributors
@@ -137,7 +263,7 @@ def find(conn_factory, cid, book_id, title, authors, identifiers, q=None):
         # By the book's identifiers, and by its title and author alone: an ISBN in Calibre can be
         # wrong (a study guide's), and then only the title finds the book itself.
         try:
-            res["calibre_ids" if by_ids else "calibre"] = calibre_sources(title, authors, ids if by_ids else {}, covers=None if by_ids else ids)
+            res["calibre_ids" if by_ids else "calibre"] = calibre_sources(title, authors, ids if by_ids else {})
         except Exception as e:  # noqa: BLE001
             if not by_ids:
                 errs.append(f"Calibre's sources: {e}")
@@ -156,8 +282,11 @@ def find(conn_factory, cid, book_id, title, authors, identifiers, q=None):
     for t in ts:
         t.join()
     out, seen = [], set()
-    for x in (res.get("hardcover") or []) + (res.get("calibre_ids") or []) + (res.get("calibre") or []):
-        key = (x["identifiers"].get("isbn") or x["identifiers"].get("google") or x["identifiers"].get("amazon") or x.get("thumb") or "") + "|" + (x["title"] or "").lower()
+    hc = res.get("hardcover") or []
+    if not q:
+        hc = [x for x in hc if same_book({"title": title, "authors": authors}, x)]
+    for x in (res.get("calibre_ids") or []) + (res.get("calibre") or []) + hc:
+        key = (x["identifiers"].get("isbn") or x["identifiers"].get("google") or x["identifiers"].get("amazon") or "") + "|" + (x["title"] or "").lower()
         if key in seen:
             continue
         seen.add(key)
@@ -181,7 +310,7 @@ def start(conn_factory, cid, book_id, title, authors, identifiers, q=None):
 
 # ---------- Find details for many books: what's missing, from an answer that's surely the same book ----------
 FILL_FIELDS = ["publisher", "published", "comments", "tags", "series", "languages", "identifiers", "#pages", "cover"]
-QUICK = ["Google", "Goodreads", "Goodreads More Tags"]     # Amazon opens a browser for each book: too slow for many
+QUICK = None            # every source Calibre has on, as its own bulk Download metadata does
 _hc_gate = threading.Lock()
 _hc_last = [0.0]
 
@@ -301,23 +430,36 @@ def fill_start(cids, fields):
     books, custom_keys = catalog.brief(cids)
     jid = uuid.uuid4().hex[:12]
     job = W._jobs[jid] = {"state": "running", "started": time.time(), "kind": "fill", "done": 0, "total": len(books), "books": []}
+    _tidy_found()
 
     def one(cid):
         b = books[cid]
         answers, errs = [], []
+        ids = {k: v for k, v in b["identifiers_map"].items() if k in ("isbn", "google", "amazon", "goodreads", "edelweiss", "openlibrary")}
+        try:
+            for a in calibre_sources(b["title"], b.get("authors") or [], ids, timeout=30, plugins=QUICK):
+                if same_book(b, a):
+                    answers.append(a)
+        except Exception as e:  # noqa: BLE001
+            errs.append(f"Calibre's sources: {e}")
         try:
             hc = _hardcover_answer(b)
             if hc:
                 answers.append(hc)
         except Exception as e:  # noqa: BLE001 - one book Hardcover won't give
             errs.append(f"Hardcover: {e}")
-        try:
-            ids = {k: v for k, v in b["identifiers_map"].items() if k in ("isbn", "google", "amazon", "goodreads", "edelweiss", "openlibrary")}
-            for a in calibre_sources(b["title"], b.get("authors") or [], ids, timeout=15, plugins=QUICK):
-                if same_book(b, a):
-                    answers.append(a)
-        except Exception as e:  # noqa: BLE001
-            errs.append(f"Calibre's sources: {e}")
+        if "cover" in fields and not b.get("cover") and answers:
+            # Calibre's own pick of a cover, from every cover source, for the surest answer's identifiers
+            try:
+                ids2 = dict(ids)
+                for a in answers:
+                    for k, v in (a.get("identifiers") or {}).items():
+                        ids2.setdefault(k, v)
+                got = calibre_covers(jid, b["title"], b.get("authors") or [], ids2, best=True, prefix=f"b{cid}")
+                if got:
+                    answers.insert(0, {"source": got[0]["source"], "cover": f"found:{jid}/{got[0]['name']}"})
+            except Exception as e:  # noqa: BLE001
+                errs.append(f"Calibre's covers: {e}")
         props, src = proposals(b, answers, fields, custom_keys)
         job["books"].append({"id": cid, "daf_id": b.get("id") or f"cal:{cid}", "title": b["title"], "authors": b.get("authors") or [],
                              "fill": props, "from": src, "found": bool(answers), "errors": errs})

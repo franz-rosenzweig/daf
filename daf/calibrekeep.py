@@ -17,6 +17,10 @@ Calibre makes the change):
   Count Pages plugin counts by default (about 2,170 characters a page), a few books a sync. All books →
   the chosen books' ⋯ → Count pages counts any book again.
 
+- Calibre's built-in metadata sources (Google, Amazon…), updated once a day from calibre's own server,
+  as the Calibre app does for itself (calibrefind.update_sources), so Find details asks them the way
+  they work now.
+
 Off with settings `calibre_keep: false`."""
 import html
 import json
@@ -24,6 +28,7 @@ import logging
 import math
 import re
 import sqlite3
+import time
 import zipfile
 
 from . import config
@@ -235,6 +240,15 @@ def run(conn, settings):
     if settings.get("calibre_keep") is False:
         return ""
     out = []
+    r = conn.execute("SELECT v FROM kv WHERE k = 'calibre_sources_updated'").fetchone()
+    if not r or time.time() - float(r[0]) > 86400:
+        try:
+            from . import calibrefind
+            calibrefind.update_sources()
+        except Exception:  # noqa: BLE001 - tried again tomorrow
+            log.warning("calibre sources update", exc_info=True)
+        conn.execute("INSERT INTO kv (k, v) VALUES ('calibre_sources_updated', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", (str(time.time()),))
+        conn.commit()
     n = keep_read(conn, settings)
     conn.commit()                    # what it noted, before the next change opens its own connection (calibrewrite._follow)
     if n:
