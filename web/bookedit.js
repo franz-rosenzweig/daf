@@ -33,6 +33,39 @@ const chips = (name, vals, choices) => '<div class="bechips" data-chips="' + esc
 const chip = v => '<span class="bechip" data-v="' + esc(v) + '">' + esc(v) + '<button type="button" data-unchip aria-label="Remove ' + esc(v) + '">×</button></span>';
 const row = (label, ctl, cls) => '<div class="berow' + (cls ? ' ' + cls : '') + '"><span>' + esc(label) + '</span><div class="bectl">' + ctl + '</div></div>';
 const inp = (name, v, extra) => '<input class="field" data-f="' + esc(name) + '" value="' + esc(v == null ? '' : v) + '"' + (extra || '') + '>';
+// A description as Calibre keeps it (HTML), shown and edited with its bold, italics and lists, and only
+// those: the same few tags catalog.clean_html keeps. Plain text becomes paragraphs.
+const KEEP = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'UL', 'OL', 'LI', 'BLOCKQUOTE']);
+function cleanHTML(src){
+  src = String(src || '');
+  if (!/<[a-z!\/]/i.test(src)) return src.trim() ? src.trim().split(/\n\s*\n/).map(p => '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>').join('') : '';
+  const doc = new DOMParser().parseFromString('<body>' + src + '</body>', 'text/html'), out = document.createElement('div');
+  const walk = (from, to) => {
+    for (const n of [...from.childNodes]) {
+      if (n.nodeType === 3) { to.appendChild(document.createTextNode(n.nodeValue)); continue; }
+      if (n.nodeType !== 1 || /^(SCRIPT|STYLE|TEMPLATE|IFRAME|OBJECT)$/.test(n.tagName)) continue;
+      let el = null;
+      if (KEEP.has(n.tagName)) el = document.createElement(n.tagName.toLowerCase());
+      else if (/^H[1-6]$/.test(n.tagName)) { el = document.createElement('p'); const b = document.createElement('b'); el.appendChild(b); walk(n, b); to.appendChild(el); continue; }
+      else if (n.tagName === 'DIV') el = document.createElement('p');
+      if (el) { walk(n, el); to.appendChild(el); } else walk(n, to);
+    }
+  };
+  walk(doc.body, out);
+  return out.innerHTML.replace(/<p>\s*<\/p>/g, '');
+}
+const RICH = { bold: '<b>B</b>', italic: '<i>I</i>', insertUnorderedList: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5.5h8M8 10h8M8 14.5h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="4.5" cy="5.5" r="1.2" fill="currentColor"/><circle cx="4.5" cy="10" r="1.2" fill="currentColor"/><circle cx="4.5" cy="14.5" r="1.2" fill="currentColor"/></svg>' };
+const RICHNAME = { bold: 'Bold', italic: 'Italic', insertUnorderedList: 'List' };
+const rich = (name, html) => '<div class="berichwrap"><div class="berichbar">' + Object.keys(RICH).map(k => '<button type="button" data-richcmd="' + k + '" aria-label="' + RICHNAME[k] + '" title="' + RICHNAME[k] + '">' + RICH[k] + '</button>').join('') + '</div>' +
+  '<div class="field berich" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Description" data-rich="' + esc(name) + '">' + cleanHTML(html) + '</div></div>';
+// The bar's buttons work on the words chosen in the description (the editor keeps its own selection).
+document.addEventListener('mousedown', e => { if (e.target.closest && e.target.closest('[data-richcmd]')) e.preventDefault(); });
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-richcmd]'); if (!b) return;
+  const ed = b.closest('.berichwrap').querySelector('[data-rich]'); ed.focus();
+  document.execCommand(b.dataset.richcmd, false, null);
+});
+
 function customCtl(c, v, bulk){
   const n = c.key;
   if (c.dtype === 'enumeration') return '<select class="field" data-f="' + esc(n) + '">' + (bulk ? '<option value="">No change</option><option value="\u0000">None</option>' : '<option value=""></option>') +
@@ -72,7 +105,9 @@ function draw(){
       '<button class="btn sm danger beremove" data-be="remove">Remove from Calibre</button>' +
     '</div><div class="beform">' +
       row('Title', inp('title', d.title)) +
+      row('Title sort', inp('title_sort', d.title_sort || '')) +
       row('Authors', inp('authors', (d.authors || []).join(' & '), ' list="dl-authors" autocomplete="off"') + dl('dl-authors', d.choices.authors)) +
+      row('Author sort', inp('author_sort', d.author_sort || '')) +
       row('Series', '<span class="beser">' + inp('series', d.series, ' list="dl-series" autocomplete="off"') + dl('dl-series', d.choices.series) + inp('series_index', d.series ? d.series_index : '', ' type="number" step="any" inputmode="decimal" aria-label="Number in the series"') + '</span>') +
       row('Tags', chips('tags', d.tags, d.choices.tags), 'betop') +
       row('Rating', stars('rating', d.rating)) +
@@ -80,7 +115,7 @@ function draw(){
       row('Published', inp('published', d.published, ' type="date"')) +
       row('Languages', inp('languages', (d.languages || []).join(', '), ' list="dl-languages" autocomplete="off"') + dl('dl-languages', d.choices.languages)) +
       row('Identifiers', '<textarea class="field" rows="' + Math.max(2, Math.min(8, Object.keys(d.identifiers || {}).length + 1)) + '" data-f="identifiers" spellcheck="false">' + esc(idents) + '</textarea>', 'betop') +
-      row('Description', '<textarea class="field" rows="7" data-f="comments">' + esc(d.comments) + '</textarea>', 'betop') +
+      row('Description', rich('comments', d.comments_clean != null ? d.comments_clean : d.comments), 'betop') +
       (d.custom || []).filter(c => c.key !== '#isbn').map(c => row(c.label, customCtl(c, d[c.key]), c.dtype === 'comments' ? 'betop' : '')).join('') +
     '</div></div>');
   E.orig = values(s);
@@ -97,6 +132,7 @@ function values(s){
   $$('[data-f]', s).forEach(el => { v[el.dataset.f] = el.value; });
   $$('[data-chips]', s).forEach(el => { v[el.dataset.chips] = $$('.bechip', el).map(c => c.dataset.v); });
   $$('[data-bestars]', s).forEach(el => { v[el.dataset.bestars] = el.dataset.v ? +el.dataset.v : null; });
+  $$('[data-rich]', s).forEach(el => { v[el.dataset.rich] = el.innerHTML; });
   return v;
 }
 function dirty(){
@@ -114,6 +150,7 @@ function toFields(ch, bulk){
   for (const [k, v] of Object.entries(ch)) {
     if (k === 'identifiers') { f.identifiers = {}; String(v).split('\n').forEach(l => { const m = l.match(/^\s*([^:\s]+)\s*:\s*(.+?)\s*$/); if (m) f.identifiers[m[1]] = m[2]; }); }
     else if (k === 'languages') f.languages = v.split(',').map(x => x.trim()).filter(Boolean);
+    else if (k === 'comments' && !bulk) f.comments_html = cleanHTML(v);
     else if (k === 'series_index') { if (v !== '') f.series_index = +v; }
     else if (custom[k]) {
       const c = custom[k];
@@ -213,6 +250,7 @@ function restore(v){
   $$('[data-f]', s).forEach(el => { if (v[el.dataset.f] != null) el.value = v[el.dataset.f]; });
   $$('[data-chips]', s).forEach(el => { $$('.bechip', el).forEach(c => c.remove()); el.insertAdjacentHTML('afterbegin', (v[el.dataset.chips] || []).map(chip).join('')); });
   $$('[data-bestars]', s).forEach(el => setStars(el, v[el.dataset.bestars]));
+  $$('[data-rich]', s).forEach(el => { if (v[el.dataset.rich] != null) el.innerHTML = cleanHTML(v[el.dataset.rich]); });
 }
 async function refreshFiles(){
   const keep = values($('#bedit')), orig = E.orig;
@@ -359,7 +397,10 @@ document.addEventListener('click', e => {
   const ed = t.closest('[data-act="bookedit"]'); if (ed) { open(ed.dataset.id); return; }
   if (!t.closest('#bedit') && !t.closest('#pop')) { if (t.closest('#beshade')) close(); return; }
   const st = t.closest('[data-star]');
-  if (st) { const el = st.closest('[data-bestars]'), n = +st.dataset.star; setStars(el, +el.dataset.v === n ? null : n); const no = $('[data-f2="norating"]'); if (no) no.checked = false; return; }
+  if (st) {     // the left half of a star is half a star
+    const el = st.closest('[data-bestars]'), r = st.getBoundingClientRect(), n = +st.dataset.star - (e.clientX && e.clientX < r.left + r.width / 2 ? .5 : 0);
+    setStars(el, +el.dataset.v === n ? null : n); const no = $('[data-f2="norating"]'); if (no) no.checked = false; return;
+  }
   if (t.closest('[data-unchip]')) { t.closest('.bechip').remove(); return; }
   const fc = t.closest('[data-befc]'); if (fc) { compare(+fc.dataset.befc); return; }
   const cv = t.closest('[data-beconv]'); if (cv) { $('#pop').hidden = true; const [a, b] = cv.dataset.beconv.split('>'); convert(a, b); return; }
@@ -573,7 +614,7 @@ async function fillStart(){
     }
   } catch(e){ const b = $('#bedit .befill'); if (b) b.innerHTML = '<p class="placeholder">' + esc(e.message) + '</p>'; }
 }
-const showVal = (k, v) => k === 'comments' ? String(v).slice(0, 140) + (String(v).length > 140 ? '…' : '') : Array.isArray(v) ? v.join(', ') : k === 'identifiers' ? Object.entries(v).map(([a, b]) => a + ': ' + b).join(', ') : String(v);
+const showVal = (k, v) => k === 'comments' ? String(v).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140) + (String(v).length > 140 ? '…' : '') : Array.isArray(v) ? v.join(', ') : k === 'identifiers' ? Object.entries(v).map(([a, b]) => a + ': ' + b).join(', ') : String(v);
 function drawFill(){
   const body = $('#bedit .befill'), head = $('#bedit .behead'); if (!body) return;
   const some = L.res.filter(b => Object.keys(b.fill).length), none = L.res.filter(b => !Object.keys(b.fill).length);

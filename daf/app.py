@@ -1262,6 +1262,14 @@ def _edit_fields(f, custom_keys):
             out["identifiers"] = {str(a).strip().lower()[:40]: str(b).strip()[:300] for a, b in v.items() if str(a).strip() and str(b or "").strip()}
         elif k == "comments":
             out["comments"] = catalog.comments_html(str(v or ""))[:100000] or None
+        elif k == "comments_html":                   # the Edit sheet's description, with its bold, italics and lists
+            out["comments"] = catalog.clean_html(str(v or ""))[:100000] or None
+        elif k == "title_sort":
+            if str(v or "").strip():
+                out["sort"] = str(v).strip()[:500]
+        elif k == "author_sort":
+            if str(v or "").strip():
+                out["author_sort"] = str(v).strip()[:500]
         elif k in custom_keys:
             out[k] = v if not isinstance(v, str) else (v.strip()[:2000] or None)
         else:

@@ -624,7 +624,7 @@ def clean_views(views):
 
 
 # ---------- one book, everything there is to edit (the Edit sheet, bookedit.js) ----------
-EDITABLE = ["title", "authors", "series", "series_index", "tags", "rating", "publisher", "published", "languages", "identifiers", "comments"]
+EDITABLE = ["title", "title_sort", "authors", "author_sort", "series", "series_index", "tags", "rating", "publisher", "published", "languages", "identifiers", "comments"]
 
 
 def details(conn, cid, settings=None):
@@ -662,7 +662,7 @@ def details(conn, cid, settings=None):
     text = re.sub(r"\n{3,}", "\n\n", html.unescape(re.sub(r"<[^>]+>", "", re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>|</h\d>", "\n", html_text)))).strip()
     for f in files:
         f["exists"] = (db.parent / path / f"{f['name']}.{f['format'].lower()}").exists()
-    return b | {"comments": text, "comments_html": html_text, "identifiers": idents, "files": files, "choices": choices,
+    return b | {"comments": text, "comments_html": html_text, "comments_clean": clean_html(html_text), "identifiers": idents, "files": files, "choices": choices,
                 "custom": [{"key": col["key"], "label": col["label"], "dtype": col["dtype"], "multi": col["multi"], "enum": col.get("enum")} for col in custom]}
 
 

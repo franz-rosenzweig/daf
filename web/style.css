@@ -2589,3 +2589,13 @@ a.rcrow:hover,a.rcrow:hover + .rcrow{box-shadow:none}
 .abhit.fbhit:hover{background:none}
 .abhit.fbhit .abt{flex:1}
 .abhit.fbhit .btn{flex:none;margin-left:auto}
+
+/* the Edit sheet's description (bookedit.js rich) */
+.berichwrap{display:flex;flex-direction:column;gap:6px;width:100%}
+.berichbar{display:flex;gap:4px}
+.berichbar button{width:32px;height:30px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--fg-2);font:inherit;font-size:14px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.berichbar button:hover{background:var(--hover)}
+.berich{min-height:9em;max-height:22em;overflow:auto;line-height:1.5;white-space:normal;height:auto;padding:8px 10px}
+.berich p{margin:0 0 .6em} .berich ul,.berich ol{margin:0 0 .6em;padding-left:1.4em}
+.berich:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:1px}
+.bestars button.half{background:linear-gradient(90deg,var(--accent) 50%,var(--line-2) 50%);-webkit-background-clip:text;background-clip:text;color:transparent}
