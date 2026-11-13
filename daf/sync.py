@@ -57,6 +57,14 @@ def run():
             log.exception("library")
         conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
         try:
+            from . import calibrekeep
+            r = calibrekeep.run(conn, settings)          # Calibre's Read column and page counts (calibrekeep.py)
+            if r:
+                report["calibre"] = r
+        except Exception:  # noqa: BLE001
+            log.exception("calibre keep")
+        conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
+        try:
             n = kindle.rebuild_sessions(conn)
             report["kindle"] = f"{n} sittings"
         except Exception as e:  # noqa: BLE001

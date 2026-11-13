@@ -245,16 +245,32 @@ async function convertMany(ids, to){
   };
   setTimeout(poll, 4000);
 }
+// Count pages for the chosen books (calibrekeep.py), the way Calibre's Count Pages does.
+async function countPages(ids){
+  let r;
+  try { r = await api('/api/catalog/count-pages', { method: 'POST', body: JSON.stringify({ ids }) }); } catch(e){ toast(e.message); return; }
+  toast('Counting ' + r.total);
+  const poll = async () => {
+    let j; try { j = await api('/api/catalog/job/' + r.job); } catch(e){ return; }
+    if (j.running) { setTimeout(poll, 3000); return; }
+    toast(j.error ? j.error : (j.done || 0) + ' counted');
+    if (C.S.route[0] === 'catalog') load(true);
+  };
+  setTimeout(poll, 3000);
+}
 // Check library (catalog.check_library): what doesn't match between Calibre's records and its folders.
 const CHECKS = [['missing_files', 'Files missing'], ['no_files', 'Books without a file'], ['missing_cover', 'Covers missing'], ['missing_folder', 'Folders missing'],
-  ['extra_files', 'Files Calibre doesn’t list'], ['unknown_folders', 'Folders Calibre doesn’t know']];
+  ['extra_files', 'Files Calibre doesn’t list'], ['unknown_folders', 'Folders Calibre doesn’t know'],
+  ['read_differs', 'Read column differs from Daf'], ['no_description', 'No description'], ['no_isbn', 'No ISBN'], ['no_pages', 'No page count'],
+  ['no_language', 'No language'], ['caps_title', 'Title in capitals'], ['unknown_author', 'Unknown author']];
+const DAFST = { 'to-read': 'To read', reading: 'Reading', read: 'Read', paused: 'Paused', dropped: 'Dropped' };
 async function checkLibrary(){
   $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false; m.classList.add('wide');
   m.innerHTML = '<h2>Check library</h2><p class="mute">Checking…</p>';
   let r;
   try { r = await api('/api/catalog/check'); } catch(e){ m.innerHTML = '<h2>Check library</h2><p class="mute">' + esc(e.message) + '</p><div class="catchkbtns"><button class="btn" data-ckclose>Close</button></div>'; return; }
   const groups = CHECKS.filter(([k]) => (r[k] || []).length);
-  const item = x => x.id ? '<a class="catchkrow" href="#book/cal:' + x.id + '" data-ckclose><span>' + esc(x.title) + '</span><span class="mute tiny">' + esc(x.format || x.file || '') + '</span></a>'
+  const item = x => x.id ? '<a class="catchkrow" href="#book/cal:' + x.id + '" data-ckclose><span>' + esc(x.title) + '</span><span class="mute tiny">' + esc(x.format || x.file || (x.calibre ? 'Calibre ' + x.calibre + ' · Daf ' + (DAFST[x.daf] || x.daf) : '')) + '</span></a>'
     : '<div class="catchkrow"><span class="mono">' + esc(x.path) + '</span></div>';
   m.innerHTML = '<h2>Check library</h2><span class="mute tiny">' + r.books + ' books</span>' +
     (groups.length ? '<div class="catchk">' + groups.map(([k, l]) => '<h3>' + l + ' <span class="mute tiny">' + r[k].length + '</span></h3>' + r[k].slice(0, 200).map(item).join('')).join('') + '</div>'
@@ -311,6 +327,7 @@ document.addEventListener('click', async e => {
     else if (k === 'conv') { $('#pop').hidden = true; convertMany([...P.sel], m.dataset.to); }
     else if (k === 'dl') { $('#pop').hidden = true; const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + [...P.sel].join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
     else if (k === 'check') { $('#pop').hidden = true; checkLibrary(); }
+    else if (k === 'pages') { $('#pop').hidden = true; countPages([...P.sel]); }
     else if (k === 'embedall') { $('#pop').hidden = true;
       if (confirm('Write the details into the files of all ' + (P.data ? P.data.total : '') + ' books?'))
         api('/api/catalog/embed', { method: 'POST', body: JSON.stringify({ all: true }) }).then(r => toast('Writing details into ' + r.pending + ' books’ files')).catch(err => toast(err.message)); }
@@ -346,7 +363,7 @@ document.addEventListener('click', e => {
     else if (k === 'shelves' && C.DragBooks) C.DragBooks.sheet(P.data.books.filter(x => P.sel.has(x.calibre_id)), b);
     else if (k === 'remove' && C.BookEdit) C.BookEdit.remove(P.data.books.filter(x => P.sel.has(x.calibre_id))).then(done => { if (done) P.sel.clear(); });
     else if (k === 'more') openPop(b, ['EPUB', 'AZW3', 'KEPUB', 'MOBI', 'PDF'].map(f => '<button data-catm="conv" data-to="' + f + '"><i></i>Convert to ' + f + '</button>').join('') +
-      '<hr><button data-catm="dl"><i></i>Download</button>');
+      '<hr><button data-catm="pages"><i></i>Count pages</button><button data-catm="dl"><i></i>Download</button>');
     else if (k === 'none') { P.sel.clear(); draw(); }
     else if (k === 'all') { P.data.books.forEach(x => P.sel.add(x.calibre_id)); draw(); }
     return; }

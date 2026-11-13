@@ -806,6 +806,35 @@ def check_library():
         for f in sorted(folder.iterdir()):
             if f.is_file() and f.suffix.lower().lstrip(".") in EBOOK_EXTS and f.name not in listed:
                 out["extra_files"].append({"id": bid, "title": title, "file": f.name})
+    # the details Calibre's Quality Check plugin looks at
+    c = read_only(db)
+    try:
+        def ids(sql):
+            return {r[0] for r in c.execute(sql)}
+        has_desc = ids("SELECT book FROM comments WHERE trim(coalesce(text, '')) <> ''")
+        has_isbn = ids("SELECT book FROM identifiers WHERE type IN ('isbn', 'isbn13', 'isbn10') AND trim(val) <> ''")
+        has_lang = ids("SELECT book FROM books_languages_link")
+        unknown = ids("SELECT l.book FROM books_authors_link l JOIN authors a ON a.id = l.author WHERE a.name = 'Unknown'")
+        pc = c.execute("SELECT id FROM custom_columns WHERE label = 'pages' AND datatype = 'int'").fetchone()
+        has_pages = ids(f"SELECT book FROM custom_column_{pc[0]} WHERE value > 0") if pc else None
+    finally:
+        c.close()
+    for k in ("no_description", "no_isbn", "no_language", "no_pages", "caps_title", "unknown_author"):
+        out[k] = []
+    for bid, title, path, cover in books:
+        x = {"id": bid, "title": title}
+        if bid not in has_desc:
+            out["no_description"].append(x)
+        if bid not in has_isbn:
+            out["no_isbn"].append(x)
+        if bid not in has_lang:
+            out["no_language"].append(x)
+        if has_pages is not None and bid not in has_pages and files.get(bid):
+            out["no_pages"].append(x)
+        if re.search(r"[A-Z]{2}", title or "") and not re.search(r"[a-z]", title or ""):
+            out["caps_title"].append(x)
+        if bid in unknown:
+            out["unknown_author"].append(x)
     for a in sorted(lib.iterdir()):
         if a.is_dir() and not a.name.startswith("."):
             for t in sorted(a.iterdir()):

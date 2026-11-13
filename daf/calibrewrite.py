@@ -367,6 +367,21 @@ def start_convert(cid, src, to):
     return jid
 
 
+def start_job(fn):
+    """Any slow change as a job: {running, done (what fn returned), error}."""
+    jid = uuid.uuid4().hex[:12]
+    j = _jobs[jid] = {"running": True, "started": time.time()}
+
+    def work():
+        try:
+            j["done"] = fn()
+        except Exception as e:  # noqa: BLE001 - the page says what went wrong
+            j["error"] = str(e)[:300]
+        j["running"] = False
+    threading.Thread(target=work, daemon=True).start()
+    return jid
+
+
 def start_convert_many(todo, to):
     """[(cid, from)] into `to`, one after another, in one job: {running, done, total, failed: [{id, error}]}."""
     jid = uuid.uuid4().hex[:12]

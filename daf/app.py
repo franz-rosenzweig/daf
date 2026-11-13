@@ -1329,9 +1329,34 @@ def bulk_catalog(b=Depends(json_body)):
 
 
 @app.get("/api/catalog/check", dependencies=[Depends(user)])
-def get_catalog_check():
-    """Check library (catalog.check_library): read only."""
-    return catalog.check_library()
+def get_catalog_check(c=Depends(conn)):
+    """Check library (catalog.check_library): read only. With where Calibre's Read column and Daf disagree."""
+    r = catalog.check_library()
+    try:
+        from . import calibrekeep
+        r["read_differs"] = calibrekeep.read_plan(c, config.load_settings())[2]
+    except Exception:  # noqa: BLE001
+        r["read_differs"] = []
+    return r
+
+
+@app.post("/api/catalog/count-pages", dependencies=[Depends(user)])
+def post_count_pages(b=Depends(json_body)):
+    """The chosen books' pages counted again from their EPUBs (calibrekeep.py), as a job."""
+    from . import calibrekeep, calibrewrite
+    ids = [int(i) for i in (b or {}).get("ids") or [] if str(i).isdigit()][:500]
+    if not ids:
+        raise HTTPException(400, "No books")
+    return {"job": calibrewrite.start_job(lambda: calibrekeep.write_pages(calibrekeep.pages_for(ids))), "total": len(ids)}
+
+
+@app.get("/api/catalog/job/{jid}", dependencies=[Depends(user)])
+def get_catalog_job(jid: str):
+    from . import calibrewrite
+    j = calibrewrite.job(jid)
+    if not j:
+        raise HTTPException(404, "No such job")
+    return j
 
 
 @app.post("/api/catalog/convert-many", dependencies=[Depends(user)])

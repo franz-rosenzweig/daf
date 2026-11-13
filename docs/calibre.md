@@ -98,6 +98,17 @@ Nothing is lost straight away. Removed and merged books go to Calibre's own tras
 
 **⋯ › Check library**, at the top of All books, compares Calibre's records with its folders, the way Calibre's own Check library does, and changes nothing: files a book lists that aren't there, books without a file, covers missing, a book's folder missing, book files in a folder that its book doesn't list, and folders no book points to. Each book in the list opens its page.
 
+Under those it lists what Calibre's Quality Check plugin would: books with no description, no ISBN, no page count or no language, titles in capitals, and books by "Unknown". And **Read column differs from Daf** lists the books where Calibre's Read column and the book's status in Daf disagree (Calibre says Dropped, Daf says To read), with both, to settle by hand.
+
+## What Daf keeps up in Calibre
+
+At each sync Daf keeps two things in Calibre in step, through Calibre itself:
+
+- **The Read column** follows each book's status in Daf (which follows Hardcover and the book's note): To read is Planning, Reading is Reading, Read is Finished, Paused is Paused, Dropped is Dropped. A book with nothing in the column gets Daf's status, and from then on, when the status changes in Daf (I start a book, finish it), the column follows. Where the two already disagreed, Daf leaves the column alone and Check library lists the book. Maybe counts as agreeing with To read.
+- **Page counts**: a book with an EPUB and nothing in the Pages column gets one, counted the way Calibre's Count Pages plugin does by default (its text, about 2,170 characters a page), a few books each sync. For any chosen books, the bar's **⋯ › Count pages** counts them again.
+
+`calibre_keep: false` in the settings turns both off.
+
 ## How Daf changes Calibre
 
 Daf reads Calibre's database directly for the table, and reads it again only when the file changes, so the table is quick even with the whole library in it.
