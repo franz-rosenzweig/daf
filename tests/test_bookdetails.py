@@ -19,5 +19,13 @@ class CleanHtml(unittest.TestCase):
         self.assertEqual(catalog.clean_html(''), '')
 
 
+class EditFields(unittest.TestCase):
+    def test_sorts_halves_and_the_description(self):
+        from daf import app
+        f = app._edit_fields({"title_sort": "Handbook, The", "author_sort": "  ", "rating": 4.5,
+                              "comments_html": '<p>One <b>bold</b></p><img src=x onerror="bad()">'}, set())
+        self.assertEqual(f, {"sort": "Handbook, The", "rating": 4.5, "comments": "<p>One <b>bold</b></p>"})
+
+
 if __name__ == "__main__":
     unittest.main()
