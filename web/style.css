@@ -2694,12 +2694,13 @@ a.catchkrow:hover{background:var(--hover)}
 @media (pointer:coarse){ .calcv input{opacity:1;width:22px;height:22px} .caltool{min-width:80px;padding:9px 8px 8px} .calsw{padding:7px 10px} }
 /* below a laptop's width Book details is a sheet over the books, like the Tag browser */
 @media (max-width:1100px){
-  .catpage.det .catshade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:43}
+  .catpage.det:has(.catdet:not(:empty)) .catshade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:43}
   .catdet{position:fixed;left:0;right:0;bottom:0;width:auto;max-height:78vh;z-index:44;border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;padding:22px 20px calc(22px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(0,0,0,.18)}
   .catpage.det .catdet:empty{display:none}
   .catdx{display:inline-flex}
   .cdcov{width:130px}
 }
+@media (max-width:900px){ .caltool{min-width:0;padding:6px 6px 5px;font-size:11px} .caltools{gap:0} }
 @media (max-width:700px){
   .calsearch{padding:0 14px 8px}
   .calsearch .catb{width:34px;padding:0} .calsearch .catb span{display:none}

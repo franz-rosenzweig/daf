@@ -174,7 +174,7 @@ async function drawDet(){
   const box = $('#catdet'); if (!box || !P.det) return;
   const id = P.sel.has(P.anchor) ? P.anchor : P.sel.size === 1 ? [...P.sel][0] : null;
   const b = id != null && P.data ? P.data.books.find(x => x.calibre_id === id) : null;
-  if (!b) { box.innerHTML = ''; box.dataset.cal = ''; if (narrow()) toggleDet(false, true); return; }
+  if (!b) { box.innerHTML = ''; box.dataset.cal = ''; return; }          // nothing chosen: no panel (on the tablet, no sheet)
   if (box.dataset.cal === String(id) && box.firstChild) return;
   box.dataset.cal = String(id);
   const head = '<button class="btn sm ib catdx" data-catm="detx" aria-label="Close">' + IC.x + '</button>' +
@@ -188,7 +188,7 @@ async function drawDet(){
   const more = $('#cdmore', box); if (!more) return;
   more.innerHTML = '<div class="cdacts">' + (x.readable ? '<a class="btn sm primary" href="#ebook/' + encodeURIComponent(b.id) + '">' + (x.daf_position ? 'Continue · ' + Math.round((x.daf_position.fraction || 0) * 100) + '%' : 'Read') + '</a>' : '') +
     '<button class="btn sm" data-cal="edit">Edit metadata</button></div>' +
-    (x.progress != null ? '<div class="cdprog">' + C.bar(x.progress) + '<span class="tiny mute">' + Math.round(x.progress) + '%</span></div>' : '') +
+    (x.progress > 0 ? '<div class="cdprog">' + C.bar(x.progress) + '<span class="tiny mute">' + Math.round(x.progress) + '%</span></div>' : '') +
     (C.bookDetails ? C.bookDetails(x.details) : '');
 }
 function toggleDet(on, quiet){
