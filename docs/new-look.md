@@ -8,9 +8,13 @@ The idea behind it is that each screen has one main thing on it, and everything 
 
 ## Getting around
 
-There are six tabs: **Today**, **Books**, **Library**, **Feed**, **Learn** and **Listen**. Each one has its own pages in a small row under it: Today and Recovery; Books, All Books, Manga and Torah; Library with its kinds (Articles, Videos and the rest, and my saved views) and the Shortlist; the Edition, the Feed and its folders; Learn's Areas (each area under it), Highlights and the Review; and Listen's own, Listening, Shows, Episodes, Recordings, Audiobooks and Clips, each with its own name at the top. A pinned place only shows when it's pinned in Preferences → Sidebar.
+There are six tabs: **Today**, **Books**, **Library**, **Feed**, **Learn** and **Listen**. Each one has its own pages in a small row under it: Today, the Edition, Recents and Recovery; Books, All Books, Manga and Torah; Library with its kinds (Articles, Videos and the rest, and my saved views) and the Shortlist; the Feed and its folders; Learn's Areas (each area under it), Highlights and the Review; and Listen's own, Listening, Shows, Episodes, Recordings, Audiobooks and Clips, each with its own name at the top. A pinned place only shows when it's pinned in Preferences → Sidebar.
 
 Where the tabs go depends on what I'm holding. On the Mac, or the tablet held upright, they're a row along the top. On the tablet held sideways they're a list down the left, each with its picture, and the tab's pages under it; the button at the foot of the list folds it down to just the pictures, and then the tab's pages move to a row along the top of the page, the way they are when the tablet is upright. On the phone they're a bar along the bottom with five of them, and the rest is in **⋯** at the end of it. It only changes when I turn the device, never by itself.
+
+Beside **Daf** at the top are two small arrows, **Back** and **Forward**. They go through the window's own history, the way a browser's do, so when one thing led to another and I've lost track of how I got somewhere, Back retraces it a step at a time. An arrow goes grey when there's nowhere further to go. They're on the Mac, on the tablet upright and on the tablet sideways (not when the side bar is folded); the phone has its own Back.
+
+**Recents**, under Today, is the log of everything I've read, watched, listened to or opened, newest first and a day at a time: books in Daf and on the Kindle, articles, videos, podcasts, audiobooks and manga, each with its picture, its kind, the minutes it got that day and the time. A row opens the thing again (a book opens to its page). Private reading is listed as Private reading, with no name and no link, the way Today lists it. **More** at the bottom goes back a week further.
 
 In the top right corner are **+** to add something, **Search**, the minutes ring (it opens Stats), and **⋯**.
 

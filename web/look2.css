@@ -464,3 +464,13 @@ html[data-look="2"].l2-top:not(.shell-android):not(.reading) .app{--bg:var(--l2-
 html[data-look="2"].l2-top:not(.shell-android):not(.reading) :is(.card,.hcard,.tcard,.notice){background:var(--l2-card2);border:1px solid var(--l2-edge);box-shadow:var(--l2-lift2)}
 html[data-look="2"].l2-top.l2-hover:not(.shell-android):not(.reading) :is(.hcard,.tcard){transition:transform .18s ease,box-shadow .18s ease}
 html[data-look="2"].l2-top.l2-hover:not(.shell-android):not(.reading) :is(.hcard,.tcard):hover{transform:translateY(-2px);box-shadow:var(--l2-lift3)}
+
+/* ---------- Back and Forward, beside Daf ---------- */
+.l2hist{display:inline-flex;flex:none;height:40px;border-radius:999px;background:var(--l2-chip);padding:0 2px;align-items:center}
+.l2hb{width:36px;height:36px;border:0;border-radius:50%;background:none;color:var(--fg);display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.l2hb:disabled{color:var(--fg-3);opacity:.45;cursor:default}
+html.l2-hover .l2hb:not(:disabled):hover{background:var(--hover)}
+.l2hb:not(:disabled):active{transform:scale(.92)}
+.l2hb + .l2hb{margin-left:-2px}
+html.l2-phone .l2hist,html.l2-side.l2-fold .l2hist{display:none}
+html.l2-side .l2brand{gap:10px}
