@@ -2312,6 +2312,16 @@ def get_doc_tags(c=Depends(conn)):
     return {"tags": reader.all_doc_tags(c)}
 
 
+@app.get("/api/recents", dependencies=[Depends(user)])
+def get_recents(before: str | None = None, n: int = 7, c=Depends(conn)):
+    """What was read, watched, listened to or opened, newest first (recents.py)."""
+    from . import recents
+    try:
+        return recents.days(c, config.load_settings(), before=before, n=max(1, min(n, 31)))
+    except ValueError:
+        raise HTTPException(400, "before: a day, YYYY-MM-DD")
+
+
 @app.get("/api/docs/{doc_id}", dependencies=[Depends(user)])
 def get_doc(doc_id: str, prefetch: int = 0, c=Depends(conn)):
     d = reader.get_doc(c, doc_id, prefetch=bool(prefetch))

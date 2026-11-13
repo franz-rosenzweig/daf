@@ -31,7 +31,7 @@ L.frame = () => {
 
 // The tabs and each one's pages: [label, [[hash, label], …]]. A page that can be pinned shows only while
 // it is (Preferences → Sidebar's list, settings nav_pins).
-const OWNS = { today: ['today'], books: ['books', 'book', 'shelf'], catalog: ['catalog'], manga: ['manga', 'mread'], torah: ['torah'],
+const OWNS = { today: ['today'], recents: ['recents'], books: ['books', 'book', 'shelf'], catalog: ['catalog'], manga: ['manga', 'mread'], torah: ['torah'],
   library: ['library', 'view'], 'library/starred': [], edition: ['edition'], feed: ['feed', 'feeds'],
   highlights: ['highlights'], review: ['review'], paper: ['paper'], learn: ['learn'], podcasts: ['podcasts'], recovery: ['recovery'] };
 // Listen's pages are the Podcasts screen's own (podcasts.js CATS): a show is under Shows, one of
@@ -51,10 +51,10 @@ function tabs(){
   const d = S.data, pins = C.pinsOn(), pin = k => pins.includes(k);
   const ed = d && d.edition && (d.edition.on || d.edition.total);
   return [
-    ['Today', [['today', 'Today'], pin('recovery') && ['recovery', 'Recovery']]],
+    ['Today', [['today', 'Today'], ed && ['edition', 'Edition'], ['recents', 'Recents'], pin('recovery') && ['recovery', 'Recovery']]],
     ['Books', [['books', 'Books'], ['catalog', 'All Books'], pin('manga') && ['manga', 'Manga'], pin('torah') && ['torah', 'Torah']]],
     ['Library', [['library', 'Library'], pin('shortlist') && ['library/starred', 'Shortlist']]],
-    ['Feed', [ed && ['edition', 'Edition'], ['feed', 'Feed']]],
+    ['Feed', [['feed', 'Feed']]],
     ['Learn', [['learn', 'Areas'], ['highlights', 'Highlights'], ['review', 'Review'], pin('paper') && ['paper', 'Paper pages']]],
     ['Listen', pin('podcasts') ? LISTEN : []],
   ].map(([label, pages]) => [label, pages.filter(Boolean)]).filter(t => t[1].length);
@@ -95,6 +95,21 @@ const TICON = { Today: 'M10 6.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7zM10 2.5v1.8M
   Feed: 'M5 4.5a10.5 10.5 0 0 1 10.5 10.5M5 9a6 6 0 0 1 6 6M5.5 14.5h.01', Learn: 'M2.5 8 10 4.5 17.5 8 10 11.5zM5.5 9.6v3.6c1.4 1.3 2.9 2 4.5 2s3.1-.7 4.5-2V9.6M17.5 8v4.2',
   Highlights: 'M4.5 15.5l1-3.5 7-7 2.5 2.5-7 7zM11.5 6l2.5 2.5M3.5 17.5h6', Listen: 'M4 13.5V11a6 6 0 0 1 12 0v2.5M4 12.5h2.5v4H4zM13.5 12.5H16v4h-2.5z' };
 const tIcon = label => TICON[label] ? '<svg class="l2ti" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="' + TICON[label] + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '';
+// Back and Forward, beside Daf: the window's own history (how you got here), greyed when there's nowhere to go.
+const CHEV = d => '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="' + d + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const HIST = '<span class="l2hist"><button class="l2hb" data-act="l2back" aria-label="Back" title="Back">' + CHEV('M12 4.5 6.5 10l5.5 5.5') + '</button>' +
+  '<button class="l2hb" data-act="l2fwd" aria-label="Forward" title="Forward">' + CHEV('M8 4.5l5.5 5.5L8 15.5') + '</button></span>';
+function histState(){
+  const n = window.navigation, b = document.querySelector('.l2hb[data-act="l2back"]'), f = document.querySelector('.l2hb[data-act="l2fwd"]');
+  if (!n || !b || !f || n.canGoBack === undefined) return;
+  b.disabled = !n.canGoBack; f.disabled = !n.canGoForward;
+}
+document.addEventListener('click', e => {
+  const h = L.on && e.target.closest && e.target.closest('.l2hb'); if (!h || h.disabled) return;
+  if (h.dataset.act === 'l2back') history.back(); else history.forward();
+});
+window.addEventListener('hashchange', () => setTimeout(histState, 0));
+if (window.navigation && navigation.addEventListener) navigation.addEventListener('currententrychange', () => setTimeout(histState, 0));
 const FOLD = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.5 5 6.5 10l5 5M15.5 5l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 L.side = () => {
   const sd = $('#side'); if (!sd) return;
@@ -116,7 +131,7 @@ L.side = () => {
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const phone = all.filter(t => t[0] !== 'Listen').slice(0, 5);
   sd.innerHTML =
-    '<div class="l2brand"><button class="l2pill" data-go="today">Daf</button><span class="l2date">' + esc(date) + '</span></div>' +
+    '<div class="l2brand"><button class="l2pill" data-go="today">Daf</button>' + HIST + '<span class="l2date">' + esc(date) + '</span></div>' +
     '<nav class="l2tabs" aria-label="Daf">' + tabRow + '</nav>' +
     '<div class="l2corner">' +
       '<button class="l2round" data-act="add" aria-label="Add to Daf" title="Add a link, a book or a PDF">' + PLUS + '</button>' +
@@ -130,6 +145,7 @@ L.side = () => {
       '<button class="mb l2more" data-act="l2menu" aria-label="More">' + DOTS + '</button></div>';
   if (onFolder) sd.querySelectorAll('.l2sub.off').forEach(b => b.classList.remove('on'));
   $('#app').classList.toggle('hassubs', pages.length + folders.length > 0);
+  histState();
   L.frame();
 };
 
