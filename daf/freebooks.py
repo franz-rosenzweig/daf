@@ -82,28 +82,50 @@ def _key(title, author):
     return t, (words[-1] if words else "")
 
 
-def search(q):
-    """Both sites at once. → {"results": [...], "failed": [names of the sites that didn't answer]}."""
+_CACHE = {}          # (site, query) -> (when, results): Standard Ebooks' search takes seconds on their side
+
+
+def _cached(site, q, fn):
+    k = (site, q.lower())
+    hit = _CACHE.get(k)
+    if hit and time.time() - hit[0] < 600:
+        return [dict(x) for x in hit[1]]
+    r = fn(q)
+    if len(_CACHE) > 200:
+        _CACHE.clear()
+    _CACHE[k] = (time.time(), r)
+    return [dict(x) for x in r]
+
+
+def search(q, site=None):
+    """One site's results (site: se or pg), or both at once. → {"results": [...], "failed": [names]}.
+    Each result has `key` (the same book on both sites shares it) and `rank` (0: every asked-for word
+    in the title … 3: none in title or author), so the page can put the two together as they come."""
     q = (q or "").strip()[:200]
     if not q:
         return {"results": [], "failed": []}
+    sites = {"se": ("Standard Ebooks", search_se), "pg": ("Project Gutenberg", search_pg)}
+    want = [site] if site in sites else list(sites)
     got, failed = {}, []
-    with concurrent.futures.ThreadPoolExecutor(2) as ex:
-        jobs = {ex.submit(search_se, q): "Standard Ebooks", ex.submit(search_pg, q): "Project Gutenberg"}
+    with concurrent.futures.ThreadPoolExecutor(len(want)) as ex:
+        jobs = {ex.submit(_cached, k, q, sites[k][1]): k for k in want}
         for f in concurrent.futures.as_completed(jobs):
             try:
                 got[jobs[f]] = f.result()
             except Exception:  # noqa: BLE001 - one site down still shows the other's
-                failed.append(jobs[f])
-    se, pg = got.get("Standard Ebooks", []), got.get("Project Gutenberg", [])
-    seen = {_key(x["title"], x["author"]) for x in se}
-    results = se + [x for x in pg if _key(x["title"], x["author"]) not in seen]
-    # the asked-for words in the title first, then in the author, then the rest (each site's own order kept)
+                failed.append(sites[jobs[f]][0])
     words = re.findall(r"\w+", q.lower())
+
     def rank(x):
         t, a = x["title"].lower(), x["author"].lower()
-        return (0 if words and all(w in t for w in words) else 1 if any(w in t for w in words) else 2 if any(w in a for w in words) else 3)
-    results.sort(key=rank)
+        return 0 if words and all(w in t for w in words) else 1 if any(w in t for w in words) else 2 if any(w in a for w in words) else 3
+    se, pg = got.get("se", []), got.get("pg", [])
+    seen = {_key(x["title"], x["author"]) for x in se}
+    results = se + [x for x in pg if _key(x["title"], x["author"]) not in seen]
+    for x in results:
+        x["key"] = "|".join(_key(x["title"], x["author"]))
+        x["rank"] = rank(x)
+    results.sort(key=lambda x: x["rank"])
     _mark_have(results)
     return {"results": results, "failed": failed}
 
