@@ -675,9 +675,9 @@ There's no check-in form and no date counter, on purpose.
 **Slow name lookups (`DAF_SERIAL_DNS=1`, `daf/netfix.py`, 2026-11-12).** Where the resolver answers an
 IPv4 lookup and an IPv6 lookup each at once, but asked both together (glibc's usual parallel lookup)
 drops one answer, every new host name waits out the five-second timeout. With `DAF_SERIAL_DNS=1` in
-Daf's environment, Daf asks for IPv4, then IPv6. Off by default. On morten it's set in the user unit's
-drop-in (`~/.config/systemd/user/daf.service.d/serial-dns.conf`); the real fix is the system resolver
-(its local stub, `DNSStubListener`, is off there, so nothing caches or retries).
+Daf's environment, Daf asks for IPv4, then IPv6. Off by default. The real fix is a local caching resolver in front (on
+morten, systemd-resolved's stub had been turned off for a DNS container; turning it back on, 2026-11-12,
+made every lookup instant, and Daf runs without the switch again).
 
 Daf answers in 5-35 ms; through daf.tiresia.xyz every request costs 250-450 ms (even from the server), so
 a page that made several reads and revalidated ~40 files took seconds. Now (measured with 300 ms added
