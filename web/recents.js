@@ -23,8 +23,8 @@ function row(x){
   const book = x.go && x.go.startsWith('book/');
   const pic = x.pic ? '<img class="rcpic' + (book ? ' book' : '') + '" src="' + esc(x.pic) + '" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'rcpic none\'}))">'
     : '<span class="rcpic none">' + icon(x.kind) + '</span>';
-  const meta = [x.kind, x.author, x.minutes ? x.minutes + ' min' : ''].filter(Boolean).map(esc).join(' · ');
-  const inner = '<span class="rcpw">' + pic + '</span><span class="rcb"><span class="rct">' + esc(C.shortTitle ? C.shortTitle(x.title) : x.title) + '</span><span class="rcm">' + meta + '</span></span><span class="rcw">' + esc(x.time) + '</span>';
+  const meta = [...new Set([x.kind, x.author, x.minutes ? x.minutes + ' min' : ''].filter(Boolean))].map(esc).join(' · ');
+  const inner = '<span class="rcpw">' + pic + '</span><span class="rcb"><span class="rct">' + esc(book && C.shortTitle ? C.shortTitle(x.title) : x.title) + '</span><span class="rcm">' + meta + '</span></span><span class="rcw">' + esc(x.time) + '</span>';
   return x.go ? '<a class="rcrow" href="#' + esc(x.go) + '">' + inner + '</a>' : '<div class="rcrow">' + inner + '</div>';
 }
 function draw(){
