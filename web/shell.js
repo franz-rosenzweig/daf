@@ -293,6 +293,8 @@ if (!mac && !window.dafShell) {
   // ink (Google's handwriting reader, for Hebrew) came with 0.5.2
   const since = w => { const a = ua[1].split('.').map(Number), b = w.split('.').map(Number); for (let i = 0; i < 3; i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); return true; };
   if (since('0.5.2')) caps.push('ink');
+  // openWith (a book's file into another app, as Calibre's Open With) came with 0.6.2
+  if (since('0.6.2')) caps.push('openWith');
   const s = v => v == null ? '' : String(v);
   window.dafShell = Object.freeze({
     platform: 'android', version: ua[1],
@@ -302,6 +304,8 @@ if (!mac && !window.dafShell) {
     share: a => call('share', { text: s(a && a.text), url: s(a && a.url), png: s(a && a.png), name: s(a && a.name) }),
     download: a => call('download', typeof a === 'string' ? { url: a } : { name: s(a && a.name), mime: s(a && a.mime), base64: s(a && a.base64) }),
     openExternal: u => call('openExternal', { url: s(u) }),
+    // a Daf file (its address, /api/…) handed to another app on the device: {url, name, mime}
+    openWith: a => call('openWith', { url: s(a && a.url), name: s(a && a.name), mime: s(a && a.mime) }),
     // notifications for new posts in the feeds set to notify: asks once, then the app looks for them
     alerts: () => call('alerts', {}),
     // the whole screen and kept on, for the manga reader

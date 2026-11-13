@@ -35,6 +35,7 @@ const TOOLS = [
   ['shelves', 'Shelves', TB('<path d="M6 3h8v14l-4-3-4 3z"/>'), 'n'],
   ['merge', 'Merge books', TB('<path d="M5 3v3.5c0 3 5 4 5 7V17M15 3v3.5c0 3-5 4-5 7"/>'), 2],
   ['dl', 'Download', TB('<path d="M10 3v9.5M6 9l4 4 4-4M4 16.5h12"/>'), 'n'],
+  ['openwith', 'Open with', TB('<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 13l5-5M9 8h4v4"/>'), 1],
   ['remove', 'Remove books', TB('<path d="M4 6h12M8 6V4h4v2M5.8 6l.9 11h6.6l.9-11"/>'), 'n'],
   ['library', 'Library', TB('<path d="M4 3.5v13M7.5 3.5v13M11 4.5l3.5 12.5M3 16.5h14"/>'), 0],
 ];
@@ -95,7 +96,7 @@ const narrow = () => matchMedia('(max-width:1100px)').matches;        // there t
 C.views.catalog = async () => {
   if (narrow()) { P.side = false; P.det = false; }
   $('#main').innerHTML = '<div class="top cattop caltop"><h1 class="sr">All books</h1><div class="caltools" id="caltools" role="toolbar" aria-label="Calibre">' +
-    TOOLS.map(([k, l, ic]) => '<button class="caltool' + (k === 'library' ? ' end' : '') + '" data-cal="' + k + '">' + ic + '<span>' + l + '</span></button>').join('') + '</div></div>' +
+    TOOLS.filter(([k]) => k !== 'openwith' || canOpenWith()).map(([k, l, ic]) => '<button class="caltool' + (k === 'library' ? ' end' : '') + '" data-cal="' + k + '">' + ic + '<span>' + l + '</span></button>').join('') + '</div></div>' +
     '<div class="calsearch"><button class="btn sm catb" data-act="cat:views" id="catviewb">' + IC.views + '<span>' + esc(P.view || 'Views') + '</span></button>' +
     '<input class="field catq" id="catq" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search" value="' + esc(P.q) + '">' +
     '<button class="btn sm catb" data-act="cat:sort">' + IC.sort + '<span>Sort</span></button>' +
@@ -306,6 +307,22 @@ function viewsMenu(anchor){
     (!P.view && P.lastView && vs.some(v => v.name === P.lastView) ? '<button data-catm="update"><i></i>Save into “' + esc(P.lastView) + '”</button>' : '') +
     '<button data-catm="save"><i></i>Save as a view…</button><button data-catm="reset"><i></i>All books, newest first</button>');
 }
+// Calibre's Open With: one of the book's files handed to another app (the Android app's dafShell.openWith).
+const canOpenWith = () => !!(window.dafShell && window.dafShell.can && window.dafShell.can('openWith'));
+const MIME = { EPUB: 'application/epub+zip', PDF: 'application/pdf', MOBI: 'application/x-mobipocket-ebook', AZW3: 'application/vnd.amazon.ebook', KEPUB: 'application/epub+zip',
+  CBZ: 'application/vnd.comicbook+zip', CBR: 'application/vnd.comicbook-rar', TXT: 'text/plain', DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', RTF: 'application/rtf', FB2: 'application/x-fictionbook+xml' };
+function openWithMenu(anchor, b){
+  const fs = b.formats || [];
+  if (!fs.length) { toast('No file'); return; }
+  openPop(anchor, fs.map(f => '<button data-catopen="' + esc(f) + '" data-cal-id="' + b.calibre_id + '"><i></i>' + esc(f) + '</button>').join(''));
+}
+document.addEventListener('click', e => {
+  const o = e.target.closest && e.target.closest('[data-catopen]'); if (!o) return;
+  $('#pop').hidden = true;
+  const fmt = o.dataset.catopen, cid = o.dataset.calId, b = P.data && P.data.books.find(x => String(x.calibre_id) === cid);
+  const name = ((b && b.title) || 'book').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.' + (fmt === 'KEPUB' ? 'kepub.epub' : fmt.toLowerCase());
+  window.dafShell.openWith({ url: '/api/catalog/book/' + cid + '/files/' + encodeURIComponent(fmt), name, mime: MIME[fmt] || 'application/octet-stream' }).catch(err => toast(err.message));
+});
 function sortMenu(anchor){
   const cs = P.data.columns.filter(c => c.key !== 'cover');
   openPop(anchor, cs.map(c => '<button data-catsortm="' + esc(c.key) + '"' + (P.sort === c.key ? ' class="on"' : '') + '><i>' + (P.sort === c.key ? (P.desc ? '↓' : '↑') : '') + '</i>' + esc(c.label) + '</button>').join(''), 'wide');
@@ -472,6 +489,7 @@ document.addEventListener('click', e => {
     else if (k === 'dl') { const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + ids.join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
     else if (k === 'remove' && C.BookEdit) C.BookEdit.remove(chosen).then(done => { if (done) { P.sel.clear(); bulkBar(); } });
     else if (k === 'library') moreMenu(tool);
+    else if (k === 'openwith' && one) openWithMenu(tool, one);
     return; }
   const b = t.closest('[data-catb]');
   if (b) { const k = b.dataset.catb;
