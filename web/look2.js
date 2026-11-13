@@ -539,7 +539,7 @@ function screenItems(){
   if (v === 'today' || !v) { add('Log paper', 'note', { act: 'paper' }); add('Sync now', 'refresh', { act: 'refresh' }); add('Goals', 'target', { go: '#prefs/goals' }); }
   else if (v === 'books') { pr('Add a book', 'plus', '[data-act="addbook"]'); pr('New shelf', 'shelf', '#shelfsec [data-shelf="new"]'); }
   else if (v === 'book') {
-    pr('Listen from here', 'headphones', '[data-abk="here"]'); pr('Edit details', 'edit', '[data-act="bookedit"]');
+    pr('Listen from here', 'headphones', '[data-abk="here"]'); pr('Edit details', 'edit', '[data-act="bookedit"]'); pr('Edit book', 'file', '[data-act="ebookedit"]');
     const o = q('.bookhead a[target="_blank"]'); if (o) add('Open the original', 'external', { href: o.href, blank: true });
     const bid = decodeURIComponent(r[1] || ''); if (bid && C.Learn) add('Add to an area', 'area', { fn: () => C.Learn.pick('book:' + bid, (q('.btitle') || {}).textContent) });
     const vl = q('.l2vault code'); if (vl) add('Open the note in Obsidian', 'external', { href: 'obsidian://open?vault=' + encodeURIComponent(q('.l2vault').dataset.vname || '') + '&file=' + encodeURIComponent(vl.textContent.trim()) });
