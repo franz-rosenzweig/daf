@@ -51,7 +51,7 @@ def main():
                 "openlibrary": "Open Library", "isbndb": "ISBNDB", "hardcover": "Hardcover"}
         for r in res[:12]:
             cover = None
-            for p in plugins:
+            for p in (plugins if getattr(r, "has_cached_cover_url", True) else []):   # Calibre knows when it's only a placeholder
                 try:
                     u = p.get_cached_cover_url(r.identifiers)
                 except Exception:
@@ -159,6 +159,7 @@ def calibre_sources(title, authors, identifiers, timeout=30, plugins=None):
     if not out.get("ok"):
         raise RuntimeError(out.get("error") or "Calibre's sources said no")
     for x in out["results"]:
+        x["comments_html"] = x["comments"]          # as the source has it, for the Edit sheet's description
         x["comments"] = _text(x["comments"])
         x["source"] = x["source"] or "Calibre"
     return out["results"]
