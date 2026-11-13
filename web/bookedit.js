@@ -357,7 +357,7 @@ function list(errs){
   const box = $('#befres'); if (!box) return;
   const yr = x => x.published ? x.published.slice(0, 4) : '';
   box.innerHTML = (F.results.length ? '<div class="befcands">' + F.results.map((x, i) => '<button class="befc" data-befc="' + i + '">' +
-      (x.cover ? '<img src="' + far(x.cover) + '" alt="" loading="lazy">' : '<span class="befnc"></span>') +
+      (x.cover ? '<img src="' + far(x.thumb || x.cover) + '" alt="" loading="lazy">' : '<span class="befnc"></span>') +
       '<span class="befct"><b>' + esc(x.title || '') + '</b><span>' + esc((x.authors || []).join(', ')) + '</span>' +
       '<span class="mute tiny">' + [yr(x), x.publisher, x.series ? x.series + (x.series_index ? ' #' + x.series_index : '') : '', x.pages ? x.pages + ' pages' : ''].filter(Boolean).map(esc).join(' · ') + '</span></span>' +
       '<span class="befsrc">' + esc(x.source) + '</span></button>').join('') + '</div>' : '<p class="mute">Nothing found</p>') +
@@ -395,7 +395,7 @@ function compare(i){
   sheet('<div class="behead"><h2>' + esc(x.source) + '</h2><span class="spacer"></span><button class="btn sm" data-be="findlist">Back</button><button class="btn sm primary" data-be="take">Use these</button></div>' +
     '<div class="bebody one befind">' +
     (x.cover ? '<div class="befcov"><figure>' + (E.d.cover ? '<img src="/api/cover/' + encodeURIComponent(E.d.id) + '?v=' + (E.coverV || 0) + '" alt="">' : '<span class="befnc"></span>') + '<figcaption class="mute tiny">Now</figcaption></figure>' +
-      '<figure><img src="' + far(x.cover) + '" alt=""><figcaption><label><input type="checkbox" data-take="cover"' + (E.d.cover ? '' : ' checked') + '> Use this cover</label></figcaption></figure></div>' : '') +
+      '<figure><img src="' + far(x.thumb || x.cover) + '" alt=""><figcaption><label><input type="checkbox" data-take="cover"' + (E.d.cover ? '' : ' checked') + '> Use this cover</label></figcaption></figure></div>' : '') +
     '<div class="befhead"><span></span><span>Now</span><span>Found</span></div>' + rows + '</div>');
 }
 async function take(){
