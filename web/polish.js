@@ -2,7 +2,9 @@
    (calibrewrite's "polish" op runs Calibre's own gui_polish job, a book at a time). Every EPUB, AZW3
    and KEPUB a book has is polished, from its ORIGINAL_ when it has one, and the file it replaces is
    kept as ORIGINAL_<format> first. The actions are the dialog's, in its order, off until ticked; the
-   last ones used are kept on this device. C.Polish.open(books) */
+   last ones used are kept on this device. When a chosen book has ORIGINAL_ files, Restore the originals
+   puts them back in place of the files they were saved from (Calibre's Restore the ORIGINAL_ format,
+   calibrewrite's "restore_original" op). C.Polish.open(books) */
 (() => {
 'use strict';
 const C = window.DafCore, { api, esc, toast, $, $$ } = C;
@@ -32,6 +34,7 @@ const M = { books: [], off: [], busy: false, run: 0, opts: Object.assign({}, sav
 // What gets polished in a book: [format, polished from]
 const plan = b => { const f = b.formats || []; return KINDS.filter(k => f.includes(k) || f.includes('ORIGINAL_' + k)).map(k => [k, f.includes('ORIGINAL_' + k) ? 'ORIGINAL_' + k : k]); };
 const chosen = () => ACTS.filter(([k]) => M.opts[k]).map(([k]) => k);
+const origs = b => (b.formats || []).filter(f => f.startsWith('ORIGINAL_'));
 
 function sheet(html){
   let s = $('#plsheet');
@@ -59,14 +62,16 @@ const bookRow = (b, fmt, off) => '<div class="plrow' + (off ? ' off' : '') + '">
   '<span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc([(b.authors || []).join(' & '), b.highlights ? b.highlights + ' highlight' + (b.highlights === 1 ? '' : 's') : ''].filter(Boolean).join(' · ')) + '</span></span>' +
   '<span class="plfmt mute tiny">' + esc(fmt) + '</span></div>';
 function draw(){
-  const n = M.books.length, dis = M.busy ? ' disabled' : '';
+  const n = M.books.length, dis = M.busy ? ' disabled' : '', back = M.books.concat(M.off).some(b => origs(b).length);
   // The formats that would be kept as ORIGINAL_ (a book polished from its ORIGINAL_ keeps nothing new)
   const fresh = KINDS.filter(k => M.books.some(b => plan(b).some(([f, src]) => f === k && src === k)));
   const opts = ACTS.map(([k, l]) => '<label><input type="checkbox" data-plo="' + k + '"' + (M.opts[k] ? ' checked' : '') + dis + '> ' + esc(l) + '</label>').join('');
   const list = M.books.map(b => bookRow(b, plan(b).map(([f, src]) => f === src ? f : f + ' from ' + src).join(' · '), false)).join('') +
     M.off.map(b => bookRow(b, 'No EPUB, AZW3 or KEPUB', true)).join('');
-  sheet('<div class="behead"><h2>' + (n > 1 ? 'Polish ' + n + ' books' : n ? 'Polish book' : 'Polish books') + '</h2><span class="spacer"></span><button class="btn sm" data-pl="cancel">Cancel</button>' +
-    '<button class="btn sm primary" data-pl="go"' + (!n || !chosen().length || M.busy ? ' disabled' : '') + '>' + (M.busy ? 'Polishing…' : 'Polish') + '</button></div>' +
+  sheet('<div class="behead"><h2>' + (n > 1 ? 'Polish ' + n + ' books' : n ? 'Polish book' : 'Polish books') + '</h2><span class="spacer"></span>' +
+    (back ? '<button class="btn sm" data-pl="restore"' + dis + '>' + (M.busy === 'restore' ? 'Restoring…' : 'Restore the originals') + '</button>' : '') +
+    '<button class="btn sm" data-pl="cancel">Cancel</button>' +
+    '<button class="btn sm primary" data-pl="go"' + (!n || !chosen().length || M.busy ? ' disabled' : '') + '>' + (M.busy === 'polish' ? 'Polishing…' : 'Polish') + '</button></div>' +
     '<div class="bebody one plbody"><div class="plopts">' + opts + '</div>' +
     (fresh.length ? '<label class="plkeep"><input type="checkbox" data-plkeep' + (M.keep ? ' checked' : '') + dis + '> Keep the original as ' + fresh.map(k => 'ORIGINAL_' + k).join(' and ') + '</label>' : '') +
     '<h3>' + (n + M.off.length) + ' book' + (n + M.off.length === 1 ? '' : 's') + '</h3><div class="pllist">' + list + '</div></div>');
@@ -76,27 +81,42 @@ function sync(){
   $$('#plsheet [data-plo]').forEach(c => { c.checked = !!M.opts[c.dataset.plo]; });
   const go = $('#plsheet [data-pl="go"]'); if (go) go.disabled = !M.books.length || !chosen().length || M.busy;
 }
-async function polish(){
-  const ids = M.books.map(b => b.calibre_id), acts = chosen();
+// Polishing and restoring: a job on the server, a book at a time, followed until it's done.
+const JOB = {
+  polish: { url: '/api/catalog/polish', btn: 'go', ing: 'Polishing', ed: 'polished', one: 'Polished', fail: 'Calibre couldn’t polish it' },
+  restore: { url: '/api/catalog/restore-original', btn: 'restore', ing: 'Restoring', ed: 'restored', one: 'Restored', fail: 'Calibre couldn’t restore it' },
+};
+function polish(){
+  const ids = M.books.map(b => b.calibre_id), acts = chosen(), opts = {};
   if (M.busy || !ids.length || !acts.length) return;
-  const run = ++M.run, opts = {};
   acts.forEach(k => { opts[k] = true; });
-  M.busy = true; draw();
+  work('polish', { ids, opts, keep_original: M.keep });
+}
+function restore(){
+  const books = M.books.concat(M.off).filter(b => origs(b).length);
+  if (M.busy || !books.length) return;
+  const f = [...new Set(books.flatMap(origs))];
+  if (!confirm(books.length === 1 ? 'Replace the ' + f.map(x => x.slice(9)).join(' and ') + ' with ' + f.join(' and ') + '?' : 'Replace the files of ' + books.length + ' books with their originals?')) return;
+  work('restore', { ids: books.map(b => b.calibre_id) });
+}
+async function work(kind, body){
+  const J = JOB[kind], run = ++M.run;
+  M.busy = kind; draw();
   const mine = () => run === M.run && $('#plsheet') && !$('#plsheet').hidden;
   try {
-    const r = await api('/api/catalog/polish', { method: 'POST', body: JSON.stringify({ ids, opts, keep_original: M.keep }) });
+    const r = await api(J.url, { method: 'POST', body: JSON.stringify(body) });
     let j = null;
     for (let i = 0, miss = 0; ; i++) {
       await sleep(i < 5 ? 800 : 2000);
       try { j = await api('/api/catalog/jobs/' + r.job); miss = 0; }
       catch(e){ if (++miss >= 5) throw e; continue; }
       if (!j.running) break;
-      const go = mine() && $('#plsheet [data-pl="go"]');
-      if (go && j.total > 1) go.textContent = 'Polishing ' + Math.min(j.done + 1, j.total) + ' of ' + j.total + '…';
+      const btn = mine() && $('#plsheet [data-pl="' + J.btn + '"]');
+      if (btn && j.total > 1) btn.textContent = J.ing + ' ' + Math.min(j.done + 1, j.total) + ' of ' + j.total + '…';
     }
     const bad = (j.failed || []).length, ok = j.total - bad;
     if (mine()) close();
-    toast(j.total === 1 ? (bad ? j.failed[0].error || 'Calibre couldn’t polish it' : 'Polished') : ok + ' polished' + (bad ? ' · ' + bad + ' didn’t' : ''));
+    toast(j.total === 1 ? (bad ? j.failed[0].error || J.fail : J.one) : ok + ' ' + J.ed + (bad ? ' · ' + bad + ' didn’t' : ''));
     if (C.Catalog) C.Catalog.reload();
   } catch(e){
     if (mine()) { M.busy = false; draw(); }
@@ -109,6 +129,7 @@ document.addEventListener('click', e => {
   const a = t.closest('#plsheet [data-pl]'); if (!a) return;
   if (a.dataset.pl === 'cancel') close();
   else if (a.dataset.pl === 'go' && !a.disabled) polish();
+  else if (a.dataset.pl === 'restore' && !a.disabled) restore();
 });
 document.addEventListener('change', e => {
   const t = e.target; if (!t.closest || !t.closest('#plsheet')) return;

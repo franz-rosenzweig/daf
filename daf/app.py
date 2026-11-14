@@ -1669,6 +1669,33 @@ def post_polish(b=Depends(json_body)):
     return {"job": job, "total": len(todo), "skipped": len(ids) - len(todo)}
 
 
+@app.post("/api/catalog/restore-original", dependencies=[Depends(user)])
+def post_restore_original(b=Depends(json_body)):
+    """Calibre's Restore the ORIGINAL_ format for {ids}: every ORIGINAL_<fmt> a book has goes back as
+    <fmt> (the polished or converted file it replaces is gone) and the ORIGINAL_ is removed, a book at
+    a time. → {job, total, skipped}; GET /api/catalog/jobs/{job} as for Polish books."""
+    from . import calibrewrite
+    b = b if isinstance(b, dict) else {}
+    ids = list(dict.fromkeys(int(i) for i in (b.get("ids") or []) if str(i).isdigit()))
+    if not 1 <= len(ids) <= 500:
+        raise HTTPException(400, "One to 500 books")
+    todo = [i for i in ids if any(f.startswith("ORIGINAL_") for f in catalog.formats_of(i))]
+    if not todo:
+        raise HTTPException(400, "No ORIGINAL_ file to restore")
+    return {"job": calibrewrite.start_restore_many(todo), "total": len(todo), "skipped": len(ids) - len(todo)}
+
+
+@app.post("/api/catalog/book/{cid}/files/{fmt}/restore", dependencies=[Depends(user)])
+def restore_catalog_file(cid: int, fmt: str):
+    """One ORIGINAL_<fmt> file back as <fmt>, in place of the one the book has now (Calibre's
+    Restore <fmt> from the original)."""
+    fmt = fmt.upper()
+    if not fmt.startswith("ORIGINAL_") or fmt not in catalog.formats_of(cid):
+        raise HTTPException(400, "The book has no such ORIGINAL_ file")
+    _calibre([{"op": "restore_original", "id": cid, "fmts": [fmt]}], timeout=600)
+    return {"ok": True, "format": fmt[len("ORIGINAL_"):]}
+
+
 @app.post("/api/catalog/book/{cid}/find", dependencies=[Depends(user)])
 def find_catalog_book(cid: int, b=Depends(json_body), c=Depends(conn)):
     """Find details: Hardcover and Calibre's own sources, for {title, authors} (the book's own by

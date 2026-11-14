@@ -338,9 +338,10 @@ async function refreshFiles(){
   if (C.Catalog) C.Catalog.reload();
 }
 function fileMenu(anchor, fmt){
-  const p = $('#pop'), to = (E.d.convert_to || []).filter(x => x !== fmt);
+  const p = $('#pop'), orig = fmt.startsWith('ORIGINAL_'), to = orig ? [] : (E.d.convert_to || []).filter(x => x !== fmt);
   p.onclick = p.oninput = p.onkeydown = null;
   p.innerHTML = '<div class="menu fmenu"><div class="fmh">' + esc(fmt) + '</div>' + to.map(t => '<button data-beconv="' + esc(fmt) + '>' + esc(t) + '"><i></i>Convert to ' + esc(t) + '</button>').join('') +
+    (orig ? '<button data-berestore="' + esc(fmt) + '"><i></i>Restore as ' + esc(fmt.slice(9)) + '</button>' : '') +
     '<hr><button class="danger" data-berm="' + esc(fmt) + '"><i></i><span>Remove the ' + esc(fmt) + ' file</span></button></div>';
   p.hidden = false; p.style.zIndex = 70;
   if (matchMedia('(max-width:700px)').matches) return;
@@ -524,6 +525,11 @@ document.addEventListener('click', e => {
   if (rm) { $('#pop').hidden = true; const fmt = rm.dataset.berm;
     if (!confirm('Remove the ' + fmt + ' file from Calibre?')) return;
     api('/api/catalog/book/' + E.d.calibre_id + '/files/' + encodeURIComponent(fmt), { method: 'DELETE' }).then(() => { toast(fmt + ' removed'); refreshFiles(); }).catch(err => toast(err.message));
+    return; }
+  const rs = t.closest('[data-berestore]');
+  if (rs) { $('#pop').hidden = true; const fmt = rs.dataset.berestore, into = fmt.slice(9);
+    if (!confirm((E.d.files || []).some(f => f.format === into) ? 'Replace the ' + into + ' with ' + fmt + '?' : 'Restore ' + fmt + ' as ' + into + '?')) return;
+    api('/api/catalog/book/' + E.d.calibre_id + '/files/' + encodeURIComponent(fmt) + '/restore', { method: 'POST' }).then(() => { toast(into + ' restored'); refreshFiles(); }).catch(err => toast(err.message));
     return; }
   const b = t.closest('[data-be]'); if (!b) { const box = t.closest('.bechips'); if (box) $('.bechipin', box).focus(); return; }
   const k = b.dataset.be;
