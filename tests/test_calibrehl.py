@@ -104,6 +104,7 @@ def daf_conn():
     for table, col, decl in db.MIGRATIONS:
         if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
             c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+    c.executescript(db.TRIGGERS)
     return c
 
 

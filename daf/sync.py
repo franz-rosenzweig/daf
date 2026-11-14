@@ -107,8 +107,16 @@ def run():
             report["calibre bookmarks"] = f"failed: {e}"
             log.exception("calibre bookmarks")
         conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
+        from . import calibreannots
         try:
-            from . import calibreannots
+            back = calibreannots.pull(conn, settings)               # what was changed in Calibre's viewer to Daf's own highlights
+            if back:
+                report["calibre highlights back"] = f"{back} changed in Calibre's viewer, taken into Daf"
+        except Exception as e:  # noqa: BLE001
+            report["calibre highlights back"] = f"failed: {e}"
+            log.exception("calibre highlights back")
+        conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
+        try:
             n = calibreannots.push(conn, settings)                  # Daf's own highlights, for Calibre's viewer
             if n:
                 report["calibre highlights"] = f"{n} written for Calibre's viewer"

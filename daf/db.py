@@ -258,8 +258,8 @@ CREATE TABLE IF NOT EXISTS kindle_files (    -- every book on the Kindle, as its
   path TEXT PRIMARY KEY,                      -- from its home folder: "Recovery/Title - Author (342).pdf"
   md5 TEXT, book_id TEXT, shelf TEXT NOT NULL DEFAULT '', seen INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS calibre_pushed (  -- Daf's own highlights written into Calibre for its viewer (calibreannots.py): what was sent last
-  hl_id TEXT PRIMARY KEY, uuid TEXT NOT NULL, cal_id INTEGER NOT NULL, fmt TEXT NOT NULL, hash TEXT NOT NULL,
-  removed INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL);
+  hl_id TEXT PRIMARY KEY, uuid TEXT NOT NULL, cal_id INTEGER NOT NULL, fmt TEXT NOT NULL, hash TEXT NOT NULL,   -- hash: Daf's side as last sent or taken
+  removed INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL, seen TEXT);                                             -- seen: Calibre's side as Daf last knew it
 CREATE TABLE IF NOT EXISTS kindle_moves (    -- a book Daf asked the Kindle to move to another shelf, until its plugin has
   id INTEGER PRIMARY KEY AUTOINCREMENT,       -- (dest "" is the home folder, off every shelf)
   path TEXT NOT NULL, dest TEXT NOT NULL, book_id TEXT, requested INTEGER NOT NULL, done INTEGER, error TEXT);
@@ -366,6 +366,7 @@ def connect():
             except sqlite3.OperationalError as e:      # another connection added it a moment ago
                 if "duplicate column" not in str(e):
                     raise
+    conn.executescript(TRIGGERS)
     if not conn.execute("SELECT 1 FROM kv WHERE k = 'fts_v1'").fetchone():
         # Once: index what was saved before full-text search existed.
         conn.execute("DELETE FROM docs_fts")
@@ -382,11 +383,24 @@ MIGRATIONS = [("areas", "plan", "TEXT"), ("areas", "plan_draft", "TEXT"), ("area
               ("docs", "tags", "TEXT"), ("docs", "ai_summary", "TEXT"),
               ("docs", "starred", "INTEGER"), ("sessions", "pages", "INTEGER"),
               ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("shelves", "kindle", "TEXT"), ("docs", "full", "INTEGER"),
-              ("docs", "deleted", "INTEGER"), ("book_marks", "calibre", "TEXT"),   # a bookmark made in Calibre's viewer: its key there (calibrehl.import_bookmarks)
+              ("docs", "deleted", "INTEGER"), ("book_marks", "calibre", "TEXT"),
+              ("highlights", "changed", "INTEGER"), ("calibre_pushed", "seen", "TEXT"),   # when a reader highlight last changed (TRIGGERS); Calibre's side as last known   # a bookmark made in Calibre's viewer: its key there (calibrehl.import_bookmarks)
               # what a feed says about an episode (episodes.parse_feed)
               ("gp_episodes", "guid", "TEXT"), ("gp_episodes", "author", "TEXT"), ("gp_episodes", "image", "TEXT"),
               ("gp_episodes", "duration", "INTEGER"), ("gp_episodes", "notes", "TEXT"), ("gp_episodes", "transcript_url", "TEXT"),
               ("gp_episodes", "transcript_type", "TEXT"), ("gp_episodes", "chapters_url", "TEXT"), ("gp_episodes", "checked", "INTEGER")]
+
+
+# After the migrations, since they use their columns.
+TRIGGERS = """
+-- When a highlight made in Daf's reader last changed (its words, place, colour, or removed/restored),
+-- so a change made to it in Calibre's viewer can be weighed against Daf's (calibreannots.pull).
+CREATE TRIGGER IF NOT EXISTS highlights_changed AFTER UPDATE OF text, pos, color, deleted ON highlights
+FOR EACH ROW WHEN NEW.source = 'epub' AND (OLD.text IS NOT NEW.text OR OLD.pos IS NOT NEW.pos OR OLD.color IS NOT NEW.color OR OLD.deleted IS NOT NEW.deleted)
+BEGIN
+  UPDATE highlights SET changed = CAST(strftime('%s', 'now') AS INTEGER) WHERE id = NEW.id;
+END;
+"""
 
 
 @contextmanager
