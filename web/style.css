@@ -3076,3 +3076,9 @@ body.ebxopen{overflow:hidden}
   .svsheet .berow{grid-template-columns:minmax(0,1fr);gap:4px}
   .svopts{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Edit metadata one at a time; books dragged over a name in the Tag browser */
+.benav{display:flex;align-items:center;gap:2px;margin-right:4px;white-space:nowrap}
+.benav .tiny{min-width:44px;text-align:center}
+#catside .catv.over{background:var(--accent-weak,var(--active));box-shadow:inset 0 0 0 2px var(--accent);border-radius:6px}
+@media (max-width:699px){ .benav .tiny{display:none} }

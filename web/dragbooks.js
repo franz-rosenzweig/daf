@@ -73,7 +73,7 @@ function target(x, y){
   const g = $('#dbghost'); if (g) g.style.display = 'none';
   const el = document.elementFromPoint(x, y);
   if (g) g.style.display = '';
-  return el && el.closest && el.closest('[data-dbshelf],[data-dbcoll],[data-dbnew],[data-dropshelf]');
+  return el && el.closest && el.closest('[data-dbshelf],[data-dbcoll],[data-dbnew],[data-dropshelf],#catside .catv[data-catk],#catside .catv[data-catt^="rating:"],#catside .catv[data-catt^="formats:"]');
 }
 function move(x, y){
   const g = $('#dbghost'); if (g) { g.style.left = (x + 14) + 'px'; g.style.top = (y + 12) + 'px'; }
@@ -92,6 +92,7 @@ async function drop(x, y){
   const d = D.drag, t = target(x, y); end();
   if (!t || !d) return;
   try {
+    if (t.closest('#catside')) { if (C.Catalog && C.Catalog.dropOn) await C.Catalog.dropOn(t, d.books); return; }
     if (t.dataset.dbshelf || t.dataset.dropshelf) await onShelf(t.dataset.dbshelf || t.dataset.dropshelf, d.books);
     else if (t.dataset.dbcoll) await inCollection(t.dataset.dbcoll, d.books);
     else if (t.dataset.dbnew === 'shelf') await newShelf(d.books);

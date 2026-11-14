@@ -572,7 +572,7 @@ function rowMenu(tr, x, y, td){
   p.innerHTML = '<div class="menu catmenu"><button data-catrow="edit" data-cal="' + cal + '"><i></i>Edit details</button>' +
     (editable(col) ? '<button data-catrow="cell" data-cal="' + cal + '" data-col="' + esc(col.key) + '"><i></i>Edit ' + esc(col.label) + '</button>' : '') +
     '<button data-catrow="shelves" data-cal="' + cal + '"><i></i>Shelves and collection</button><a href="#book/' + encodeURIComponent(id) + '"><i></i>Open the book’s page</a>' +
-    (many ? '<hr><button data-catrow="bulk"><i></i>Edit the ' + P.sel.size + ' chosen</button>' : '') +
+    (many ? '<hr><button data-catrow="bulk"><i></i>Edit the ' + P.sel.size + ' chosen</button><button data-catrow="each"><i></i>Edit them one at a time</button>' : '') +
     '<button data-catrow="mark" data-cal="' + cal + '"><i></i>' + (marks.length && marks.every(z => z.marked) ? 'Unmark' : 'Mark') + (many ? ' the ' + P.sel.size + ' chosen' : '') + '</button>' +
     (b ? '<hr>' + SIM.filter(([f]) => valsOf(b, f).length).map(([f, l]) => '<button data-catrow="sim" data-cal="' + cal + '" data-f="' + f + '"><i></i>' + l + '</button>').join('') : '') + '</div>';
   p.hidden = false;
@@ -591,6 +591,7 @@ document.addEventListener('click', e => {
   else if (m.dataset.catrow === 'shelves' && C.DragBooks) C.DragBooks.sheet(P.data.books.filter(b => b.calibre_id === +m.dataset.cal));
   else if (m.dataset.catrow === 'bulk' && C.BookEdit) C.BookEdit.bulk([...P.sel]);
   else if (m.dataset.catrow === 'cell') editCell(+m.dataset.cal, m.dataset.col);
+  else if (m.dataset.catrow === 'each' && C.BookEdit) { const ids = chosenBooks().map(b => b.calibre_id); C.BookEdit.open(ids[0], ids); }
   else if (m.dataset.catrow === 'mark') { const cal = +m.dataset.cal; toggleMarks(P.sel.size > 1 && P.sel.has(cal) ? null : [cal]); }
   else if (m.dataset.catrow === 'sim') { const b = P.data.books.find(z => z.calibre_id === +m.dataset.cal); if (b) similar(b, m.dataset.f); }
 });
@@ -911,6 +912,18 @@ document.addEventListener('keydown', e => {
 });
 
 C.Catalog = {
+  // Books dropped on a name in the Tag browser (dragbooks.js), Calibre's way: a tag added, a series with the
+  // next number, an author for all of them, a rating set; a format opens Convert to it.
+  dropOn: async (el, books) => {
+    const ids = books.map(b => b.calibre_id).filter(x => x != null); if (!ids.length) return;
+    const t = el.dataset.catt || '', k = el.dataset.catk;
+    if (t.startsWith('formats:')) { if (C.ConvertSheet) C.ConvertSheet.open(books, { to: t.replace(/^formats:"=?|"$/g, '') }); return; }
+    const field = k || (t.startsWith('rating:') ? 'rating' : null); if (!field) return;
+    const value = k ? el.dataset.catn : +t.slice(7);
+    if (field === 'authors' ? ids.length >= 5 && !confirm('Make “' + value + '” the author of ' + ids.length + ' books?') : ids.length > 15 && !confirm('Change ' + ids.length + ' books?')) return;
+    try { await api('/api/catalog/drop', { method: 'POST', body: JSON.stringify({ ids, field, value }) }); qvCache.clear(); P.facets = null; C.Catalog.reload(); }
+    catch(e){ toast(e.message); }
+  },
   rowMenu: (tr, x, y) => { held = Date.now(); const at = document.elementFromPoint(x, y); rowMenu(tr, x, y, at && at.closest ? at.closest('td') : null); },
   // What a drag from this row carries: every chosen row when it's one of them, else just it.
   dragBooks: tr => { const id = +tr.dataset.cal; return P.data ? P.data.books.filter(b => P.sel.has(id) && P.sel.size > 1 ? P.sel.has(b.calibre_id) : b.calibre_id === id) : []; },

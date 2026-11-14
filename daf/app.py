@@ -1718,6 +1718,53 @@ def delete_catalog_column(label: str):
     return {"ok": True}
 
 
+@app.post("/api/catalog/drop", dependencies=[Depends(user)])
+def post_catalog_drop(b=Depends(json_body)):
+    """Books dropped on a name in the Tag browser (Calibre's way): {ids, field, value}. A tag (or a name in
+    a list column) is added, a series is set with each book the next number in it, an author becomes
+    the books' author, a rating or a one-value column is set."""
+    b = b if isinstance(b, dict) else {}
+    ids = [int(i) for i in b.get("ids") or [] if str(i).isdigit()][:1000]
+    field, value = str(b.get("field") or ""), b.get("value")
+    if not ids:
+        raise HTTPException(400, "No books")
+    if field == "rating":
+        try:
+            value = max(0.5, min(5.0, float(value)))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Rating: 1 to 5 stars")
+    else:
+        field = _item_field(field)
+        value = str(value or "").strip()[:300]
+        if not value:
+            raise HTTPException(400, "Drop on a name")
+    _calibre([{"op": "drop", "ids": ids, "field": field, "value": value}], timeout=600)
+    return {"ok": True}
+
+
+@app.post("/api/catalog/book/{cid}/cover/trim", dependencies=[Depends(user)])
+def trim_catalog_cover(cid: int):
+    """Calibre's Trim: the cover's plain borders cut off."""
+    _calibre([{"op": "trim_cover", "ids": [cid]}])
+    return {"ok": True}
+
+
+@app.get("/api/catalog/book/{cid}/filemeta", dependencies=[Depends(user)])
+def get_catalog_filemeta(cid: int, fmt: str):
+    """The details written inside one of the book's files, for the Edit sheet to take (Calibre's Set
+    metadata from book file). Only reads the file."""
+    from . import calibrefind, calibrewrite
+    fmt = fmt.upper()
+    p = catalog.book_file(cid, fmt)
+    if not p or not p.exists():
+        raise HTTPException(404, "No such file")
+    rel = p.relative_to(config.CALIBRE_DBS[0].parent)
+    try:
+        return calibrefind.file_meta(str(calibrewrite.LIB.rstrip("/") + "/" + rel.as_posix()), fmt)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.delete("/api/catalog/book/{cid}/cover", dependencies=[Depends(user)])
 def delete_catalog_cover(cid: int):
     """Calibre's Remove cover: the book has none afterwards."""

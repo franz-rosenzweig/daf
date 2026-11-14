@@ -4,7 +4,7 @@
 (() => {
 'use strict';
 const C = window.DafCore, { api, esc, toast, $, $$ } = C;
-const E = { d: null, ids: null, orig: null, busy: false };
+const E = { d: null, ids: null, orig: null, busy: false, list: null, pos: 0 };
 const MB = n => n == null ? '' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
 const ACCEPT = '.epub,.kepub,.azw3,.azw,.mobi,.kfx,.pdf,.fb2,.cbz,.cbr,.cb7,.txt,.rtf,.docx,.html,.htmlz,.djvu,.lit,.odt';
 
@@ -21,7 +21,7 @@ function close(force){
   const s = $('#bedit'); if (s) s.hidden = true;
   const sh = $('#beshade'); if (sh) sh.hidden = true;
   document.body.classList.remove('beopen');
-  E.d = E.ids = E.orig = null; F.snap = null; F.seq++;
+  E.d = E.ids = E.orig = E.list = null; F.snap = null; F.seq++;
 }
 
 /* ---------- fields ---------- */
@@ -81,8 +81,11 @@ function customCtl(c, v, bulk){
 }
 
 /* ---------- one book ---------- */
-async function open(cid){
+// One book; with `list` (Calibre's Edit metadata individually) the chosen books one after another, Next and Previous.
+async function open(cid, list){
   cid = String(cid).replace(/^cal:/, '');
+  E.list = list && list.length > 1 ? list.map(x => String(x).replace(/^cal:/, '')) : null;
+  E.pos = E.list ? Math.max(0, E.list.indexOf(cid)) : 0;
   sheet('<div class="behead"><h2>Edit details</h2></div><div class="bebody"><p class="mute">Loading…</p></div>');
   let d;
   try { d = await api('/api/catalog/book/' + encodeURIComponent(cid)); } catch(e){ close(true); toast(e.message); return; }
@@ -92,13 +95,15 @@ async function open(cid){
 function draw(){
   const d = E.d, coverUrl = '/api/cover/' + encodeURIComponent(d.id) + '?v=' + (E.coverV || 0);
   const idents = Object.entries(d.identifiers || {}).map(([k, v]) => k + ': ' + v).join('\n');
-  const s = sheet('<div class="behead"><h2>' + esc(d.title) + '</h2><span class="spacer"></span><button class="btn sm" data-be="find">Find details</button><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-be="save">Save</button></div>' +
+  const nav = E.list ? '<span class="benav"><button class="btn sm ib" data-be="prev" aria-label="Previous"' + (E.pos ? '' : ' disabled') + '>' + ICON.left + '</button><span class="tiny mute">' + (E.pos + 1) + ' of ' + E.list.length + '</span>' +
+    '<button class="btn sm ib" data-be="next" aria-label="Next"' + (E.pos < E.list.length - 1 ? '' : ' disabled') + '>' + ICON.right + '</button></span>' : '';
+  const s = sheet('<div class="behead"><h2>' + esc(d.title) + '</h2><span class="spacer"></span>' + nav + '<button class="btn sm" data-be="find">Find details</button><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-be="save">Save</button></div>' +
     '<div class="bebody"><div class="beside">' +
       '<div class="becover">' + (d.cover ? '<img src="' + coverUrl + '" alt="">' : '<span class="becovernone">' + esc(d.title) + '</span>') + '</div>' +
       '<label class="btn sm befile">Change cover<input type="file" accept="image/*" data-be="coverfile" hidden></label>' +
       '<button class="btn sm" data-be="coverurl">Cover from a link</button>' +
       '<button class="btn sm" data-be="gencover">Generate cover</button><div class="befcovs begen" id="begen" hidden></div>' +
-      (d.cover ? '<button class="btn sm" data-be="nocover">Remove cover</button>' : '') +
+      (d.cover ? '<button class="btn sm" data-be="trimcover">Trim cover</button><button class="btn sm" data-be="nocover">Remove cover</button>' : '') +
       '<h3>Files</h3><div class="befiles">' + (d.files.length ? d.files.map(f => '<div class="befilerow"><b>' + esc(f.format) + '</b><span class="mute tiny">' + MB(f.size) + '</span><span class="spacer"></span>' +
         (f.exists ? '<a class="ib" href="/api/catalog/book/' + d.calibre_id + '/files/' + esc(f.format) + '" download aria-label="Download ' + esc(f.format) + '">' + ICON.down + '</a>' : '') +
         '<button class="ib" data-be="filemenu" data-fmt="' + esc(f.format) + '" aria-label="More for ' + esc(f.format) + '">' + ICON.dots + '</button></div>').join('') : '<span class="mute tiny">No file</span>') + '</div>' +
@@ -124,6 +129,8 @@ function draw(){
   s.dataset.mode = 'one';
 }
 const ICON = {
+  left: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l-5 5 5 5"/></svg>',
+  right: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>',
   down: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M5.5 9l4.5 4.5L14.5 9M4 16.5h12"/></svg>',
   dots: '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>',
 };
@@ -163,6 +170,21 @@ function toFields(ch, bulk){
   }
   return f;
 }
+// Next and Previous keep what was changed, as Calibre's do, then show the next book.
+async function step(by){
+  if (E.busy || !E.list) return;
+  const to = E.list[E.pos + by]; if (!to) return;
+  addTyped($('#bedit'));
+  const ch = changed();
+  if (Object.keys(ch).length) {
+    E.busy = true;
+    try { await api('/api/catalog/book/' + E.d.calibre_id, { method: 'PUT', body: JSON.stringify({ fields: toFields(ch) }) }); after(); }
+    catch(e){ toast(e.message); E.busy = false; return; }
+    E.busy = false;
+  }
+  F.snap = null; F.seq++;
+  open(to, E.list);
+}
 async function save(){
   if (E.busy) return;
   const s = $('#bedit'), btn = $('[data-be="save"]', s);
@@ -193,7 +215,7 @@ async function bulk(ids){
   E.d = d; E.ids = ids;
   const books = (C.Catalog && C.Catalog.books ? C.Catalog.books() : []).filter(b => ids.includes(String(b.calibre_id)));
   const theirTags = [...new Set(books.flatMap(b => b.tags || []))].sort((a, b) => a.localeCompare(b));
-  const s = sheet('<div class="behead"><h2>' + ids.length + ' books</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-be="save">Save</button></div>' +
+  const s = sheet('<div class="behead"><h2>' + ids.length + ' books</h2><span class="spacer"></span><button class="btn sm" data-be="oneatatime">One at a time</button><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-be="save">Save</button></div>' +
     '<div class="bebody one"><div class="beform">' +
       row('Authors', inp('authors', '', ' list="dl-authors" autocomplete="off" placeholder="No change"') + dl('dl-authors', d.choices.authors)) +
       '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="flip"> Turn “Last, First” names around</label></div>' +
@@ -300,6 +322,34 @@ async function genCovers(){
   const b = $('#begen'); if (!b || n !== G.seq) return;
   b.innerHTML = covers.map(c => '<button class="befcv" data-begen="' + esc(c.ref) + '"><img src="/api/catalog/found/' + esc(c.ref) + '?thumb=1" alt=""><span class="tiny">' + esc(c.source) + '</span><span class="tiny mute">' + esc(c.theme || '') + '</span></button>').join('');
 }
+// Calibre's Trim: the cover's plain borders cut off, there and then, like the other cover buttons.
+async function trimCover(){
+  if (!E.d || !confirm('Trim the cover’s borders?')) return;
+  try {
+    await api('/api/catalog/book/' + E.d.calibre_id + '/cover/trim', { method: 'POST', body: '{}' });
+    E.coverV = Date.now(); freshCover(E.d.id);
+    const keep = values($('#bedit')), orig = E.orig; draw(); restore(keep); E.orig = orig;
+    if (C.Catalog) C.Catalog.reload();
+  } catch(e){ toast(e.message); }
+}
+// Calibre's Set metadata from book file: the details written inside this file go into the form, to save or not.
+async function fileMeta(fmt){
+  const cid = E.d && E.d.calibre_id; if (!cid) return;
+  let m;
+  try { m = await api('/api/catalog/book/' + cid + '/filemeta?fmt=' + encodeURIComponent(fmt)); } catch(e){ toast(e.message); return; }
+  if (!E.d || E.d.calibre_id !== cid) return;
+  const v = values($('#bedit'));
+  if (m.title) v.title = m.title;
+  if ((m.authors || []).length) v.authors = m.authors.join(' & ');
+  if (m.series) { v.series = m.series; if (m.series_index != null) v.series_index = String(m.series_index); }
+  if ((m.tags || []).length) v.tags = m.tags;
+  if (m.publisher) v.publisher = m.publisher;
+  if (m.published) v.published = m.published;
+  if ((m.languages || []).length) v.languages = m.languages.join(', ');
+  if (m.identifiers && Object.keys(m.identifiers).length) v.identifiers = Object.entries(m.identifiers).map(([a, b]) => a + ': ' + b).join('\n');
+  if (m.comments) v.comments = m.comments;
+  restore(v);
+}
 async function noCover(){
   if (!E.d || !confirm('Remove the cover?')) return;
   try {
@@ -341,7 +391,7 @@ function fileMenu(anchor, fmt){
   const p = $('#pop'), orig = fmt.startsWith('ORIGINAL_'), to = orig ? [] : (E.d.convert_to || []).filter(x => x !== fmt);
   p.onclick = p.oninput = p.onkeydown = null;
   p.innerHTML = '<div class="menu fmenu"><div class="fmh">' + esc(fmt) + '</div>' + to.map(t => '<button data-beconv="' + esc(fmt) + '>' + esc(t) + '"><i></i>Convert to ' + esc(t) + '</button>').join('') +
-    (orig ? '<button data-berestore="' + esc(fmt) + '"><i></i>Restore as ' + esc(fmt.slice(9)) + '</button>' : '') +
+    (orig ? '<button data-berestore="' + esc(fmt) + '"><i></i>Restore as ' + esc(fmt.slice(9)) + '</button>' : '<button data-befilemeta="' + esc(fmt) + '"><i></i>Set details from this file</button>') +
     '<hr><button class="danger" data-berm="' + esc(fmt) + '"><i></i><span>Remove the ' + esc(fmt) + ' file</span></button></div>';
   p.hidden = false; p.style.zIndex = 70;
   if (matchMedia('(max-width:700px)').matches) return;
@@ -521,6 +571,7 @@ document.addEventListener('click', e => {
   const pickCov = t.closest('[data-cov]'); if (pickCov) { F.cov = pickCov.dataset.cov; drawCovers(F.pick); return; }
   const gen = t.closest('[data-begen]'); if (gen) { G.seq++; cover(JSON.stringify({ found: gen.dataset.begen }), 'application/json'); return; }
   const cv = t.closest('[data-beconv]'); if (cv) { $('#pop').hidden = true; const [a, b] = cv.dataset.beconv.split('>'); convert(a, b); return; }
+  const fmb = t.closest('[data-befilemeta]'); if (fmb) { $('#pop').hidden = true; fileMeta(fmb.dataset.befilemeta); return; }
   const rm = t.closest('[data-berm]');
   if (rm) { $('#pop').hidden = true; const fmt = rm.dataset.berm;
     if (!confirm('Remove the ' + fmt + ' file from Calibre?')) return;
@@ -541,8 +592,14 @@ document.addEventListener('click', e => {
   else if (k === 'findlist') sheetList(F.results);
   else if (k === 'take') take();
   else if (k === 'save') save();
+  else if (k === 'next') step(1);
+  else if (k === 'prev') step(-1);
+  else if (k === 'oneatatime') { const ids = E.ids; if (dirty() && !confirm('Leave without saving?')) return;
+    const order = C.Catalog && C.Catalog.books ? C.Catalog.books().map(b => String(b.calibre_id)).filter(id => ids.includes(id)) : ids;
+    open((order.length ? order : ids)[0], order.length === ids.length ? order : ids); }
   else if (k === 'gencover') genCovers();
   else if (k === 'nocover') noCover();
+  else if (k === 'trimcover') trimCover();
   else if (k === 'coverurl') { const u = (prompt('The cover’s address') || '').trim(); if (u) cover(JSON.stringify({ url: u }), 'application/json'); }
   else if (k === 'filemenu') { e.stopPropagation(); fileMenu(b, b.dataset.fmt); }
 });
