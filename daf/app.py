@@ -2601,6 +2601,59 @@ def post_ebookedit_reports(cid: int):
     return _ebx_job(ebooktools.reports, cid)
 
 
+# ---- Edit book's other tools (ebookmore.py): Split, Merge, Beautify, Check external links, the character map ----
+def _ebt_name(b):
+    n = (b or {}).get("name") if isinstance(b, dict) else None
+    return str(n) if isinstance(n, str) and n else None
+
+
+@app.post("/api/ebookedit/{cid}/split", dependencies=[Depends(user)])
+def post_ebookedit_split(cid: int, b=Depends(json_body)):
+    """Calibre's split of an HTML file before the element at the cursor: {name, at (characters into
+    the file's text)}. A job: done = {bottom (the new file), checkpoint}."""
+    from . import ebookedit, ebookmore
+    _ebx(ebookedit._need, cid)
+    name, at = _ebt_name(b), (b or {}).get("at") if isinstance(b, dict) else None
+    if not name or not isinstance(at, int) or isinstance(at, bool):
+        raise HTTPException(400, "Which file, and where")
+    return _ebx_job(ebookmore.split, cid, name, at)
+
+
+@app.post("/api/ebookedit/{cid}/merge", dependencies=[Depends(user)])
+def post_ebookedit_merge(cid: int, b=Depends(json_body)):
+    """Calibre's merge: {category: text | styles, names, master}. A job: done = {master, checkpoint}."""
+    from . import ebookedit, ebookmore
+    _ebx(ebookedit._need, cid)
+    b = b if isinstance(b, dict) else {}
+    names = b.get("names") if isinstance(b.get("names"), list) else []
+    return _ebx_job(ebookmore.merge, cid, str(b.get("category") or ""), names[:500], str(b.get("master") or ""))
+
+
+@app.post("/api/ebookedit/{cid}/beautify", dependencies=[Depends(user)])
+def post_ebookedit_beautify(cid: int, b=Depends(json_body)):
+    """Calibre's Beautify: {name} for one file, {} for all of them. A job: done = {checkpoint}."""
+    from . import ebookedit, ebookmore
+    _ebx(ebookedit._need, cid)
+    return _ebx_job(ebookmore.beautify, cid, _ebt_name(b))
+
+
+@app.post("/api/ebookedit/{cid}/extlinks", dependencies=[Depends(user)])
+def post_ebookedit_extlinks(cid: int):
+    """Check external links, as a job: done = {links: [{href, at: [[name, line, col]], status: ok |
+    redirected | broken | skipped, code, error, url}], more (links past the first 400)}."""
+    from . import ebookedit, ebookmore
+    _ebx(ebookedit._need, cid)
+    return _ebx_job(ebookmore.external_links, cid)
+
+
+@app.get("/api/charmap", dependencies=[Depends(user)])
+def get_charmap(q: str | None = None, first: int | None = None, last: int | None = None):
+    """Insert special character: {categories, favorites}, or ?q= the characters by name, or
+    ?first=&last= a category's. Each character [code point, name]."""
+    from . import ebookmore
+    return ebookmore.chars(q, first, last)
+
+
 @app.put("/api/nightstand", dependencies=[Depends(user)])
 async def put_nightstand(request: Request, c=Depends(conn)):
     body = await request.json()
