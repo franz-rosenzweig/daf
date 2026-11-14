@@ -243,7 +243,9 @@ def rows(conn, settings=None, private=False):
             "marked": cid in marks, "ondevice": (dev.get(bid) or {}).get("state"),
             **{col["key"]: composite.cell(cvals.get(col["key"], {}).get(cid), col["multi"]) for col in comp},
         })
-    return out, columns(custom) + [{"key": col["key"], "label": col["label"], "type": "list" if col["multi"] else "text", "custom": True,
+    builtin = {lab.lower() for _k, lab, _t, _a in BUILTIN}
+    return out, columns(custom) + [{"key": col["key"], "label": col["label"] + (f" ({col['key']})" if col["label"].lower() in builtin else ""),
+                                    "type": "list" if col["multi"] else "text", "custom": True,
                                     "dtype": "composite", "multi": col["multi"], "enum": None} for col in comp]
 
 
