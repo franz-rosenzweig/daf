@@ -23,6 +23,7 @@ Everything is under **Tools → Daf**:
 - **Show today's minutes on the sleep screen:** on or off. Turning it off puts back the screensaver message you had before.
 - **Sound in Daf:** sends the page to Daf a few seconds after each page turn, so a phone or a computer beside me can play the scene's sound. See [Sound](sound.md#beside-the-kindle). Off unless I turn it on.
 - **Open Daf on the first wake of the morning:** the first time you wake the Kindle each morning, it opens on the Daf tab.
+- **About me:** **Show**, **Edit** and **On the sleep screen**. See [About me](#about-me), below.
 
 Three actions are also in KOReader's gestures, under **Gestures → pick a gesture → General**: "Daf: open Home", "Daf: open the Daf screen" and "Daf: send reading time".
 
@@ -68,6 +69,16 @@ A book on my private list never shows on Home, in Continue reading or in Lately,
 ## The sleep screen
 
 When the Kindle sleeps, the screensaver message becomes three lines: "Daf", then today's minutes, like "38 of 60 minutes today" or "That's the hour: 64 minutes today", then "Year 30, day N · H hours so far". It counts the Kindle's own minutes even with Wi-Fi off, plus what Daf said about the rest of the day the last time it had a connection.
+
+Under those lines goes my About me note, unless I've turned that off.
+
+## About me
+
+If I ever lose the Kindle, I want whoever picks it up to know whose it is and how to reach me. So there's a short note, ABOUT ME.txt, in the Kindle's documents folder: my name, my phone number and my email. Because it sits in documents, the Kindle's own library lists it too, and it's the first thing anyone sees if they plug the Kindle into a computer and open that folder.
+
+The plugin shows the same note at the foot of the sleep screen, which is what a stranger sees when they find the Kindle lying somewhere. **Tools → Daf → About me → Show** puts it on the screen, and **Edit** opens it in KOReader's text editor (if the file isn't there yet, it starts one with the lines to fill in). The sleep screen picks up an edit the next time the Kindle sleeps. **On the sleep screen** turns that part off and on.
+
+The note lives only in that file on the Kindle. Neither the plugin nor Daf keeps a copy, so my number never ends up in this repository or on the server.
 
 ## The Daf tab
 
