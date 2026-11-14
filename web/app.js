@@ -1309,7 +1309,7 @@ document.addEventListener('keydown', e => {
   }
   // Pages without shortcuts of their own still answer ?: the ones that work everywhere.
   if (!typing && e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey && window.DafCore.Keys &&
-      ['today', 'highlights', 'books', 'book', 'stats', 'prefs', 'sources', 'torah', 'recovery', 'podcasts', 'paper', 'manga', 'shelves', 'shelf', 'catalog'].includes(S.route[0])) {
+      ['today', 'highlights', 'books', 'book', 'stats', 'prefs', 'sources', 'torah', 'recovery', 'podcasts', 'paper', 'manga', 'shelves', 'shelf'].includes(S.route[0])) {
     e.preventDefault(); window.DafCore.Keys.sheet('general'); return;
   }
   if (S.route[0] === 'review'){

@@ -35,6 +35,12 @@ const DEFS = {
     ['goto', 'Go to a page', ['g']], ['search', 'Search in the PDF', ['/']], ['grid', 'All the pages', ['G']],
     ['larger', 'Larger', ['+', '=']], ['smaller', 'Smaller', ['-']], ['fit', 'Fit the width, or the whole page', ['0']],
     ['highlight', 'Highlight the selection', ['h']]]],
+  catalog: ['All books', [
+    ['next', 'Next book', ['ArrowDown']], ['prev', 'Previous book', ['ArrowUp']], ['first', 'First book', ['Home']], ['last', 'Last book', ['End']],
+    ['open', 'Open the book’s page', ['Enter']], ['search', 'Search', ['/']], ['quickview', 'Quickview', ['q']], ['cell', 'Edit the cell', ['F2']],
+    ['add', 'Add books', ['a']], ['edit', 'Edit metadata', ['e']], ['convert', 'Convert books', ['c']], ['read', 'Read', ['v']], ['ebook', 'Edit book', ['t']],
+    ['polish', 'Polish books', ['p']], ['find', 'Find details', ['d']], ['merge', 'Merge books', ['m']], ['download', 'Download', ['s']],
+    ['remove', 'Remove books', ['Delete', 'Backspace']]]],
   manga: ['Manga', [
     ['left', 'Page to the left', ['ArrowLeft']], ['right', 'Page to the right', ['ArrowRight']], ['next', 'Next page', [' ', 'PageDown', 'ArrowDown']],
     ['prev', 'Previous page', ['PageUp', 'ArrowUp']], ['first', 'First page', ['Home']], ['last', 'Last page', ['End']],
@@ -47,6 +53,9 @@ const FIXED = { list: [['?', 'These shortcuts'], ['Esc', 'Clear the selection']]
   review: [['Space', 'Show a flashcard’s answer'], ['1 2 3 4', 'Again, hard, good, easy'], ['⌘ Enter', 'Save the note']],
   pdf: [['Pinch', 'Larger or smaller (⌘ and the wheel, on a Mac)'], ['?', 'These shortcuts'], ['Esc', 'Close what’s open']],
   manga: [['Shift Space', 'Previous page'], ['?', 'These shortcuts'], ['Esc', 'Close, then back']],
+  catalog: [['⌘A', 'Choose all'], ['Shift ↑ ↓', 'Choose more'], ['⌘D', 'Find details'], ['⌘M', 'Mark or unmark'], ['⌘F', 'Search'],
+    ['Alt A', 'Books by the same author'], ['Alt S', 'Books in this series'], ['Alt T', 'Books with the same tags'], ['Alt P', 'Books by this publisher'],
+    ['?', 'These shortcuts'], ['Esc', 'Clear the choice']],
   general: [['⌘K', 'Search everything, or go somewhere'], ['⌘\\', 'The sidebar: full, mini, hidden'], ['?', 'These shortcuts'], ['Esc', 'Close what’s open']] };
 
 let mine = (() => { try { return JSON.parse(localStorage.getItem('daf.keys') || '{}') || {}; } catch(e){ return {}; } })();

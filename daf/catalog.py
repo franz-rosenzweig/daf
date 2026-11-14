@@ -47,6 +47,7 @@ BUILTIN = [
     ("shelves", "Shelves", "list", ("shelf",)),
     ("calibre_id", "Calibre ID", "number", ("id",)),
     ("duplicate", "Duplicate", "bool", ("duplicates", "dupe", "dupes")),
+    ("marked", "Marked", "bool", ("mark",)),
 ]
 DEFAULT_COLS = ["title", "authors", "series", "tags", "rating", "added", "formats", "#pages", "status", "progress"]
 STATUS = {"to-read": "To read", "reading": "Reading", "read": "Read", "paused": "Paused", "dropped": "Dropped"}
@@ -213,6 +214,7 @@ def rows(conn, settings=None, private=False):
     for bid, sid, name in conn.execute("SELECT sb.book_id, s.id, s.name FROM shelf_books sb JOIN shelves s ON s.id = sb.shelf_id ORDER BY s.name"):
         shelves.setdefault(bid, []).append(name)
         shelf_ids.setdefault(bid, []).append(sid)
+    marks = set(marked(settings))
     out = []
     for cid, b in cal.items():
         d = daf.get(cid) or {}
@@ -226,8 +228,15 @@ def rows(conn, settings=None, private=False):
             "progress": d.get("progress"), "progress_note": d.get("progress_note"),
             "last_read": datetime.fromtimestamp(lr, tz).date().isoformat() if lr else None,
             "audio": d.get("audio_pct"), "highlights": hl.get(bid, 0), "shelves": shelves.get(bid, []), "shelf_ids": shelf_ids.get(bid, []),
+            "marked": cid in marks,
         })
     return out, columns(custom)
+
+
+def marked(settings=None):
+    """The books I've marked (Calibre's Mark books: a pin to come back to; marked:true finds them)."""
+    s = settings if settings is not None else config.load_settings()
+    return [int(i) for i in s.get("catalog_marks") or [] if str(i).isdigit()]
 
 
 # ---------- search ----------
@@ -570,7 +579,7 @@ def view(conn, q="", sort_key="added", desc=True, private=False, with_facets=Fal
     for b in found:
         b.pop("_hay", None)
     out = {"total": total, "count": len(found), "books": found, "columns": cols, "error": err, "sort": sort_key, "desc": bool(desc),
-           "default_columns": DEFAULT_COLS, "views": s.get("catalog_views") or []}
+           "default_columns": DEFAULT_COLS, "views": s.get("catalog_views") or [], "marks": len(marked(s))}
     if with_facets:
         out["facets"] = facets(books, cols)
     return out

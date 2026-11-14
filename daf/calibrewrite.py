@@ -121,6 +121,11 @@ def main():
             elif k == "cover":
                 data = base64.b64decode(op["data"]) if op.get("data") else None
                 d.set_cover({ids[0]: data})
+            elif k == "gencover":                       # Calibre's own generated cover (Generate cover; Edit metadata in bulk's "Generate default cover")
+                os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+                from calibre.ebooks.covers import generate_cover
+                for i in ids:
+                    d.set_cover({i: generate_cover(d.get_metadata(i))})
             elif k == "add_format":
                 fmt = op["fmt"].upper()
                 with tempfile.NamedTemporaryFile(suffix="." + fmt.lower(), delete=False) as f:
@@ -194,6 +199,8 @@ def main():
                 exact = {n: i for i, n in d.get_id_map(field).items()}
                 for name, to in names.items():
                     iid = exact.get(name)       # get_item_id(case_sensitive=True) misses names with a comma
+                    if iid is None and field == "authors":
+                        iid = exact.get(name.replace(",", "|"))     # Calibre keeps an author's comma as |
                     if iid is None:
                         continue
                     hit |= set(d.books_for_field(field, iid))
@@ -393,7 +400,7 @@ def b64(data):
 # which is what the Kindle and other readers show. After a change, Calibre writes them into the
 # files (embed_metadata), as Calibre-Web Automated does after an edit there. In the background, a
 # batch at a time, so an edit of many books doesn't wait for it.
-EMBED_AFTER = {"set", "tags", "cover", "merge", "rename_items", "remove_items", "restore"}
+EMBED_AFTER = {"set", "tags", "cover", "gencover", "merge", "rename_items", "remove_items", "restore"}
 _embed = {"pending": set(), "running": 0, "done": 0, "error": None}
 _embed_cv = threading.Condition()
 

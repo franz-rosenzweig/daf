@@ -97,6 +97,7 @@ function draw(){
       '<div class="becover">' + (d.cover ? '<img src="' + coverUrl + '" alt="">' : '<span class="becovernone">' + esc(d.title) + '</span>') + '</div>' +
       '<label class="btn sm befile">Change cover<input type="file" accept="image/*" data-be="coverfile" hidden></label>' +
       '<button class="btn sm" data-be="coverurl">Cover from a link</button>' +
+      '<button class="btn sm" data-be="gencover">Generate cover</button><div class="befcovs begen" id="begen" hidden></div>' +
       '<h3>Files</h3><div class="befiles">' + (d.files.length ? d.files.map(f => '<div class="befilerow"><b>' + esc(f.format) + '</b><span class="mute tiny">' + MB(f.size) + '</span><span class="spacer"></span>' +
         (f.exists ? '<a class="ib" href="/api/catalog/book/' + d.calibre_id + '/files/' + esc(f.format) + '" download aria-label="Download ' + esc(f.format) + '">' + ICON.down + '</a>' : '') +
         '<button class="ib" data-be="filemenu" data-fmt="' + esc(f.format) + '" aria-label="More for ' + esc(f.format) + '">' + ICON.dots + '</button></div>').join('') : '<span class="mute tiny">No file</span>') + '</div>' +
@@ -204,6 +205,7 @@ async function bulk(ids){
       row('Published', inp('published', '', ' type="date"')) +
       row('Languages', '<span class="beclr">' + inp('languages', '', ' list="dl-languages" autocomplete="off" placeholder="No change"') + '<label class="benone"><input type="checkbox" data-f2="clear_languages"> None</label></span>' + dl('dl-languages', d.choices.languages)) +
       (d.custom || []).filter(c => c.key !== '#isbn' && c.dtype !== 'comments').map(c => row(c.label, customCtl(c, null, true))).join('') +
+      '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="gencover"> Generate covers</label></div>' +
       '<h3 class="befrh">Find and replace</h3>' +
       row('In', '<select class="field" data-fr="field">' + FR.map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('') + '</select>') +
       row('Find', '<input class="field" data-fr="find" autocomplete="off" autocapitalize="off" spellcheck="false">') +
@@ -259,19 +261,42 @@ async function saveBulk(){
   for (const k of ['series', 'publisher', 'languages']) if ($('[data-f2="clear_' + k + '"]', s).checked) fields[k] = k === 'languages' ? [] : null;
   const each = {};
   for (const x of frChanges().list) each[x.id] = Object.assign(each[x.id] || {}, { [x.field]: x.to });
-  if (!Object.keys(fields).length && !add.length && !rem.length && !Object.keys(each).length) { close(true); return; }
+  const gencover = $('[data-f2="gencover"]', s).checked;
+  if (!Object.keys(fields).length && !add.length && !rem.length && !Object.keys(each).length && !gencover) { close(true); return; }
   if (fields.authors !== undefined) fields.authors = String(fields.authors).split('&').map(x => x.trim()).filter(Boolean);
   // In the table's order, for numbering a series.
   const order = C.Catalog && C.Catalog.books ? C.Catalog.books().map(b => String(b.calibre_id)).filter(id => E.ids.includes(id)) : E.ids;
   E.busy = true; btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    await api('/api/catalog/bulk', { method: 'POST', body: JSON.stringify({ ids: order.length === E.ids.length ? order : E.ids, fields, add_tags: add, remove_tags: rem, each }) });
+    await api('/api/catalog/bulk', { method: 'POST', body: JSON.stringify({ ids: order.length === E.ids.length ? order : E.ids, fields, add_tags: add, remove_tags: rem, each, gencover }) });
     toast(E.ids.length + ' books changed in Calibre'); close(true); after();
   } catch(e){ toast(e.message); btn.disabled = false; btn.textContent = 'Save'; }
   E.busy = false;
 }
 
 /* ---------- covers and files ---------- */
+// Calibre's Generate cover: one in each of its styles, in colours picked at random each time; a tap takes one.
+const G = { seq: 0 };
+async function genCovers(){
+  const box = $('#begen'); if (!box || !E.d) return;
+  const n = ++G.seq, cid = E.d.calibre_id;
+  box.hidden = false; box.innerHTML = '<span class="befcvwait"></span>'.repeat(5);
+  let covers = [];
+  try {
+    const { job } = await api('/api/catalog/book/' + cid + '/gencovers', { method: 'POST', body: '{}' });
+    for (;;) {
+      await new Promise(r => setTimeout(r, 1200));
+      if (n !== G.seq || !E.d || E.d.calibre_id !== cid) return;
+      const j = await api('/api/catalog/jobs/' + job);
+      if (j.state === 'running') continue;
+      if (j.state !== 'done') throw new Error(j.error || 'Calibre couldn’t make a cover');
+      covers = (j.covers || []).map(c => Object.assign({ ref: job + '/' + c.name }, c));
+      break;
+    }
+  } catch(e){ if (n === G.seq) { box.hidden = true; toast(e.message); } return; }
+  const b = $('#begen'); if (!b || n !== G.seq) return;
+  b.innerHTML = covers.map(c => '<button class="befcv" data-begen="' + esc(c.ref) + '"><img src="/api/catalog/found/' + esc(c.ref) + '?thumb=1" alt=""><span class="tiny">' + esc(c.source) + '</span><span class="tiny mute">' + esc(c.theme || '') + '</span></button>').join('');
+}
 async function cover(body, type){
   try {
     await api('/api/catalog/book/' + E.d.calibre_id + '/cover', { method: 'PUT', body, headers: { 'Content-Type': type } });
@@ -486,6 +511,7 @@ document.addEventListener('click', e => {
   if (t.closest('[data-unchip]')) { t.closest('.bechip').remove(); return; }
   const fc = t.closest('[data-befc]'); if (fc) { compare(+fc.dataset.befc); return; }
   const pickCov = t.closest('[data-cov]'); if (pickCov) { F.cov = pickCov.dataset.cov; drawCovers(F.pick); return; }
+  const gen = t.closest('[data-begen]'); if (gen) { G.seq++; cover(JSON.stringify({ found: gen.dataset.begen }), 'application/json'); return; }
   const cv = t.closest('[data-beconv]'); if (cv) { $('#pop').hidden = true; const [a, b] = cv.dataset.beconv.split('>'); convert(a, b); return; }
   const rm = t.closest('[data-berm]');
   if (rm) { $('#pop').hidden = true; const fmt = rm.dataset.berm;
@@ -502,6 +528,7 @@ document.addEventListener('click', e => {
   else if (k === 'findlist') sheetList(F.results);
   else if (k === 'take') take();
   else if (k === 'save') save();
+  else if (k === 'gencover') genCovers();
   else if (k === 'coverurl') { const u = (prompt('The cover’s address') || '').trim(); if (u) cover(JSON.stringify({ url: u }), 'application/json'); }
   else if (k === 'filemenu') { e.stopPropagation(); fileMenu(b, b.dataset.fmt); }
 });
