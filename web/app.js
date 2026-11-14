@@ -57,7 +57,9 @@ async function api(path, opts){
   }
   if (r.status === 401 && path !== '/api/login') { renderLogin(); throw new Error('signed out'); }
   if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch(e){} noteErr((o.method || 'GET') + ' ' + path.split('?')[0] + ' → ' + r.status + ' ' + m); throw new Error(m); }
-  return r.json();
+  const out = await r.json();
+  if (o.method && o.method !== 'GET' && out && out.job) window.dispatchEvent(new CustomEvent('daf:job'));   // a job started: the Jobs corner (jobs.js) looks
+  return out;
 }
 // What went wrong lately (failed calls, script errors), for Send feedback (feedback.js).
 const ERRS = [];

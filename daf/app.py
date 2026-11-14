@@ -1374,7 +1374,8 @@ def post_count_pages(b=Depends(json_body)):
     ids = [int(i) for i in (b or {}).get("ids") or [] if str(i).isdigit()][:500]
     if not ids:
         raise HTTPException(400, "No books")
-    return {"job": calibrewrite.start_job(lambda: calibrekeep.write_pages(calibrekeep.pages_for(ids))), "total": len(ids)}
+    jid = calibrewrite.start_job(lambda: calibrekeep.write_pages(calibrekeep.pages_for(ids)))
+    return {"job": calibrewrite.name(jid, "pages", "Count pages of {}", "Count pages of {} books", ids), "total": len(ids)}
 
 
 @app.get("/api/catalog/job/{jid}", dependencies=[Depends(user)])
@@ -1431,6 +1432,7 @@ def post_convert_many(b=Depends(json_body)):
         if src:
             todo.append((cid, src))
     job = calibrewrite.start_convert_many(todo, to, opts) if todo else None
+    calibrewrite.name(job, "convert", "Convert {} to " + to, "Convert {} books to " + to, [cid for cid, _src in todo])
     return {"job": job, "total": len(todo), "have": have}
 
 
@@ -1585,7 +1587,7 @@ def post_catalog_save(b=Depends(json_body)):
     if not cids:
         raise HTTPException(400, "No books")
     opts = savetodisk.clean(b)
-    return {"job": calibrewrite.start_job(lambda: savetodisk.build(cids, opts))}
+    return {"job": calibrewrite.name(calibrewrite.start_job(lambda: savetodisk.build(cids, opts)), "save", "Save {} to disk", "Save {} books to disk", cids)}
 
 
 @app.get("/api/catalog/save/{token}", dependencies=[Depends(user)])
@@ -1812,7 +1814,7 @@ def convert_catalog_file(cid: int, b=Depends(json_body)):
     opts = _convert_opts(b, to)
     if not catalog.book_file(cid, src):
         raise HTTPException(400, f"The book has no {src} file")
-    return {"job": calibrewrite.start_convert(cid, src, to, opts)}
+    return {"job": calibrewrite.name(calibrewrite.start_convert(cid, src, to, opts), "convert", "Convert {} to " + to, "", [cid])}
 
 
 @app.post("/api/catalog/epubmerge", dependencies=[Depends(user)])
@@ -1832,7 +1834,8 @@ def post_epubmerge(b=Depends(json_body)):
     op = {"op": "epubmerge", "ids": ids, "title": str(b.get("title") or "").strip()[:500],
           "authors": [str(a).strip()[:200] for a in authors if str(a).strip()][:20],
           "flatten": bool(b.get("flatten")), "descriptions": bool(b.get("descriptions"))}
-    return {"job": calibrewrite.start_job(lambda: calibrewrite.run([op], timeout=1800)["added"][0])}
+    jid = calibrewrite.start_job(lambda: calibrewrite.run([op], timeout=1800)["added"][0])
+    return {"job": calibrewrite.name(jid, "epubmerge", "EpubMerge {}", "EpubMerge {} books", ids)}
 
 
 # Calibre's Polish books dialog: its actions, in its order; "metadata" and "do_cover" are its Update
@@ -1865,7 +1868,7 @@ def post_polish(b=Depends(json_body)):
     todo = [i for i in ids if kinds & set(catalog.formats_of(i))]
     if not todo:
         raise HTTPException(400, "No EPUB, AZW3 or KEPUB to polish")
-    job = calibrewrite.start_polish_many(todo, opts, b.get("keep_original") is not False)
+    job = calibrewrite.name(calibrewrite.start_polish_many(todo, opts, b.get("keep_original") is not False), "polish", "Polish {}", "Polish {} books", todo)
     return {"job": job, "total": len(todo), "skipped": len(ids) - len(todo)}
 
 
@@ -1882,7 +1885,8 @@ def post_restore_original(b=Depends(json_body)):
     todo = [i for i in ids if any(f.startswith("ORIGINAL_") for f in catalog.formats_of(i))]
     if not todo:
         raise HTTPException(400, "No ORIGINAL_ file to restore")
-    return {"job": calibrewrite.start_restore_many(todo), "total": len(todo), "skipped": len(ids) - len(todo)}
+    job = calibrewrite.name(calibrewrite.start_restore_many(todo), "restore", "Restore the originals of {}", "Restore the originals of {} books", todo)
+    return {"job": job, "total": len(todo), "skipped": len(ids) - len(todo)}
 
 
 @app.post("/api/catalog/book/{cid}/files/{fmt}/restore", dependencies=[Depends(user)])
@@ -2089,7 +2093,8 @@ def fill_catalog_books(b=Depends(json_body)):
     fields = [f for f in b.get("fields") or calibrefind.FILL_FIELDS if f in calibrefind.FILL_FIELDS]
     if not ids or not fields:
         raise HTTPException(400, "Which books, and what to fill in")
-    return {"job": calibrefind.fill_start(ids, fields)}
+    from . import calibrewrite
+    return {"job": calibrewrite.name(calibrefind.fill_start(ids, fields), "fill", "Find details for {}", "Find details for {} books", ids)}
 
 
 @app.post("/api/catalog/fill/apply", dependencies=[Depends(user)])
@@ -2103,6 +2108,7 @@ def apply_catalog_fill(b=Depends(json_body)):
     have, custom_keys = catalog.brief([int(x["id"]) for x in books])
     jid = uuid.uuid4().hex[:12]
     job = calibrewrite._jobs[jid] = {"state": "running", "started": time.time(), "kind": "apply", "done": 0, "total": len(books), "failed": []}
+    calibrewrite.name(jid, "apply", "Fill in details for {}", "Fill in details for {} books", [int(x["id"]) for x in books])
 
     def fields_for(cid, fill):
         f = {}
@@ -2158,6 +2164,30 @@ def post_catalog_embed(b=Depends(json_body)):
     return calibrewrite.embed_status()
 
 
+@app.get("/api/catalog/jobs", dependencies=[Depends(user)])
+def get_catalog_jobs():
+    """Calibre's Jobs list: the named jobs, running first, then the last 30 finished (a day at most),
+    each with its label, state, progress and errors (calibrewrite.jobs_list). → {jobs, running}."""
+    from . import calibrewrite
+
+    def titles(ids):
+        books = catalog.calibre_rows()[0]
+        return {i: books[i]["title"] for i in ids if i in books}
+    jobs = calibrewrite.jobs_list(titles)
+    return {"jobs": jobs, "running": sum(1 for j in jobs if j["state"] == "running")}
+
+
+@app.post("/api/catalog/jobs/{jid}/stop", dependencies=[Depends(user)])
+def post_catalog_job_stop(jid: str):
+    """Stop a job that goes a book at a time, after the book it's on (the rest are left)."""
+    from . import calibrewrite
+    if not calibrewrite.job(jid):
+        raise HTTPException(404, "No such job")
+    if not calibrewrite.stop(jid):
+        raise HTTPException(400, "That job can't be stopped")
+    return {"ok": True}
+
+
 @app.get("/api/catalog/jobs/{jid}", dependencies=[Depends(user)])
 def get_catalog_job(jid: str):
     from . import calibrewrite
@@ -2176,7 +2206,9 @@ def post_isbn_lookup(b=Depends(json_body)):
     text = str(b.get("text") or "")[:20000] if isinstance(b, dict) else ""
     if not any(it["isbn"] for it in isbnadd.parse(text)):
         raise HTTPException(400, "No ISBNs")
-    return {"job": isbnadd.lookup_start(text)}
+    from . import calibrewrite
+    n = sum(1 for it in isbnadd.parse(text) if it["isbn"])
+    return {"job": calibrewrite.name(isbnadd.lookup_start(text), "isbn", "Look up an ISBN", "Look up {} ISBNs", n=n)}
 
 
 @app.post("/api/catalog/isbn/add", dependencies=[Depends(user)])
@@ -2204,7 +2236,7 @@ def post_isbn_add(b=Depends(json_body)):
                 except Exception:  # noqa: BLE001 - a book without its cover is still added
                     pass
         return added
-    return {"job": calibrewrite.start_job(work)}
+    return {"job": calibrewrite.name(calibrewrite.start_job(work), "isbnadd", "Add a book from its ISBN", "Add {} books from ISBNs", n=len(books))}
 
 
 # ---- Import list (importlist.py, web/importlist.js): a list of books from elsewhere, matched against Calibre ----
@@ -2316,7 +2348,7 @@ def post_importlist_apply(b=Depends(json_body), c=Depends(conn)):
         if added:
             _after_removal({})                  # Daf's book list built again, away from here (as after a restore)
         return out
-    return {"job": calibrewrite.start_job(work)}
+    return {"job": calibrewrite.name(calibrewrite.start_job(work), "import", "Import a list of one book", "Import a list of {} books", n=len(add) + len(have))}
 
 
 # ---- Edit book: a Calibre book's insides, on a working copy (ebookedit.py, web/ebookedit.js) ----

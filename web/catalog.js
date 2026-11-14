@@ -114,7 +114,7 @@ C.views.catalog = async () => {
     '<button class="calsw" data-act="cat:side" aria-pressed="' + P.side + '">' + IC.side + '<span>Tag browser</span></button>' +
     '<button class="calsw" data-act="cat:det" aria-pressed="' + P.det + '">' + IC.det + '<span>Book details</span></button>' +
     '<button class="calsw" data-act="cat:grid" aria-pressed="' + P.grid + '">' + IC.grid + '<span>Cover grid</span></button>' +
-    '<button class="calsw" data-act="cat:qv" aria-pressed="' + P.qv + '">' + IC.qv + '<span>Quickview</span></button></div>';
+    '<button class="calsw" data-act="cat:qv" aria-pressed="' + P.qv + '">' + IC.qv + '<span>Quickview</span></button>' + (C.Jobs ? C.Jobs.button() : '') + '</div>';
   await load(P.side);
   if (P.side) drawSide();
 };
