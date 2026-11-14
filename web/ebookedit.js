@@ -341,6 +341,7 @@ const unpop = () => { const p = $('#ebxpop'); if (p) p.hidden = true; };
 function moreMenu(anchor){
   pop(anchor, (phone() ? '<button data-ebm="toc">Contents</button><button data-ebm="check">Check book</button><hr>' : '') +
     TOOLS.map(([k, label]) => '<button data-ebm="tool" data-tool="' + k + '">' + label + '</button>').join('') +
+    (C.EbookTools ? '<hr><button data-ebm="spell">Check spelling</button><button data-ebm="reports">Reports</button>' : '') +      // ebooktools.js
     '<hr><button data-ebm="add">Add a file</button><button data-ebm="cps"' + (X.checkpoints.length ? '' : ' disabled') + '>Checkpoints</button>' +
     '<hr><button data-ebm="discard"' + (X.changed ? '' : ' disabled') + '>Discard changes</button>');
 }
@@ -758,6 +759,7 @@ document.addEventListener('click', async e => {
     else if (k === 'rename') renameFile(m.dataset.name);
     else if (k === 'remove') removeFile(m.dataset.name);
     else if (k === 'gen') tocGen(m.dataset.kind);
+    else if ((k === 'spell' || k === 'reports') && C.EbookTools) C.EbookTools[k]();
     return;
   }
   const b = t.closest('[data-ebx]'); if (!b) return;
@@ -819,5 +821,9 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && X) 
 window.addEventListener('hashchange', () => { if (X) shut(); });
 window.addEventListener('resize', () => { if (X) layout(); });
 
-C.EbookEdit = { open, close: () => shut() };
+C.EbookEdit = { open, close: () => shut(),
+  // for ebooktools.js (Check spelling, Reports): the open book, and going to a place in it
+  tools: { book: () => X && { cid: X.cid, files: X.files, cur: X.cur }, base: () => base(), show: (name, at) => showFile(name, at),
+    text: () => (X && X.view ? X.view.state.doc.toString() : ''), goTo: at => goTo(at), flush: () => flush(), reload: () => reload(),
+    busy: (label, fn) => busy(label, fn), job: p => job(p) } };
 })();

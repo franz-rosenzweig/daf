@@ -2558,6 +2558,49 @@ def delete_ebookedit(cid: int):
     return {"ok": True}
 
 
+# ---- Edit book's Check spelling and Reports (ebooktools.py, web/ebooktools.js): Calibre's, on the copy ----
+@app.post("/api/ebookedit/{cid}/spell", dependencies=[Depends(user)])
+def post_ebookedit_spell(cid: int):
+    """Check spelling: every word with its language and count, as a job (GET /api/catalog/jobs/{job}: done)."""
+    from . import ebooktools
+    _ebx(ebooktools.E._need, cid)
+    return _ebx_job(ebooktools.spell, cid)
+
+
+@app.post("/api/ebookedit/{cid}/spell/suggest", dependencies=[Depends(user)])
+def post_ebookedit_suggest(cid: int, b=Depends(json_body)):
+    """{word, lang} → {suggestions, dictionary}."""
+    from . import ebooktools
+    b = b if isinstance(b, dict) else {}
+    return _ebx(ebooktools.suggest, cid, b.get("word"), b.get("lang"))
+
+
+@app.post("/api/ebookedit/{cid}/spell/add", dependencies=[Depends(user)])
+def post_ebookedit_add_word(cid: int, b=Depends(json_body)):
+    """{word, lang} into Calibre's user dictionary."""
+    from . import ebooktools
+    b = b if isinstance(b, dict) else {}
+    return _ebx(ebooktools.add_word, cid, b.get("word"), b.get("lang"))
+
+
+@app.post("/api/ebookedit/{cid}/spell/change", dependencies=[Depends(user)])
+def post_ebookedit_change_all(cid: int, b=Depends(json_body)):
+    """Change all: {word, to, lang}, a checkpoint first, as a job (done: {changed, recognized, checkpoint})."""
+    from . import ebooktools
+    b = b if isinstance(b, dict) else {}
+    word, to, lang = (_ebx(ebooktools._word, b.get("word")), _ebx(ebooktools._word, b.get("to")), _ebx(ebooktools._lang, b.get("lang")))
+    _ebx(ebooktools.E._need, cid)
+    return _ebx_job(ebooktools.change_all, cid, word, to, lang)
+
+
+@app.post("/api/ebookedit/{cid}/reports", dependencies=[Depends(user)])
+def post_ebookedit_reports(cid: int):
+    """Reports: {files, words, images, links, chars, css}, as a job."""
+    from . import ebooktools
+    _ebx(ebooktools.E._need, cid)
+    return _ebx_job(ebooktools.reports, cid)
+
+
 @app.put("/api/nightstand", dependencies=[Depends(user)])
 async def put_nightstand(request: Request, c=Depends(conn)):
     body = await request.json()
