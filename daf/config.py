@@ -187,6 +187,8 @@ def load_settings():
         s["views"] = [v for v in saved["views"] if isinstance(v, dict) and isinstance(v.get("id"), str)][:30]
     if isinstance(saved.get("catalog_views"), list):  # All books (#catalog): saved searches, sorts and columns (catalog.py)
         s["catalog_views"] = [v for v in saved["catalog_views"] if isinstance(v, dict) and isinstance(v.get("name"), str)][:40]
+    if isinstance(saved.get("catalog_marks"), list):  # All books' Mark books (catalog.marked): Calibre ids
+        s["catalog_marks"] = [i for i in saved["catalog_marks"] if isinstance(i, int)][-5000:]
     if isinstance(saved.get("convert_opts"), dict):  # the Convert sheet's defaults (convertopts.py), checked where they're used
         s["convert_opts"] = saved["convert_opts"]
     if isinstance(saved.get("goals"), list):
