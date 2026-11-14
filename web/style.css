@@ -2879,6 +2879,8 @@ body.ebxopen{overflow:hidden}
 @media (pointer:coarse){ .emacts .btn{min-width:42px;min-height:40px} }
 @media (max-width:699px){
   .emsheet .field{font-size:16px}
-  .emrow{grid-template-columns:18px 34px minmax(0,1fr) auto;gap:8px}
+  .emrow{grid-template-columns:18px 34px minmax(0,1fr);gap:4px 8px}
+  .emrow .emn,.emrow img,.emrow .befnc{grid-row:span 2}
   .emrow img,.emrow .befnc{width:34px;height:50px}
+  .emacts{grid-column:3}
 }
