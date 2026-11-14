@@ -660,23 +660,32 @@ def start_convert(cid, src, to, opts=None):
             _jobs[jid].update(state="done", ended=time.time())
         except Exception as e:  # noqa: BLE001 - the page says what went wrong
             _jobs[jid].update(state="failed", error=str(e), ended=time.time())
+        finished(jid)
     threading.Thread(target=work, daemon=True).start()
     _prune()
     return jid
 
 
-def start_job(fn):
-    """Any slow change as a job: {running, done (what fn returned), error}."""
+def start_job(fn, stoppable=False):
+    """Any slow change as a job: {running, done (what fn returned), error}. A stoppable one's fn gets
+    a stop() to ask between its steps: True once Stop was pressed (and the job then says stopped)."""
     jid = uuid.uuid4().hex[:12]
-    j = _jobs[jid] = {"running": True, "started": time.time()}
+    j = _jobs[jid] = {"running": True, "started": time.time(), **({"stoppable": True} if stoppable else {})}
+
+    def stop_now():
+        if j.get("stop"):
+            j["stopped"] = True
+            return True
+        return False
 
     def work():
         try:
-            j["done"] = fn()
+            j["done"] = fn(stop_now) if stoppable else fn()
         except Exception as e:  # noqa: BLE001 - the page says what went wrong
             j["error"] = str(e)[:300]
         j["ended"] = time.time()
         j["running"] = False
+        finished(jid)
     threading.Thread(target=work, daemon=True).start()
     _prune()
     return jid
@@ -701,6 +710,7 @@ def start_each(ops, timeout=1000, **info):
             j["done"] += 1
         j["ended"] = time.time()
         j["running"] = False
+        finished(jid)
     threading.Thread(target=work, daemon=True).start()
     _prune()
     return jid
@@ -739,6 +749,96 @@ def _prune():
             _jobs.pop(k, None)
 
 
+def _row(jid, j):
+    """A job as the Jobs list keeps it, its label still to be made (name)."""
+    run_ = _running(j)
+    fails = j.get("failed") if isinstance(j.get("failed"), list) else []
+    if j.get("stopped"):
+        state = "stopped"
+    elif run_:
+        state = "running"
+    elif j.get("state") == "failed" or j.get("error") or (fails and len(fails) >= (j.get("total") or 0)):
+        state = "failed"
+    else:
+        state = "done"
+    counts = isinstance(j.get("done"), int) and not isinstance(j.get("done"), bool) and isinstance(j.get("total"), int)
+    return {"id": jid, "kind": j.get("kind"), "name": j["name"], "state": state, "started": j["started"],
+            "ended": None if run_ else j.get("ended"), "done": j["done"] if counts else None,
+            "total": j["total"] if counts else None, "failed": len(fails),
+            "errors": [{"id": f.get("id"), "error": f.get("error")} for f in fails[:5] if isinstance(f, dict)],
+            "error": j.get("error") or (fails[0].get("error") if state == "failed" and fails and isinstance(fails[0], dict) else None)}
+
+
+# The named jobs' rows are kept in Daf's own database too (kv calibre_jobs, {id: row}), written when a
+# job is named and when it finishes, so the list survives a restart; one that was still running then
+# shows as interrupted. Read once, then kept here.
+_stored = None
+_store_lock = threading.Lock()
+
+
+def _store_load():
+    from .db import connect
+    conn = connect()
+    try:
+        r = conn.execute("SELECT v FROM kv WHERE k = 'calibre_jobs'").fetchone()
+    finally:
+        conn.close()
+    v = json.loads(r[0]) if r and r[0] else {}
+    return v if isinstance(v, dict) else {}
+
+
+def _store_save(rows):
+    from .db import connect
+    conn = connect()
+    try:
+        conn.execute("INSERT INTO kv (k, v) VALUES ('calibre_jobs', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", (json.dumps(rows),))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _keep(r, now):
+    """A stored row still worth keeping: finished less than a day ago, started less than two."""
+    return now - (r.get("ended") or r.get("started") or 0) <= DAY and now - (r.get("started") or 0) <= 2 * DAY
+
+
+def stored():
+    """The kept rows, {id: row}: read from the database the first time."""
+    global _stored
+    with _store_lock:
+        if _stored is None:
+            try:
+                _stored = _store_load()
+            except Exception as e:  # noqa: BLE001 - no kept rows is still a list
+                log.warning("jobs: couldn't read the kept ones: %s", e)
+                _stored = {}
+        return _stored
+
+
+def _store(jid):
+    j = _jobs.get(jid)
+    if not j or not j.get("name"):
+        return
+    rows = stored()
+    with _store_lock:
+        now = time.time()
+        rows[jid] = _row(jid, j)
+        for k in [k for k, r in rows.items() if not _keep(r, now)]:
+            rows.pop(k, None)
+        try:
+            _store_save(rows)
+        except Exception as e:  # noqa: BLE001 - a job isn't stopped by a list that couldn't be written
+            log.warning("jobs: couldn't keep %s: %s", jid, e)
+
+
+def finished(jid):
+    """A job is done (whichever way): its end stamped, and its row kept when it's named."""
+    j = _jobs.get(jid)
+    if j is not None:
+        j.setdefault("ended", time.time())
+        _store(jid)
+
+
 def name(jid, kind, one, many, ids=(), n=None):
     """A job's name in the Jobs list: `one` for a single book ({} its title, put in when the list is
     read), else `many` ({} how many). A job without one isn't listed (Edit book's steps, a book's own
@@ -749,6 +849,7 @@ def name(jid, kind, one, many, ids=(), n=None):
         n = len(ids) if n is None else n
         j.setdefault("kind", kind)
         j["name"] = {"one": one, "many": many, "id": ids[0] if n == 1 and ids else None, "n": n}
+        _store(jid)
     return jid
 
 
@@ -764,33 +865,25 @@ def stop(jid):
 
 def jobs_list(titles=lambda ids: {}):
     """The named jobs, running first (newest first), then the last 30 finished, newest first:
-    [{id, label, kind, state (running, done, failed, stopped), started, ended, done, total,
-    failed, errors [{id, title, error}], error, stoppable, stopping}]. titles({ids}) → {id: title}."""
+    [{id, label, kind, state (running, done, failed, stopped, interrupted), started, ended, done,
+    total, failed, errors [{id, title, error}], error, stoppable, stopping}]. titles({ids}) → {id: title}.
+    Jobs from before a restart come from the kept rows; one still running then is interrupted."""
     _prune()
     now, rows = time.time(), []
     for jid, j in list(_jobs.items()):
-        nm = j.get("name")
-        if not nm:
+        if not j.get("name"):
             continue
         run_ = _running(j)
         if not run_ and not j.get("ended"):
             j["ended"] = now                        # a job that doesn't stamp its own end: about now
-        fails = j.get("failed") if isinstance(j.get("failed"), list) else []
-        if j.get("stopped"):
-            state = "stopped"
-        elif run_:
-            state = "running"
-        elif j.get("state") == "failed" or j.get("error") or (fails and len(fails) >= (j.get("total") or 0)):
-            state = "failed"
-        else:
-            state = "done"
-        counts = isinstance(j.get("done"), int) and not isinstance(j.get("done"), bool) and isinstance(j.get("total"), int)
-        rows.append({"id": jid, "kind": j.get("kind"), "name": nm, "state": state, "started": j["started"],
-                     "ended": None if run_ else j.get("ended"), "done": j["done"] if counts else None,
-                     "total": j["total"] if counts else None, "failed": len(fails),
-                     "errors": [{"id": f.get("id"), "error": f.get("error")} for f in fails[:5] if isinstance(f, dict)],
-                     "error": j.get("error") or (fails[0].get("error") if state == "failed" and fails and isinstance(fails[0], dict) else None),
-                     "stoppable": bool(j.get("stoppable")) and run_ and not j.get("stop"), "stopping": bool(j.get("stop")) and run_})
+        rows.append(dict(_row(jid, j), stoppable=bool(j.get("stoppable")) and run_ and not j.get("stop"), stopping=bool(j.get("stop")) and run_))
+    for jid, r in list(stored().items()):
+        if jid in _jobs or not _keep(r, now) or not isinstance(r.get("name"), dict):
+            continue
+        r = dict(r, stoppable=False, stopping=False, errors=[dict(e) for e in r.get("errors") or []])
+        if r["state"] == "running":                 # running when Daf stopped
+            r["state"] = "interrupted"
+        rows.append(r)
     want = {r["name"]["id"] for r in rows if r["name"]["id"] is not None} | {e["id"] for r in rows for e in r["errors"] if e["id"] is not None}
     try:
         t = titles(want) if want else {}

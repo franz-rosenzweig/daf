@@ -3164,3 +3164,19 @@ body.ebxopen{overflow:hidden}
 /* columns built from other columns in Add your own columns; Highlight pressed */
 .octpl{font-family:ui-monospace,Menlo,monospace}
 .calsearch .catb[aria-pressed="true"]{background:var(--active);color:var(--fg)}
+
+/* Jobs on every page (jobs.js): the new look's corner beside the goal ring; a pill elsewhere */
+.jbcorner{display:contents}
+.jbround{position:relative}
+.jbround .jbn{position:absolute;top:-4px;right:-4px;min-width:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;line-height:18px;text-align:center}
+.jbround.bad,.jbfloat.bad{color:var(--bad)}
+.jbfloat{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:45;display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg-2);font:inherit;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer}
+.jbfloat[hidden]{display:none}
+.jbfloat .jbn{min-width:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;line-height:18px;text-align:center}
+html[data-look="2"]:not(.l2-phone) .jbfloat,html.reading .jbfloat,body[data-view="catalog"] .jbfloat,body[data-view="catalog"] .jbcorner{display:none}
+body.playing .jbfloat{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+@media (max-width:699px){
+  .jbfloat{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  body.playing .jbfloat{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+}
+@media (pointer:coarse){ .jbfloat{padding:9px 14px} }

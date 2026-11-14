@@ -515,10 +515,13 @@ def fill_start(cids, fields):
     from . import catalog
     books, custom_keys = catalog.brief(cids)
     jid = uuid.uuid4().hex[:12]
-    job = W._jobs[jid] = {"state": "running", "started": time.time(), "kind": "fill", "done": 0, "total": len(books), "books": []}
+    job = W._jobs[jid] = {"state": "running", "started": time.time(), "kind": "fill", "done": 0, "total": len(books), "books": [], "stoppable": True}
     _tidy_found()
 
     def one(cid):
+        if job.get("stop"):                     # Stop (Jobs): the books being looked up finish, the rest aren't asked for
+            job["stopped"] = True
+            return
         b = books[cid]
         answers, errs = [], []
         ids = {k: v for k, v in b["identifiers_map"].items() if k in ("isbn", "google", "amazon", "goodreads", "edelweiss", "openlibrary")}
@@ -561,5 +564,6 @@ def fill_start(cids, fields):
             job["state"] = "done"
         except Exception as e:  # noqa: BLE001
             job.update(state="failed", error=str(e))
+        W.finished(jid)
     threading.Thread(target=work, daemon=True).start()
     return jid

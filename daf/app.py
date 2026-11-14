@@ -2203,6 +2203,7 @@ def apply_catalog_fill(b=Depends(json_body)):
                 job["failed"] += [{"id": int(x["id"]), "error": str(e)} for x in batch]
             job["done"] += len(batch)
         job["state"] = "done"
+        calibrewrite.finished(jid)
     threading.Thread(target=work, daemon=True).start()
     return {"job": jid}
 
@@ -2356,6 +2357,9 @@ def get_importlist_search(q: str = ""):
     return {"books": [x for x in importlist.search(_il_books(), q[:200], 60) if not library.is_private(x["title"], s)][:30]}
 
 
+IMPORT_BATCH = 10                                   # Import list's empty books per Calibre run (Stop comes between)
+
+
 @app.post("/api/catalog/importlist/apply", dependencies=[Depends(user)])
 def post_importlist_apply(b=Depends(json_body), c=Depends(conn)):
     """The list's books, all at once, as a job (GET /api/catalog/job/{job}): {add: [rows] → empty books
@@ -2384,14 +2388,18 @@ def post_importlist_apply(b=Depends(json_body), c=Depends(conn)):
         raise HTTPException(400, "Nothing to do")
     names = {cid: (x.get("title"), x.get("authors") or []) for cid, x in catalog.calibre_rows()[0].items() if cid in set(have)}
 
-    def work():
-        ops = []
-        if add:
-            ops.append({"op": "add_empty", "books": importlist.empty_books(add, add_tags, read)})
+    def work(stop):
+        # The empty books ten at a time, so Stop (Jobs) can come between them: the ones added stay,
+        # and get their tags, Daf rows and shelves like the rest
+        res, added, empty = {}, [], importlist.empty_books(add, add_tags, read) if add else []
         if have and have_tags:
-            ops.append({"op": "tags", "ids": have, "add": have_tags})
-        res = calibrewrite.run(ops, timeout=900) if ops else {}
-        added = res.get("added") or []
+            res.update(calibrewrite.run([{"op": "tags", "ids": have, "add": have_tags}], timeout=900))
+        for i in range(0, len(empty), IMPORT_BATCH):
+            if stop():
+                break
+            r = calibrewrite.run([{"op": "add_empty", "books": empty[i:i + IMPORT_BATCH]}], timeout=900)
+            added += r.pop("added", None) or []
+            res.update(r)
         out = {"added": added, "tagged": len(have) if have_tags else 0, "shelved": 0, "failed": []}
         c2 = db.connect()
         try:
@@ -2410,7 +2418,7 @@ def post_importlist_apply(b=Depends(json_body), c=Depends(conn)):
         if added:
             _after_removal({})                  # Daf's book list built again, away from here (as after a restore)
         return out
-    return {"job": calibrewrite.name(calibrewrite.start_job(work), "import", "Import a list of one book", "Import a list of {} books", n=len(add) + len(have))}
+    return {"job": calibrewrite.name(calibrewrite.start_job(work, stoppable=True), "import", "Import a list of one book", "Import a list of {} books", n=len(add) + len(have))}
 
 
 # ---- Edit book: a Calibre book's insides, on a working copy (ebookedit.py, web/ebookedit.js) ----
