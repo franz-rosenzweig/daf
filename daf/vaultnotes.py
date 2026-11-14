@@ -51,6 +51,8 @@ def _render(book, hl_notes, reading_notes, settings, listened=()):
             label = f"**Paper, p. {h['page']}**" if h.get("page") else "**Paper**"
         elif h.get("source") == "epub":
             label = "**Read in Daf**" + (f" · {h['chapter']}" if h.get("chapter") else "")
+        elif h.get("source") == "calibre":
+            label = "**Read in Calibre**" + (f" · {h['chapter']}" if h.get("chapter") else "")
         else:
             label = f"**Audiobook, {_ts(t)}**" if t is not None else "**Audiobook**"
         label += f" · {h['note']}" if h.get("note") else ""
@@ -120,11 +122,11 @@ def write_book(conn, settings, book_id, create=False):
     # removed in Daf, or merged into a bigger one, goes; a Kindle one deleted on the Kindle keeps its note.
     hl_notes = [dict(r) for r in conn.execute(
         "SELECT h.id, h.text, s.user_note, s.vault_hash, s.tags FROM highlights h JOIN review_state s ON s.hl_id = h.id "
-        "WHERE h.book_id = ? AND (s.user_note IS NOT NULL OR (s.tags IS NOT NULL AND h.source NOT IN ('audiobookshelf', 'paper', 'epub') AND h.deleted = 0)) "
+        "WHERE h.book_id = ? AND (s.user_note IS NOT NULL OR (s.tags IS NOT NULL AND h.source NOT IN ('audiobookshelf', 'paper', 'epub', 'calibre') AND h.deleted = 0)) "
         "AND NOT (h.deleted = 1 AND h.source IN ('epub', 'paper', 'daf')) ORDER BY COALESCE(h.page, 0), h.created", (book_id,))]
     listened = [dict(r) for r in conn.execute(
         "SELECT h.id, h.text, h.note, h.pos, h.source, h.page, h.chapter, s.tags FROM highlights h LEFT JOIN review_state s ON s.hl_id = h.id "
-        "WHERE h.book_id = ? AND h.source IN ('audiobookshelf', 'paper', 'epub') "
+        "WHERE h.book_id = ? AND h.source IN ('audiobookshelf', 'paper', 'epub', 'calibre') "
         "AND h.deleted = 0 AND s.user_note IS NULL "
         "ORDER BY h.source, COALESCE(h.page, 0), h.created", (book_id,))]
     notes = [dict(r) for r in conn.execute(
@@ -166,7 +168,7 @@ def write_all(conn, settings):
     ids = {r[0] for r in conn.execute(
         "SELECT DISTINCT h.book_id FROM highlights h JOIN review_state s ON s.hl_id = h.id WHERE s.user_note IS NOT NULL "
         "AND h.source NOT IN ('daf', 'clip')")}
-    ids |= {r[0] for r in conn.execute("SELECT DISTINCT book_id FROM highlights WHERE source IN ('audiobookshelf', 'paper', 'epub') AND deleted = 0 AND book_id IS NOT NULL")}
+    ids |= {r[0] for r in conn.execute("SELECT DISTINCT book_id FROM highlights WHERE source IN ('audiobookshelf', 'paper', 'epub', 'calibre') AND deleted = 0 AND book_id IS NOT NULL")}
     ids |= {r[0] for r in conn.execute("SELECT DISTINCT book_id FROM reading_notes WHERE book_id IS NOT NULL")}
     # Articles highlighted on the Kindle (Send to Kindle): their clipping notes. Any id that is a
     # document (an article's Karakeep highlight with a note, say) gets its clipping note, never a

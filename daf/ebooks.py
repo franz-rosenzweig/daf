@@ -137,9 +137,12 @@ def details(conn, book_id):
         p = h.pop("pos", None)
         if p and p.startswith("{"):
             try:
-                h["t"] = json.loads(p).get("t")
+                j = json.loads(p)
             except ValueError:
-                pass
+                j = {}
+            h["t"] = j.get("t")
+            if h["source"] == "calibre":           # its chapter, and Calibre's place when it was found in this file (calibrehl.place)
+                h["sec"], h["ccfi"] = j.get("sec"), j.get("cfi")
         elif p:
             h["xp"] = p
     out["bookmarks"] = [dict(r) for r in conn.execute(

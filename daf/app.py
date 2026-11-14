@@ -975,7 +975,7 @@ def _hl_rows(c, where="", args=(), order="COALESCE(h.created, 0) DESC"):
 
 HL_SOURCES = {"kindle": "h.source = 'kindle'", "daf": "h.source IN ('epub', 'daf')", "articles": "b.kind = 'article'",
               "audio": "h.source IN ('audiobookshelf', 'clip')", "paper": "h.source = 'paper'",
-              "readwise": "h.source = 'readwise'"}
+              "readwise": "h.source = 'readwise'", "calibre": "h.source = 'calibre'"}
 
 
 def _hl_filter(q="", book="", private=0, source="", color="", tag="", fav=0):

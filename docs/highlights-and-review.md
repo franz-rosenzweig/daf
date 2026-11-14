@@ -13,12 +13,13 @@ This page is about the part of Daf I'd miss most if it disappeared: every highli
 - **Audiobooks and podcasts**, transcribed from a bookmark or a shared position.
 - **Paper pages**, from photos of the lines you marked in pencil.
 - **Readwise**, the years before Daf, read from the Readwise exports in my vault.
+- **Calibre**, the highlights I made in Calibre's own viewer on the Mac, read from the library itself (see [Highlights from Calibre](#highlights-from-calibre)).
 
 ## Making a highlight
 
 With a mouse, selecting more than one word highlights it right away, like Readwise, and selections grow to whole words. Hold Alt (⌥ on a Mac) to select without highlighting. On a touch screen, or when **Auto highlight** is off, a small bar comes up instead with **Highlight** (h), **Highlight with a note** (n), **Ask about this** and **Copy**, and **Define** or **Translate** when you've selected a single word or a Hebrew phrase.
 
-Once it's a highlight, the bar changes: the colored circle removes it (with Undo for a few seconds), then **Add a note**, **Tag it**, the five colors (yellow, green, blue, pink and purple), and **…** for **Copy text**, **Share as image**, **View in notebook**, **Favorite** and **Make a flashcard**. A Kindle highlight shows "Kindle" where the remove button is, because it belongs to the Kindle.
+Once it's a highlight, the bar changes: the colored circle removes it (with Undo for a few seconds), then **Add a note**, **Tag it**, the five colors (yellow, green, blue, pink and purple), and **…** for **Copy text**, **Share as image**, **View in notebook**, **Favorite** and **Make a flashcard**. A Kindle highlight shows "Kindle" where the remove button is, because it belongs to the Kindle, and one made in Calibre shows "Calibre" for the same reason.
 
 On a phone the bar keeps clear of the selection handles, so a tap on it never lands on a handle instead. In the Android app it's the only menu, since Android's own Copy and Select all bar stays away while a book or article is open, and it sits over the words. In a phone's browser, whose own menu takes that spot, it sits well under them. A tap anywhere on the page puts the bar away and does only that, so it doesn't turn the page too.
 
@@ -27,16 +28,24 @@ On a phone the bar keeps clear of the selection handles, so a tap on it never la
 
 A word with a dot in a note becomes a tag, as in Readwise: ".craft" in a note tags the highlight "craft". Highlighting over an existing highlight merges them, and the note, tags and review history come along.
 
+## Highlights from Calibre
+
+When I read a book in Calibre's viewer on the Mac and highlight something there, Calibre keeps the highlight in the library, and Daf reads it from there at every sync (Calibre itself is only read). It comes into Daf on the same book, with the note I typed in Calibre, the colour I picked (Calibre's red is Daf's pink, and an underline is a plain yellow highlight), and the chapter it's in, and from then on it's in the Highlights page, the book's page, the daily review and the book's note in the vault, marked "Read in Calibre".
+
+Daf knows each one by Calibre's own id for it, so a sync never brings one in twice. If I change the note or the colour in Calibre, the change comes over, and if I remove the highlight in Calibre, it goes from Daf too. A colour I change in Daf stays, until I change it in Calibre again.
+
+In Daf's reader the highlight sits exactly where I made it, because Daf turns Calibre's place for it into the reader's, after checking in the very file the reader opens that those are the words. When the file isn't the same any more, say I converted or polished the book since, the reader finds the highlight by its words, the way it does the Kindle's.
+
 ## Open at the exact spot
 
-Every highlight opens where it is. Press the small arrow next to a highlight on the Highlights page or a book page, tap its card in the Notebook, or press o in the review, and the book or article opens at that line, and the spot flashes. That works for the Kindle's highlights in books Calibre has, for Daf's own, and for audiobook and paper highlights, which Daf finds by their words.
+Every highlight opens where it is. Press the small arrow next to a highlight on the Highlights page or a book page, tap its card in the Notebook, or press o in the review, and the book or article opens at that line, and the spot flashes. That works for the Kindle's highlights in books Calibre has, for Daf's own, for the ones I made in Calibre, and for audiobook and paper highlights, which Daf finds by their words.
 
 ## The Highlights page
 
 **Highlights** in the sidebar shows them all, grouped by book or article. At the top:
 
 - the search, the magnifying glass at the top right, for the text, notes, tags and titles;
-- source chips: **All**, **Kindle**, **Made in Daf**, **Articles**, **Audiobooks**, **Paper** and **Readwise**;
+- source chips: **All**, **Kindle**, **Made in Daf**, **Articles**, **Audiobooks**, **Paper**, **Readwise** and **Calibre**;
 - the five colors, **Favorites**, and the order (newest, by book in reading order, or oldest);
 - **Review these**, which turns whatever the filters show into a review of its own;
 - **Export**: **Markdown, by book**, **CSV (spreadsheet)** or **JSON** of what the filters show, and **Flashcards for Anki**.

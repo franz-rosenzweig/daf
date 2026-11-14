@@ -114,7 +114,7 @@ async function openBook(id, at){
   if (C.Sound) C.Sound.open(id);
   inkLoad(d);
   d.highlights.forEach(h => { h.source = 'epub'; B.byCfi.set(h.pos.cfi, h); });
-  d.other_highlights.forEach(h => { h.sec = xpIndex(h.xp); });
+  d.other_highlights.forEach(h => { if (h.sec == null) h.sec = xpIndex(h.xp); });     // Calibre's come with their chapter
   drawTop(); drawPanel();
   let file;
   try {
@@ -261,18 +261,24 @@ function placeText(doc, text, from){
   const r = doc.createRange(); r.setStart(s[0], s[1]); r.setEnd(e[0], e[1] + 1);
   return r;
 }
-// The Kindle's highlights, drawn like Daf's own wherever this edition has the same words.
+// The Kindle's highlights and Calibre's, drawn like Daf's own wherever this edition has the same words.
+const flatWords = s => String(s || '').replace(/[\u00ad\u200b-\u200d\ufeff]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+// Calibre's own place for one of its highlights (calibrehl.place), when its words are there in this copy.
+function calibreRange(h, doc){
+  try { const r = B.view.resolveCFI(h.ccfi).anchor(doc); return r && flatWords(r.toString()) === flatWords(h.text) ? r : null; } catch(e){ return null; }
+}
 function markKindle(index){
-  const list = (B.d && B.d.other_highlights || []).filter(h => h.text && h.text.length > 3 && !h.cfi && (h.source === 'kindle' ? (h.sec === index || h.sec == null || h.miss) : false));
+  const list = (B.d && B.d.other_highlights || []).filter(h => h.text && h.text.length > 3 && !h.cfi && (h.source === 'kindle' || h.source === 'calibre' ? (h.sec === index || h.sec == null || h.miss) : false));
   if (!list.length || !B.view) return;
   const c = B.view.renderer.getContents().find(x => x.index === index); if (!c) return;
   for (const h of list) {
     let from = null;
-    if (h.sec === index && h.xp) { const el = xpElement(c.doc, h.xp); if (el) from = indexIn(textIndex(c.doc), c.doc, el); }
-    const r = placeText(c.doc, h.text, from);
+    const own = h.ccfi && h.sec === index ? calibreRange(h, c.doc) : null;
+    if (!own && h.sec === index && h.xp) { const el = xpElement(c.doc, h.xp); if (el) from = indexIn(textIndex(c.doc), c.doc, el); }
+    const r = own || placeText(c.doc, h.text, from);
     if (!r) { if (h.sec === index) h.miss = true; continue; }
     try {
-      const cfi = B.view.getCFI(index, r);
+      const cfi = own ? h.ccfi : B.view.getCFI(index, r);
       h.cfi = cfi; h.index = index; B.kindleByCfi.set(cfi, h);
       B.view.addAnnotation({ value: cfi });
     } catch(err){}
@@ -307,7 +313,7 @@ async function jumpTo(h){
   if (!B.view) return;
   H.hide(); document.body.classList.remove('bpanelsheet', 'btocsheet');
   if (h.pos && h.pos.cfi) { await B.view.goTo(h.pos.cfi).catch(() => {}); centerIt(); flashCfi(h.pos.cfi); return; }
-  if (h.source === 'kindle') {
+  if (h.source === 'kindle' || h.source === 'calibre') {
     if (!h.cfi && h.sec != null && B.view.book.sections[h.sec]) { await B.view.goTo(h.sec).catch(() => {}); }
     if (!h.cfi) { const cfi = await findText(h.text); if (cfi) { h.miss = true; await B.view.goTo(cfi).catch(() => {}); } }
     if (h.cfi) { await B.view.goTo(h.cfi).catch(() => {}); centerIt(); flashCfi(h.cfi); return; }
