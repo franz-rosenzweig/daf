@@ -56,7 +56,7 @@ function open(books){
 }
 const cover = b => b.cover ? '<img src="/api/cover/' + encodeURIComponent(b.id) + '?v=' + (b.cover_v || 0) + '" alt="" loading="lazy">' : '<span class="befnc"></span>';
 const bookRow = (b, fmt, off) => '<div class="plrow' + (off ? ' off' : '') + '">' + cover(b) +
-  '<span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc((b.authors || []).join(' & ')) + '</span></span>' +
+  '<span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc([(b.authors || []).join(' & '), b.highlights ? b.highlights + ' highlight' + (b.highlights === 1 ? '' : 's') : ''].filter(Boolean).join(' · ')) + '</span></span>' +
   '<span class="plfmt mute tiny">' + esc(fmt) + '</span></div>';
 function draw(){
   const n = M.books.length, dis = M.busy ? ' disabled' : '';
