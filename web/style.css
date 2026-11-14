@@ -3000,3 +3000,16 @@ body.ebxopen{overflow:hidden}
   .cvsec > summary{padding:10px 12px}
   .cvrows{padding:2px 12px 12px}
 }
+
+/* Add your own columns (owncols.js) */
+.ocsheet{width:min(640px,calc(100vw - 32px))}
+.oclist{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+.ocrow{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:2px 0}
+.ocname{all:unset;box-sizing:border-box;flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;padding:7px 6px;border-radius:8px;cursor:pointer}
+.ocname:hover{background:var(--hover)} .ocname:focus-visible{outline:2px solid var(--accent)}
+.ocname b{font-weight:600;font-size:14px} .ocname .tiny{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ochash{display:flex;align-items:center;gap:6px;width:100%} .ochash > span{color:var(--fg-2)}
+.ocbody h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);margin:16px 0 4px}
+.ocgo{display:flex;justify-content:flex-end;margin-top:12px}
+@media (pointer:coarse){ .ocname{padding:10px 6px} }
+@media (max-width:699px){ .ocsheet{width:auto} }

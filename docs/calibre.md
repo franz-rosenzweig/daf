@@ -48,6 +48,10 @@ When I have a search, an order and a set of columns I'll want again, **Views ›
 
 **⋯ › Export as CSV** downloads exactly what's on the screen, in its order and with its columns, as a spreadsheet file that Numbers, Excel or Google Sheets opens.
 
+## My own columns
+
+**Columns › Add your own columns** is Calibre's page for making a column of my own, like "Mood" or "Lent to". I give it a lookup name (the `#mood` I search with), a heading, and one of Calibre's kinds: text shown in the Tag browser, comma-separated text like tags, long text like a description, series-like text, text with a fixed set of values (which I list), a date, numbers with or without decimals, a rating with stars, or yes and no. Calibre makes it, and it shows up at the end of the table straight away, in Edit details, in the Tag browser and in the search. The same page lists the columns I have already: a click on one renames its heading, and the × deletes it, with everything the books had in it, after asking.
+
 ## Editing a book
 
 **Edit details** is on every Calibre book's page in Daf, and in All books when I right-click a row (or hold it on the tablet). It has everything Calibre's own edit window has: the title, the authors (separated by "&", the way Calibre does it), the series and the book's number in it, the tags, my rating, the publisher, the date it was published, the languages, the identifiers (one per line, like `isbn: 978…`), the description, and my own Calibre columns (Read, Pages, Collections and the rest). The tags are little chips: I type one and press Enter or a comma, pick one from the list Calibre already has, or press the × to take one off. Nothing changes until I press **Save** (or ⌘↩), and only the fields I actually touched are sent.

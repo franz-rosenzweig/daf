@@ -307,7 +307,7 @@ function colsMenu(anchor){
     (i >= 0 ? '<span class="catgrip" data-catgrip="' + esc(c.key) + '" aria-label="Move">' + IC.grip + '</span>' : '') + '</div>';
   const shown = on.map(k => all.find(c => c.key === k)), rest = all.filter(c => !on.includes(c.key));
   openPop(anchor, '<div class="catcols" id="catcols">' + shown.map((c, i) => row(c, i)).join('') + '</div><hr>' +
-    '<div class="catcols rest">' + rest.map(c => row(c, -1)).join('') + '</div><hr><button data-catm="colsreset"><i></i>Default columns</button>', 'wide');
+    '<div class="catcols rest">' + rest.map(c => row(c, -1)).join('') + '</div><hr><button data-catm="colsreset"><i></i>Default columns</button><button data-catm="owncols"><i></i>Add your own columns</button>', 'wide');
 }
 function viewsMenu(anchor){
   const vs = P.data.views || [];
@@ -476,6 +476,7 @@ document.addEventListener('click', async e => {
     else if (k === 'pages') { $('#pop').hidden = true; countPages([...P.sel]); }
     else if (k === 'mark') { $('#pop').hidden = true; toggleMarks(); }
     else if (k === 'multisort') { $('#pop').hidden = true; multiSort(); }
+    else if (k === 'owncols') { $('#pop').hidden = true; if (C.OwnCols) C.OwnCols.open(); }
     else if (k === 'marked') { $('#pop').hidden = true; setQ('marked:true'); }
     else if (k === 'unmarkall') { $('#pop').hidden = true; setMarks(null, false); }
     else if (k === 'embedall') { $('#pop').hidden = true;
@@ -909,5 +910,7 @@ C.Catalog = {
     if (C.S.route[0] !== 'catalog') { C.Catalog.search(q); return; }
     P.q = q; P.view = dirtyView(); keep(); const box = $('#catq'); if (box) box.value = q;
     load().then(() => { ids.forEach(i => P.sel.add(i)); draw(); }); },
+  // A column just made (owncols.js) joins the ones shown, at the end, as Calibre shows a new column.
+  showColumn: k => { const on = colsNow().map(c => c.key); if (!on.includes(k)) { P.cols = [...on, k]; P.view = dirtyView(); keep(); } },
   reload: () => { P.info.clear(); const d = $('#catdet'); if (d) d.dataset.cal = ''; if (C.S.route[0] === 'catalog') load(true).then(() => { if (P.side) drawSide(); }); }, books: () => (P.data && P.data.books) || [] };
 })();

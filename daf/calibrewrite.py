@@ -122,6 +122,26 @@ def main():
             elif k == "cover":
                 data = base64.b64decode(op["data"]) if op.get("data") else None
                 d.set_cover({ids[0]: data})
+            elif k in ("create_column", "column_heading", "delete_column"):    # Calibre's Add your own columns
+                import re as _re
+                label = str(op["label"]).strip().lower()
+                cols = ldb.custom_column_label_map
+                if k == "create_column":
+                    if not _re.fullmatch(r"[a-z][a-z0-9_]{0,39}", label):
+                        raise ValueError("A lookup name is lower-case letters, digits and _, and starts with a letter")
+                    if label in cols or label in d.field_metadata.keys() or ("#" + label) in d.field_metadata.keys():
+                        raise ValueError("There's a column called %s already" % label)
+                    ldb.create_custom_column(label, str(op["heading"]).strip(), op["datatype"], bool(op.get("multiple")), editable=True, display=op.get("display") or {})
+                else:
+                    if label not in cols:
+                        raise ValueError("Calibre has no column %s" % label)
+                    if k == "column_heading":
+                        ldb.set_custom_column_metadata(cols[label]["num"], name=str(op["heading"]).strip())
+                    else:
+                        ldb.delete_custom_column(label=label)      # gone for good the next time Calibre opens the library
+                        _db(job["lib"])                            # which is now
+                out["done"].append(k)
+                continue
             elif k == "remove_covers":                  # Calibre's Remove cover (and "Remove all covers" in bulk)
                 d.set_cover({i: None for i in ids})
             elif k == "gencover":                       # Calibre's own generated cover (Generate cover; Edit metadata in bulk's "Generate default cover")
