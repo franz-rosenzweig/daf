@@ -3013,3 +3013,17 @@ body.ebxopen{overflow:hidden}
 .ocgo{display:flex;justify-content:flex-end;margin-top:12px}
 @media (pointer:coarse){ .ocname{padding:10px 6px} }
 @media (max-width:699px){ .ocsheet{width:auto} }
+
+/* Add from ISBN (isbnadd.js) */
+.ibsheet{width:min(680px,calc(100vw - 32px))}
+.ibtext{min-height:180px;resize:vertical;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;line-height:1.55}
+.iblist{display:flex;flex-direction:column;margin-bottom:8px}
+.ibrow{display:grid;grid-template-columns:22px 40px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:7px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.ibrow.off{cursor:default} .ibrow.off .befct b{color:var(--fg-2);font-weight:500}
+.ibrow input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.ibrow img,.ibrow .befnc{width:40px;aspect-ratio:2/3;object-fit:cover;border-radius:4px;background:var(--hover);display:block}
+.ibrow .befct{display:flex;flex-direction:column;min-width:0} .ibrow .befct b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ibrow .ibwait{width:18px;height:18px;margin:0;aspect-ratio:auto;background:none}
+.ibisbn{font-variant-numeric:tabular-nums}
+@media (pointer:coarse){ .ibrow{padding:10px 2px} .ibrow input{width:22px;height:22px} }
+@media (max-width:699px){ .ibsheet{width:auto} .ibrow{grid-template-columns:22px 34px minmax(0,1fr) auto} .ibisbn{display:none} }
