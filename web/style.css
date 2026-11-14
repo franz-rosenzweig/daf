@@ -2716,10 +2716,12 @@ a.catchkrow:hover{background:var(--hover)}
 .catqv{display:none;flex:none;height:250px;flex-direction:column;border-top:1px solid var(--line);background:var(--panel);min-height:0}
 .catpage.qv .catqv:not(:empty){display:flex}
 .qvhead{flex:none;display:flex;align-items:center;gap:6px;padding:6px 10px 6px 14px;border-bottom:1px solid var(--line)}
-.qvtabs{display:flex;gap:2px;flex-wrap:wrap}
+.qvtabs{flex:1;min-width:0;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.qvtabs::-webkit-scrollbar{display:none} .qvtabs .calsw{flex:none}
 .qvtabs .calsw:disabled{opacity:.4;cursor:default} .qvtabs .calsw:disabled:hover{background:none}
-.qvvals{flex:none;display:flex;gap:6px;flex-wrap:wrap;padding:8px 14px 0;max-height:68px;overflow:auto}
-.qvv{all:unset;box-sizing:border-box;padding:3px 10px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;cursor:pointer;color:var(--fg-2)}
+.qvvals{flex:none;display:flex;gap:6px;padding:8px 14px 2px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.qvvals::-webkit-scrollbar{display:none}
+.qvv{all:unset;box-sizing:border-box;flex:none;white-space:nowrap;padding:3px 10px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;cursor:pointer;color:var(--fg-2)}
 .qvv:hover{background:var(--hover)} .qvv.on{background:var(--active);color:var(--fg);border-color:transparent}
 .qvlist{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));align-content:start;gap:2px 10px;padding:8px 10px 12px}
 .qvrow{all:unset;box-sizing:border-box;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:center;padding:5px 6px;border-radius:8px;cursor:pointer;min-width:0}
@@ -2744,6 +2746,7 @@ a.catchkrow:hover{background:var(--hover)}
 @media (max-width:700px){
   .catqv{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   .qvlist{grid-template-columns:1fr}
+  .qvtabs .calsw{padding:6px 8px}
 }
 
 /* Import list (importlist.js): a sheet like the edit sheet's */

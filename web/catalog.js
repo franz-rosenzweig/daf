@@ -669,7 +669,7 @@ async function drawQv(){
   if (box.dataset.key === key && box.firstChild) return;
   box.dataset.key = key; P.qvNow = { f, v };
   box.innerHTML = '<div class="qvhead"><span class="qvtabs" role="tablist">' + QVF.map(([k, l]) => '<button role="tab" class="calsw" data-qvf="' + k + '" aria-pressed="' + (k === f) + '"' + (valsOf(b, k).length ? '' : ' disabled') + '>' + l + '</button>').join('') + '</span>' +
-    '<span class="spacer"></span>' + (v != null ? '<button class="btn sm" data-qv="search">Search</button>' : '') + '<button class="btn sm ib" data-qv="close" aria-label="Close">' + IC.x + '</button></div>' +
+    (v != null ? '<button class="btn sm" data-qv="search">Search</button>' : '') + '<button class="btn sm ib" data-qv="close" aria-label="Close">' + IC.x + '</button></div>' +
     (vals.length > 1 ? '<div class="qvvals">' + vals.map(x => '<button class="qvv' + (x === v ? ' on' : '') + '" data-qvv="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>' : '') +
     '<div class="qvlist" id="qvlist">' + (v == null ? '' : '<span class="befcvwait"></span>') + '</div>';
   if (v == null) return;
