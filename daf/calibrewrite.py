@@ -603,7 +603,12 @@ def _embed_worker():
 
 
 # ---------- conversions take a while: a job the page asks about ----------
+# Every job is a dict in _jobs that its own page polls (GET /api/catalog/jobs/{id}), in one of two
+# shapes: {running, done, error} (start_job, start_each) or {state: running|done|failed, error}. The
+# ones a person started on books also get a name (name()), and those make the Jobs list (Calibre's
+# "Jobs" corner, jobs_list()); start_each's can be stopped between books (stop()).
 _jobs = {}
+DAY = 86400
 
 
 def convert_op(cid, src, to, opts=None):
@@ -624,12 +629,11 @@ def start_convert(cid, src, to, opts=None):
     def work():
         try:
             run([convert_op(cid, src, to, opts)], timeout=1000)
-            _jobs[jid].update(state="done")
+            _jobs[jid].update(state="done", ended=time.time())
         except Exception as e:  # noqa: BLE001 - the page says what went wrong
-            _jobs[jid].update(state="failed", error=str(e))
+            _jobs[jid].update(state="failed", error=str(e), ended=time.time())
     threading.Thread(target=work, daemon=True).start()
-    for k in [k for k, j in _jobs.items() if time.time() - j["started"] > 86400]:
-        _jobs.pop(k, None)
+    _prune()
     return jid
 
 
@@ -643,26 +647,34 @@ def start_job(fn):
             j["done"] = fn()
         except Exception as e:  # noqa: BLE001 - the page says what went wrong
             j["error"] = str(e)[:300]
+        j["ended"] = time.time()
         j["running"] = False
     threading.Thread(target=work, daemon=True).start()
+    _prune()
     return jid
 
 
 def start_each(ops, timeout=1000, **info):
     """One op a book, one after another, each its own run, in one job: {running, done, total,
-    failed: [{id, error}], **info}."""
+    failed: [{id, error}], **info}. Stop (stop()) takes effect between books: the one going on
+    finishes, the rest are left, and the job says stopped."""
     jid = uuid.uuid4().hex[:12]
-    j = _jobs[jid] = {"running": True, "started": time.time(), "done": 0, "total": len(ops), "failed": [], **info}
+    j = _jobs[jid] = {"running": True, "started": time.time(), "done": 0, "total": len(ops), "failed": [], "stoppable": True, **info}
 
     def work():
         for op in ops:
+            if j.get("stop"):
+                j["stopped"] = True
+                break
             try:
                 run([op], timeout=timeout)
             except Exception as e:  # noqa: BLE001 - one book's failure doesn't stop the rest
                 j["failed"].append({"id": op.get("id"), "error": str(e)[:300]})
             j["done"] += 1
+        j["ended"] = time.time()
         j["running"] = False
     threading.Thread(target=work, daemon=True).start()
+    _prune()
     return jid
 
 
@@ -685,3 +697,82 @@ def start_restore_many(ids):
 
 def job(jid):
     return _jobs.get(jid)
+
+
+def _running(j):
+    return bool(j.get("running")) if "running" in j else j.get("state") == "running"
+
+
+def _prune():
+    """Finished jobs go a day after they ended; one that never says it finished, after two."""
+    now = time.time()
+    for k, j in list(_jobs.items()):
+        if (not _running(j) and now - (j.get("ended") or j["started"]) > DAY) or now - j["started"] > 2 * DAY:
+            _jobs.pop(k, None)
+
+
+def name(jid, kind, one, many, ids=(), n=None):
+    """A job's name in the Jobs list: `one` for a single book ({} its title, put in when the list is
+    read), else `many` ({} how many). A job without one isn't listed (Edit book's steps, a book's own
+    Find details and covers: parts of a sheet, as in Calibre)."""
+    j = _jobs.get(jid) if jid else None
+    if j is not None:
+        ids = [int(i) for i in ids]
+        n = len(ids) if n is None else n
+        j.setdefault("kind", kind)
+        j["name"] = {"one": one, "many": many, "id": ids[0] if n == 1 and ids else None, "n": n}
+    return jid
+
+
+def stop(jid):
+    """Asks a start_each job to stop after the book it's on. False when it can't be stopped (not
+    that kind of job, or already done)."""
+    j = _jobs.get(jid)
+    if not j or not j.get("stoppable") or not _running(j):
+        return False
+    j["stop"] = True
+    return True
+
+
+def jobs_list(titles=lambda ids: {}):
+    """The named jobs, running first (newest first), then the last 30 finished, newest first:
+    [{id, label, kind, state (running, done, failed, stopped), started, ended, done, total,
+    failed, errors [{id, title, error}], error, stoppable, stopping}]. titles({ids}) → {id: title}."""
+    _prune()
+    now, rows = time.time(), []
+    for jid, j in list(_jobs.items()):
+        nm = j.get("name")
+        if not nm:
+            continue
+        run_ = _running(j)
+        if not run_ and not j.get("ended"):
+            j["ended"] = now                        # a job that doesn't stamp its own end: about now
+        fails = j.get("failed") if isinstance(j.get("failed"), list) else []
+        if j.get("stopped"):
+            state = "stopped"
+        elif run_:
+            state = "running"
+        elif j.get("state") == "failed" or j.get("error") or (fails and len(fails) >= (j.get("total") or 0)):
+            state = "failed"
+        else:
+            state = "done"
+        counts = isinstance(j.get("done"), int) and not isinstance(j.get("done"), bool) and isinstance(j.get("total"), int)
+        rows.append({"id": jid, "kind": j.get("kind"), "name": nm, "state": state, "started": j["started"],
+                     "ended": None if run_ else j.get("ended"), "done": j["done"] if counts else None,
+                     "total": j["total"] if counts else None, "failed": len(fails),
+                     "errors": [{"id": f.get("id"), "error": f.get("error")} for f in fails[:5] if isinstance(f, dict)],
+                     "error": j.get("error") or (fails[0].get("error") if state == "failed" and fails and isinstance(fails[0], dict) else None),
+                     "stoppable": bool(j.get("stoppable")) and run_ and not j.get("stop"), "stopping": bool(j.get("stop")) and run_})
+    want = {r["name"]["id"] for r in rows if r["name"]["id"] is not None} | {e["id"] for r in rows for e in r["errors"] if e["id"] is not None}
+    try:
+        t = titles(want) if want else {}
+    except Exception:  # noqa: BLE001 - a list without titles is still the list
+        t = {}
+    for r in rows:
+        nm = r.pop("name")
+        r["label"] = nm["one"].format("“%s”" % t[nm["id"]] if nm["id"] in t else "a book") if nm["n"] == 1 else nm["many"].format(nm["n"])
+        for e in r["errors"]:
+            e["title"] = t.get(e["id"])
+    running = sorted((r for r in rows if r["state"] == "running"), key=lambda r: -r["started"])
+    finished = sorted((r for r in rows if r["state"] != "running"), key=lambda r: -(r["ended"] or r["started"]))[:30]
+    return running + finished

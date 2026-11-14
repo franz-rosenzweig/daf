@@ -114,7 +114,7 @@ async function work(kind, body){
       const btn = mine() && $('#plsheet [data-pl="' + J.btn + '"]');
       if (btn && j.total > 1) btn.textContent = J.ing + ' ' + Math.min(j.done + 1, j.total) + ' of ' + j.total + '…';
     }
-    const bad = (j.failed || []).length, ok = j.total - bad;
+    const bad = (j.failed || []).length, ok = (j.done || 0) - bad;      // done: the books it got to (fewer when stopped)
     if (mine()) close();
     toast(j.total === 1 ? (bad ? j.failed[0].error || J.fail : J.one) : ok + ' ' + J.ed + (bad ? ' · ' + bad + ' didn’t' : ''));
     if (C.Catalog) C.Catalog.reload();

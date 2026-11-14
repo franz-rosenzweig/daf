@@ -3082,3 +3082,30 @@ body.ebxopen{overflow:hidden}
 .benav .tiny{min-width:44px;text-align:center}
 #catside .catv.over{background:var(--accent-weak,var(--active));box-shadow:inset 0 0 0 2px var(--accent);border-radius:6px}
 @media (max-width:699px){ .benav .tiny{display:none} }
+
+/* Jobs (jobs.js): Calibre's Jobs corner in All books' status bar */
+.jbbtn .jbn{min-width:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;line-height:18px;text-align:center;font-variant-numeric:tabular-nums}
+.jbspin{display:block;width:14px;height:14px;flex:none;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:dafspin .8s linear infinite}
+.jbpanel{position:fixed;right:12px;bottom:44px;width:min(400px,calc(100vw - 24px));max-height:min(60vh,560px);z-index:60;background:var(--bg);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+.jbpanel[hidden],.jbshade[hidden]{display:none}
+.jbshade{z-index:59}
+.jbhead{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 16px;border-bottom:1px solid var(--line);flex:none}
+.jbhead h2{margin:0;font-size:15px}
+.jblist{overflow:auto;overscroll-behavior:contain;padding:4px 0}
+.jbnone{margin:14px 16px}
+.jbrow{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+.jbrow:last-child{border-bottom:0}
+.jbtop{display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+.jbtop b{font-weight:600;font-size:13.5px;min-width:0;overflow-wrap:anywhere}
+.jbtop .tiny{flex:none}
+.jbst{display:flex;align-items:center;gap:10px;color:var(--fg-2);min-height:24px}
+.jbst .pbar{flex:1;min-width:40px}
+.jbst .btn{margin-left:auto}
+.jbrow.failed .jbst,.jberr{color:var(--bad)}
+.jberr{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}
+.jberr b{font-weight:600}
+@media (pointer:coarse){ .jbst .btn{min-height:38px;padding-inline:14px} .jbhead .ib{min-width:40px;min-height:40px} }
+@media (max-width:699px){
+  .jbpanel{left:0;right:0;bottom:0;width:auto;max-height:80vh;border-radius:16px 16px 0 0;border-width:1px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .calsw.jbbtn{gap:4px}
+}

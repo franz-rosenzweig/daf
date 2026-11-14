@@ -285,7 +285,7 @@ async function go(){
     await sleep(4000);
     let j; try { j = await api('/api/catalog/convert-many/' + r.job); } catch(e){ return; }
     if (j.running) continue;
-    toast((j.total - j.failed.length) + ' converted to ' + to + (j.failed.length ? ' · ' + j.failed.length + ' didn’t' : ''));
+    toast((j.done - j.failed.length) + ' converted to ' + to + (j.failed.length ? ' · ' + j.failed.length + ' didn’t' : ''));
     if (cb.done) cb.done(!j.failed.length); else if (C.Catalog) C.Catalog.reload();
     return;
   }
