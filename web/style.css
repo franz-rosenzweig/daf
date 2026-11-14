@@ -3140,3 +3140,6 @@ body.ebxopen{overflow:hidden}
   .mdrule{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding-bottom:8px;border-bottom:1px solid var(--line)}
   .mdrule .emacts{grid-column:1 / -1;justify-content:flex-end}
 }
+
+/* every sheet's boxes in Daf's own colour (the newer sheets left them the browser's blue) */
+.besheet input[type=checkbox],.besheet input[type=radio]{accent-color:var(--accent)}
