@@ -31,7 +31,7 @@ const TB = s => '<svg width="24" height="24" viewBox="0 0 20 20" aria-hidden="tr
 const TOOLS = [
   ['add', 'Add books', TB('<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H15v12H5.5A1.5 1.5 0 0 0 4 16.5z"/><path d="M4 16.5A1.5 1.5 0 0 0 5.5 18H15"/><path d="M9.5 6v5.5M6.75 8.75h5.5"/>'), 0],
   ['edit', 'Edit metadata', TB('<path d="M4 16l1-4 8-8 3 3-8 8z"/><path d="M11.5 5.5l3 3"/>'), 'n'],
-  ['conv', 'Convert books', TB('<path d="M4 7h11l-3-3M16 13H5l3 3"/>'), 'n'],
+  ['conv', 'Convert books', TB('<path d="M4 7h11l-3-3M16 13H5l3 3"/>'), 'n'],          // convertsheet.js
   ['read', 'Read', TB('<path d="M10 5.5C8.5 4.3 6.5 4 3 4v11c3.5 0 5.5.3 7 1.5 1.5-1.2 3.5-1.5 7-1.5V4c-3.5 0-5.5.3-7 1.5z"/><path d="M10 5.5v11"/>'), 1],
   ['ebook', 'Edit book', TB('<path d="M7 6.5L3.5 10 7 13.5M13 6.5l3.5 3.5-3.5 3.5M11.2 4.5l-2.4 11"/>'), 1],      // ebookedit.js
   ['polish', 'Polish books', TB('<path d="M8.5 3l1.4 4.1L14 8.5l-4.1 1.4L8.5 14l-1.4-4.1L3 8.5l4.1-1.4z"/><path d="M14.5 12.5v4M12.5 14.5h4"/>'), 'n'],      // polish.js
@@ -348,21 +348,6 @@ async function moreMenu(anchor){
     ((P.data && P.data.marks) ? (P.sel.size ? '' : '<hr>') + '<button data-catm="marked"><i></i>Marked books · ' + P.data.marks + '</button><button data-catm="unmarkall"><i></i>Clear marks</button>' : '') +
     '<hr><button data-catm="import"><i></i>Import list</button><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>');
 }
-// Many books into one format: one job on the server, a book at a time; the toast says when it's done.
-async function convertMany(ids, to){
-  let r;
-  try { r = await api('/api/catalog/convert-many', { method: 'POST', body: JSON.stringify({ ids, to }) }); } catch(e){ toast(e.message); return; }
-  if (!r.job) { toast(r.have ? 'All ' + r.have + ' have ' + to : 'No file to convert'); return; }
-  toast('Converting ' + r.total + ' to ' + to);
-  const poll = async () => {
-    let j; try { j = await api('/api/catalog/convert-many/' + r.job); } catch(e){ return; }
-    if (j.running) { setTimeout(poll, 4000); return; }
-    const ok = j.total - j.failed.length;
-    toast(ok + ' converted to ' + to + (j.failed.length ? ' · ' + j.failed.length + ' didn’t' : ''));
-    if (C.S.route[0] === 'catalog') load(true);
-  };
-  setTimeout(poll, 4000);
-}
 // Count pages for the chosen books (calibrekeep.py), the way Calibre's Count Pages does.
 async function countPages(ids){
   let r;
@@ -453,7 +438,7 @@ document.addEventListener('click', async e => {
     else if (k === 'colsreset') { P.cols = null; P.widths = {}; P.view = dirtyView(); keep(); draw(); $('#pop').hidden = true; }
     else if (k === 'trash') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.trash(P.priv); }
     else if (k === 'items') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.items('tags'); }
-    else if (k === 'conv') { $('#pop').hidden = true; convertMany([...P.sel], m.dataset.to); }
+    else if (k === 'conv') { $('#pop').hidden = true; if (C.ConvertSheet) C.ConvertSheet.open(P.data.books.filter(x => P.sel.has(x.calibre_id)), { to: m.dataset.to }); }     // convertsheet.js
     else if (k === 'dl') { $('#pop').hidden = true; const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + [...P.sel].join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
     else if (k === 'check') { $('#pop').hidden = true; checkLibrary(); }
     else if (k === 'import') { $('#pop').hidden = true; if (C.ImportList) C.ImportList.open(); }
@@ -494,7 +479,7 @@ document.addEventListener('click', e => {
     const one = P.sel.has(P.anchor) ? P.data.books.find(x => x.calibre_id === P.anchor) : chosen[0];
     if (k === 'add') { if (C.AddBook) C.AddBook.open(); }
     else if (k === 'edit' && C.BookEdit) { if (ids.length === 1 || t.closest('#catdet')) C.BookEdit.open(one.calibre_id); else C.BookEdit.bulk(ids); }
-    else if (k === 'conv') openPop(tool, ['EPUB', 'AZW3', 'KEPUB', 'MOBI', 'PDF'].map(f => '<button data-catm="conv" data-to="' + f + '"><i></i>' + f + '</button>').join(''));
+    else if (k === 'conv' && C.ConvertSheet) C.ConvertSheet.open(chosen);
     else if (k === 'read' && one) location.hash = 'ebook/' + encodeURIComponent(one.id);
     else if (k === 'ebook' && one && C.EbookEdit) C.EbookEdit.open(one.calibre_id);
     else if (k === 'find' && C.BookEdit) {

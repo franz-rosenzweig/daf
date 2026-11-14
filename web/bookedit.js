@@ -336,19 +336,14 @@ function fileMenu(anchor, fmt){
   p.style.left = Math.max(8, Math.min(innerWidth - p.offsetWidth - 8, r.right - p.offsetWidth)) + 'px';
   p.style.top = Math.min(r.bottom + 6, innerHeight - p.offsetHeight - 8) + 'px';
 }
-async function convert(src, to){
-  const box = $('#beconv'), cid = E.d.calibre_id;
-  if (box) box.innerHTML = '<span class="mute tiny">Converting to ' + esc(to) + '…</span>';
-  try {
-    const { job } = await api('/api/catalog/book/' + cid + '/convert', { method: 'POST', body: JSON.stringify({ from: src, to }) });
-    for (;;) {
-      await new Promise(r => setTimeout(r, 2000));
-      const j = await api('/api/catalog/jobs/' + job);
-      if (j.state === 'done') { toast('Converted to ' + to); break; }
-      if (j.state === 'failed') { toast(j.error || 'Calibre couldn’t convert it'); break; }
-    }
-  } catch(e){ toast(e.message); }
-  if (E.d && E.d.calibre_id === cid) refreshFiles();
+// Convert to: the Convert sheet (convertsheet.js) with this file and format, over this one; the file
+// shows up in the list when Calibre is done.
+function convert(src, to){
+  if (!C.ConvertSheet) return;
+  const cid = E.d.calibre_id;
+  C.ConvertSheet.open([E.d], { from: src, to,
+    started: t => { const box = $('#beconv'); if (box && E.d && E.d.calibre_id === cid) box.innerHTML = '<span class="mute tiny">Converting to ' + esc(t) + '…</span>'; },
+    done: () => { if (E.d && E.d.calibre_id === cid) refreshFiles(); else if (C.Catalog) C.Catalog.reload(); } });
 }
 
 /* ---------- Find details: Calibre's own Download metadata, and Hardcover (calibrefind.py) ---------- */

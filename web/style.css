@@ -2949,3 +2949,48 @@ body.ebxopen{overflow:hidden}
   .plrow img,.plrow .befnc{width:34px;height:50px;grid-row:span 2}
   .plfmt{grid-column:2;text-align:left}
 }
+
+/* Convert settings (convertsheet.js): Calibre's Convert dialog as a sheet, over Edit metadata too */
+.cvshade{z-index:57}
+.cvsheet{z-index:58;width:min(760px,calc(100vw - 32px))}
+.cvbody{display:flex;flex-direction:column;gap:10px}
+.cvsheet .berow{grid-template-columns:180px minmax(0,1fr)}
+.cvsheet .berow:has(.field:disabled) > span{opacity:.45}
+.cvh{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--fg-2)}
+.cvbooks{display:flex;flex-direction:column}
+.cvbook{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)}
+.cvbook img,.cvbook .befnc{width:34px;height:50px;object-fit:cover;border-radius:4px;background:var(--panel);display:block}
+.cvbook.off{opacity:.5}
+.cvfmt{font-size:12.5px;color:var(--fg-2);white-space:nowrap}
+.cvsec{border:1px solid var(--line);border-radius:10px}
+.cvsec > summary{cursor:pointer;padding:10px 14px;font-weight:600;font-size:14px;list-style:none;display:flex;align-items:center;gap:10px}
+.cvsec > summary::-webkit-details-marker{display:none}
+.cvsec > summary::before{content:'';width:6px;height:6px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+.cvsec[open] > summary::before{transform:rotate(45deg)}
+.cvrows{display:flex;flex-direction:column;gap:8px;padding:2px 14px 14px}
+.cvnum{display:inline-flex;align-items:center;gap:8px}
+.cvnum .field{width:100px}
+.cvtick{padding-left:192px}
+.cvchk{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+.cvchk input{width:16px;height:16px;flex:none;margin:0}
+.cvchk:has(input:disabled){opacity:.45;cursor:default}
+.cvmarg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cvmarg label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--fg-2)}
+.cvfilt{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
+.cvcss{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.45;resize:vertical}
+.cvfoot{display:flex;gap:8px;justify-content:flex-end;padding-top:4px}
+@media (pointer:coarse){
+  .cvchk{min-height:40px}
+  .cvchk input{width:22px;height:22px}
+  .cvsec > summary{min-height:46px}
+  .cvfoot .btn{min-height:40px}
+}
+@media (max-width:699px){
+  .cvsheet{width:auto}
+  .cvsheet .field{font-size:16px}
+  .cvsheet .berow{grid-template-columns:minmax(0,1fr);gap:4px}
+  .cvtick{padding-left:0}
+  .cvmarg{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cvsec > summary{padding:10px 12px}
+  .cvrows{padding:2px 12px 12px}
+}
