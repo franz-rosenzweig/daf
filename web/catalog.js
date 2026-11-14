@@ -381,7 +381,7 @@ async function moreMenu(anchor){
     '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>' +
     (P.sel.size ? '<hr><button data-catm="mark"><i></i>' + (chosenBooks().every(b => b.marked) ? 'Unmark' : 'Mark') + '</button>' : '') +
     ((P.data && P.data.marks) ? (P.sel.size ? '' : '<hr>') + '<button data-catm="marked"><i></i>Marked books · ' + P.data.marks + '</button><button data-catm="unmarkall"><i></i>Clear marks</button>' : '') +
-    '<hr><button data-catm="import"><i></i>Import list</button><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>');
+    '<hr><button data-catm="import"><i></i>Import list</button><button data-catm="isbn"><i></i>Add from ISBN</button><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>');
 }
 // Count pages for the chosen books (calibrekeep.py), the way Calibre's Count Pages does.
 async function countPages(ids){
@@ -473,6 +473,7 @@ document.addEventListener('click', async e => {
     else if (k === 'dl') { $('#pop').hidden = true; const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + [...P.sel].join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
     else if (k === 'check') { $('#pop').hidden = true; checkLibrary(); }
     else if (k === 'import') { $('#pop').hidden = true; if (C.ImportList) C.ImportList.open(); }
+    else if (k === 'isbn') { $('#pop').hidden = true; if (C.IsbnAdd) C.IsbnAdd.open(); }
     else if (k === 'pages') { $('#pop').hidden = true; countPages([...P.sel]); }
     else if (k === 'mark') { $('#pop').hidden = true; toggleMarks(); }
     else if (k === 'multisort') { $('#pop').hidden = true; multiSort(); }

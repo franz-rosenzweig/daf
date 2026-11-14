@@ -148,6 +148,10 @@ The list can come in four ways. **Text** is for anything I can paste: one book a
 
 **Next** again is what to do with them. For the books that aren't in the library, **Add as empty books** makes a Calibre record for each one with the title, the authors and whatever else the list had (the series and its number, the date, the ISBN and the Hardcover or Goodreads id), the same as Calibre's own Add empty book. **Read: Planning** puts them on my Read column's Planning, and a **Tag** and a **Shelf** can go on them too (one of Daf's own shelves, since Hardcover doesn't know an empty book yet). For the books already in the library, I can add a **Tag** or put them on a **Shelf**, a Hardcover list included, or on a **New shelf…**. The Kindle's shelves aren't offered, since an empty book has no file to send. Nothing changes until **Import**. When it's done, **Show in All books** shows the new books with all of them chosen, ready for **Find details** to fill in their descriptions and covers.
 
+## Adding books from their ISBNs
+
+**Library › Add from ISBN** is Calibre's Add from ISBN. I paste or type ISBNs (one a line, or separated by spaces or commas, with or without hyphens, the old ten-digit ones too), and **Look up** asks Calibre's own sources about each one, three at a time, the same sources as Find details. Each comes back with its cover, title, authors, publisher and year; the ones the library already has say **In the library**, and anything that isn't an ISBN or that nobody knows says so. Unticking one leaves it out, **Tags to apply** puts the same tags on all of them, and **Add** makes them books in Calibre without a file, with everything that was found and the cover, then shows them chosen in All books. Calibre's own dialog adds first and looks up after; I'd rather see what each ISBN is before anything is added.
+
 ## Tags, authors and series
 
 **⋯ › Tags, authors and series** (or **Manage tags** from a name in the Tag browser) lists every tag, author, series, publisher and my own name columns (Collections, Reading) across the whole library, each with how many books have it. Clicking the number shows those books in the table.

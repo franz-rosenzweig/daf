@@ -2028,6 +2028,46 @@ def get_catalog_job(jid: str):
     return j
 
 
+# ---- Add from ISBN (isbnadd.py, web/isbnadd.js): Calibre's Add books › Add from ISBN ----
+@app.post("/api/catalog/isbn/lookup", dependencies=[Depends(user)])
+def post_isbn_lookup(b=Depends(json_body)):
+    """{text} with ISBNs → a job looking each up with Calibre's own sources; GET /api/catalog/jobs/{job}:
+    {state, done, total, items [{token, isbn, state: wait|found|have|missing|bad, found, calibre_id, title}]}."""
+    from . import isbnadd
+    text = str(b.get("text") or "")[:20000] if isinstance(b, dict) else ""
+    if not any(it["isbn"] for it in isbnadd.parse(text)):
+        raise HTTPException(400, "No ISBNs")
+    return {"job": isbnadd.lookup_start(text)}
+
+
+@app.post("/api/catalog/isbn/add", dependencies=[Depends(user)])
+def post_isbn_add(b=Depends(json_body)):
+    """{books: [found books, with isbn and cover], tags} → a job adding them to Calibre as books without
+    a file, each with what was found and its cover; done = the new books' ids."""
+    from . import calibrewrite, isbnadd
+    b = b if isinstance(b, dict) else {}
+    tags = [str(t).strip()[:100] for t in (b.get("tags") or []) if str(t).strip()][:20] if isinstance(b.get("tags"), list) else []
+    raw = b.get("books")[:200] if isinstance(b.get("books"), list) else []
+    try:
+        books = [isbnadd.clean_book(x, tags) for x in raw]
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if not books:
+        raise HTTPException(400, "No books")
+    covers = [str(x.get("cover") or "") for x in raw]
+
+    def work():
+        added = calibrewrite.run([{"op": "add_empty", "books": books}], timeout=600)["added"]
+        for cid, u in zip(added, covers):
+            if re.match(r"^(https?://|found:[0-9a-f]{12}/[A-Za-z0-9_-]{1,40}$)", u):
+                try:
+                    calibrewrite.run([{"op": "cover", "id": cid, "data": calibrewrite.b64(_image(_cover_data(u)))}], timeout=120)
+                except Exception:  # noqa: BLE001 - a book without its cover is still added
+                    pass
+        return added
+    return {"job": calibrewrite.start_job(work)}
+
+
 # ---- Import list (importlist.py, web/importlist.js): a list of books from elsewhere, matched against Calibre ----
 def _il(fn, *a):
     from . import hardcover, importlist
