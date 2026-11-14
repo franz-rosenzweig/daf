@@ -54,6 +54,8 @@ CHOICES = {
     "mobi_file_type": [("old", "Old"), ("both", "Both"), ("new", "New")],
     "paper_size": [(p, p.title() if len(p) > 2 else p.upper()) for p in PAPER],
     "pdf_standard_font": [("serif", "Serif"), ("sans", "Sans"), ("mono", "Mono")],
+    "unit": [("millimeter", "Millimeter"), ("centimeter", "Centimeter"), ("point", "Point"), ("inch", "Inch"), ("pica", "Pica"),
+             ("didot", "Didot"), ("cicero", "Cicero"), ("devicepixel", "Device pixel")],
 }
 CHAPTER = ("//*[((name()='h1' or name()='h2') and re:test(., '\\s*((chapter|book|section|part)\\s+)|"
            "((prolog|prologue|epilogue)(\\s+|$))', 'i')) or @class = 'chapter']")
@@ -101,6 +103,7 @@ PIPE = {
     # Structure detection
     "chapter": S(CHAPTER, XPATH), "chapter_mark": E("pagebreak", "chapter_mark"),
     "remove_first_image": B(False), "remove_fake_margins": B(True), "insert_metadata": B(False),
+    "page_breaks_before": S("/", XPATH), "start_reading_at": S(None, XPATH),
     # Table of contents
     "use_auto_toc": B(False), "no_chapters_in_toc": B(False), "max_toc_links": I(50, 0, 10000), "toc_threshold": I(6, 0, 10000),
     "level1_toc": S(None, XPATH), "level2_toc": S(None, XPATH), "level3_toc": S(None, XPATH),
@@ -109,6 +112,8 @@ PIPE = {
     "fix_indents": B(True), "unwrap_lines": B(True), "html_unwrap_factor": F(0.4, 0, 1),
     "delete_blank_paragraphs": B(True), "format_scene_breaks": B(True), "replace_scene_breaks": S("", 200),
     "dehyphenate": B(True), "renumber_headings": B(True),
+    # Search & replace: Calibre's dialog keeps the pairs as JSON text, [["regex", "replacement"], …]
+    "search_replace": {"t": "sr", "d": "[]"},
 }
 # Each output format's own options (Calibre's EPUB output, AZW3 output…).
 OUT = {
@@ -116,6 +121,7 @@ OUT = {
         "epub_version": E("2", "epub_version"), "flow_size": I(260, 0, 100000), "dont_split_on_page_breaks": B(False),
         "no_default_epub_cover": B(False), "no_svg_cover": B(False), "preserve_cover_aspect_ratio": B(False),
         "epub_inline_toc": B(False), "epub_toc_at_end": B(False), "toc_title": S(None, 200), "epub_flatten": B(False),
+        "epub_max_image_size": {"t": "imgsize", "d": "none"},
     },
     "AZW3": {
         "no_inline_toc": B(False), "mobi_toc_at_start": B(False), "toc_title": S(None, 200), "prefer_author_sort": B(False),
@@ -128,7 +134,7 @@ OUT = {
         "flow_size": I(512, 0, 100000), "dont_split_on_page_breaks": B(False), "kepub_prefer_justification": B(False),
         "kepub_disable_hyphenation": B(False), "kepub_affect_hyphenation": B(False), "kepub_hyphenation_min_chars": I(6, 0, 100),
         "kepub_hyphenation_min_chars_before": I(3, 0, 20), "kepub_hyphenation_min_chars_after": I(3, 0, 20),
-        "kepub_hyphenation_limit_lines": I(2, 0, 20),
+        "kepub_hyphenation_limit_lines": I(2, 0, 20), "kepub_max_image_size": {"t": "imgsize", "d": "none"},
     },
     "PDF": {
         "paper_size": E("letter", "paper_size"), "use_profile_size": B(False), "pdf_default_font_size": I(20, 1, 100),
@@ -137,9 +143,13 @@ OUT = {
         "pdf_no_cover": B(False), "pdf_use_document_margins": B(False),
         "pdf_page_margin_top": F(72.0, 0, 1000), "pdf_page_margin_bottom": F(72.0, 0, 1000),
         "pdf_page_margin_left": F(72.0, 0, 1000), "pdf_page_margin_right": F(72.0, 0, 1000),
+        "custom_size": {"t": "size", "d": None}, "unit": E("inch", "unit"),
+        # HTML templates with _PAGENUM_, _TITLE_, _AUTHOR_ and _SECTION_, which Calibre's renderer runs
+        "pdf_header_template": {"t": "html", "d": None, "n": 5000}, "pdf_footer_template": {"t": "html", "d": None, "n": 5000},
     },
 }
-FILE_OPTS = {"extra_css"}      # given to ebook-convert as a file (calibrewrite writes it), never as text it might take for a path
+FILE_OPTS = {"extra_css", "search_replace"}     # given to ebook-convert as files (calibrewrite writes them): see op_files
+SR_MAX, SR_LEN = 50, 1000
 
 
 def specs(to=None):
@@ -166,6 +176,42 @@ _BAD = object()
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _PROP = re.compile(r"-?[a-z][a-z0-9-]{0,40}")
 _FONTMAP = re.compile(r"\d{1,3}(\.\d{1,2})?(,\d{1,3}(\.\d{1,2})?){0,9}")
+_SIZE = re.compile(r"(\d{1,5}(?:\.\d{1,3})?)x(\d{1,5}(?:\.\d{1,3})?)")
+_PIXELS = re.compile(r"(\d{1,5})x(\d{1,5})")
+
+
+def _pairs(v):
+    """Search & replace as Calibre keeps it, a JSON list of [regex, replacement] (or the list itself)
+    → the pairs, each a string pair with no line breaks (ebook-convert reads them a line each); a
+    search that is empty is dropped. None when it isn't a list at all."""
+    if isinstance(v, str):
+        try:
+            v = json.loads(v or "[]")
+        except ValueError:
+            return None
+    if not isinstance(v, list):
+        return None
+    out = []
+    for x in v:
+        if not isinstance(x, (list, tuple)) or len(x) != 2 or not all(isinstance(y, str) for y in x):
+            continue
+        a, b = x
+        if not a.strip() or len(a) > SR_LEN or len(b) > SR_LEN or any(c in a + b for c in "\r\n\x00"):
+            continue
+        out.append([a, b])
+    return out[:SR_MAX]
+
+
+def bad_regex(opts):
+    """The first search in Search & replace that isn't a regular expression (ebook-convert checks them
+    with Python's re and stops), or None."""
+    pairs = _pairs((opts or {}).get("search_replace")) if isinstance(opts, dict) else None
+    for a, _b in pairs or []:
+        try:
+            re.compile(a)
+        except re.error:
+            return a
+    return None
 
 
 def _number(v):
@@ -195,6 +241,18 @@ def _value(s, v):
     if t == "enum":
         v = str(v) if isinstance(v, (str, int)) and not isinstance(v, bool) else None
         return v if v in s["choices"] else _BAD
+    if t == "sr":                # a list of pairs, or Calibre's JSON text of one
+        pairs = _pairs(v)
+        if pairs is None:
+            return _BAD
+        ok = []
+        for a, b in pairs:
+            try:
+                re.compile(a)
+            except re.error:
+                continue
+            ok.append([a, b])
+        return json.dumps(ok, ensure_ascii=False)
     if v is None:
         return None
     if not isinstance(v, str):
@@ -207,6 +265,22 @@ def _value(s, v):
         if any(not _PROP.fullmatch(x) for x in names):
             return _BAD
         return ",".join(dict.fromkeys(names))[:2000]
+    if t == "html":            # a PDF header or footer: HTML, lines and all
+        v = v.replace("\x00", "")[:s["n"]]
+        return v if v.strip() else None
+    if t == "size":            # Custom size: width x height, in the unit chosen
+        m = _SIZE.fullmatch(re.sub(r"\s+", "", v).lower().replace("×", "x"))
+        if not v.strip():
+            return None
+        if not m or not float(m.group(1)) or not float(m.group(2)):
+            return _BAD
+        return m.group(1) + "x" + m.group(2)
+    if t == "imgsize":         # Shrink images larger than: none, the output profile's screen, or width x height in pixels
+        v = re.sub(r"\s+", "", v).lower().replace("×", "x")
+        if v in ("none", "profile"):
+            return v
+        m = _PIXELS.fullmatch(v)
+        return v if m and int(m.group(1)) and int(m.group(2)) else _BAD
     if t == "fontmap":         # Font size key: 12,12,14,16,18,20,22,24
         v = re.sub(r"\s+", "", v)
         if not v:
@@ -241,7 +315,8 @@ def _flag(k):
 def flags(opts, to):
     """ebook-convert's flags for these (clean) options, in a fixed order, each one argument: a switch
     when it differs from Calibre's default (--disable-… for the ones that are on by default), else
-    --name=value. Empty values are left to Calibre. extra_css isn't here: it goes as a file."""
+    --name=value. Empty values are left to Calibre. extra_css and search_replace aren't here: they go
+    as files (files())."""
     out = []
     for k, s in specs(to).items():
         if k not in opts or k in FILE_OPTS:
@@ -257,6 +332,14 @@ def flags(opts, to):
             v = int(round(v))
         out.append(f"{_flag(k)}={v}")
     return out
+
+
+def files(opts):
+    """What the convert op writes to files for ebook-convert: the extra CSS (so its text is never taken
+    for a path) and Search & replace's pairs (ebook-convert reads a file of them, a regex line then its
+    replacement line; Calibre's dialog keeps the same pairs as JSON)."""
+    pairs = _pairs((opts or {}).get("search_replace")) or []
+    return {"css": (opts or {}).get("extra_css") or None, "sr": pairs or None}
 
 
 def to_save(opts, to):
@@ -311,6 +394,10 @@ def book_opts(cid):
     finally:
         c.close()
     d = parse(row[0]) if row else {}
+    if "search_replace" not in d:               # older Calibre's three pairs, as its dialog takes them up
+        old = [[d.get("sr%d_search" % i), d.get("sr%d_replace" % i) or ""] for i in (1, 2, 3)]
+        if any(a for a, _b in old):
+            d["search_replace"] = json.dumps([[a, b] for a, b in old if a])
     src = d.get("gui_preferred_input_format")
     return clean(d), (str(src).upper()[:10] if isinstance(src, str) and src else None)
 

@@ -2961,7 +2961,7 @@ body.ebxopen{overflow:hidden}
 .cvsheet{z-index:58;width:min(760px,calc(100vw - 32px))}
 .cvbody{display:flex;flex-direction:column;gap:10px}
 .cvsheet .berow{grid-template-columns:180px minmax(0,1fr)}
-.cvsheet .berow:has(.field:disabled) > span{opacity:.45}
+.cvsheet .berow:has([data-cvdep]:disabled) > span{opacity:.45}
 .cvh{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--fg-2)}
 .cvbooks{display:flex;flex-direction:column}
 .cvbook{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)}
@@ -2985,11 +2985,21 @@ body.ebxopen{overflow:hidden}
 .cvfilt{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
 .cvcss{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.45;resize:vertical}
 .cvfoot{display:flex;gap:8px;justify-content:flex-end;padding-top:4px}
+.cvtpl{min-height:72px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.45;resize:vertical}
+.cvpair{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cvpair select.field{width:auto}
+.cvnum .field:disabled{opacity:.45}
+.cvsr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 34px;gap:8px;align-items:center}
+.cvsr .field{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;min-height:36px;padding:6px 9px}
+.cvsr .btn{min-width:34px;justify-content:center;padding-inline:0}
+.cvsrh{font-size:12px;color:var(--fg-2)}
 @media (pointer:coarse){
   .cvchk{min-height:40px}
   .cvchk input{width:22px;height:22px}
   .cvsec > summary{min-height:46px}
   .cvfoot .btn{min-height:40px}
+  .cvsr{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 42px}
+  .cvsr .btn{min-width:42px;min-height:40px}
 }
 @media (max-width:699px){
   .cvsheet{width:auto}
@@ -2997,6 +3007,7 @@ body.ebxopen{overflow:hidden}
   .cvsheet .berow{grid-template-columns:minmax(0,1fr);gap:4px}
   .cvtick{padding-left:0}
   .cvmarg{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cvsr .field{font-size:16px}
   .cvsec > summary{padding:10px 12px}
   .cvrows{padding:2px 12px 12px}
 }
