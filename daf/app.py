@@ -1394,7 +1394,15 @@ def _convert_opts(b, to):
         return None
     if not isinstance(opts, dict):
         raise HTTPException(400, "opts: an object")
+    _check_regex(opts)
     return convertopts.clean(opts, to)
+
+
+def _check_regex(opts):
+    from . import convertopts
+    bad = convertopts.bad_regex(opts)
+    if bad is not None:
+        raise HTTPException(400, f"Search & replace: “{bad[:80]}” isn't a regular expression")
 
 
 @app.post("/api/catalog/convert-many", dependencies=[Depends(user)])
@@ -1442,6 +1450,7 @@ def put_convert_opts(b=Depends(json_body)):
     opts = (b or {}).get("opts") if isinstance(b, dict) else None
     if not isinstance(opts, dict):
         raise HTTPException(400, "opts: an object")
+    _check_regex(opts)
     s = config.load_settings()
     s["convert_opts"] = convertopts.clean(opts)
     config.save_settings(s)

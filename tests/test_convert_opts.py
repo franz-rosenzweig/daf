@@ -30,7 +30,7 @@ def calibre_blob(d, short=False):
 class Clean(unittest.TestCase):
     def test_unknown_keys_dropped(self):
         out = co.clean({"margin_top": 10, "debug_pipeline": "/tmp/x", "read_metadata_from_opf": "/etc/passwd",
-                        "search_replace": "x", "__proto__": 1, "transform_css_rules": "[]"}, "EPUB")
+                        "search_replace": "x", "__proto__": 1, "transform_css_rules": "[]", "sr1_search": "a"}, "EPUB")
         self.assertEqual(out, {"margin_top": 10.0})
 
     def test_numbers_clamped_and_typed(self):
@@ -96,6 +96,65 @@ class Clean(unittest.TestCase):
         self.assertEqual(co.clean([("margin_top", 3)], "EPUB"), {})
 
 
+class More(unittest.TestCase):
+    """Search & replace, page breaks, start reading at, PDF templates and size, image size limits."""
+    def test_search_replace(self):
+        sr = lambda v: co.clean({"search_replace": v}, "EPUB").get("search_replace", "DROPPED")
+        self.assertEqual(json.loads(sr([["colou?r", "color"], ["Page \\d+", ""]])), [["colou?r", "color"], ["Page \\d+", ""]])
+        self.assertEqual(json.loads(sr('[["a", "b"]]')), [["a", "b"]])          # Calibre's own JSON text
+        self.assertEqual(json.loads(sr([["(unclosed", "x"], ["ok", "fine"]])), [["ok", "fine"]])
+        self.assertEqual(json.loads(sr([["a\nb", "x"], ["c", "d\re"], ["  ", "x"], ["a", 3], ["a"], "ab", ["x" * 1001, ""]])), [])
+        self.assertEqual(len(json.loads(sr([["a%d" % i, ""] for i in range(80)]))), co.SR_MAX)
+        self.assertEqual(sr("not json"), "DROPPED")
+        self.assertEqual(sr({"a": "b"}), "DROPPED")
+        self.assertEqual(sr([]), "[]")
+
+    def test_bad_regex(self):
+        self.assertEqual(co.bad_regex({"search_replace": [["ok", ""], ["(", "x"]]}), "(")
+        self.assertEqual(co.bad_regex({"search_replace": '[["\\\\p{Lu}", "x"]]'}), "\\p{Lu}")   # Calibre checks with Python's re too
+        self.assertIsNone(co.bad_regex({"search_replace": [["ok", ""]]}))
+        self.assertIsNone(co.bad_regex({}))
+        self.assertIsNone(co.bad_regex(None))
+
+    def test_files_not_flags(self):
+        opts = co.clean({"search_replace": [["--output-profile=kindle", "x"]], "extra_css": "p{}"}, "EPUB")
+        self.assertEqual(co.flags(opts, "EPUB"), [])
+        self.assertEqual(co.files(opts), {"css": "p{}", "sr": [["--output-profile=kindle", "x"]]})
+        self.assertEqual(co.files({}), {"css": None, "sr": None})
+        self.assertEqual(co.files(co.clean({"search_replace": []}, "EPUB")), {"css": None, "sr": None})
+
+    def test_structure_xpaths(self):
+        opts = co.clean({"page_breaks_before": "//*[name()='h2']", "start_reading_at": "//*[@id='start']\n"}, "EPUB")
+        self.assertEqual(co.flags(opts, "EPUB"), ["--page-breaks-before=//*[name()='h2']", "--start-reading-at=//*[@id='start']"])
+        self.assertEqual(co.defaults("EPUB")["page_breaks_before"], "/")
+
+    def test_pdf_size_and_templates(self):
+        opts = co.clean({"custom_size": " 100 × 150.5 ", "unit": "millimeter", "pdf_header_template": "<p>\n_TITLE_ \x00_PAGENUM_</p>",
+                         "pdf_footer_template": "x" * 9000}, "PDF")
+        self.assertEqual(opts["custom_size"], "100x150.5")
+        self.assertEqual(opts["pdf_header_template"], "<p>\n_TITLE_ _PAGENUM_</p>")
+        self.assertEqual(len(opts["pdf_footer_template"]), 5000)
+        f = co.flags(opts, "PDF")
+        self.assertIn("--custom-size=100x150.5", f)
+        self.assertIn("--unit=millimeter", f)
+        self.assertIn("--pdf-header-template=<p>\n_TITLE_ _PAGENUM_</p>", f)      # one argument, lines and all
+        for bad in ("0x10", "10x", "abc", "1e3x5", "-5x5", 7):
+            self.assertNotIn("custom_size", co.clean({"custom_size": bad}, "PDF"), bad)
+        self.assertIsNone(co.clean({"custom_size": "", "pdf_header_template": "  "}, "PDF")["custom_size"])
+        self.assertNotIn("unit", co.clean({"unit": "furlong"}, "PDF"))
+        self.assertEqual(co.clean({"custom_size": "1x1", "pdf_header_template": "x"}, "EPUB"), {})   # PDF's own
+
+    def test_image_size(self):
+        for fmt, k in (("EPUB", "epub_max_image_size"), ("KEPUB", "kepub_max_image_size")):
+            self.assertEqual(co.clean({k: "400 x 300"}, fmt), {k: "400x300"})
+            self.assertEqual(co.clean({k: "profile"}, fmt), {k: "profile"})
+            self.assertEqual(co.clean({k: "none"}, fmt), {k: "none"})
+            for bad in ("400x", "0x300", "-4x3", "big", "4.5x3", None):
+                self.assertNotIn(k, co.clean({k: bad}, fmt) if bad is not None else {}, bad)
+            self.assertEqual(co.flags(co.clean({k: "400x300"}, fmt), fmt), ["--%s=400x300" % k.replace("_", "-")])
+        self.assertEqual(co.clean({"epub_max_image_size": "400x300"}, "KEPUB"), {})
+
+
 class Flags(unittest.TestCase):
     def test_flags(self):
         opts = co.clean({"margin_top": 20, "output_profile": "kobo", "smarten_punctuation": True, "remove_fake_margins": False,
@@ -158,6 +217,8 @@ class BookSettings(unittest.TestCase):
                   (calibre_blob({"margin_top": 15.0, "output_profile": "kindle", "gui_preferred_input_format": "pdf",
                                  "search_replace": "[]", "epub_version": "3", "base_font_size": 0.0}),))
         c.execute("INSERT INTO conversion_options (format, book, data) VALUES ('PIPE', 8, ?)", (b"not a pickle",))
+        c.execute("INSERT INTO conversion_options (format, book, data) VALUES ('PIPE', 10, ?)",
+                  (calibre_blob({"sr1_search": "colour", "sr1_replace": "color", "sr2_search": None, "sr3_search": "\\s+$", "sr3_replace": None}),))
         c.commit()
         c.close()
         p = mock.patch.object(config, "CALIBRE_DBS", [self.db])
@@ -167,7 +228,11 @@ class BookSettings(unittest.TestCase):
     def test_read_as_calibre_keeps_it(self):
         opts, src = co.book_opts(7)
         self.assertEqual(src, "PDF")
-        self.assertEqual(opts, {"margin_top": 15.0, "output_profile": "kindle", "epub_version": "3", "base_font_size": 0.0})
+        self.assertEqual(opts, {"margin_top": 15.0, "output_profile": "kindle", "epub_version": "3", "base_font_size": 0.0, "search_replace": "[]"})
+
+    def test_older_three_pairs(self):
+        opts, _src = co.book_opts(10)
+        self.assertEqual(json.loads(opts["search_replace"]), [["colour", "color"], ["\\s+$", ""]])
 
     def test_none_or_unreadable(self):
         self.assertEqual(co.book_opts(8), ({}, None))
@@ -229,6 +294,18 @@ class Endpoints(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 self.many(body)
 
+    def test_bad_regex_turned_away(self):
+        body = {"ids": [1], "to": "AZW3", "opts": {"search_replace": [["([a-z]", "x"]]}}
+        with self.assertRaises(HTTPException) as e:
+            self.many(body)
+        self.assertIn("([a-z]", e.exception.detail)
+        with mock.patch("daf.catalog.book_file", return_value=Path("/x.epub")), self.assertRaises(HTTPException):
+            self.app.convert_catalog_file(1, {"from": "EPUB", "to": "PDF", "opts": {"search_replace": '[["*", ""]]'}})
+        with mock.patch.object(config, "load_settings", return_value={}), mock.patch.object(config, "save_settings") as save, \
+                self.assertRaises(HTTPException):
+            self.app.put_convert_opts({"opts": {"search_replace": [["?", ""]]}})
+        save.assert_not_called()
+
     def test_one_book(self):
         with mock.patch("daf.catalog.book_file", return_value=Path("/x.epub")), \
                 mock.patch.object(calibrewrite, "start_convert", return_value="job2") as m:
@@ -274,9 +351,14 @@ class Op(unittest.TestCase):
         op = calibrewrite.convert_op(3, "EPUB", "AZW3", co.clean({"margin_top": 12, "extra_css": "p{x:y}", "no_inline_toc": True}, "AZW3"))
         self.assertEqual(op["flags"], ["--margin-top=12.0", "--no-inline-toc"])
         self.assertEqual(op["css"], "p{x:y}")
+        self.assertIsNone(op["sr"])
         self.assertEqual(op["save"]["margin_top"], 12.0)
         self.assertEqual(op["save"]["extra_css"], "p{x:y}")  # the book keeps its CSS in Calibre, as Calibre does
         self.assertTrue(op["save"]["no_inline_toc"])
+        op = calibrewrite.convert_op(3, "EPUB", "PDF", co.clean({"search_replace": [["a", "b"]], "custom_size": "5x8", "unit": "inch"}, "PDF"))
+        self.assertEqual(op["sr"], [["a", "b"]])
+        self.assertEqual(op["flags"], ["--custom-size=5x8", "--unit=inch"])
+        self.assertEqual(json.loads(op["save"]["search_replace"]), [["a", "b"]])     # kept the way Calibre's dialog keeps it
         json.dumps(op)
 
     def test_many_is_one_op_a_book(self):
@@ -295,6 +377,7 @@ class Op(unittest.TestCase):
         compile(calibrewrite.SCRIPT, "calibre-script", "exec")
         self.assertIn("save_specifics(ldb, ids[0], recs)", calibrewrite.SCRIPT)
         self.assertIn('cmd.append("--extra-css=" + css)', calibrewrite.SCRIPT)
+        self.assertIn('cmd.append("--search-replace=" + srf)', calibrewrite.SCRIPT)
 
 
 if __name__ == "__main__":

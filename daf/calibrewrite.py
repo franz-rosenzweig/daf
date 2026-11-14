@@ -182,6 +182,14 @@ def main():
                         with open(css, "w", encoding="utf-8") as f:
                             f.write(op["css"])
                         cmd.append("--extra-css=" + css)
+                    if op.get("sr"):                    # Search & replace: a regex line, then its replacement line
+                        pairs = op["sr"]
+                        if not all(isinstance(x, list) and len(x) == 2 and all(isinstance(y, str) and not any(c in y for c in "\r\n") for y in x) for x in pairs):
+                            raise ValueError("bad search and replace")
+                        srf = os.path.join(tmp, "search-replace.txt")
+                        with open(srf, "w", encoding="utf-8") as f:
+                            f.write("".join(a + "\n" + b + "\n" for a, b in pairs))
+                        cmd.append("--search-replace=" + srf)
                     r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
                     if r.returncode or not os.path.exists(dst):
                         raise ValueError("Calibre couldn't convert it: " + (r.stderr or r.stdout or "")[-400:])
@@ -578,11 +586,12 @@ _jobs = {}
 
 def convert_op(cid, src, to, opts=None):
     """The convert op for one book. With the Convert sheet's options (convertopts.clean'd): ebook-convert's
-    flags, the extra CSS (written to a file in the container) and what the book keeps in Calibre."""
+    flags, the extra CSS and Search & replace (written to files in the container) and what the book
+    keeps in Calibre."""
     op = {"op": "convert", "id": cid, "from": src, "to": to}
     if opts is not None:
         from . import convertopts
-        op.update(flags=convertopts.flags(opts, to), css=opts.get("extra_css") or None, save=convertopts.to_save(opts, to))
+        op.update(flags=convertopts.flags(opts, to), save=convertopts.to_save(opts, to), **convertopts.files(opts))
     return op
 
 
