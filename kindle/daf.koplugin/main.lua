@@ -21,9 +21,11 @@ Daf for KOReader.
   * Home (home.lua) and the shelves (shelf.lua), drawn with canvas.lua, with book covers from
     covers.lua (made ahead for the whole library after Home appears); and outside a book,
     the book's global settings in KOReader's menu too (readerprefs.lua).
+  * About me: a note for whoever finds the Kindle, kept only in a text file on the Kindle
+    (documents/ABOUT ME.txt), shown from the menu and at the foot of the sleep screen.
 
 Settings live in settings/daf.lua (url, token, sleep_screen, last_start, cache, home,
-pending_review, paths, show_on_wake).
+pending_review, paths, show_on_wake, about_on_sleep, about_file).
 Nothing here edits settings.reader.lua directly; the screensaver message is set
 through G_reader_settings in memory, which KOReader saves itself.
 ]]
@@ -837,36 +839,94 @@ function Daf:message()
     return "Daf\n" .. first .. "\n" .. second
 end
 
+-- The sleep screen's message: Daf's lines (or the message you had before, when those are off),
+-- then About me under them. With neither, the message you had before comes back.
 function Daf:refreshSleepMessage(force)
-    if self.settings:readSetting("sleep_screen") == false then return end
     local now = os.time()
     if not force and now - self.last_refresh < REFRESH_EVERY then return end
     self.last_refresh = now
+    local daf_on = self.settings:readSetting("sleep_screen") ~= false
+    local about = self.settings:readSetting("about_on_sleep") ~= false and self:aboutText() or nil
+    if not daf_on and not about then return self:restoreSleepMessage() end
     if not self.settings:readSetting("orig_saved") then
         self.settings:saveSetting("orig_message", G_reader_settings:readSetting("screensaver_message"))
         self.settings:saveSetting("orig_show_message", G_reader_settings:isTrue("screensaver_show_message"))
         self.settings:saveSetting("orig_saved", true)
         self.settings:flush()
     end
-    local ok, msg = pcall(function() return self:message() end)
-    if ok and msg then
-        G_reader_settings:saveSetting("screensaver_message", msg)
+    local parts = {}
+    if daf_on then
+        local ok, msg = pcall(function() return self:message() end)
+        if ok and msg then table.insert(parts, msg) end
+    else
+        local orig = self.settings:readSetting("orig_message")
+        if self.settings:readSetting("orig_show_message") and orig and orig ~= "" then table.insert(parts, orig) end
+    end
+    -- KOReader expands %-codes in the message (%T is the title), so a % in About me stays a %.
+    if about then table.insert(parts, (about:gsub("%%", "%%%%"))) end
+    if #parts > 0 then
+        G_reader_settings:saveSetting("screensaver_message", table.concat(parts, "\n\n"))
         G_reader_settings:makeTrue("screensaver_show_message")
     end
+end
+
+function Daf:restoreSleepMessage()
+    if not self.settings:readSetting("orig_saved") then return end
+    local orig = self.settings:readSetting("orig_message")
+    if orig then G_reader_settings:saveSetting("screensaver_message", orig) else G_reader_settings:delSetting("screensaver_message") end
+    if self.settings:readSetting("orig_show_message") then G_reader_settings:makeTrue("screensaver_show_message") else G_reader_settings:makeFalse("screensaver_show_message") end
+    self.settings:delSetting("orig_saved")
+    self.settings:flush()
 end
 
 function Daf:setSleepScreen(on)
     self.settings:saveSetting("sleep_screen", on)
     self.settings:flush()
-    if on then
-        self:refreshSleepMessage(true)
-    else
-        local orig = self.settings:readSetting("orig_message")
-        if orig then G_reader_settings:saveSetting("screensaver_message", orig) else G_reader_settings:delSetting("screensaver_message") end
-        if self.settings:readSetting("orig_show_message") then G_reader_settings:makeTrue("screensaver_show_message") else G_reader_settings:makeFalse("screensaver_show_message") end
-        self.settings:delSetting("orig_saved")
-        self.settings:flush()
+    self:refreshSleepMessage(true)
+end
+
+-- ---------------------------------------------------------------- about me
+
+-- A note for whoever finds the Kindle, in a text file on the Kindle itself: documents/ABOUT ME.txt,
+-- so the Kindle's own library lists it too. Tools → Daf → About me shows it and opens it in
+-- KOReader's text editor, and it goes at the foot of the sleep screen. Nothing here or in Daf
+-- keeps a copy: it lives only in that file (settings about_file can point somewhere else).
+local ABOUT_FILE = "/mnt/us/documents/ABOUT ME.txt"
+local ABOUT_NEW = "ABOUT ME\n\nThis Kindle belongs to \nPhone: \nEmail: \n"
+
+function Daf:aboutFile()
+    return self.settings:readSetting("about_file") or ABOUT_FILE
+end
+
+-- The file's text, trimmed, or nil when there's no file or nothing in it.
+function Daf:aboutText()
+    local f = io.open(self:aboutFile(), "r")
+    if not f then return nil end
+    local text = f:read(2000) or ""
+    f:close()
+    text = text:gsub("^\239\187\191", ""):gsub("\r", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return text ~= "" and text or nil
+end
+
+function Daf:showAbout()
+    local text = self:aboutText()
+    if not text then return self:editAbout() end
+    UIManager:show(InfoMessage:new{ text = text, show_icon = false })
+end
+
+function Daf:editAbout()
+    local path = self:aboutFile()
+    local editor = self.ui.texteditor
+    if not editor then
+        UIManager:show(InfoMessage:new{ text = path, show_icon = false })
+        return
     end
+    local f = io.open(path, "r")
+    if f then f:close() else
+        f = io.open(path, "w")
+        if f then f:write(ABOUT_NEW); f:close() end
+    end
+    editor:checkEditFile(path, false, true, function() self:refreshSleepMessage(true) end)
 end
 
 -- ---------------------------------------------------------------- events
@@ -1004,6 +1064,29 @@ function Daf:addToMainMenu(menu_items)
                     self.settings:saveSetting("show_on_wake", not self.settings:isTrue("show_on_wake"))
                     self.settings:flush()
                 end,
+            },
+            {
+                text = _("About me"),
+                sub_item_table = {
+                    {
+                        text = _("Show"),
+                        keep_menu_open = true,
+                        callback = function() self:showAbout() end,
+                    },
+                    {
+                        text = _("Edit"),
+                        callback = function() self:editAbout() end,
+                    },
+                    {
+                        text = _("On the sleep screen"),
+                        checked_func = function() return self.settings:readSetting("about_on_sleep") ~= false end,
+                        callback = function()
+                            self.settings:saveSetting("about_on_sleep", self.settings:readSetting("about_on_sleep") == false)
+                            self.settings:flush()
+                            self:refreshSleepMessage(true)
+                        end,
+                    },
+                },
             },
         },
     }
