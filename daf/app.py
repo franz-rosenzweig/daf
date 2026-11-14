@@ -4016,6 +4016,10 @@ async def post_ebook_bookmark(book_id: str, request: Request, c=Depends(conn)):
 
 @app.delete("/api/ebooks/{book_id}/bookmarks/{mark_id}", dependencies=[Depends(user)])
 def delete_ebook_bookmark(book_id: str, mark_id: str, c=Depends(conn)):
+    r = c.execute("SELECT calibre FROM book_marks WHERE id = ? AND book_id = ?", (mark_id, book_id)).fetchone()
+    if r and r[0]:                              # one made in Calibre's viewer: the next sync leaves it out
+        from .sources import calibrehl
+        calibrehl.bookmark_taken_out(c, r[0])
     c.execute("DELETE FROM book_marks WHERE id = ? AND book_id = ?", (mark_id, book_id))
     return {"ok": True}
 

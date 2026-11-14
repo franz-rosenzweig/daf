@@ -14,7 +14,14 @@ book's CFI, "epubcfi(/6/24!/4/10,/1:110,/1:239)", so the two are joined, but onl
 in the file Daf's reader opens, that the chapter is the one Calibre named and that the CFI's range
 holds the highlighted words. When it doesn't (the book was converted or polished since, or Daf
 reads another format), the reader finds the highlight by its words, as it does the Kindle's.
+
+Calibre's bookmarks come in too, as Daf bookmarks on the book (import_bookmarks), kept by Calibre's
+key for them (its bookmarks are named, one a name), so a removed one goes and a moved one moves.
+
+The other way (calibreannots.py) Daf writes its own reader's highlights into Calibre, each with a
+uuid made from its Daf id (daf_uuid); this import skips those, so nothing comes back as a copy.
 """
+import base64
 import colorsys
 import hashlib
 import json
@@ -63,21 +70,34 @@ def hid(cid, uuid):
     return "c" + hashlib.sha1(f"calibre|{cid}|{uuid}".encode()).hexdigest()[:16]
 
 
-def annotations(db=None):
-    """Calibre's highlights: [{book, format, uuid, data}], the removed ones too (data["removed"])."""
+def daf_uuid(hl_id):
+    """The uuid a highlight made in Daf has in Calibre: 22 characters like Calibre's own, from its Daf id."""
+    return base64.urlsafe_b64encode(hashlib.sha1(f"daf-calibre|{hl_id}".encode()).digest()[:16]).decode().rstrip("=")
+
+
+def ours(conn):
+    """The uuids of the highlights Daf has written into Calibre, or would: they're never imported."""
+    out = {r[0] for r in conn.execute("SELECT uuid FROM calibre_pushed")}
+    return out | {daf_uuid(r[0]) for r in conn.execute("SELECT id FROM highlights WHERE source = 'epub'")}
+
+
+def annotations(db=None, kind="highlight"):
+    """Calibre's highlights (or bookmarks): [{book, format, uuid, user, data}], the removed ones too (data["removed"])."""
     c = read_only(db or config.CALIBRE_DBS[0])
     try:
-        rows = c.execute("SELECT book, format, annot_id, annot_data, timestamp FROM annotations WHERE annot_type = 'highlight' ORDER BY id").fetchall()
+        rows = c.execute("SELECT book, format, annot_id, annot_data, timestamp, user_type, user FROM annotations WHERE annot_type = ? ORDER BY id",
+                         (kind,)).fetchall()
     finally:
         c.close()
     out = []
-    for book, fmt, aid, data, ts in rows:
+    for book, fmt, aid, data, ts, utype, user in rows:
         try:
             d = json.loads(data)
         except ValueError:
             continue
         if isinstance(d, dict):
-            out.append({"book": book, "format": (fmt or "").upper(), "uuid": d.get("uuid") or aid, "data": d, "ts": ts})
+            out.append({"book": book, "format": (fmt or "").upper(), "uuid": d.get("uuid") or aid, "aid": aid, "data": d, "ts": ts,
+                        "user": f"{utype}:{user}"})
     return out
 
 
@@ -238,6 +258,24 @@ def _book(path):
     return _cache[key]
 
 
+def _doc(path, bk, i):
+    """A chapter of the book, parsed once: (root, its text as UTF-16, where each chunk starts)."""
+    if i not in bk["docs"]:
+        with zipfile.ZipFile(path) as z:
+            root = _parse_xml(z.read(bk["items"][i][0]))
+        bk["docs"][i] = (root, *_flat(root))
+    return bk["docs"][i]
+
+
+def _fraction(bk, i, at, text):
+    """How far into the book a place is, the way foliate-js measures it: by the chapters' sizes."""
+    sizes = [sz if lin and sz > 0 else 0 for _n, _c, lin, sz in bk["items"]]
+    total = sum(sizes)
+    if not total or not sizes[i]:
+        return None
+    return round((sum(sizes[:i]) + at / max(1, len(text) // 2) * sizes[i]) / total, 6)
+
+
 def place(path, a):
     """For one Calibre highlight in the EPUB at `path`: {cfi, fraction, sec} when its CFI holds its
     words in this very file, else {sec} when the chapter is there, else {}."""
@@ -254,11 +292,7 @@ def place(path, a):
         return out                                      # Calibre's paths begin at the document: /2 is its root element
     start, end = start[1:], end[1:]
     try:
-        if i not in bk["docs"]:
-            with zipfile.ZipFile(path) as z:
-                root = _parse_xml(z.read(items[i][0]))
-            bk["docs"][i] = (root, *_flat(root))
-        root, text, pos = bk["docs"][i]
+        root, text, pos = _doc(path, bk, i)
         starts, ends = _points(root, pos, start), _points(root, pos, end)
     except Exception:  # noqa: BLE001
         return out
@@ -267,11 +301,7 @@ def place(path, a):
         for e, e_last in ends:
             if e <= s or _norm(text[2 * s:2 * e].decode("utf-16-le", "replace")).casefold() != want:
                 continue
-            sizes = [sz if lin and sz > 0 else 0 for _n, _c, lin, sz in items]
-            total, before = sum(sizes), sum(sizes[:i])
-            within = s / max(1, len(text) // 2)
-            out.update(cfi=book_cfi(items[i][1], start[:-1] + [s_last], end[:-1] + [e_last]),
-                       fraction=round((before + within * sizes[i]) / total, 6) if total and sizes[i] else None)
+            out.update(cfi=book_cfi(items[i][1], start[:-1] + [s_last], end[:-1] + [e_last]), fraction=_fraction(bk, i, s, text))
             return out
     return out
 
@@ -281,8 +311,8 @@ def rows(conn, settings):
     """Calibre's highlights as Daf highlight rows ({…, "color"}), on their Daf books (a Calibre book
     Daf hasn't listed yet gets its row first, as Import list does)."""
     from .. import catalog, ebooks, importlist
-    anns = annotations()
-    live = [a for a in anns if not a["data"].get("removed") and (a["data"].get("highlighted_text") or "").strip()]
+    anns, mine = annotations(), ours(conn)
+    live = [a for a in anns if not a["data"].get("removed") and (a["data"].get("highlighted_text") or "").strip() and a["uuid"] not in mine]
     cids = sorted({a["book"] for a in live})
     if not cids:
         return []
@@ -335,3 +365,84 @@ def colors_after(conn, rows, before):
         c = json.loads(r["pos"]).get("c")
         if c and (r["id"] not in before or before[r["id"]] != c):
             conn.execute("UPDATE highlights SET color = ? WHERE id = ?", (c, r["id"]))
+
+
+
+# ---------- Calibre's bookmarks, as Daf bookmarks ----------
+GONE_KEY = "calibre_bookmarks_gone"        # kv: the Calibre bookmarks taken out in Daf, so a sync doesn't put them back
+
+
+def bookmark_place(path, pos):
+    """A Calibre bookmark's position ("epubcfi(/24/2/4/14/1:95)": the chapter's step, then Calibre's
+    path in it) → {cfi (the reader's), fraction, excerpt}; just the chapter's start when the place
+    isn't in this file; {} when the chapter isn't either."""
+    m = re.fullmatch(r"epubcfi\((.*)\)", str(pos or "").strip())
+    steps = _steps(re.sub(r"[~@][^/\[\]]*$", "", m.group(1))) if m and "!" not in m.group(1) else None
+    if not steps or len(steps) < 2 or steps[0][0] % 2 or steps[1][0] != 2:
+        return {}
+    try:
+        bk = _book(path)
+    except Exception:  # noqa: BLE001
+        return {}
+    i = steps[0][0] // 2 - 1
+    if not 0 <= i < len(bk["items"]):
+        return {}
+    base, out = bk["items"][i][1], {"cfi": f"epubcfi({bk['items'][i][1]}!/4)", "fraction": _fraction(bk, i, 0, b"")}
+    try:
+        root, text, at = _doc(path, bk, i)
+        pts = _points(root, at, steps[2:]) if len(steps) > 2 else []
+    except Exception:  # noqa: BLE001
+        return out
+    if not pts:
+        return out
+    x, last = pts[-1]                                   # at a chunk's edge, the text after it
+    words = _norm(text[2 * x:2 * x + 2000].decode("utf-16-le", "replace"))
+    return {"cfi": f"epubcfi({base}!{_part(steps[2:-1] + [last])})", "fraction": _fraction(bk, i, x, text),
+            "excerpt": (words[:140].rsplit(" ", 1)[0] if len(words) > 140 else words) or None}
+
+
+def import_bookmarks(conn, settings):
+    """Calibre's bookmarks on their Daf books (for books Daf reads as the format they were made in).
+    Returns how many there are. One removed in Calibre goes from Daf; one taken out in Daf stays out."""
+    from .. import ebooks
+    anns = annotations(kind="bookmark")
+    gone = set()
+    r = conn.execute("SELECT v FROM kv WHERE k = ?", (GONE_KEY,)).fetchone()
+    if r and r[0]:
+        gone = set(json.loads(r[0]))
+    daf = {row[0]: row[1] for row in conn.execute("SELECT calibre_id, id FROM books WHERE calibre_id IS NOT NULL")}
+    files, keep, present = {}, [], set()
+    for a in anns:
+        d = a["data"]
+        title = str(d.get("title") or "").strip()
+        bid = daf.get(a["book"])
+        if d.get("removed") or not title or not bid or d.get("pos_type", "epubcfi") != "epubcfi":
+            continue
+        key = f"{a['book']}|{a['format']}|{a['user']}|{title}"
+        present.add(key)
+        if key in gone:
+            continue
+        if bid not in files:
+            files[bid] = ebooks.book_file(conn, bid)
+        path, fmt = files[bid]
+        p = bookmark_place(path, d.get("pos")) if path and fmt == a["format"] else {}
+        if not p:
+            continue
+        mid = "m" + hashlib.sha1(f"calibre|{key}".encode()).hexdigest()[:15]
+        keep.append(mid)
+        conn.execute("INSERT INTO book_marks (id, book_id, cfi, fraction, chapter, excerpt, created, calibre) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                     "ON CONFLICT(id) DO UPDATE SET book_id = excluded.book_id, cfi = excluded.cfi, fraction = excluded.fraction, "
+                     "chapter = excluded.chapter, excerpt = excluded.excerpt, created = excluded.created, calibre = excluded.calibre",
+                     (mid, bid, p["cfi"], p.get("fraction"), title[:200], p.get("excerpt"), _epoch(d.get("timestamp"), a["ts"]), key))
+    conn.execute(f"DELETE FROM book_marks WHERE calibre IS NOT NULL AND id NOT IN ({','.join('?' * len(keep))})", keep)
+    if gone:
+        conn.execute("UPDATE kv SET v = ? WHERE k = ?", (json.dumps(sorted(gone & present)), GONE_KEY))
+    return len(keep)
+
+
+def bookmark_taken_out(conn, key):
+    """A Calibre bookmark taken out in Daf: remembered, so the next sync doesn't bring it back."""
+    r = conn.execute("SELECT v FROM kv WHERE k = ?", (GONE_KEY,)).fetchone()
+    gone = set(json.loads(r[0])) if r and r[0] else set()
+    gone.add(key)
+    conn.execute("INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", (GONE_KEY, json.dumps(sorted(gone))))

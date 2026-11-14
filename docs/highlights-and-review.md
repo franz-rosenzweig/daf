@@ -13,7 +13,7 @@ This page is about the part of Daf I'd miss most if it disappeared: every highli
 - **Audiobooks and podcasts**, transcribed from a bookmark or a shared position.
 - **Paper pages**, from photos of the lines you marked in pencil.
 - **Readwise**, the years before Daf, read from the Readwise exports in my vault.
-- **Calibre**, the highlights I made in Calibre's own viewer on the Mac, read from the library itself (see [Highlights from Calibre](#highlights-from-calibre)).
+- **Calibre**, the highlights I made in Calibre's own viewer on the Mac, read from the library itself (see [Highlights from Calibre](#highlights-from-calibre)). It goes the other way too: what I highlight in Daf's reader shows up in Calibre's viewer.
 
 ## Making a highlight
 
@@ -30,11 +30,17 @@ A word with a dot in a note becomes a tag, as in Readwise: ".craft" in a note ta
 
 ## Highlights from Calibre
 
-When I read a book in Calibre's viewer on the Mac and highlight something there, Calibre keeps the highlight in the library, and Daf reads it from there at every sync (Calibre itself is only read). It comes into Daf on the same book, with the note I typed in Calibre, the colour I picked (Calibre's red is Daf's pink, and an underline is a plain yellow highlight), and the chapter it's in, and from then on it's in the Highlights page, the book's page, the daily review and the book's note in the vault, marked "Read in Calibre".
+When I read a book in Calibre's viewer on the Mac and highlight something there, Calibre keeps the highlight in the library, and Daf reads it from there at every sync. It comes into Daf on the same book, with the note I typed in Calibre, the colour I picked (Calibre's red is Daf's pink, and an underline is a plain yellow highlight), and the chapter it's in, and from then on it's in the Highlights page, the book's page, the daily review and the book's note in the vault, marked "Read in Calibre".
 
 Daf knows each one by Calibre's own id for it, so a sync never brings one in twice. If I change the note or the colour in Calibre, the change comes over, and if I remove the highlight in Calibre, it goes from Daf too. A colour I change in Daf stays, until I change it in Calibre again.
 
 In Daf's reader the highlight sits exactly where I made it, because Daf turns Calibre's place for it into the reader's, after checking in the very file the reader opens that those are the words. When the file isn't the same any more, say I converted or polished the book since, the reader finds the highlight by its words, the way it does the Kindle's.
+
+It works the other way as well. What I highlight in Daf's reader goes into Calibre at the next sync, the same way Calibre's viewer saves its own highlights, so when I open the book in Calibre on the Mac (once the library has synced there), my highlights from Daf are in it, in the right spots and colours, with my notes, and in Calibre's Highlights panel and Browse annotations too. Only the ones I made in Daf's reader go, and only for a book whose EPUB is the file Daf reads, because then a place in Daf is a place in the very file Calibre opens. The Kindle's highlights stay where they are: KOReader keeps its places in its own terms, in the Kindle's copy, which is often a different file. Before one goes, Daf turns its place into Calibre's and back again and checks that it lands on the same words, and a highlight that doesn't (the book changed since I made it) stays in Daf only.
+
+Each sync sends only what changed. A note or a colour I change in Daf follows into Calibre, and a highlight I remove in Daf is removed in Calibre as well. Daf gives each of its highlights its own id in Calibre and knows them by it, so they never come back into Daf as Calibre highlights and nothing doubles. If I change one of them in Calibre instead, Calibre keeps my change, and Daf leaves it alone until I change that highlight in Daf again.
+
+Calibre's bookmarks come in too. A bookmark I make in Calibre's viewer shows up with the book's bookmarks in Daf's reader, under the name I gave it there, at the same spot (or at the start of its chapter, if the file has changed since). Removing it in Calibre removes it in Daf, and if I take it out in Daf it stays out.
 
 ## Open at the exact spot
 
