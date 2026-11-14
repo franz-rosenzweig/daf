@@ -3252,3 +3252,37 @@ body.playing .jbfloat{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
   .ebrt thead{display:none}
   .ebrt td{padding:6px 4px}
 }
+
+/* Edit book's other tools (ebookmore.js): Merge files, Insert special character, Check external links */
+.ebzmerge{display:flex;flex-direction:column;gap:12px}
+.ebzseg{display:flex;gap:6px}
+.ebzseg .btn.on{background:var(--hover);border-color:var(--accent)}
+.ebzfiles{display:flex;flex-direction:column;gap:4px;max-height:46vh;overflow:auto}
+.ebzfiles .cvchk{gap:8px}
+.ebzfiles .mute{margin-left:4px}
+.ebzchars{display:flex;flex-direction:column;gap:10px;min-height:0}
+.ebzcbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.ebzcbar .field{min-height:36px;padding:6px 10px}
+.ebzgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:4px}
+.ebzch{height:42px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--fg);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.ebzch:hover{background:var(--hover);border-color:var(--line-2)}
+.ebznp{font-size:10px;color:var(--fg-2);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.ebzlast{min-height:18px;font-size:13px}
+.ebzlinks{display:flex;flex-direction:column;gap:2px}
+.ebzlink{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:10px;align-items:start;padding:8px 0;border-bottom:1px solid var(--line)}
+.ebzst{font-size:12.5px;font-weight:600;color:var(--fg-2)}
+.ebzlink.broken .ebzst{color:var(--bad)}
+.ebzlink.ok .ebzst{color:var(--ok)}
+.ebzhref{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:13.5px;overflow-wrap:anywhere}
+.ebzat{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:220px}
+@media (pointer:coarse){
+  .ebzch{height:48px}
+  .ebzgrid{grid-template-columns:repeat(auto-fill,minmax(48px,1fr))}
+  .ebzat .btn,.ebzseg .btn{min-height:40px}
+}
+@media (max-width:699px){
+  .ebzcbar{grid-template-columns:minmax(0,1fr)}
+  .ebzcbar .field{font-size:16px}
+  .ebzlink{grid-template-columns:minmax(0,1fr)}
+  .ebzat{justify-content:flex-start;max-width:none}
+}

@@ -347,14 +347,15 @@ main()
 '''
 
 
-def _run(cid, job, timeout=600):
-    """One job for Calibre on this book's working copy; its answer, or EditError."""
+def _run(cid, job, timeout=600, script=None):
+    """One job for Calibre on this book's working copy; its answer, or EditError. script: another
+    script with the same job and answer (ebookmore.TOOLS_SCRIPT), else SCRIPT."""
     from . import calibrewrite as W
     for old in home(cid).glob("tmp-*"):          # left by a run that was cut off
         shutil.rmtree(old, ignore_errors=True)
     job = dict(job, dir=inside(home(cid)))
     try:
-        r = subprocess.run(W.RUN + [W.DEBUG, "-c", SCRIPT], input=json.dumps(job), capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(W.RUN + [W.DEBUG, "-c", script or SCRIPT], input=json.dumps(job), capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         raise EditError("Calibre took too long")
     except OSError as e:
