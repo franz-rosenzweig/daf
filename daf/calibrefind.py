@@ -367,6 +367,13 @@ def find(conn_factory, cid, book_id, title, authors, identifiers, q=None):
         t.start()
     for t in ts:
         t.join()
+    if not res.get("calibre") and not res.get("calibre_ids"):
+        # Nothing for this title and author (an author spelled as a library catalogue spells it, a
+        # title missing its colon): the title alone, as I'd search for it by hand.
+        try:
+            res["calibre"] = calibre_sources(main_title(title), [], {}, info=info)
+        except Exception as e:  # noqa: BLE001
+            errs.append(f"Calibre's sources: {e}")
     out, seen = [], set()
     hc = res.get("hardcover") or []
     if not q:
@@ -412,15 +419,43 @@ def _hc(query, variables):
     return H.gql(query, variables)
 
 
-def same_book(book, cand):
-    """Is this answer surely the book: the same title (subtitles aside) and the same author?"""
-    from .library import norm, surname
-    a, b = norm(book["title"]), norm(cand.get("title") or "")
-    if not a or not b or not (a == b or a.startswith(b + " ") or b.startswith(a + " ")):
-        return False
+def _name_words(s):
     from .catalog import fold
-    who = surname((book.get("authors") or [""])[0])
-    return bool(who) and who in re.sub(r"[^a-z]+", " ", fold(" ".join(cand.get("authors") or [])))
+    return re.findall(r"\w+", fold(s))
+
+
+def _last_name(author):
+    """An author's surname, in any script: "Wilf" from "Einat Wilf" or "Wilf, Einat"; a Hebrew one too."""
+    a = str(author or "")
+    words = _name_words(a.split(",")[0] if "," in a else a.split("&")[0])
+    return words[-1] if words else ""
+
+
+def _close(a, b):
+    """The same surname, or one spelled a little differently (a transliteration: Vilf, Wilf)."""
+    import difflib
+    return a == b or (len(a) > 3 and len(b) > 3 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.75)
+
+
+def same_book(book, cand):
+    """Is this answer surely the book: the same title (subtitles aside) and one of its authors (in
+    either order, a spelling a letter apart allowed)?"""
+    from .library import norm
+    a, b = norm(book["title"]), norm(cand.get("title") or "")
+    short = a if len(a) <= len(b) else b
+    # The same, or one running on past the other (a subtitle without its colon), when the shorter is
+    # a real title of three words or more: "Dune" isn't "Dune Messiah".
+    if not a or not b or not (a == b or (len(short.split()) >= 3 and (a.startswith(b + " ") or b.startswith(a + " ")))):
+        return False
+    mine = [n for n in (_last_name(x) for x in book.get("authors") or []) if n]
+    theirs = set(_name_words(" ".join(cand.get("authors") or [])))
+    return any(_close(m, t) for m in mine for t in theirs)
+
+
+def main_title(title):
+    """The title without its subtitle, for a second search; the whole title when that would leave a word or two."""
+    t = re.split(r":| - | \(", str(title or ""))[0].strip()
+    return t if len(t.split()) >= 3 or t == str(title or "").strip() else str(title or "").strip()
 
 
 def _hardcover_answer(book):
@@ -529,6 +564,10 @@ def fill_start(cids, fields):
             for a in calibre_sources(b["title"], b.get("authors") or [], ids, timeout=30, plugins=QUICK):
                 if same_book(b, a):
                     answers.append(a)
+            if not answers:                     # nothing surely this book: the title alone, then the same test
+                for a in calibre_sources(main_title(b["title"]), [], {}, timeout=30, plugins=QUICK):
+                    if same_book(b, a):
+                        answers.append(a)
         except Exception as e:  # noqa: BLE001
             errs.append(f"Calibre's sources: {e}")
         try:
