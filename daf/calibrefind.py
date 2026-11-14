@@ -48,7 +48,8 @@ def main():
         prio = msprefs["cover_priorities"]
         plugins = sorted(metadata_plugins(["identify"]), key=lambda p: prio.get(p.name, 1))
         keys = {"goodreads": "Goodreads", "google": "Google", "amazon": "Amazon.com", "edelweiss": "Edelweiss",
-                "openlibrary": "Open Library", "isbndb": "ISBNDB", "hardcover": "Hardcover"}
+                "openlibrary": "Open Library", "isbndb": "ISBNDB", "hardcover": "Hardcover", "evrit": "Evrit", "kobo": "Kobo",
+                "barnesnoble": "Barnes & Noble", "storygraph": "StoryGraph"}
         for r in res[:12]:
             cover = None
             for p in (plugins if getattr(r, "has_cached_cover_url", True) else []):   # Calibre knows when it's only a placeholder
