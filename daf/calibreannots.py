@@ -16,7 +16,11 @@ it isn't sent), the highlighted words, Daf's note, the colour as one of Calibre'
 when. Only what changed since the last sync is sent (calibre_pushed keeps what was sent); a
 highlight removed in Daf is marked removed in Calibre, the way Calibre's viewer removes one.
 calibrehl skips these uuids when it reads Calibre's highlights, so nothing comes back as a copy.
-A change made to one of these in Calibre stays there until the highlight changes in Daf.
+
+And back (pull, before each push): a note, a colour, new ends or a removal made in Calibre's viewer
+to one of these comes into the Daf highlight it came from; when both sides changed it since the last
+sync, the newer one wins. calibre_pushed keeps both sides as they were left (hash: Daf's, seen:
+Calibre's), so a change taken from Calibre isn't sent back and nothing goes back and forth.
 """
 import hashlib
 import json
@@ -185,8 +189,9 @@ def plan(conn, now=None):
         u, prev = H.daf_uuid(h["id"]), sent.get(h["id"])
         if h["deleted"]:
             if prev and not prev["removed"]:
-                ops.setdefault((prev["cal_id"], prev["fmt"]), []).append({"type": "highlight", "uuid": u, "removed": True, "timestamp": _iso(now)})
-                done.append((h["id"], u, prev["cal_id"], prev["fmt"], prev["hash"], 1, now))
+                stub = {"type": "highlight", "uuid": u, "removed": True, "timestamp": _iso(now)}
+                ops.setdefault((prev["cal_id"], prev["fmt"]), []).append(stub)
+                done.append((h["id"], u, prev["cal_id"], prev["fmt"], prev["hash"], 1, now, _hash(stub)))
             continue
         bid = h["book_id"]
         if bid not in files:
@@ -206,11 +211,12 @@ def plan(conn, now=None):
             continue
         a["timestamp"] = _iso(now if prev else (h["created"] or now))     # a change is newer than what Calibre has
         ops.setdefault((cid, "EPUB"), []).append(a)
-        done.append((h["id"], u, cid, "EPUB", key, 0, now))
+        done.append((h["id"], u, cid, "EPUB", key, 0, now, key))
     for hid, prev in sent.items():                       # gone from Daf altogether
         if hid not in seen and not prev["removed"]:
-            ops.setdefault((prev["cal_id"], prev["fmt"]), []).append({"type": "highlight", "uuid": prev["uuid"], "removed": True, "timestamp": _iso(now)})
-            done.append((hid, prev["uuid"], prev["cal_id"], prev["fmt"], prev["hash"], 1, now))
+            stub = {"type": "highlight", "uuid": prev["uuid"], "removed": True, "timestamp": _iso(now)}
+            ops.setdefault((prev["cal_id"], prev["fmt"]), []).append(stub)
+            done.append((hid, prev["uuid"], prev["cal_id"], prev["fmt"], prev["hash"], 1, now, _hash(stub)))
     return [{"op": "annotations", "id": cid, "fmt": fmt, "annots": annots} for (cid, fmt), annots in ops.items()], done
 
 
@@ -220,7 +226,106 @@ def push(conn, settings=None):
     ops, done = plan(conn)
     if not ops:
         return 0
+    # A change must be newer than the version Calibre has, or Calibre's merge keeps its own (the Mac's
+    # clock may be ahead of the server's); a first one Calibre doesn't have yet keeps its own time.
+    known = {d[1]: {"cal_id": d[2], "fmt": d[3]} for d in done}
+    try:
+        theirs = {u: H._epoch_ms(a["data"].get("timestamp")) for u, a in _calibre_side(known).items()}
+    except Exception:  # noqa: BLE001 - a library without Calibre's annotations yet: nothing there to be newer than
+        theirs = {}
+    for op in ops:
+        for a in op["annots"]:
+            t = theirs.get(a["uuid"])
+            if t is not None and H._epoch_ms(a["timestamp"]) <= t:
+                a["timestamp"] = _iso((t + 1) / 1000)
     conn.commit()                    # nothing of the sync's held open while Calibre's run brings Daf's book rows along (calibrewrite._follow)
     calibrewrite.run(ops, timeout=300)
-    conn.executemany("INSERT OR REPLACE INTO calibre_pushed (hl_id, uuid, cal_id, fmt, hash, removed, at) VALUES (?, ?, ?, ?, ?, ?, ?)", done)
+    conn.executemany("INSERT OR REPLACE INTO calibre_pushed (hl_id, uuid, cal_id, fmt, hash, removed, at, seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", done)
     return len(done)
+
+
+# ---------- the other way: what was done in Calibre to Daf's own highlights ----------
+def _calibre_side(sent):
+    """Calibre's version now of each highlight Daf sent it (the newest, should two users have one): {uuid: annotation}."""
+    out = {}
+    for a in H.annotations():
+        p = sent.get(a["uuid"])
+        if not p or a["book"] != p["cal_id"] or a["format"] != p["fmt"]:
+            continue
+        cur = out.get(a["uuid"])
+        if not cur or (H._epoch(a["data"].get("timestamp")) or 0) > (H._epoch(cur["data"].get("timestamp")) or 0):
+            out[a["uuid"]] = a
+    return out
+
+
+def pull(conn, settings):
+    """Changes made in Calibre (its viewer on the Mac) to the highlights Daf sent it, back into Daf.
+
+    Calibre's side changed when its version isn't the one Daf last knew (`seen`; Calibre's viewer
+    doesn't always move a highlight's time, a note alone keeps it). Daf's side changed when what Daf
+    would send now isn't what it last sent (`hash`), or Daf removed it. If only Calibre's changed, Daf
+    takes it; if both did, the newer wins: Calibre's time for its version against the time the
+    highlight last changed in Daf (highlights.changed, its note's note_updated), and a Daf win is
+    sent by push() as usual. Taken from Calibre: the note, the colour, the ends (only when Calibre's
+    place for them holds its words in the file Daf reads; otherwise Daf keeps its place), removed
+    (Daf's own removal: deleted = 1, which can be undone) and, for one Daf had removed and Calibre
+    changed later, brought back. Only ever for a highlight made in Daf's reader whose uuid is Daf's
+    own for it. Afterwards both sides are recorded as they now are, so nothing goes back and forth.
+    Returns how many highlights changed in Daf."""
+    from . import review, vaultnotes
+    sent = {r["uuid"]: dict(r) for r in conn.execute("SELECT * FROM calibre_pushed WHERE removed = 0")}
+    if not sent:
+        return 0
+    files, taken = {}, 0
+    for u, theirs in _calibre_side(sent).items():
+        p, d = sent[u], theirs["data"]
+        if _hash(d) == (p["seen"] or p["hash"]):
+            continue                                     # as Daf left it
+        h = conn.execute("SELECT h.*, s.user_note, s.note_updated FROM highlights h LEFT JOIN review_state s ON s.hl_id = h.id "
+                         "WHERE h.id = ?", (p["hl_id"],)).fetchone()
+        if not h or h["source"] != "epub" or H.daf_uuid(h["id"]) != u:
+            continue                                     # only Daf's own, by its own uuid
+        bid = h["book_id"]
+        if bid not in files:
+            files[bid] = ebooks.book_file(conn, bid)
+        path, fmt = files[bid]
+        try:
+            mine = annotation(path, h, u) if path and fmt == "EPUB" else None
+        except Exception:  # noqa: BLE001
+            mine = None
+        daf_changed = bool(h["deleted"]) or (mine is not None and _hash(mine) != p["hash"])
+        if daf_changed and max(h["changed"] or 0, h["note_updated"] or 0, h["created"] or 0) >= (H._epoch(d.get("timestamp")) or 0):
+            continue                                     # Daf's change is the newer: push() sends it
+        before = (h["deleted"], h["user_note"], h["color"], h["pos"], h["text"])
+        if d.get("removed"):
+            if not h["deleted"]:
+                conn.execute("UPDATE highlights SET deleted = 1 WHERE id = ?", (h["id"],))
+        else:
+            if h["deleted"]:
+                conn.execute("UPDATE highlights SET deleted = 0 WHERE id = ?", (h["id"],))
+            note = (d.get("notes") or "").strip() or None
+            if note != ((h["user_note"] or "").strip() or None):
+                review.set_note(conn, h["id"], note)
+            c = H.color(d.get("style"))
+            if c != (h["color"] or "yellow"):
+                conn.execute("UPDATE highlights SET color = ? WHERE id = ?", (None if c == "yellow" else c, h["id"]))
+            ends = (d.get("start_cfi"), d.get("end_cfi"))
+            if mine is not None and ends != (mine["start_cfi"], mine["end_cfi"]) and fmt == theirs["format"]:
+                at = H.place(path, d)
+                if at.get("cfi"):                        # Calibre's new ends hold its words in this file
+                    pos = json.loads(h["pos"]) if h["pos"] and str(h["pos"]).startswith("{") else {}
+                    pos.update(cfi=at["cfi"], fraction=at.get("fraction"))
+                    toc = [str(t).strip() for t in d.get("toc_family_titles") or [] if str(t).strip()] if isinstance(d.get("toc_family_titles"), list) else []
+                    conn.execute("UPDATE highlights SET pos = ?, text = ?, chapter = COALESCE(?, chapter) WHERE id = ?",
+                                 (json.dumps(pos), d["highlighted_text"].strip(), toc[-1][:200] if toc else None, h["id"]))
+        h2 = conn.execute("SELECT h.*, s.user_note FROM highlights h LEFT JOIN review_state s ON s.hl_id = h.id WHERE h.id = ?", (h["id"],)).fetchone()
+        try:
+            now_mine = annotation(path, h2, u) if path and fmt == "EPUB" and not h2["deleted"] else None
+        except Exception:  # noqa: BLE001
+            now_mine = None
+        conn.execute("UPDATE calibre_pushed SET hash = ?, seen = ?, removed = ?, at = ? WHERE hl_id = ?",
+                     (_hash(now_mine) if now_mine else p["hash"], _hash(d), 1 if h2["deleted"] else 0, int(time.time()), h["id"]))
+        if before != (h2["deleted"], h2["user_note"], h2["color"], h2["pos"], h2["text"]):
+            taken += 1
+            vaultnotes.write_for(conn, settings, bid)    # as Daf's own removal and edits do
+    return taken

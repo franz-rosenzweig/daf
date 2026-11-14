@@ -66,6 +66,14 @@ def _epoch(v, fallback=None):
         return int(fallback) if fallback else None
 
 
+def _epoch_ms(v):
+    """Calibre's ISO time in milliseconds (its own precision), or None."""
+    try:
+        return round(datetime.fromisoformat(str(v).replace("Z", "+00:00")).timestamp() * 1000)
+    except (TypeError, ValueError):
+        return None
+
+
 def hid(cid, uuid):
     return "c" + hashlib.sha1(f"calibre|{cid}|{uuid}".encode()).hexdigest()[:16]
 

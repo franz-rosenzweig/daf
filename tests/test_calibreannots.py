@@ -165,6 +165,145 @@ class Push(unittest.TestCase):
         self.assertIn('merge_annotations_for_book(ids[0], op["fmt"].upper(), op["annots"], user_type="local", user="viewer")', calibrewrite.SCRIPT)
 
 
+class Pull(unittest.TestCase):
+    """Changes made in Calibre's viewer to Daf's own highlights, back into Daf (calibreannots.pull),
+    with Calibre's merge stood in for by a table that keeps the newer of two versions."""
+
+    setUp_push = Push.setUp
+
+    def setUp(self):
+        self.setUp_push()
+        c = sqlite3.connect(self.dbp)
+        c.execute("CREATE TABLE annotations (id INTEGER PRIMARY KEY, book INTEGER, format TEXT, user_type TEXT, user TEXT, timestamp REAL, "
+                  "annot_id TEXT, annot_type TEXT, annot_data TEXT, UNIQUE(book, user_type, user, format, annot_type, annot_id))")
+        c.commit()
+        c.close()
+        p = mock.patch.object(calibrewrite, "run", side_effect=self.merge)
+        p.start()
+        self.addCleanup(p.stop)
+        self.notes = mock.patch("daf.vaultnotes.write_for").start()
+        self.addCleanup(mock.patch.stopall)
+        A.push(self.c)
+
+    def merge(self, ops, timeout=120):                       # Calibre's merge: by uuid, the newer one stays
+        c = sqlite3.connect(self.dbp)
+        for op in ops:
+            for a in op["annots"]:
+                old = c.execute("SELECT annot_data FROM annotations WHERE annot_id = ?", (a["uuid"],)).fetchone()
+                if old and json.loads(old[0])["timestamp"] > a["timestamp"]:
+                    continue
+                c.execute("INSERT OR REPLACE INTO annotations (id, book, format, user_type, user, timestamp, annot_id, annot_type, annot_data) "
+                          "VALUES ((SELECT id FROM annotations WHERE annot_id = ?), ?, ?, 'local', 'viewer', 0, ?, 'highlight', ?)",
+                          (a["uuid"], op["id"], op["fmt"], a["uuid"], json.dumps(a)))
+        c.commit()
+        c.close()
+        return {}
+
+    def calibre(self, hid):
+        c = sqlite3.connect(self.dbp)
+        try:
+            return json.loads(c.execute("SELECT annot_data FROM annotations WHERE annot_id = ?", (H.daf_uuid(hid),)).fetchone()[0])
+        finally:
+            c.close()
+
+    def edit(self, hid, **change):                           # what Calibre's viewer on the Mac would leave in the library
+        a = self.calibre(hid)
+        a.update(change)
+        for k in [k for k, v in a.items() if v is None]:
+            del a[k]
+        c = sqlite3.connect(self.dbp)
+        c.execute("UPDATE annotations SET annot_data = ? WHERE annot_id = ?", (json.dumps(a), a["uuid"]))
+        c.commit()
+        c.close()
+
+    def daf(self, hid):
+        return dict(self.c.execute("SELECT h.*, s.user_note FROM highlights h LEFT JOIN review_state s ON s.hl_id = h.id WHERE h.id = ?", (hid,)).fetchone())
+
+    def settled(self):
+        """Nothing goes back and forth afterwards."""
+        self.assertEqual(A.pull(self.c, {}), 0)
+        self.assertEqual(A.push(self.c), 0)
+
+    def test_a_note_written_in_calibre(self):
+        self.edit("e1", notes="A note typed in Calibre")             # the viewer keeps the time for a note alone
+        self.assertEqual(A.pull(self.c, {}), 1)
+        self.assertEqual(self.daf("e1")["user_note"], "A note typed in Calibre")
+        self.notes.assert_called_with(self.c, {}, "cal:1")
+        self.settled()
+        self.edit("e1", notes=None)                                   # and taken off again
+        self.assertEqual(A.pull(self.c, {}), 1)
+        self.assertIsNone(self.daf("e1")["user_note"])
+        self.settled()
+
+    def test_a_colour_changed_in_calibre(self):
+        self.edit("e2", style={"kind": "color", "type": "builtin", "which": "red"}, timestamp="2099-01-01T00:00:00.000Z")
+        A.pull(self.c, {})
+        self.assertEqual(self.daf("e2")["color"], "pink")
+        self.settled()
+
+    def test_new_ends_in_calibre(self):
+        self.edit("e1", start_cfi="/2/4/6/1:2", end_cfi="/2/4/6/1:18", highlighted_text="plain line about", timestamp="2099-01-01T00:00:00.000Z")
+        A.pull(self.c, {})
+        h = self.daf("e1")
+        self.assertEqual((json.loads(h["pos"])["cfi"], h["text"]), ("epubcfi(/6/4!/4/6,/1:2,/1:18)", "plain line about"))
+        self.settled()
+
+    def test_new_ends_that_arent_in_this_file(self):
+        self.edit("e1", start_cfi="/2/4/6/1:2", end_cfi="/2/4/6/1:18", highlighted_text="words this file hasn't", notes="Kept anyway",
+                  timestamp="2099-01-01T00:00:00.000Z")
+        A.pull(self.c, {})
+        h = self.daf("e1")
+        self.assertEqual((json.loads(h["pos"])["cfi"], h["text"], h["user_note"]), ("epubcfi(/6/4!/4/6,/1:2,/1:12)", "plain line", "Kept anyway"))
+        self.settled()
+
+    def test_removed_in_calibre(self):
+        self.edit("e2", removed=True, timestamp="2099-01-01T00:00:00.000Z", style=None, highlighted_text=None, start_cfi=None, end_cfi=None,
+                  spine_name=None, spine_index=None, toc_family_titles=None)
+        self.assertEqual(A.pull(self.c, {}), 1)
+        self.assertEqual(self.daf("e2")["deleted"], 1)                # Daf's own removal: still there, and can be brought back
+        self.settled()
+        self.c.execute("UPDATE highlights SET deleted = 0 WHERE id = 'e2'")      # brought back in Daf
+        self.assertEqual(A.push(self.c), 1)
+        back = self.calibre("e2")
+        self.assertNotIn("removed", back)
+        self.assertEqual(back["timestamp"], "2099-01-01T00:00:00.001Z")           # newer than Calibre's, whatever the Mac's clock said
+        self.settled()
+
+    def test_both_changed_the_newer_wins(self):
+        self.c.execute("UPDATE highlights SET color = 'green' WHERE id = 'e1'")    # changed in Daf now…
+        self.edit("e1", notes="Older, from Calibre")                              # …and in Calibre with its old time
+        A.pull(self.c, {})
+        self.assertIsNone(self.daf("e1")["user_note"])
+        self.assertEqual(A.push(self.c), 1)                                       # Daf's goes to Calibre
+        self.assertEqual((self.calibre("e1")["style"]["which"], self.calibre("e1").get("notes")), ("green", None))
+        self.settled()
+        self.c.execute("UPDATE highlights SET color = 'blue' WHERE id = 'e1'")
+        self.edit("e1", notes="Newer, from Calibre", timestamp="2099-01-01T00:00:00.000Z")
+        A.pull(self.c, {})
+        h = self.daf("e1")
+        self.assertEqual((h["user_note"], h["color"]), ("Newer, from Calibre", "green"))   # Calibre's whole version: its colour too
+        self.settled()
+
+    def test_only_dafs_own(self):
+        self.c.execute("UPDATE highlights SET source = 'kindle' WHERE id = 'e1'")
+        self.edit("e1", notes="Not for this one", timestamp="2099-01-01T00:00:00.000Z")
+        self.assertEqual(A.pull(self.c, {}), 0)
+        self.assertIsNone(self.daf("e1")["user_note"])
+        self.c.execute("UPDATE highlights SET source = 'epub' WHERE id = 'e1'")
+        self.c.execute("UPDATE calibre_pushed SET uuid = 'someone-elses' WHERE hl_id = 'e2'")
+        self.edit("e2", notes="Nor this one", timestamp="2099-01-01T00:00:00.000Z")
+        self.assertEqual(A.pull(self.c, {}), 1)                                       # e1 again (Daf's now), not e2
+        self.assertIsNone(self.daf("e2")["user_note"])
+
+    def test_never_gone_from_daf(self):
+        c = sqlite3.connect(self.dbp)
+        c.execute("DELETE FROM annotations")                                         # Calibre lost them all
+        c.commit()
+        c.close()
+        self.assertEqual(A.pull(self.c, {}), 0)
+        self.assertEqual(self.c.execute("SELECT COUNT(*) FROM highlights WHERE source = 'epub' AND deleted = 0").fetchone()[0], 3)
+
+
 class Bookmarks(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
