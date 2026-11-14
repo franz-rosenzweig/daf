@@ -1663,14 +1663,16 @@ async def put_catalog_cover(cid: int, request: Request):
 COLUMN_TYPES = [("text", "Text, column shown in the Tag browser"), ("*text", "Comma separated text, like tags, shown in the Tag browser"),
                 ("comments", "Long text, like comments, not shown in the Tag browser"), ("series", "Text column for keeping series-like information"),
                 ("enumeration", "Text, but with a fixed set of permitted values"), ("datetime", "Date"), ("float", "Floating point numbers"),
-                ("int", "Integers"), ("rating", "Ratings, shown with stars"), ("bool", "Yes/No")]
+                ("int", "Integers"), ("rating", "Ratings, shown with stars"), ("bool", "Yes/No"),
+                ("composite", "Column built from other columns"), ("*composite", "Column built from other columns, behaves like tags")]
 
 
 @app.get("/api/catalog/columns", dependencies=[Depends(user)])
 def get_catalog_columns():
     """My own Calibre columns ({key, label (its heading), dtype, multi, enum}) and the kinds a new one can be."""
     _books, custom = catalog.calibre_rows()
-    return {"columns": [{k: c.get(k) for k in ("key", "label", "dtype", "multi", "enum")} for c in custom],
+    comp = [{"key": c["key"], "label": c["label"], "dtype": "composite", "multi": c["multi"], "enum": None, "template": c["template"]} for c in catalog.composites()]
+    return {"columns": sorted([{k: c.get(k) for k in ("key", "label", "dtype", "multi", "enum")} for c in custom] + comp, key=lambda c: c["key"]),
             "types": [{"key": k, "label": l} for k, l in COLUMN_TYPES]}
 
 
@@ -1699,14 +1701,26 @@ def post_catalog_column(b=Depends(json_body)):
         display = {"heading_position": "hide", "interpret_as": "html"}
     elif typ == "rating":
         display = {"allow_half_stars": True}
-    _calibre([{"op": "create_column", "label": label, "heading": heading, "datatype": typ.lstrip("*"), "multiple": typ == "*text", "display": display}])
+    elif typ in ("composite", "*composite"):
+        tpl = str(b.get("template") or "").strip()[:5000]
+        if not tpl:
+            raise HTTPException(400, "A column built from other columns needs its template")
+        display = {"composite_template": tpl, "composite_sort": "text", "make_category": typ == "*composite", "contains_html": False, "use_decorations": False}
+    _calibre([{"op": "create_column", "label": label, "heading": heading, "datatype": typ.lstrip("*"), "multiple": typ in ("*text", "*composite"), "display": display}])
     return {"key": "#" + label}
 
 
 @app.put("/api/catalog/columns/{label}", dependencies=[Depends(user)])
 def put_catalog_column(label: str, b=Depends(json_body)):
-    """A column of mine gets a new heading: {heading}."""
-    heading = str((b or {}).get("heading") or "").strip()[:100] if isinstance(b, dict) else ""
+    """A column of mine gets a new heading ({heading}), or, built from other columns, a new template ({template})."""
+    b = b if isinstance(b, dict) else {}
+    if "template" in b:
+        tpl = str(b.get("template") or "").strip()[:5000]
+        if not tpl:
+            raise HTTPException(400, "A column built from other columns needs its template")
+        _calibre([{"op": "column_template", "label": label.lstrip("#").lower(), "template": tpl}])
+        return {"ok": True}
+    heading = str(b.get("heading") or "").strip()[:100]
     if not heading:
         raise HTTPException(400, "A column needs a heading")
     _calibre([{"op": "column_heading", "label": label.lstrip("#").lower(), "heading": heading}])

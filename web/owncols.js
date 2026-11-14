@@ -6,7 +6,8 @@
 'use strict';
 const C = window.DafCore, { api, esc, toast, $ } = C;
 const X = '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 6l8 8M14 6l-8 8"/></svg>';
-const M = { data: null, busy: false, form: { label: '', heading: '', type: 'text', values: '' } };
+const M = { data: null, busy: false, form: { label: '', heading: '', type: 'text', values: '', template: '' } };
+const built = t => t === 'composite' || t === '*composite';
 
 function sheet(html){
   let s = $('#ocsheet');
@@ -26,19 +27,22 @@ async function open(){
   try { M.data = await api('/api/catalog/columns'); } catch(e){ close(); toast(e.message); return; }
   draw();
 }
-const kind = c => { const k = c.dtype === 'text' && c.multi ? '*text' : c.dtype; return ((M.data.types.find(t => t.key === k) || {}).label) || c.dtype; };
+const kind = c => { const k = (c.dtype === 'text' || c.dtype === 'composite') && c.multi ? '*' + c.dtype : c.dtype; return ((M.data.types.find(t => t.key === k) || {}).label) || c.dtype; };
 const row = (label, ctl) => '<div class="berow"><span>' + esc(label) + '</span><div class="bectl">' + ctl + '</div></div>';
 function draw(){
   const d = M.data, f = M.form, dis = M.busy ? ' disabled' : '';
   sheet('<div class="behead"><h2>Add your own columns</h2><span class="spacer"></span><button class="btn sm" data-oc="close">Close</button></div>' +
     '<div class="bebody one ocbody">' +
-    '<div class="oclist">' + d.columns.map(c => '<div class="ocrow"><button class="ocname" data-ocren="' + esc(c.key) + '"' + dis + '><b>' + esc(c.label) + '</b><span class="mute tiny">' + esc(c.key) + ' · ' + esc(kind(c)) + '</span></button>' +
+    '<div class="oclist">' + d.columns.map(c => '<div class="ocrow"><button class="ocname" data-ocren="' + esc(c.key) + '"' + dis + '><b>' + esc(c.label) + '</b><span class="mute tiny">' + esc(c.key) + ' · ' + esc(kind(c)) + '</span>' +
+        (c.dtype === 'composite' ? '<span class="mute tiny octpl">' + esc(c.template || '') + '</span>' : '') + '</button>' +
+      (c.dtype === 'composite' ? '<button class="btn sm" data-octpl="' + esc(c.key) + '"' + dis + '>Template</button>' : '') +
       '<button class="btn sm ib" data-ocdel="' + esc(c.key) + '" aria-label="Delete ' + esc(c.label) + '"' + dis + '>' + X + '</button></div>').join('') + '</div>' +
     '<h3>New column</h3>' +
     row('Lookup name', '<span class="ochash"><span>#</span><input class="field" data-ocf="label" value="' + esc(f.label) + '" autocomplete="off" autocapitalize="off" spellcheck="false"></span>') +
     row('Column heading', '<input class="field" data-ocf="heading" value="' + esc(f.heading) + '" autocomplete="off">') +
     row('Column type', '<select class="field" data-ocf="type">' + d.types.map(t => '<option value="' + esc(t.key) + '"' + (t.key === f.type ? ' selected' : '') + '>' + esc(t.label) + '</option>').join('') + '</select>') +
     (f.type === 'enumeration' ? row('Values', '<input class="field" data-ocf="values" value="' + esc(f.values) + '" autocomplete="off">') : '') +
+    (built(f.type) ? row('Template', '<input class="field mono" data-ocf="template" value="' + esc(f.template) + '" autocomplete="off" autocapitalize="off" spellcheck="false">') : '') +
     '<div class="ocgo"><button class="btn primary" data-oc="create"' + (M.busy || !f.label.trim() || !f.heading.trim() ? ' disabled' : '') + '>' + (M.busy ? 'Working…' : 'Create') + '</button></div></div>');
 }
 async function act(fn){
@@ -57,8 +61,8 @@ document.addEventListener('click', e => {
   if (a && a.dataset.oc === 'create') {
     const f = M.form, label = f.label.trim().replace(/^#/, '').toLowerCase();
     act(async () => {
-      const r = await api('/api/catalog/columns', { method: 'POST', body: JSON.stringify({ label, heading: f.heading.trim(), type: f.type, values: f.values.split(',').map(x => x.trim()).filter(Boolean) }) });
-      M.form = { label: '', heading: '', type: f.type, values: '' };
+      const r = await api('/api/catalog/columns', { method: 'POST', body: JSON.stringify({ label, heading: f.heading.trim(), type: f.type, values: f.values.split(',').map(x => x.trim()).filter(Boolean), template: f.template.trim() }) });
+      M.form = { label: '', heading: '', type: f.type, values: '', template: '' };
       if (C.Catalog && C.Catalog.showColumn) C.Catalog.showColumn(r.key);
     });
     return;
@@ -66,6 +70,10 @@ document.addEventListener('click', e => {
   const ren = t.closest('[data-ocren]');
   if (ren) { const c = M.data.columns.find(x => x.key === ren.dataset.ocren), to = (prompt('Column heading', c.label) || '').trim();
     if (to && to !== c.label) act(() => api('/api/catalog/columns/' + encodeURIComponent(c.key.slice(1)), { method: 'PUT', body: JSON.stringify({ heading: to }) }));
+    return; }
+  const tp = t.closest('[data-octpl]');
+  if (tp) { const c = M.data.columns.find(x => x.key === tp.dataset.octpl), to = (prompt('Template', c.template || '') || '').trim();
+    if (to && to !== c.template) act(() => api('/api/catalog/columns/' + encodeURIComponent(c.key.slice(1)), { method: 'PUT', body: JSON.stringify({ template: to }) }));
     return; }
   const del = t.closest('[data-ocdel]');
   if (del) { const c = M.data.columns.find(x => x.key === del.dataset.ocdel);

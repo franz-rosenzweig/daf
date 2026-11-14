@@ -19,7 +19,7 @@ import re
 import unicodedata
 from datetime import date, datetime, timedelta
 
-from . import config
+from . import composite, config
 from .db import read_only
 
 # key, label, type, Calibre's own name for the field (search aliases)
@@ -156,6 +156,7 @@ def calibre_rows(settings=None):
                 if typ in ("isbn", "isbn13", "isbn10") and not books[b]["isbn"]:
                     books[b]["isbn"] = re.sub(r"[^0-9Xx]", "", str(val))
         custom = _custom_columns(c)
+        comp = composite.columns(c)
         for col in custom:
             n, k = col["id"], col["key"]
             for b in books.values():
@@ -193,8 +194,14 @@ def calibre_rows(settings=None):
     for g in groups.values():
         for i in g:
             books[i]["duplicate"] = len(g) > 1
-    _cache.update(key=key, books=books, custom=custom)
+    _cache.update(key=key, books=books, custom=custom, comp=comp)
     return books, custom
+
+
+def composites():
+    """My columns built from other columns (composite.py): [{id, key, label, template, multi}]."""
+    calibre_rows()
+    return _cache.get("comp") or []
 
 
 def columns(custom):
@@ -207,6 +214,8 @@ def rows(conn, settings=None, private=False):
     """Every Calibre book with Daf's side joined in: [{id, …fields}]."""
     settings = settings or config.load_settings()
     cal, custom = calibre_rows(settings)
+    comp = _cache.get("comp") or []
+    cvals = composite.values(_cache.get("key"), comp)
     tz = _tz(settings)
     daf = {r["calibre_id"]: dict(r) for r in conn.execute(
         "SELECT id, calibre_id, status, progress, progress_note, last_read, audio_pct, private FROM books WHERE calibre_id IS NOT NULL")}
@@ -232,8 +241,10 @@ def rows(conn, settings=None, private=False):
             "last_read": datetime.fromtimestamp(lr, tz).date().isoformat() if lr else None,
             "audio": d.get("audio_pct"), "highlights": hl.get(bid, 0), "shelves": shelves.get(bid, []), "shelf_ids": shelf_ids.get(bid, []),
             "marked": cid in marks, "ondevice": (dev.get(bid) or {}).get("state"),
+            **{col["key"]: composite.cell(cvals.get(col["key"], {}).get(cid), col["multi"]) for col in comp},
         })
-    return out, columns(custom)
+    return out, columns(custom) + [{"key": col["key"], "label": col["label"], "type": "list" if col["multi"] else "text", "custom": True,
+                                    "dtype": "composite", "multi": col["multi"], "enum": None} for col in comp]
 
 
 def marked(settings=None):
@@ -563,7 +574,7 @@ FACETS = [("status", "Status"), ("tags", "Tags"), ("authors", "Authors"), ("seri
 
 def facets(books, cols):
     out = []
-    keys = FACETS + [(c["key"], c["label"]) for c in cols if c.get("custom") and c["type"] in ("text", "list", "rating")]
+    keys = FACETS + [(c["key"], c["label"]) for c in cols if c.get("custom") and c["type"] in ("text", "list", "rating") and c.get("dtype") != "composite"]
     for key, label in keys:
         counts = {}
         for b in books:
