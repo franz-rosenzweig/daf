@@ -4,6 +4,7 @@
   fullest record, with KoInsight's annotation table filling any book whose
   sidecar never synced.
 - Karakeep: highlights on saved articles, read-only from its SQLite file.
+- Calibre: highlights made in Calibre's own viewer, read-only from its library (calibrehl.py).
 - Audiobookshelf: bookmarks (a time and a title, no text yet; Phase 5
   transcribes them), kept apart from highlights.
 
@@ -12,6 +13,7 @@ its normalized text. Review state and Daf notes hang off that id.
 """
 import hashlib
 import json
+import logging
 import re
 import time
 from datetime import datetime
@@ -180,6 +182,15 @@ def import_all(conn, settings):
         rw_ok = (config.VAULT / readwise.FOLDER).is_dir()
     except Exception:  # noqa: BLE001 - the vault is a source like any other
         pass
+    # Calibre's own viewer, read from its library (calibrehl.py), by Calibre's ids.
+    cal_ok, cal_rows = False, []
+    try:
+        from . import calibrehl
+        cal_rows = calibrehl.rows(conn, settings)
+        rows.update({r["id"]: r for r in cal_rows})
+        cal_ok = True
+    except Exception:  # noqa: BLE001 - an unreadable Calibre is a source like any other
+        logging.getLogger("daf.calibrehl").exception("calibre highlights")
     if rw_tags:                                   # Readwise's tags, once: one taken off in Daf stays off
         known = {r[0] for r in conn.execute("SELECT id FROM highlights WHERE source = 'readwise'")}
         from .. import review as _review
@@ -197,21 +208,25 @@ def import_all(conn, settings):
     # A note typed on the Kindle with ".tag" in it tags the highlight, as in Readwise. Only for a note
     # that's new or changed, so a tag taken off in Daf stays off.
     from .. import review
-    old_notes = {r[0]: r[1] for r in conn.execute("SELECT id, note FROM highlights WHERE source IN ('kindle', 'karakeep', 'readwise')")}
+    old_notes = {r[0]: r[1] for r in conn.execute("SELECT id, note FROM highlights WHERE source IN ('kindle', 'karakeep', 'readwise', 'calibre')")}
     for r in rows.values():
         if r.get("note") and old_notes.get(r["id"]) != r["note"] and review.DOT_TAG.search(r["note"]):
             review.add_tags(conn, r["id"], review.dot_tags(r["note"]))
 
     cols = ["id", "book_id", "source", "text", "note", "chapter", "page", "created", "pos"]
+    cal_before = calibrehl.colors_before(conn) if cal_rows else {}
     conn.executemany(
         f"INSERT INTO highlights ({', '.join(cols)}, seen, deleted) VALUES ({', '.join('?' * len(cols))}, ?, 0) "
         "ON CONFLICT(id) DO UPDATE SET book_id = excluded.book_id, text = excluded.text, note = excluded.note, "
         "chapter = excluded.chapter, page = excluded.page, created = excluded.created, pos = excluded.pos, "
         "seen = excluded.seen, deleted = 0",
         [tuple(r[c] for c in cols) + (now,) for r in rows.values()])
+    if cal_rows:
+        calibrehl.colors_after(conn, cal_rows, cal_before)
     # Gone from every source: deleted on the Kindle. Daf notes on it are kept. A digest deleted from
     # the Kindle takes its sidecar with it, but not its highlights: those stay with their articles.
-    gone = "('kindle', 'karakeep', 'readwise')" if rw_ok else "('kindle', 'karakeep')"   # no vault, no verdict on Readwise's
+    gone = ["'kindle'", "'karakeep'"] + (["'readwise'"] if rw_ok else []) + (["'calibre'"] if cal_ok else [])   # a source not read: no verdict on its
+    gone = "(" + ", ".join(gone) + ")"
     conn.execute(f"UPDATE highlights SET deleted = 1 WHERE seen < ? AND source IN {gone} AND NOT "
                  "(json_valid(pos) AND json_extract(pos, '$.k') IS NOT NULL AND json_extract(pos, '$.k') NOT IN "
                  f"({','.join('?' * len(seen_epubs))}))", (now, *seen_epubs))

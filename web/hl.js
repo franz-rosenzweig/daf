@@ -116,7 +116,7 @@ H.quote = t => { const p = H.picture(t); return p ? '<img class="hlpic" src="' +
 H.imgBar = () => btn('hl', IC.marker, 'Highlight the picture' + ktip('highlight'), ' class="hbmain"') + btn('note', IC.note, 'Highlight it with a note' + ktip('note'));
 H.hlBar = (h, o = {}) => {
   const c = h.color || 'yellow';
-  return (o.kindle ? '<span class="hbsrc" data-tip="Made on the Kindle">Kindle</span>' : '<button data-hb="rm" class="hbx" data-tip="Remove the highlight" aria-label="Remove the highlight" style="--c:var(--hl-' + c + '-line);--f:var(--hl-' + c + ')">' + IC.x + '</button>') +
+  return (o.kindle ? (h.source === 'calibre' ? '<span class="hbsrc" data-tip="Made in Calibre">Calibre</span>' : '<span class="hbsrc" data-tip="Made on the Kindle">Kindle</span>') : '<button data-hb="rm" class="hbx" data-tip="Remove the highlight" aria-label="Remove the highlight" style="--c:var(--hl-' + c + '-line);--f:var(--hl-' + c + ')">' + IC.x + '</button>') +
     btn('note', IC.note, h.user_note ? 'Edit the note' : 'Add a note', h.user_note ? ' class="has"' : '') + btn('tag', IC.tag, (h.tags || []).length ? 'Tags: ' + h.tags.join(', ') : 'Tag it', (h.tags || []).length ? ' class="has"' : '') +
     H.dots(c) + btn('more', IC.more, 'View other actions');
 };
@@ -379,7 +379,7 @@ H.undo = (msg, fn) => {
 };
 
 /* ---------- rows on the Highlights page, book pages, review ---------- */
-const SRC = { kindle: 'Kindle', epub: 'Daf', daf: 'Daf', karakeep: 'Karakeep', audiobookshelf: 'Audiobook', paper: 'Paper', clip: 'Podcast clip', readwise: 'Readwise' };
+const SRC = { kindle: 'Kindle', epub: 'Daf', daf: 'Daf', karakeep: 'Karakeep', audiobookshelf: 'Audiobook', paper: 'Paper', clip: 'Podcast clip', readwise: 'Readwise', calibre: 'Calibre' };
 H.srcName = s => SRC[s] || 'Kindle';
 H.where = x => {
   const p = (() => { try { return typeof x.pos === 'string' && x.pos.startsWith('{') ? JSON.parse(x.pos) : (x.pos && typeof x.pos === 'object' ? x.pos : {}); } catch(e){ return {}; } })();
@@ -390,7 +390,7 @@ H.where = x => {
 H.row = (x, o = {}) => {
   H.reg.set(x.id, x);
   const rtl = /[֐-׿]/.test(x.text || ''), c = x.color || 'yellow', text = String(x.text || '').replace(/[^\S\n]*\n(?:[^\S\n]*\n)+/g, '\n').trim();
-  const noteFrom = { readwise: 'In Readwise', karakeep: 'In Karakeep', audiobookshelf: 'In Audiobookshelf' }[x.source] || 'On the Kindle';
+  const noteFrom = { readwise: 'In Readwise', karakeep: 'In Karakeep', audiobookshelf: 'In Audiobookshelf', calibre: 'In Calibre' }[x.source] || 'On the Kindle';
   const notes = (x.note ? '<div class="hnote"><span class="mute tiny">' + noteFrom + '</span> ' + esc(x.note) + '</div>' : '') +
     '<div class="hnote mine' + (x.user_note ? '' : ' empty') + '" data-hra="note">' + (x.user_note ? esc(x.user_note) : '') + '</div>';
   const meta = [o.chapter === false ? '' : x.chapter, H.where(x), o.date === false ? '' : epochDate(x.created), H.srcName(x.source), x.r_status === 'never' ? 'not in review' : '', x.cards ? x.cards + ' flashcard' + (x.cards > 1 ? 's' : '') : ''].filter(Boolean).map(esc).join(' · ');

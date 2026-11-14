@@ -620,7 +620,7 @@ async function reviewAct(action){
 }
 
 /* ---------- highlights ---------- */
-const HL_SOURCES = [['', 'All'], ['kindle', 'Kindle'], ['daf', 'Made in Daf'], ['articles', 'Articles'], ['audio', 'Audiobooks'], ['paper', 'Paper'], ['readwise', 'Readwise']];
+const HL_SOURCES = [['', 'All'], ['kindle', 'Kindle'], ['daf', 'Made in Daf'], ['articles', 'Articles'], ['audio', 'Audiobooks'], ['paper', 'Paper'], ['readwise', 'Readwise'], ['calibre', 'Calibre']];
 function hlQuery(){
   const q = new URLSearchParams();
   if (S.hlq) q.set('q', S.hlq); if (S.hlPrivate) q.set('private', '1'); if (S.hlSource) q.set('source', S.hlSource);
