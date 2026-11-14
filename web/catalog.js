@@ -382,7 +382,8 @@ async function moreMenu(anchor){
     '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>' +
     (P.sel.size ? '<hr><button data-catm="mark"><i></i>' + (chosenBooks().every(b => b.marked) ? 'Unmark' : 'Mark') + '</button>' : '') +
     ((P.data && P.data.marks) ? (P.sel.size ? '' : '<hr>') + '<button data-catm="marked"><i></i>Marked books · ' + P.data.marks + '</button><button data-catm="unmarkall"><i></i>Clear marks</button>' : '') +
-    '<hr><button data-catm="import"><i></i>Import list</button><button data-catm="isbn"><i></i>Add from ISBN</button><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>');
+    '<hr><button data-catm="import"><i></i>Import list</button><button data-catm="isbn"><i></i>Add from ISBN</button><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>' +
+    '<hr><button data-catm="dlprefs"><i></i>Metadata download</button>');     // dlprefs.js
 }
 // Count pages for the chosen books (calibrekeep.py), the way Calibre's Count Pages does.
 async function countPages(ids){
@@ -469,6 +470,7 @@ document.addEventListener('click', async e => {
     else if (k === 'clear') setQ('');
     else if (k === 'colsreset') { P.cols = null; P.widths = {}; P.view = dirtyView(); keep(); draw(); $('#pop').hidden = true; }
     else if (k === 'trash') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.trash(P.priv); }
+    else if (k === 'dlprefs') { $('#pop').hidden = true; if (C.DlPrefs) C.DlPrefs.open(); }
     else if (k === 'items') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.items('tags'); }
     else if (k === 'conv') { $('#pop').hidden = true; if (C.ConvertSheet) C.ConvertSheet.open(P.data.books.filter(x => P.sel.has(x.calibre_id)), { to: m.dataset.to }); }     // convertsheet.js
     else if (k === 'dl') { $('#pop').hidden = true; download(chosenBooks()); }

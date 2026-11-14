@@ -69,7 +69,10 @@ def main():
     except Exception as e:
         print("DAFRESULT " + json.dumps({"ok": False, "error": str(e)}))
         return
-    print("DAFRESULT " + json.dumps({"ok": True, "results": out}))
+    # Preferences → Metadata download's fields and Append comments, for the page: Calibre's own picker
+    # shows every field and leaves the ignored ones out when an answer is used; bulk download never takes them
+    print("DAFRESULT " + json.dumps({"ok": True, "results": out, "prefs": {"ignore_fields": list(msprefs["ignore_fields"]),
+                                                                         "append_comments": bool(msprefs["append_comments"])}}))
 main()
 '''
 
@@ -146,7 +149,9 @@ def _text(h):
     return re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]+", " ", t)).strip()
 
 
-def calibre_sources(title, authors, identifiers, timeout=30, plugins=None):
+def calibre_sources(title, authors, identifiers, timeout=30, plugins=None, info=None):
+    """Calibre's answers. info, a dict, gets Calibre's Metadata download prefs the run had (prefs:
+    ignore_fields, append_comments)."""
     job = json.dumps({"title": title, "authors": authors, "identifiers": identifiers, "timeout": timeout, "plugins": plugins})
     try:
         r = subprocess.run(RUN + [W.DEBUG, "-c", IDENTIFY], input=job, capture_output=True, text=True, timeout=timeout + 60)
@@ -158,6 +163,8 @@ def calibre_sources(title, authors, identifiers, timeout=30, plugins=None):
     out = json.loads(line[len("DAFRESULT "):])
     if not out.get("ok"):
         raise RuntimeError(out.get("error") or "Calibre's sources said no")
+    if info is not None:
+        info["prefs"] = out.get("prefs") or {}
     for x in out["results"]:
         x["comments_html"] = x["comments"]          # as the source has it, for the Edit sheet's description
         x["comments"] = _text(x["comments"])
@@ -334,7 +341,7 @@ def hardcover(conn, book_id, q=None, limit=4):
 
 def find(conn_factory, cid, book_id, title, authors, identifiers, q=None):
     """Both places at once; whichever fails just says so."""
-    res, errs = {}, []
+    res, errs, info = {}, [], {}
 
     ids = {k: v for k, v in identifiers.items() if k in ("isbn", "amazon", "google", "goodreads", "edelweiss", "openlibrary")}
 
@@ -342,7 +349,7 @@ def find(conn_factory, cid, book_id, title, authors, identifiers, q=None):
         # By the book's identifiers, and by its title and author alone: an ISBN in Calibre can be
         # wrong (a study guide's), and then only the title finds the book itself.
         try:
-            res["calibre_ids" if by_ids else "calibre"] = calibre_sources(title, authors, ids if by_ids else {})
+            res["calibre_ids" if by_ids else "calibre"] = calibre_sources(title, authors, ids if by_ids else {}, info=info)
         except Exception as e:  # noqa: BLE001
             if not by_ids:
                 errs.append(f"Calibre's sources: {e}")
@@ -370,7 +377,7 @@ def find(conn_factory, cid, book_id, title, authors, identifiers, q=None):
             continue
         seen.add(key)
         out.append(x)
-    return {"results": out, "errors": errs}
+    return {"results": out, "errors": errs, "prefs": info.get("prefs") or {}}
 
 
 def start(conn_factory, cid, book_id, title, authors, identifiers, q=None):
