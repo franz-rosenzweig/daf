@@ -39,6 +39,18 @@ class Marks(unittest.TestCase):
         self.assertIn("marked", {c["key"] for c in cols})
 
 
+class MarksKept(unittest.TestCase):
+    def test_settings_keep_the_marks(self):
+        import json
+        import tempfile
+        from daf import config
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "settings.json"
+            p.write_text(json.dumps({"catalog_marks": [4, "x", 9]}))
+            with mock.patch.object(config, "SETTINGS_PATH", p):
+                self.assertEqual(config.load_settings()["catalog_marks"], [4, 9])
+
+
 class Covers(unittest.TestCase):
     def setUp(self):
         from daf import app
