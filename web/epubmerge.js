@@ -8,6 +8,7 @@ const C = window.DafCore, { api, esc, toast, $ } = C;
 const store = { get(k, d){ try { const v = localStorage.getItem('daf.' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } }, set(k, v){ try { localStorage.setItem('daf.' + k, JSON.stringify(v)); } catch(e){} } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const UP = '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5-5 5 5"/></svg>';
+const X = '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 6l8 8M14 6l-8 8"/></svg>';
 const DOWN = '<svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>';
 const M = { books: [], off: [], title: '', titleSet: false, authors: '', authorsSet: false, busy: false,
   opts: Object.assign({ flatten: false, descriptions: false }, store.get('epubmerge', {})) };
@@ -54,7 +55,7 @@ function draw(){
     '<span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">' + esc([(b.authors || []).join(' & '), b.series ? b.series + (b.series_index != null ? ' ' + b.series_index : '') : ''].filter(Boolean).join(' · ')) + '</span></span>' +
     '<span class="emacts"><button class="btn sm" data-emmove="' + i + ':-1"' + (i ? '' : ' disabled') + ' aria-label="Up">' + UP + '</button>' +
     '<button class="btn sm" data-emmove="' + i + ':1"' + (i < n - 1 ? '' : ' disabled') + ' aria-label="Down">' + DOWN + '</button>' +
-    '<button class="btn sm" data-emdrop="' + i + '" aria-label="Take out">×</button></span></div>').join('');
+    '<button class="btn sm" data-emdrop="' + i + '" aria-label="Take out">' + X + '</button></span></div>').join('');
   const off = M.off.map(b => '<div class="emrow off">' + '<span class="emn"></span>' + cover(b) + '<span class="befct"><b>' + esc(b.title) + '</b><span class="mute tiny">No EPUB</span></span></div>').join('');
   sheet('<div class="behead"><h2>EpubMerge</h2><span class="spacer"></span><button class="btn sm" data-em="cancel">Cancel</button>' +
     '<button class="btn sm primary" data-em="merge"' + (n < 2 || M.busy ? ' disabled' : '') + '>' + (M.busy ? 'Merging…' : 'Merge') + '</button></div>' +
