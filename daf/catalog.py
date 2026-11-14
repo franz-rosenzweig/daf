@@ -783,7 +783,8 @@ def clean_html(src):
 
 LINKS = [("hardcover", "Hardcover", "https://hardcover.app/books/{}"), ("goodreads", "Goodreads", "https://www.goodreads.com/book/show/{}"),
          ("amazon", "Amazon", "https://www.amazon.com/dp/{}"), ("google", "Google Books", "https://books.google.com/books?id={}"),
-         ("openlibrary", "Open Library", "https://openlibrary.org/books/{}")]
+         ("openlibrary", "Open Library", "https://openlibrary.org/books/{}"), ("evrit", "Evrit", "https://www.e-vrit.co.il/product/{}"),
+         ("storygraph", "StoryGraph", "https://app.thestorygraph.com/books/{}")]
 
 
 def card_details(conn, cid, settings=None):
