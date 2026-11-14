@@ -933,6 +933,14 @@ def items(field):
     finally:
         db.close()
     names = [{"name": (n.replace("|", ",") if field == "authors" else n), "raw": n, "count": k} for n, k in rows if k]   # unused ones hidden, as Calibre does
+    if field == "authors":                          # Calibre's Manage authors: each one's sort and link too
+        db = read_only(config.CALIBRE_DBS[0])
+        try:
+            meta = {r[0]: (r[1] or "", r[2] or "") for r in db.execute("SELECT name, sort, link FROM authors")}
+        finally:
+            db.close()
+        for x in names:
+            x["sort"], x["link"] = meta.get(x["raw"], ("", ""))
     names.sort(key=lambda x: (-x["count"], fold(x["name"])))
     return {"field": field, "items": names, "alike": alike([x["name"] for x in names], field)}
 

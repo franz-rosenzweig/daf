@@ -723,7 +723,8 @@ function drawItems(){
       '<button class="btn sm" data-bemcombine="' + esc(JSON.stringify(g)) + '">Combine</button></div>'; }).join('') + '</div>';
   h += '<h3>' + shown.length + ' ' + esc((d.fields.find(f => f.key === M.field) || {}).label || '').toLowerCase() + '</h3><div class="bemlist">' + shown.map(x =>
     '<div class="bemrow' + (M.sel.has(x.name) ? ' sel' : '') + '"><input type="checkbox" data-bemsel="' + esc(x.name) + '"' + (M.sel.has(x.name) ? ' checked' : '') + ' aria-label="Choose">' +
-    (M.editing === x.name ? '<input class="field sm bemedit" data-bemedit="' + esc(x.name) + '" value="' + esc(x.name) + '">' : '<button class="bemname" data-bemren="' + esc(x.name) + '">' + esc(x.name) + '</button>') +
+    (M.editing === x.name ? (M.field === 'authors' ? authorEditor(x) : '<input class="field sm bemedit" data-bemedit="' + esc(x.name) + '" value="' + esc(x.name) + '">')
+      : '<button class="bemname" data-bemren="' + esc(x.name) + '">' + (M.field === 'authors' ? '<span>' + esc(x.name) + '</span><span class="mute tiny">' + esc([x.sort, x.link ? x.link.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] : ''].filter(Boolean).join(' · ')) + '</span>' : esc(x.name)) + '</button>') +
     '<button class="bemcount" data-bemshow="' + esc(x.name) + '">' + x.count + '</button></div>').join('') + '</div>';
   if (M.sel.size) h += '<div class="bembar"><b>' + M.sel.size + ' chosen</b><span class="spacer"></span><button class="btn sm" data-bem="none">Clear</button>' +
     (M.sel.size > 1 ? '<button class="btn sm" data-bem="combine">Combine</button>' : '') + (M.field !== 'authors' ? '<button class="btn sm danger" data-bem="delete">Delete</button>' : '') + '</div>';
@@ -731,6 +732,24 @@ function drawItems(){
   box.innerHTML = h;
   if (keepFocus) { const i = $('[data-bemq]', box); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
   const ed = $('[data-bemedit]', box); if (ed) { ed.focus(); ed.select(); }
+}
+// Calibre's Manage authors: the name, its sort and its link, saved together.
+const authorEditor = x => '<span class="bemauthor"><input class="field sm bemedit" data-bemedit="' + esc(x.name) + '" value="' + esc(x.name) + '" aria-label="Author">' +
+  '<input class="field sm" data-bemsort value="' + esc(x.sort || '') + '" aria-label="Author sort">' +
+  '<input class="field sm" data-bemlink value="' + esc(x.link || '') + '" aria-label="Link" inputmode="url" autocapitalize="off" spellcheck="false">' +
+  '<span class="bemauthorbtns"><button class="btn sm" data-bem="authorcancel">Cancel</button><button class="btn sm primary" data-bem="authorsave">Save</button></span></span>';
+async function saveAuthor(){
+  const box = $('#bedit .bemauthor'); if (!box) return;
+  const old = M.editing, x = M.data.items.find(i => i.name === old); if (!x) return;
+  const name = $('[data-bemedit]', box).value.trim(), sort = $('[data-bemsort]', box).value.trim(), link = $('[data-bemlink]', box).value.trim();
+  try {
+    if (name && name !== old) { await renameItems([old], name); if (M.editing === old) return; }
+    const body = { name: name || old };
+    if (sort !== (x.sort || '')) body.sort = sort;
+    if (link !== (x.link || '')) body.link = link;
+    if (Object.keys(body).length > 1) await api('/api/catalog/items/author', { method: 'POST', body: JSON.stringify(body) });
+    M.editing = null; items(M.field); after();
+  } catch(e){ toast(e.message); }
 }
 async function renameItems(names, to){
   to = (to || '').trim(); names = names.filter(n => n !== to);
@@ -755,6 +774,8 @@ document.addEventListener('click', e => {
     const most = names.slice().sort((a, b) => (M.data.items.find(x => x.name === b) || {}).count - (M.data.items.find(x => x.name === a) || {}).count)[0];
     const to = prompt('Combine into', most); if (to) renameItems(names, to);
   }
+  else if (k.dataset.bem === 'authorsave') saveAuthor();
+  else if (k.dataset.bem === 'authorcancel') { M.editing = null; drawItems(); }
   else if (k.dataset.bem === 'delete') {
     if (!confirm('Delete ' + (names.length === 1 ? '“' + names[0] + '”' : names.length + ' names') + ' from every book that has ' + (names.length === 1 ? 'it' : 'them') + '?')) return;
     api('/api/catalog/items/delete', { method: 'POST', body: JSON.stringify({ field: M.field, names }) })
@@ -768,11 +789,12 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('input', e => { if (e.target.matches && e.target.matches('[data-bemq]')) { M.q = e.target.value; drawItems(); } });
 document.addEventListener('keydown', e => {
-  const t = e.target; if (!t.matches || !t.matches('[data-bemedit]')) return;
-  if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); renameItems([t.dataset.bemedit], t.value); }
+  const t = e.target; if (!t.matches || !t.matches('[data-bemedit], .bemauthor input')) return;
+  if (e.key === 'Enter' && t.closest('.bemauthor')) { e.preventDefault(); e.stopPropagation(); saveAuthor(); }
+  else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); renameItems([t.dataset.bemedit], t.value); }
   else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); M.editing = null; drawItems(); }
 }, true);
-document.addEventListener('focusout', e => { const t = e.target; if (t.matches && t.matches('[data-bemedit]') && M.editing) setTimeout(() => { if (M.editing === t.dataset.bemedit && !document.activeElement.matches('[data-bemedit]')) { M.editing = null; drawItems(); } }, 150); });
+document.addEventListener('focusout', e => { const t = e.target; if (t.matches && t.matches('[data-bemedit]') && M.editing && !t.closest('.bemauthor')) setTimeout(() => { if (M.editing === t.dataset.bemedit && !document.activeElement.matches('[data-bemedit]')) { M.editing = null; drawItems(); } }, 150); });
 
 /* ---------- Find details for many books: only what each is missing, from answers surely the same book ---------- */
 const FILL = [['publisher', 'Publisher'], ['published', 'Published'], ['comments', 'Description'], ['tags', 'Tags'], ['series', 'Series'], ['languages', 'Languages'], ['identifiers', 'Identifiers'], ['#pages', 'Pages'], ['cover', 'Cover']];
