@@ -16,6 +16,8 @@ Clicking a column's name sorts by it, and clicking again turns the order around.
 
 A click or a tap on a row chooses that book alone, as in Calibre, and shows it in Book details; the box at the start of the row (or Cmd or Ctrl and a click) adds a book to the ones chosen or takes it out, and Shift chooses everything from the last one. A click on the title chooses the book like anywhere else on the row, and a second click on it opens the book's page in Daf, the same as a double-click anywhere on the row or a click on the cover in Book details. When I come back, the table is where I left it.
 
+Sorting works the way Calibre's does. A click on a column's name sorts by it (a second click turns it around), and the column I sorted by before it still decides among the books that come out equal, so clicking Series and then Author gives me each author's books in series order. **Sort › Sort on several columns** sets it out by hand: up to four columns, each ascending or descending, and the Sort menu shows the second, third and fourth with their number. A saved view keeps the whole order.
+
 ## Searching the way Calibre does
 
 The search box understands Calibre's search language, so anything I'd type in Calibre works here:

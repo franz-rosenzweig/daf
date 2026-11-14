@@ -62,12 +62,12 @@ const GI = {
   custom: '<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 4v12"/>',
 };
 const ORDER = ['authors', 'languages', 'series', 'formats', 'publisher', 'rating', 'tags'];
-const DEF = { q: '', sort: 'added', desc: true, cols: null, widths: {}, priv: false, view: null };
+const DEF = { q: '', sort: 'added', desc: true, then: [], cols: null, widths: {}, priv: false, view: null };
 const saved = store.get('catalog', {});
 const P = Object.assign({}, DEF, saved, { data: null, facets: null, side: store.get('calSide', true), det: store.get('calDet', true), grid: store.get('calGrid', false), info: new Map(),
   qv: store.get('calQv', false), qvField: store.get('calQvField', 'authors'), qvVal: null, cell: 'title',
   open: new Set(store.get('catalogOpen', ['added', 'missing', 'tidy', 'status', 'tags'])), all: new Set(), fq: '', scroll: 0, seq: 0, sel: new Set(), anchor: null });
-const keep = () => store.set('catalog', { q: P.q, sort: P.sort, desc: P.desc, cols: P.cols, widths: P.widths, priv: P.priv, view: P.view, lastView: P.lastView });
+const keep = () => store.set('catalog', { q: P.q, sort: P.sort, desc: P.desc, then: P.then, cols: P.cols, widths: P.widths, priv: P.priv, view: P.view, lastView: P.lastView });
 const WIDTH = { title: 300, authors: 180, series: 170, tags: 200, rating: 112, added: 112, published: 100, modified: 112, publisher: 160, languages: 90,
   formats: 110, size: 80, isbn: 130, identifiers: 240, cover: 70, status: 96, progress: 120, last_read: 112, audio: 110, highlights: 92, shelves: 160, calibre_id: 90 };
 const NUMERIC = new Set(['number', 'rating', 'percent', 'size']);
@@ -121,6 +121,7 @@ C.views.catalog = async () => {
 async function load(withFacets){
   const n = ++P.seq;
   const qs = new URLSearchParams({ q: P.q, sort: P.sort, desc: P.desc ? '1' : '0' });
+  if ((P.then || []).length) qs.set('then', thenParam());
   if (P.priv) qs.set('private', '1');
   if (withFacets || !P.facets) qs.set('facets', '1');
   let r;
@@ -234,7 +235,7 @@ function setQ(q){
 function dirtyView(){
   const v = (P.data && P.data.views || []).find(x => x.name === P.view);
   if (!v) return null;
-  return v.q === P.q && v.sort === P.sort && !!v.desc === !!P.desc && JSON.stringify(v.cols) === JSON.stringify(P.cols || []) ? v.name : null;
+  return v.q === P.q && v.sort === P.sort && !!v.desc === !!P.desc && JSON.stringify(v.then || []) === JSON.stringify(P.then || []) && JSON.stringify(v.cols) === JSON.stringify(P.cols || []) ? v.name : null;
 }
 
 /* ---------- the Filter panel: Calibre's Tag browser ---------- */
@@ -332,11 +333,45 @@ document.addEventListener('click', e => {
   window.dafShell.openWith({ url: '/api/catalog/book/' + cid + '/files/' + encodeURIComponent(fmt), name, mime: MIME[fmt] || 'application/octet-stream' }).catch(err => toast(err.message));
 });
 function sortMenu(anchor){
-  const cs = P.data.columns.filter(c => c.key !== 'cover');
-  openPop(anchor, cs.map(c => '<button data-catsortm="' + esc(c.key) + '"' + (P.sort === c.key ? ' class="on"' : '') + '><i>' + (P.sort === c.key ? (P.desc ? '↓' : '↑') : '') + '</i>' + esc(c.label) + '</button>').join(''), 'wide');
+  const cs = P.data.columns.filter(c => c.key !== 'cover'), then = P.then || [];
+  const mark = c => { if (P.sort === c.key) return P.desc ? '↓' : '↑'; const i = then.findIndex(t => t[0] === c.key); return i < 0 ? '' : (i + 2) + (then[i][1] ? '↓' : '↑'); };
+  openPop(anchor, cs.map(c => '<button data-catsortm="' + esc(c.key) + '"' + (P.sort === c.key ? ' class="on"' : '') + '><i>' + mark(c) + '</i>' + esc(c.label) + '</button>').join('') +
+    '<hr><button data-catm="multisort"><i></i>Sort on several columns</button>', 'wide');
 }
+// Calibre's sort history: the column clicked comes first, and the ones sorted by before it decide among equals.
+const defDesc = k => { const c = P.data.columns.find(x => x.key === k); return !!c && (NUMERIC.has(c.type) || c.type === 'date' || c.type === 'bool'); };
+const thenParam = () => (P.then || []).map(([k, d]) => k + ':' + (d ? 1 : 0)).join(',');
+function sortBy(k){
+  if (P.sort === k) P.desc = !P.desc;
+  else { P.then = [[P.sort, P.desc]].concat(P.then || []).filter((t, i, a) => t[0] !== k && a.findIndex(x => x[0] === t[0]) === i).slice(0, 3); P.sort = k; P.desc = defDesc(k); }
+  P.view = dirtyView(); keep(); load();
+}
+// Sort on several columns (Calibre's dialog): up to four, each up or down.
+function multiSort(){
+  const cs = P.data.columns.filter(c => c.key !== 'cover');
+  const rows = [[P.sort, P.desc]].concat(P.then || []);
+  const row = ([k, d]) => '<div class="msrow"><select class="field" data-msk>' + cs.map(c => '<option value="' + esc(c.key) + '"' + (c.key === k ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select>' +
+    '<select class="field" data-msd><option value="0"' + (d ? '' : ' selected') + '>Ascending</option><option value="1"' + (d ? ' selected' : '') + '>Descending</option></select>' +
+    '<button class="btn sm ib" data-msx aria-label="Take out">' + IC.x + '</button></div>';
+  $('#scrim').hidden = false; const m = $('#modal'); m.hidden = false; m.classList.remove('wide');
+  m.innerHTML = '<h2>Sort on several columns</h2><div class="msrows" id="msrows">' + rows.map(row).join('') + '</div>' +
+    '<div class="msbtns"><button class="btn sm" data-msadd>Add a column</button><span class="spacer"></span><button class="btn" data-ckclose>Cancel</button><button class="btn primary" data-msgo>Sort</button></div>';
+  m.dataset.msrow = row(['title', false]);
+}
+document.addEventListener('click', e => {
+  const t = e.target; if (!t.closest || !t.closest('#modal #msrows, #modal [data-msadd], #modal [data-msgo]')) return;
+  const box = $('#msrows');
+  if (t.closest('[data-msadd]')) { if (box.children.length < 4) box.insertAdjacentHTML('beforeend', $('#modal').dataset.msrow); return; }
+  if (t.closest('[data-msx]')) { if (box.children.length > 1) t.closest('.msrow').remove(); return; }
+  if (t.closest('[data-msgo]')) {
+    const rows = [...box.querySelectorAll('.msrow')].map(r => [$('[data-msk]', r).value, $('[data-msd]', r).value === '1']).filter((x, i, a) => a.findIndex(y => y[0] === x[0]) === i);
+    [P.sort, P.desc] = rows[0]; P.then = rows.slice(1, 4);
+    C.closeModal ? C.closeModal() : ($('#modal').hidden = $('#scrim').hidden = true);
+    P.view = dirtyView(); keep(); load();
+  }
+});
 async function moreMenu(anchor){
-  const qs = new URLSearchParams({ q: P.q, sort: P.sort, desc: P.desc ? '1' : '0', cols: colsNow().map(c => c.key).join(',') });
+  const qs = new URLSearchParams({ q: P.q, sort: P.sort, desc: P.desc ? '1' : '0', cols: colsNow().map(c => c.key).join(','), then: thenParam() });
   if (P.priv) qs.set('private', '1');
   let emb = { pending: 0 };
   try { emb = await api('/api/catalog/embed'); } catch(e){}
@@ -386,9 +421,9 @@ async function saveViews(views){
   const r = await api('/api/catalog/views', { method: 'PUT', body: JSON.stringify({ views }) });
   P.data.views = r.views;
 }
-const thisView = name => ({ name, q: P.q, sort: P.sort, desc: P.desc, cols: P.cols || [], widths: P.widths });
+const thisView = name => ({ name, q: P.q, sort: P.sort, desc: P.desc, then: P.then || [], cols: P.cols || [], widths: P.widths });
 function applyView(v){
-  Object.assign(P, { q: v.q || '', sort: v.sort || 'added', desc: !!v.desc, cols: v.cols && v.cols.length ? v.cols : null, widths: v.widths || {}, view: v.name, lastView: v.name });
+  Object.assign(P, { q: v.q || '', sort: v.sort || 'added', desc: !!v.desc, then: v.then || [], cols: v.cols && v.cols.length ? v.cols : null, widths: v.widths || {}, view: v.name, lastView: v.name });
   keep(); const box = $('#catq'); if (box) box.value = P.q; load(); if (P.side) drawSide();
 }
 
@@ -411,14 +446,10 @@ document.addEventListener('click', async e => {
   }
   const s = t.closest('[data-catsort]');
   if (s) { if (Date.now() - drag.ended < 300) return;
-    const k = s.dataset.catsort, c = P.data.columns.find(x => x.key === k);
-    if (P.sort === k) P.desc = !P.desc; else { P.sort = k; P.desc = !!c && (NUMERIC.has(c.type) || c.type === 'date' || c.type === 'bool'); }
-    P.view = dirtyView(); keep(); load(); return; }
+    sortBy(s.dataset.catsort); return; }
   const tt = t.closest('[data-catt]'); if (tt) { cycle(tt.dataset.catt); return; }
   const sm = t.closest('[data-catsortm]');
-  if (sm) { const k = sm.dataset.catsortm, c = P.data.columns.find(x => x.key === k);
-    if (P.sort === k) P.desc = !P.desc; else { P.sort = k; P.desc = !!c && (NUMERIC.has(c.type) || c.type === 'date' || c.type === 'bool'); }
-    P.view = dirtyView(); keep(); load(); sortMenu(sm.closest('#pop') ? $('[data-act="cat:sort"]') : sm); return; }
+  if (sm) { sortBy(sm.dataset.catsortm); sortMenu(sm.closest('#pop') ? $('[data-act="cat:sort"]') : sm); return; }
   const dq = t.closest('#catdet [data-catq]'); if (dq) { setQ(dq.dataset.catq); return; }
   const g = t.closest('[data-catg]'); if (g) { const k = g.dataset.catg; P.open.has(k) ? P.open.delete(k) : P.open.add(k); store.set('catalogOpen', [...P.open]); drawSide(); return; }
   const all = t.closest('[data-catall]'); if (all) { P.all.add(all.dataset.catall); drawSide(); return; }
@@ -444,13 +475,14 @@ document.addEventListener('click', async e => {
     else if (k === 'import') { $('#pop').hidden = true; if (C.ImportList) C.ImportList.open(); }
     else if (k === 'pages') { $('#pop').hidden = true; countPages([...P.sel]); }
     else if (k === 'mark') { $('#pop').hidden = true; toggleMarks(); }
+    else if (k === 'multisort') { $('#pop').hidden = true; multiSort(); }
     else if (k === 'marked') { $('#pop').hidden = true; setQ('marked:true'); }
     else if (k === 'unmarkall') { $('#pop').hidden = true; setMarks(null, false); }
     else if (k === 'embedall') { $('#pop').hidden = true;
       if (confirm('Write the details into the files of all ' + (P.data ? P.data.total : '') + ' books?'))
         api('/api/catalog/embed', { method: 'POST', body: JSON.stringify({ all: true }) }).then(r => toast('Writing details into ' + r.pending + ' books’ files')).catch(err => toast(err.message)); }
     else if (k === 'priv') { P.priv = !P.priv; keep(); $('#pop').hidden = true; P.facets = null; load(true).then(() => { if (P.side) drawSide(); }); }
-    else if (k === 'reset') { $('#pop').hidden = true; Object.assign(P, { q: '', sort: 'added', desc: true, cols: null, widths: {}, view: null }); keep(); const box = $('#catq'); if (box) box.value = ''; load(); if (P.side) drawSide(); }
+    else if (k === 'reset') { $('#pop').hidden = true; Object.assign(P, { q: '', sort: 'added', desc: true, then: [], cols: null, widths: {}, view: null }); keep(); const box = $('#catq'); if (box) box.value = ''; load(); if (P.side) drawSide(); }
     else if (k === 'save' || k === 'update') {
       $('#pop').hidden = true;
       const name = k === 'update' ? P.lastView : (prompt('Name of the view', P.view || '') || '').trim();
