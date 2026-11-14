@@ -23,7 +23,7 @@ STATE = {"ok": True, "sources": [{"name": "Google", "enabled": True, "priority":
 
 class Clean(unittest.TestCase):
     def test_unknown_keys_dropped(self):
-        out = cp.clean({"prefs": {"cover_priorities": {"Google": 9}, "id_link_rules": {"x": "y"}, "author_map_rules": [], "user_default_ignore_fields": [],
+        out = cp.clean({"prefs": {"cover_priorities": {"Google": 9}, "id_link_rules": {"x": "y"}, "user_default_ignore_fields": [], "author_map_rule": [],
                                   "find_first_edition_date": True, "max_tags": 5}, "plugins": {"x": 1}, "sources": {}})
         self.assertEqual(out, {"prefs": {"max_tags": 5}, "sources": {}})
 
@@ -69,6 +69,65 @@ class Clean(unittest.TestCase):
         self.assertEqual(cp.clean({"prefs": [1], "sources": [2]}), {"prefs": {}, "sources": {}})
 
 
+class Mappers(unittest.TestCase):
+    def test_each_mapper_has_its_own_actions(self):
+        ok = {"action": "replace", "match_type": "one_of", "query": "a & b", "replace": "A"}
+        for kind in cp.RULES:
+            self.assertEqual(cp.clean_rule(ok, kind), ok)
+        self.assertIsNone(cp.clean_rule({"action": "remove", "match_type": "one_of", "query": "x"}, "author_map_rules"))     # tags only
+        self.assertIsNone(cp.clean_rule({"action": "titlecase", "match_type": "has", "query": "x"}, "author_map_rules"))
+        self.assertEqual(cp.clean_rule({"action": "titlecase", "match_type": "has", "query": "x", "replace": "y"}, "series_map_rules"),
+                         {"action": "titlecase", "match_type": "has", "query": "x", "replace": ""})
+        self.assertIsNone(cp.clean_rule({"action": "split", "match_type": "has", "query": "x", "replace": "/"}, "publisher_map_rules"))
+
+    def test_clean_takes_all_four(self):
+        body = {"prefs": {k: [{"action": "upper", "match_type": "has", "query": "q"}, {"action": "nope", "match_type": "has", "query": "q"}] for k in cp.RULES}}
+        out = cp.clean(body)["prefs"]
+        self.assertEqual(sorted(out), sorted(cp.RULES))
+        self.assertTrue(all(out[k] == [{"action": "upper", "match_type": "has", "query": "q", "replace": ""}] for k in cp.RULES))
+
+    def test_labels(self):
+        L = cp.labels()
+        self.assertEqual(L["rules"]["author_map_rules"]["actions"][0], ("replace", "Change"))
+        self.assertEqual(dict(L["rules"]["publisher_map_rules"]["matches"])["one_of"], "is")
+        self.assertEqual(L["rules"]["tag_map_rules"]["replace"], ("replace", "split"))
+        json.dumps(L)
+
+
+class Sources(unittest.TestCase):
+    def src(self, v):
+        return cp.clean({"sources": {"S": v}})["sources"].get("S")
+
+    def test_options_and_fields(self):
+        out = self.src({"options": {"domain": "uk", "max_covers": 3, "use_mobi_asin": True, "additional_country": None, "bad key": 1, "x" * 61: 1,
+                                    "big": "x" * 501, "nan": float("nan"), "list": [1], "obj": {}},
+                        "ignore_fields": ["comments", "identifier:isbn", "Title"]})
+        self.assertEqual(out, {"options": {"domain": "uk", "max_covers": 3, "use_mobi_asin": True, "additional_country": None}, "ignore_fields": ["comments"]})
+        self.assertIsNone(self.src({"options": {"bad key": 1}}))
+
+    def test_goodreads(self):
+        out = self.src({"goodreads": {"values": {"getAsin": True, "mapGenres": "yes", "other": True},
+                                      "mappings": {"Science Fiction": ["Science Fiction", "SF", "a, b", ""], "": ["x"], "Bad\nKey": ["x"], "Ok": "not a list"}}})
+        self.assertEqual(out, {"goodreads": {"values": {"getAsin": True}, "mappings": {"Science Fiction": ["Science Fiction", "SF"]}}})
+        self.assertEqual(self.src({"goodreads": {"mappings": {}}}), {"goodreads": {"mappings": {}}})
+        self.assertIsNone(self.src({"goodreads": {"mappings": "x", "values": []}}))
+
+    def test_goodreads_more_tags(self):
+        out = self.src({"goodreads_more_tags": {"values": {"absolute": "7.6", "percentage": 250, "percentageOf": [0, 2, 300], "enabled": False,
+                                                           "timeout": 0, "nope": 1}, "mappings": {"sci-fi": ["Science Fiction"]}}})
+        self.assertEqual(out, {"goodreads_more_tags": {"values": {"absolute": 8, "percentage": 100, "percentageOf": [1, 2, 100], "enabled": False, "timeout": 0.1},
+                                                       "mappings": {"sci-fi": ["Science Fiction"]}}})
+        for bad in ([], ["1"], "1, 2", [True]):
+            self.assertIsNone(self.src({"goodreads_more_tags": {"values": {"percentageOf": bad}}}), bad)
+
+    def test_mappings(self):
+        self.assertIsNone(cp.clean_mappings(["a"]))
+        many = {"k%d" % i: ["t%d" % j for j in range(30)] for i in range(1200)}
+        out = cp.clean_mappings(many)
+        self.assertEqual(len(out), cp.MAX_MAPPINGS)
+        self.assertEqual(len(out["k0"]), cp.MAP_TAGS)
+
+
 class ReadWrite(unittest.TestCase):
     def test_read_adds_the_labels(self):
         with mock.patch.object(cp, "_run", return_value=dict(STATE)) as run:
@@ -99,9 +158,13 @@ class ReadWrite(unittest.TestCase):
         self.assertIn("enable_plugin(p)", cp.WRITE)
         self.assertIn("disable_plugin(p)", cp.WRITE)
         self.assertIn('msprefs["cover_priorities"] = cp', cp.WRITE)
-        self.assertIn("compile_pat(r[\"query\"])", cp.WRITE)      # the tag mapper's own regex flavour
+        self.assertIn("matcher(r, names[key][1])", cp.WRITE)       # the tag mapper's own compile, for tags, publishers, series
+        self.assertIn("compile_rules([r])", cp.WRITE)               # and the author mapper's
+        self.assertIn("p.prefs[o.name] = v", cp.WRITE)               # a source's options into its own prefs
+        self.assertIn("plugin_prefs[STORE_NAME] = new", cp.WRITE)    # the Goodreads plugin's, as its dialog commits
+        self.assertIn("c.plugin_prefs.commit()", cp.WRITE)           # Goodreads More Tags' nested settings, written
         keys = re.search(r"keys = \[(.*?)\]", cp.READ, re.S).group(1)
-        self.assertEqual(sorted(re.findall(r'"(\w+)"', keys)), sorted(list(cp.BOOLS) + list(cp.INTS) + ["ignore_fields", "tag_map_rules"]))
+        self.assertEqual(sorted(re.findall(r'"(\w+)"', keys)), sorted(list(cp.BOOLS) + list(cp.INTS) + ["ignore_fields"] + list(cp.RULES)))
 
 
 class Endpoints(unittest.TestCase):

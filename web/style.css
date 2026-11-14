@@ -3116,7 +3116,16 @@ body.ebxopen{overflow:hidden}
 .mdbody{display:flex;flex-direction:column;gap:18px}
 .mdsec{display:flex;flex-direction:column;gap:8px}
 .mdsec h3{margin:0;font-size:13px;font-weight:600;color:var(--fg-2)}
-.mdsrc{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:10px;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)}
+.mdsrc{display:grid;grid-template-columns:minmax(0,1fr) 96px 34px;gap:10px;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)}
+.mdsrc > .btn{min-width:34px;justify-content:center;padding-inline:0}
+.mdsrc > .btn.on{background:var(--hover)}
+.mdcfg{display:flex;flex-direction:column;gap:8px;margin:2px 0 8px 26px;padding:10px 12px;border-left:2px solid var(--line-2)}
+.mdcfg h4{margin:4px 0 0;font-size:12.5px;font-weight:600;color:var(--fg-2)}
+.mdcfg select.field{max-width:100%}
+.mdmap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 34px;gap:6px;align-items:center}
+.mdmap .field{min-height:32px;padding:4px 8px;font-size:13.5px}
+.mdmap .btn{min-width:34px;justify-content:center;padding-inline:0}
+.mdmaph{font-size:12px;color:var(--fg-2)}
 .mdsrc .cvchk{flex-wrap:wrap}
 .mdsrc .field{min-height:34px;padding:5px 9px}
 .mdsrc .field:disabled{opacity:.35}
@@ -3129,7 +3138,10 @@ body.ebxopen{overflow:hidden}
 .mdrule .field{min-height:34px;padding:5px 8px;font-size:13.5px}
 .mdrule .field:disabled{opacity:.35}
 @media (pointer:coarse){
-  .mdsrc .field,.mdrule .field{min-height:40px}
+  .mdsrc .field,.mdrule .field,.mdmap .field{min-height:40px}
+  .mdsrc{grid-template-columns:minmax(0,1fr) 96px 42px}
+  .mdsrc > .btn,.mdmap .btn{min-width:42px;min-height:40px}
+  .mdmap{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 42px}
   .mdfields .cvchk{min-height:40px}
 }
 @media (max-width:699px){
@@ -3139,6 +3151,7 @@ body.ebxopen{overflow:hidden}
   .mdsheet .berow{grid-template-columns:minmax(0,1fr) auto;gap:8px}
   .mdrule{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding-bottom:8px;border-bottom:1px solid var(--line)}
   .mdrule .emacts{grid-column:1 / -1;justify-content:flex-end}
+  .mdcfg{margin-left:6px;padding:8px 10px}
 }
 
 /* every sheet's boxes in Daf's own colour (the newer sheets left them the browser's blue) */
