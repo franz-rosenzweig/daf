@@ -22,6 +22,7 @@ const IC = {
   sort: svg('<path d="M6 4v12M3 13l3 3 3-3M14 16V4M11 7l3-3 3 3"/>'),
   side: svg('<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 4v12"/>'),
   det: svg('<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M12 4v12"/>'),
+  hl: svg('<path d="M4 16h5M6.5 13.5l-1.5 1.5M14.5 3.5l2 2-8 8-3 .5.5-3z"/>'),
   grid: svg('<rect x="3.5" y="3.5" width="5" height="5" rx="1"/><rect x="11.5" y="3.5" width="5" height="5" rx="1"/><rect x="3.5" y="11.5" width="5" height="5" rx="1"/><rect x="11.5" y="11.5" width="5" height="5" rx="1"/>'),
   qv: svg('<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 11.5h14M6 14h3"/>'),
   pin: '<svg class="catpin" width="13" height="13" viewBox="0 0 20 20" aria-label="Marked" role="img" fill="currentColor"><path d="M12.6 2.4l5 5-2.3.7-3.4 3.4.4 4.1-1.4 1.4-3.5-3.5L3.2 17.7l-.9-.9 4.2-4.2L3 9.1l1.4-1.4 4.1.4 3.4-3.4z"/></svg>',
@@ -66,7 +67,7 @@ const ORDER = ['authors', 'languages', 'series', 'formats', 'publisher', 'rating
 const DEF = { q: '', sort: 'added', desc: true, then: [], cols: null, widths: {}, priv: false, view: null };
 const saved = store.get('catalog', {});
 const P = Object.assign({}, DEF, saved, { data: null, facets: null, side: store.get('calSide', true), det: store.get('calDet', true), grid: store.get('calGrid', false), info: new Map(),
-  qv: store.get('calQv', false), qvField: store.get('calQvField', 'authors'), qvVal: null, cell: 'title',
+  qv: store.get('calQv', false), qvField: store.get('calQvField', 'authors'), qvVal: null, cell: 'title', hl: store.get('calHl', false), letters: new Set(),
   open: new Set(store.get('catalogOpen', ['added', 'missing', 'tidy', 'status', 'tags'])), all: new Set(), fq: '', scroll: 0, seq: 0, sel: new Set(), anchor: null });
 const keep = () => store.set('catalog', { q: P.q, sort: P.sort, desc: P.desc, then: P.then, cols: P.cols, widths: P.widths, priv: P.priv, view: P.view, lastView: P.lastView });
 const WIDTH = { title: 300, authors: 180, series: 170, tags: 200, rating: 112, added: 112, published: 100, modified: 112, publisher: 160, languages: 90,
@@ -106,6 +107,7 @@ C.views.catalog = async () => {
     TOOLS.filter(([k]) => k !== 'openwith' || canOpenWith()).map(([k, l, ic]) => '<button class="caltool' + (k === 'library' ? ' end' : '') + '" data-cal="' + k + '">' + ic + '<span>' + l + '</span></button>').join('') + '</div></div>' +
     '<div class="calsearch"><button class="btn sm catb" data-act="cat:views" id="catviewb">' + IC.views + '<span>' + esc(P.view || 'Views') + '</span></button>' +
     '<input class="field catq" id="catq" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search" value="' + esc(P.q) + '">' +
+    '<button class="btn sm catb" data-act="cat:hl" aria-pressed="' + P.hl + '">' + IC.hl + '<span>Highlight</span></button>' +
     '<button class="btn sm catb" data-act="cat:sort">' + IC.sort + '<span>Sort</span></button>' +
     '<button class="btn sm catb" data-act="cat:cols">' + IC.cols + '<span>Columns</span></button></div>' +
     '<div class="catpage' + (P.side ? ' filt' : '') + (P.det ? ' det' : '') + (P.qv ? ' qv' : '') + '" id="catpage"><div class="catshade" data-catm="shade"></div><aside class="catside" id="catside" aria-label="Tag browser"></aside>' +
@@ -123,6 +125,7 @@ async function load(withFacets){
   const n = ++P.seq;
   const qs = new URLSearchParams({ q: P.q, sort: P.sort, desc: P.desc ? '1' : '0' });
   if ((P.then || []).length) qs.set('then', thenParam());
+  if (P.hl) qs.set('highlight', '1');
   if (P.priv) qs.set('private', '1');
   if (withFacets || !P.facets) qs.set('facets', '1');
   let r;
@@ -138,11 +141,11 @@ function draw(){
   const box = $('#catscroll'); if (!box || !P.data) return;
   const r = P.data, cols = colsNow();
   const q = $('#catq'); if (q) { q.classList.toggle('bad', !!r.error); q.title = r.error || ''; }
-  const shown = new Set(r.books.map(b => b.calibre_id));
+  const shown = new Set(r.books.map(b => b.calibre_id)), hits = r.matches ? new Set(r.matches) : null;
   for (const id of [...P.sel]) if (!shown.has(id)) P.sel.delete(id);          // only what the list shows stays chosen
   let h;
   if (P.grid) {          // Calibre's Cover grid
-    h = '<div class="calgrid">' + r.books.map(b => '<div class="calcell' + (P.sel.has(b.calibre_id) ? ' sel' : '') + (b.private ? ' priv' : '') + '" data-cid="' + esc(b.id) + '" data-cal="' + b.calibre_id + '" tabindex="0">' +
+    h = '<div class="calgrid' + (hits ? ' hl' : '') + '">' + r.books.map(b => '<div class="calcell' + (P.sel.has(b.calibre_id) ? ' sel' : '') + (b.private ? ' priv' : '') + (hits && hits.has(b.calibre_id) ? ' hit' : '') + '" data-cid="' + esc(b.id) + '" data-cal="' + b.calibre_id + '" tabindex="0">' +
       '<span class="calcv">' + (b.cover ? '<img src="/api/cover/' + encodeURIComponent(b.id) + '?v=' + (b.cover_v || 0) + '" alt="" loading="lazy">' : C.cover({ id: b.id, title: b.title }, 'cv')) +
       '<input type="checkbox" data-catsel' + (P.sel.has(b.calibre_id) ? ' checked' : '') + ' aria-label="Choose"></span>' +
       '<span class="calct">' + (b.marked ? IC.pin : '') + esc(b.title) + '</span><span class="calca">' + esc((b.authors || []).join(' & ')) + '</span></div>').join('') + '</div>';
@@ -154,7 +157,7 @@ function draw(){
       cols.map(c => '<th data-ck="' + esc(c.key) + '" class="' + (NUMERIC.has(c.type) ? 'num ' : '') + (P.sort === c.key ? 'on' : '') + '" aria-sort="' + (P.sort === c.key ? (P.desc ? 'descending' : 'ascending') : 'none') + '">' +
         '<button class="catsort" data-catsort="' + esc(c.key) + '">' + esc(c.label) + (P.sort === c.key ? '<i>' + (P.desc ? '↓' : '↑') + '</i>' : '') + '</button><span class="catrs" data-catrs="' + esc(c.key) + '"></span></th>').join('') +
       '</tr></thead><tbody>';
-    h += r.books.map(b => '<tr data-cid="' + esc(b.id) + '" data-cal="' + b.calibre_id + '" class="' + (b.private ? 'priv' : '') + (P.sel.has(b.calibre_id) ? ' sel' : '') + '">' +
+    h += r.books.map(b => '<tr data-cid="' + esc(b.id) + '" data-cal="' + b.calibre_id + '" class="' + (b.private ? 'priv' : '') + (P.sel.has(b.calibre_id) ? ' sel' : '') + (hits && hits.has(b.calibre_id) ? ' hit' : '') + '">' +
       '<td class="catck"><input type="checkbox" data-catsel' + (P.sel.has(b.calibre_id) ? ' checked' : '') + ' aria-label="Choose"></td>' + cols.map(c => '<td class="' + (NUMERIC.has(c.type) ? 'num' : '') + '">' + cellHtml(b, c) + '</td>').join('') + '</tr>').join('');
     h += '</tbody></table>';
   }
@@ -174,7 +177,7 @@ function bulkBar(){
     const need = (TOOLS.find(t => t[0] === b.dataset.cal) || [])[3];
     b.disabled = need === 1 ? n !== 1 : need === 2 ? n < 2 : need === 'n' ? !n : false;
   });
-  const cn = $('#catn'); if (cn && P.data) cn.textContent = P.data.count === P.data.total ? P.data.total + ' books' : P.data.count + ' of ' + P.data.total + ' books';
+  const cn = $('#catn'); if (cn && P.data) cn.textContent = P.data.matches ? P.data.matches.length + ' of ' + P.data.total + ' books match' : P.data.count === P.data.total ? P.data.total + ' books' : P.data.count + ' of ' + P.data.total + ' books';
   const s = $('#calsel');
   if (s) s.innerHTML = n ? '<b>' + n + ' chosen</b>' + (n < all ? '<button class="linkbtn" data-catb="all">Choose all ' + all + '</button>' : '') + '<button class="linkbtn" data-catb="none">Clear</button>' : '';
   drawDet(); drawQv();
@@ -264,7 +267,7 @@ function drawSide(keepFocus){
     if (!items.length) return '';
     const open = fq || P.open.has(key), many = !fq && !P.all.has(key) && items.length > 30;
     return '<section class="catg"><button class="catgh" data-catg="' + esc(key) + '">' + IC.chev(open) + svg(GI[icon || key] || GI.custom) + '<span>' + esc(label) + '</span><b>' + items.length + '</b></button>' +
-      (open ? '<div class="catvs">' + (many ? items.slice(0, 30) : items).map(row || (x => val(x[0], x[1], x[2], x[3], x[4]))).join('') +
+      (open ? '<div class="catvs">' + (!fq && P.all.has(key) && items.length > 50 && !row ? letters(key, items, x => val(x[0], x[1], x[2], x[3], x[4])) : (many ? items.slice(0, 30) : items).map(row || (x => val(x[0], x[1], x[2], x[3], x[4]))).join('')) +
         (many ? '<button class="linkbtn tiny catall" data-catall="' + esc(key) + '">Show all ' + items.length + '</button>' : '') + '</div>' : '') + '</section>';
   };
   let h = '<div class="catsh"><input class="field sm" id="catfq" type="search" placeholder="Find" autocomplete="off" value="' + esc(P.fq) + '" aria-label="Find in the Tag browser">' +
@@ -282,6 +285,17 @@ function drawSide(keepFocus){
   h += group('tidy', 'Tidy', TIDY.map(([t, l]) => [t, esc(l)]));
   side.innerHTML = h;
   if (keepFocus) { const i = $('#catfq'); if (i && document.activeElement !== i && P.fq) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+}
+// Calibre's partitions: a long list shown all at once comes as its first letters, each opening to its names.
+function letters(key, items, one){
+  const by = new Map(), nameOf = x => String(x[4] != null ? x[4] : x[1].replace(/<[^>]+>/g, '')).trim();
+  items.slice().sort((a, b) => nameOf(a).localeCompare(nameOf(b))).forEach(x => {
+    const c = nameOf(x).charAt(0).toLocaleUpperCase(), L = /\p{L}|\d/u.test(c) ? c : '#';
+    if (!by.has(L)) by.set(L, []); by.get(L).push(x);
+  });
+  return [...by.entries()].map(([L, xs]) => { const id = key + ':' + L, open = P.letters.has(id);
+    return '<button class="catletter" data-catletter="' + esc(id) + '" aria-expanded="' + open + '">' + IC.chev(open) + '<span>' + esc(L) + '</span><b>' + xs.length + '</b></button>' +
+      (open ? '<div class="catvs catvl">' + xs.map(one).join('') + '</div>' : ''); }).join('');
 }
 function toggleSide(on){
   P.side = on == null ? !P.side : on; if (!narrow()) store.set('calSide', P.side);
@@ -439,6 +453,7 @@ document.addEventListener('click', async e => {
     else if (k === 'det') { if (narrow() && !P.det) { if (P.side) toggleSide(false); if (P.qv) toggleQv(false); } toggleDet(); }
     else if (k === 'grid') { P.grid = !P.grid; store.set('calGrid', P.grid); a.setAttribute('aria-pressed', P.grid); draw(); }
     else if (k === 'qv') toggleQv();
+    else if (k === 'hl') { P.hl = !P.hl; store.set('calHl', P.hl); a.setAttribute('aria-pressed', P.hl); load(); }
     else if (!P.data) return;
     else if (k === 'sort') sortMenu(a);
     else if (k === 'cols') colsMenu(a);
@@ -455,6 +470,7 @@ document.addEventListener('click', async e => {
   const dq = t.closest('#catdet [data-catq]'); if (dq) { setQ(dq.dataset.catq); return; }
   const g = t.closest('[data-catg]'); if (g) { const k = g.dataset.catg; P.open.has(k) ? P.open.delete(k) : P.open.add(k); store.set('catalogOpen', [...P.open]); drawSide(); return; }
   const all = t.closest('[data-catall]'); if (all) { P.all.add(all.dataset.catall); drawSide(); return; }
+  const lt = t.closest('[data-catletter]'); if (lt) { const id = lt.dataset.catletter; P.letters.has(id) ? P.letters.delete(id) : P.letters.add(id); drawSide(); return; }
   const cv = t.closest('[data-catview]'); if (cv) { $('#pop').hidden = true; const v = P.data.views.find(x => x.name === cv.dataset.catview); if (v) applyView(v); return; }
   const vd = t.closest('[data-catvdel]');
   if (vd) { e.stopPropagation(); const name = vd.dataset.catvdel;
@@ -909,6 +925,12 @@ document.addEventListener('keydown', e => {
   else if (is('open')) { const b = anchorBook(); if (b) { e.preventDefault(); location.hash = 'book/' + encodeURIComponent(b.id); } }
   else if (is('search')) { e.preventDefault(); const q = $('#catq'); if (q) { q.focus(); q.select(); } }
   else if (is('quickview')) { e.preventDefault(); toggleQv(); }
+  else if ((is('nextmatch') || is('prevmatch')) && P.data.matches && P.data.matches.length) {
+    e.preventDefault();
+    const ids = P.data.books.map(x => x.calibre_id), m = new Set(P.data.matches), at = ids.indexOf(P.anchor), fwd = is('nextmatch');
+    const order = fwd ? ids.slice(at + 1).concat(ids.slice(0, at + 1)) : ids.slice(0, Math.max(0, at)).reverse().concat(ids.slice(Math.max(0, at)).reverse());
+    const id = order.find(x => m.has(x)); if (id != null) chooseOnly(id);
+  }
   else if (is('cell')) { const b = anchorBook(); if (b) { e.preventDefault(); editCell(b.calibre_id, editable(colsNow().find(c => c.key === P.cell)) ? P.cell : 'title'); } }
   else { const a = Object.keys(TOOLKEY).find(is); if (a) go(TOOLKEY[a]); }
 });

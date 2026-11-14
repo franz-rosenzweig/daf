@@ -586,7 +586,7 @@ def facets(books, cols):
 
 
 # ---------- the view as a whole ----------
-def view(conn, q="", sort_key="added", desc=True, private=False, with_facets=False, then=""):
+def view(conn, q="", sort_key="added", desc=True, private=False, with_facets=False, then="", highlight=False):
     s = config.load_settings()
     books, cols = rows(conn, s, private)
     total = len(books)
@@ -598,11 +598,16 @@ def view(conn, q="", sort_key="added", desc=True, private=False, with_facets=Fal
     if sort_key not in {c["key"] for c in cols}:
         sort_key = "added"
     then = parse_then(then, cols)
+    matches = None
+    if highlight and q.strip() and not err:          # Calibre's "highlight instead of restricting": every book, the matches marked
+        matches = [b["calibre_id"] for b in found]
+        found = books
     found = sort(found, sort_key, desc, cols, then)
     for b in found:
         b.pop("_hay", None)
     out = {"total": total, "count": len(found), "books": found, "columns": cols, "error": err, "sort": sort_key, "desc": bool(desc),
            "then": [[k, d] for k, d in then],
+           **({"matches": matches} if matches is not None else {}),
            "default_columns": DEFAULT_COLS, "views": s.get("catalog_views") or [], "marks": len(marked(s))}
     if with_facets:
         out["facets"] = facets(books, cols)

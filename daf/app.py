@@ -1179,11 +1179,11 @@ def get_books(private: int = 0, c=Depends(conn)):
 
 # ---- All books (#catalog): the Calibre library as a spreadsheet (catalog.py) ----------------
 @app.get("/api/catalog", dependencies=[Depends(user)])
-def get_catalog(q: str = "", sort: str = "added", desc: int = 1, private: int = 0, facets: int = 0, then: str = "", c=Depends(conn)):
+def get_catalog(q: str = "", sort: str = "added", desc: int = 1, private: int = 0, facets: int = 0, then: str = "", highlight: int = 0, c=Depends(conn)):
     """Every Calibre book with Daf's side (status, progress, highlights, shelves), searched the way
     Calibre searches (q), sorted by any column, then by others where those are the same (then=key:1,key:0).
     facets=1 adds the values to filter by, with counts."""
-    return catalog.view(c, q, sort, bool(desc), bool(private), bool(facets), then)
+    return catalog.view(c, q, sort, bool(desc), bool(private), bool(facets), then, bool(highlight))
 
 
 @app.get("/api/catalog/export", dependencies=[Depends(user)])

@@ -3150,3 +3150,13 @@ body.ebxopen{overflow:hidden}
 .bemauthor input[data-bemlink]{grid-column:1 / -1}
 .bemauthorbtns{grid-column:1 / -1;display:flex;justify-content:flex-end;gap:6px}
 @media (max-width:699px){ .bemauthor{grid-template-columns:1fr} }
+
+/* All books: matches highlighted instead of the rest hidden; a long Tag browser list by first letter */
+.cattable tr.hit td{background:var(--accent-weak,var(--active))}
+.cattable tr.hit.sel td{background:var(--active)}
+.calgrid.hl .calcell:not(.hit){opacity:.45} .calgrid.hl .calcell.hit{background:var(--accent-weak,var(--active))}
+.catletter{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:6px;width:100%;padding:5px 6px 5px 2px;border-radius:6px;cursor:pointer;font-size:13.5px;color:var(--fg-2)}
+.catletter:hover{background:var(--hover)} .catletter:focus-visible{outline:2px solid var(--accent)}
+.catletter span{flex:1;font-weight:600;color:var(--fg)} .catletter b{font-weight:500;font-size:12px;color:var(--fg-3)}
+.catvl{padding-left:14px}
+@media (pointer:coarse){ .catletter{padding:9px 6px 9px 2px;font-size:14.5px} }
