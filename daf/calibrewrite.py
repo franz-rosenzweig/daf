@@ -142,6 +142,28 @@ def main():
                         _db(job["lib"])                            # which is now
                 out["done"].append(k)
                 continue
+            elif k == "drop":                           # books dropped on a name in the Tag browser, as Calibre's handle_drop does it
+                key, v = op["field"], op["value"]
+                fm = d.field_metadata[key]
+                if key == "authors":
+                    d.set_field("authors", {i: (v,) for i in ids})
+                elif fm["datatype"] == "rating":
+                    d.set_field(key, {i: int(round(float(v) * 2)) for i in ids})
+                elif fm["datatype"] == "series":         # the series, each book the next number in it
+                    for i in ids:
+                        n = d.get_next_series_num_for(v, field=key)
+                        d.set_field(key, {i: v})
+                        d.set_field("series_index" if key == "series" else key + "_index", {i: n})
+                elif fm["is_multiple"]:
+                    d.set_field(key, {i: tuple(list(d.field_for(key, i)) + ([] if v in d.field_for(key, i) else [v])) for i in ids})
+                else:
+                    d.set_field(key, {i: v for i in ids})
+            elif k == "trim_cover":                     # Calibre's Trim: the cover's plain borders cut off
+                from calibre.utils.img import remove_borders_from_image, image_from_data, image_to_data
+                data = d.cover(ids[0])
+                if not data:
+                    raise ValueError("The book has no cover")
+                d.set_cover({ids[0]: image_to_data(remove_borders_from_image(image_from_data(data)), fmt="JPEG")})
             elif k == "remove_covers":                  # Calibre's Remove cover (and "Remove all covers" in bulk)
                 d.set_cover({i: None for i in ids})
             elif k == "gencover":                       # Calibre's own generated cover (Generate cover; Edit metadata in bulk's "Generate default cover")
@@ -528,7 +550,7 @@ def b64(data):
 # which is what the Kindle and other readers show. After a change, Calibre writes them into the
 # files (embed_metadata), as Calibre-Web Automated does after an edit there. In the background, a
 # batch at a time, so an edit of many books doesn't wait for it.
-EMBED_AFTER = {"set", "tags", "cover", "gencover", "remove_covers", "merge", "rename_items", "remove_items", "restore"}
+EMBED_AFTER = {"set", "tags", "cover", "gencover", "remove_covers", "drop", "trim_cover", "merge", "rename_items", "remove_items", "restore"}
 _embed = {"pending": set(), "running": 0, "done": 0, "error": None}
 _embed_cv = threading.Condition()
 

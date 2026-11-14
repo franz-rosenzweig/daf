@@ -266,6 +266,31 @@ main()
 '''
 
 
+FILEMETA = r'''
+def main():
+    import json, sys
+    from calibre.ebooks.metadata.meta import get_metadata
+    job = json.loads(sys.stdin.read())
+    try:
+        with open(job["path"], "rb") as f:
+            mi = get_metadata(f, job["fmt"].lower())
+        out = {"title": mi.title, "authors": list(mi.authors or []), "publisher": mi.publisher,
+               "published": mi.pubdate.isoformat()[:10] if mi.pubdate and mi.pubdate.year > 101 else None,
+               "tags": list(mi.tags or []), "languages": list(mi.languages or []), "identifiers": dict(mi.identifiers or {}),
+               "series": mi.series, "series_index": mi.series_index if mi.series else None, "comments": mi.comments or ""}
+    except Exception as e:
+        print("DAFRESULT " + json.dumps({"ok": False, "error": str(e)}))
+        return
+    print("DAFRESULT " + json.dumps({"ok": True, "meta": out}))
+main()
+'''
+
+
+def file_meta(path_in_container, fmt):
+    """The details written inside one of a book's files (Calibre's Set metadata from book file); only reads the file."""
+    return _run(FILEMETA, {"path": path_in_container, "fmt": fmt}, 90)["meta"]
+
+
 def gencovers_start(cid, book):
     """Calibre's generated covers for a book, one in each style, as a job: {state, covers}."""
     jid = uuid.uuid4().hex[:12]
