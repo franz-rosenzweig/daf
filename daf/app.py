@@ -1228,6 +1228,7 @@ def put_catalog_marks(b=Depends(json_body)):
 # ---- Editing Calibre from Daf: every change goes through Calibre itself (calibrewrite.py) ----
 BOOK_FORMATS = {"EPUB", "KEPUB", "AZW3", "AZW", "MOBI", "KFX", "PDF", "FB2", "CBZ", "CBR", "CB7", "TXT", "RTF", "DOCX", "HTML", "HTMLZ", "DJVU", "LIT", "ODT"}
 CONVERT_TO = ["EPUB", "AZW3", "KEPUB", "MOBI", "PDF"]
+CONVERT_FROM = ["EPUB", "AZW3", "MOBI", "KEPUB", "KFX", "FB2", "DOCX", "PDF"]     # a book's best file to convert from, in order
 
 
 def _calibre(ops, timeout=120):
@@ -1382,28 +1383,81 @@ def get_catalog_job(jid: str):
     return j
 
 
+def _convert_opts(b, to):
+    """The Convert sheet's options ({opts: {…}}), checked for this output format; None when there are none."""
+    from . import convertopts
+    opts = (b or {}).get("opts")
+    if opts is None:
+        return None
+    if not isinstance(opts, dict):
+        raise HTTPException(400, "opts: an object")
+    return convertopts.clean(opts, to)
+
+
 @app.post("/api/catalog/convert-many", dependencies=[Depends(user)])
 def post_convert_many(b=Depends(json_body)):
     """The chosen books into one format, one after another, each from its best file; a book that has
-    the format already is left as it is. → {job, total, have}."""
+    the format already is left as it is, unless replace. opts: the Convert sheet's settings, the same
+    for every book, and kept as each book's own in Calibre. → {job, total, have}."""
     from . import calibrewrite
-    to = str((b or {}).get("to") or "").upper()
+    b = b if isinstance(b, dict) else {}
+    to = str(b.get("to") or "").upper()
     if to not in CONVERT_TO:
         raise HTTPException(400, "Daf converts to " + ", ".join(CONVERT_TO))
-    ids = [int(i) for i in (b or {}).get("ids") or [] if str(i).isdigit()][:500]
+    ids = list(dict.fromkeys(int(i) for i in b.get("ids") or [] if str(i).isdigit()))[:500]
     if not ids:
         raise HTTPException(400, "No books")
+    opts = _convert_opts(b, to)
+    replace = bool(b.get("replace"))
     todo, have = [], 0
     for cid in ids:
         fmts = catalog.formats_of(cid)
-        if to in fmts:
+        if to in fmts and not replace:
             have += 1
             continue
-        src = next((f for f in ("EPUB", "AZW3", "MOBI", "KEPUB", "KFX", "FB2", "DOCX", "PDF") if f in fmts), fmts[0] if fmts else None)
+        others = [f for f in fmts if f != to]
+        src = next((f for f in CONVERT_FROM if f in others), others[0] if others else None)
         if src:
             todo.append((cid, src))
-    job = calibrewrite.start_convert_many(todo, to) if todo else None
+    job = calibrewrite.start_convert_many(todo, to, opts) if todo else None
     return {"job": job, "total": len(todo), "have": have}
+
+
+@app.get("/api/catalog/convert-opts", dependencies=[Depends(user)])
+def get_convert_opts():
+    """The Convert sheet: Daf's defaults (saved), Calibre's own (calibre: pipe, and out by format), the
+    choices for the lists, the formats, and the order a book's file to convert from is picked in."""
+    from . import convertopts
+    return {"saved": convertopts.clean(config.load_settings().get("convert_opts") or {}), "calibre": convertopts.calibre_defaults(),
+            "choices": convertopts.CHOICES, "formats": CONVERT_TO, "from_order": CONVERT_FROM}
+
+
+@app.put("/api/catalog/convert-opts", dependencies=[Depends(user)])
+def put_convert_opts(b=Depends(json_body)):
+    """Daf's default conversion settings, for every device: {opts}. An empty one is Calibre's own."""
+    from . import convertopts
+    opts = (b or {}).get("opts") if isinstance(b, dict) else None
+    if not isinstance(opts, dict):
+        raise HTTPException(400, "opts: an object")
+    s = config.load_settings()
+    s["convert_opts"] = convertopts.clean(opts)
+    config.save_settings(s)
+    return {"saved": s["convert_opts"]}
+
+
+@app.get("/api/catalog/convert-fonts", dependencies=[Depends(user)])
+def get_convert_fonts():
+    """The font families Calibre can embed (the container's)."""
+    from . import convertopts
+    return {"fonts": convertopts.fonts()}
+
+
+@app.get("/api/catalog/book/{cid}/convert-opts", dependencies=[Depends(user)])
+def get_book_convert_opts(cid: int):
+    """A book's own conversion settings, as Calibre keeps them, and the input format last used for it."""
+    from . import convertopts
+    opts, src = convertopts.book_opts(cid)
+    return {"opts": opts, "input": src}
 
 
 @app.get("/api/catalog/convert-many/{jid}", dependencies=[Depends(user)])
@@ -1538,14 +1592,17 @@ def delete_catalog_file(cid: int, fmt: str):
 
 @app.post("/api/catalog/book/{cid}/convert", dependencies=[Depends(user)])
 def convert_catalog_file(cid: int, b=Depends(json_body)):
-    """Calibre converts one of the book's files to another format; GET /api/catalog/jobs/{job} says when."""
+    """Calibre converts one of the book's files to another format: {from, to, opts?}, opts the Convert
+    sheet's settings, which the book then keeps in Calibre. GET /api/catalog/jobs/{job} says when."""
     from . import calibrewrite
-    src, to = str((b or {}).get("from") or "").upper(), str((b or {}).get("to") or "").upper()
+    b = b if isinstance(b, dict) else {}
+    src, to = str(b.get("from") or "").upper(), str(b.get("to") or "").upper()
     if to not in CONVERT_TO or not src or src == to:
         raise HTTPException(400, "Convert to " + ", ".join(CONVERT_TO))
+    opts = _convert_opts(b, to)
     if not catalog.book_file(cid, src):
         raise HTTPException(400, f"The book has no {src} file")
-    return {"job": calibrewrite.start_convert(cid, src, to)}
+    return {"job": calibrewrite.start_convert(cid, src, to, opts)}
 
 
 @app.post("/api/catalog/epubmerge", dependencies=[Depends(user)])

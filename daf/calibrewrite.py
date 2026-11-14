@@ -41,7 +41,8 @@ def main():
         y, m, dd = (int(x) for x in str(v)[:10].split("-"))
         return datetime(y, m, dd, 12, 0, tzinfo=timezone.utc)
     job = json.loads(sys.stdin.read())
-    d = _db(job["lib"]).new_api
+    ldb = _db(job["lib"])
+    d = ldb.new_api
     touched, out = set(), {"ok": True, "books": {}, "done": []}
     def val(field, v):
         fm = d.field_metadata[field]
@@ -137,16 +138,34 @@ def main():
             elif k == "remove_formats":
                 d.remove_formats({ids[0]: [x.upper() for x in op["fmts"]]})
             elif k == "convert":
+                import shutil
                 src = d.format_abspath(ids[0], op["from"].upper())
                 if not src:
                     raise ValueError("The book has no %s file" % op["from"].upper())
-                tmp = tempfile.mkdtemp()
-                dst = os.path.join(tmp, "book." + op["to"].lower())
-                r = subprocess.run(["/app/calibre/ebook-convert", src, dst], capture_output=True, text=True, timeout=900)
-                if r.returncode or not os.path.exists(dst):
-                    raise ValueError("Calibre couldn't convert it: " + (r.stderr or r.stdout or "")[-400:])
-                d.add_format(ids[0], op["to"].upper(), dst, replace=True)
-                os.unlink(dst); os.rmdir(tmp)
+                flags = op.get("flags") or []
+                if not all(isinstance(f, str) and f.startswith("--") for f in flags):
+                    raise ValueError("bad conversion flags")
+                if op.get("save") is not None:          # the Convert sheet's settings become the book's own, as Calibre's dialog keeps them
+                    from calibre.ebooks.conversion.config import load_specifics, save_specifics
+                    recs = load_specifics(ldb, ids[0])
+                    recs.update(op["save"])
+                    recs["gui_preferred_input_format"] = op["from"].lower()
+                    save_specifics(ldb, ids[0], recs)
+                tmp = tempfile.mkdtemp(prefix="daf-convert-")
+                try:
+                    dst = os.path.join(tmp, "book." + op["to"].lower())
+                    cmd = ["/app/calibre/ebook-convert", src, dst] + flags
+                    if op.get("css"):                   # extra CSS as a file, so its text is never taken for a path
+                        css = os.path.join(tmp, "extra.css")
+                        with open(css, "w", encoding="utf-8") as f:
+                            f.write(op["css"])
+                        cmd.append("--extra-css=" + css)
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+                    if r.returncode or not os.path.exists(dst):
+                        raise ValueError("Calibre couldn't convert it: " + (r.stderr or r.stdout or "")[-400:])
+                    d.add_format(ids[0], op["to"].upper(), dst, replace=True)
+                finally:
+                    shutil.rmtree(tmp, ignore_errors=True)
             elif k == "merge":                          # the others' files, tags, identifiers and empty fields into one; then the others go
                 keep = int(op["keep"])
                 others = [i for i in ids if i != keep]
@@ -499,13 +518,23 @@ def _embed_worker():
 _jobs = {}
 
 
-def start_convert(cid, src, to):
+def convert_op(cid, src, to, opts=None):
+    """The convert op for one book. With the Convert sheet's options (convertopts.clean'd): ebook-convert's
+    flags, the extra CSS (written to a file in the container) and what the book keeps in Calibre."""
+    op = {"op": "convert", "id": cid, "from": src, "to": to}
+    if opts is not None:
+        from . import convertopts
+        op.update(flags=convertopts.flags(opts, to), css=opts.get("extra_css") or None, save=convertopts.to_save(opts, to))
+    return op
+
+
+def start_convert(cid, src, to, opts=None):
     jid = uuid.uuid4().hex[:12]
     _jobs[jid] = {"state": "running", "started": time.time(), "id": cid, "to": to.upper()}
 
     def work():
         try:
-            run([{"op": "convert", "id": cid, "from": src, "to": to}], timeout=1000)
+            run([convert_op(cid, src, to, opts)], timeout=1000)
             _jobs[jid].update(state="done")
         except Exception as e:  # noqa: BLE001 - the page says what went wrong
             _jobs[jid].update(state="failed", error=str(e))
@@ -548,9 +577,11 @@ def start_each(ops, timeout=1000, **info):
     return jid
 
 
-def start_convert_many(todo, to):
-    """[(cid, from)] into `to`, one after another, in one job: {running, done, total, failed: [{id, error}]}."""
-    return start_each([{"op": "convert", "id": cid, "from": src, "to": to} for cid, src in todo], 1000, to=to)
+def start_convert_many(todo, to, opts=None):
+    """[(cid, from)] into `to`, one after another, in one job: {running, done, total, failed: [{id, error}]}.
+    With the Convert sheet's options, every book gets the same ones, and keeps them in Calibre (Calibre's
+    bulk convert does the same)."""
+    return start_each([convert_op(cid, src, to, opts) for cid, src in todo], 1000, to=to)
 
 
 def start_polish_many(ids, opts, keep_original):
