@@ -202,3 +202,4 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 ## Edit book (2026-11-13)
 
 - not yet: Edit book (ebookedit.js, /api/ebookedit/<id>/…): the working copy's files grouped like Calibre's, a code editor with syntax colours, the live preview, find and replace (current file, all text, all styles; regex, match case), Contents (edit, move, add, Generate), Check book with Fix all, Polish's tools, add/rename/remove files, checkpoints, Save and Discard
+- not yet: EpubMerge (All books' toolbar, two or more books; epubmerge.js): the order with up/down and take out, Title and Authors (the plugin's until changed), Contents (nested or one level), Description (titles, or with descriptions); POST /api/catalog/epubmerge {ids, title, authors, flatten, descriptions}, then GET /api/catalog/jobs/<id>, done = the new book's id, shown chosen

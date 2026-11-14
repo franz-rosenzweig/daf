@@ -1376,7 +1376,7 @@ def post_convert_many(b=Depends(json_body)):
         if to in fmts:
             have += 1
             continue
-        src = next((f for f in ("EPUB", "AZW3", "MOBI", "KEPUB", "FB2", "DOCX", "PDF") if f in fmts), fmts[0] if fmts else None)
+        src = next((f for f in ("EPUB", "AZW3", "MOBI", "KEPUB", "KFX", "FB2", "DOCX", "PDF") if f in fmts), fmts[0] if fmts else None)
         if src:
             todo.append((cid, src))
     job = calibrewrite.start_convert_many(todo, to) if todo else None
@@ -1523,6 +1523,26 @@ def convert_catalog_file(cid: int, b=Depends(json_body)):
     if not catalog.book_file(cid, src):
         raise HTTPException(400, f"The book has no {src} file")
     return {"job": calibrewrite.start_convert(cid, src, to)}
+
+
+@app.post("/api/catalog/epubmerge", dependencies=[Depends(user)])
+def post_epubmerge(b=Depends(json_body)):
+    """EpubMerge, the Calibre plugin: the books' EPUBs, in the order given, into one new book.
+    {ids, title?, authors?, flatten?, descriptions?}; an empty title or authors is the plugin's own
+    (the series, or the first title and "Anthology"; every book's authors). A job: GET
+    /api/catalog/jobs/{job} has done = the new book's Calibre id."""
+    from . import calibrewrite
+    b = b if isinstance(b, dict) else {}
+    ids = list(dict.fromkeys(int(i) for i in (b.get("ids") or []) if str(i).isdigit()))
+    if not 2 <= len(ids) <= 200:
+        raise HTTPException(400, "Two to 200 books")
+    if any("EPUB" not in catalog.formats_of(i) for i in ids):
+        raise HTTPException(400, "Every book needs an EPUB")
+    authors = b.get("authors") if isinstance(b.get("authors"), list) else []
+    op = {"op": "epubmerge", "ids": ids, "title": str(b.get("title") or "").strip()[:500],
+          "authors": [str(a).strip()[:200] for a in authors if str(a).strip()][:20],
+          "flatten": bool(b.get("flatten")), "descriptions": bool(b.get("descriptions"))}
+    return {"job": calibrewrite.start_job(lambda: calibrewrite.run([op], timeout=1800)["added"][0])}
 
 
 @app.post("/api/catalog/book/{cid}/find", dependencies=[Depends(user)])
