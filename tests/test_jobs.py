@@ -14,13 +14,34 @@ class Now:                                              # a job's thread, run ri
         self.target()
 
 
+class Held:                                             # a job's thread, started by hand later
+    def __call__(self, target, daemon):
+        self.target = target
+        return self
+
+    def start(self):
+        pass
+
+    def go(self):
+        self.target()
+
+
 class Base(unittest.TestCase):
     def setUp(self):
-        from daf import calibrewrite
+        import tempfile
+        from pathlib import Path
+        from daf import calibrewrite, config
         self.W = calibrewrite
         saved = dict(calibrewrite._jobs)
         calibrewrite._jobs.clear()
         self.addCleanup(lambda: (calibrewrite._jobs.clear(), calibrewrite._jobs.update(saved)))
+        # the kept rows go to a database of the test's own, never Daf's
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        was = (config.STATE, config.DB_PATH, calibrewrite._stored)
+        config.STATE, config.DB_PATH, calibrewrite._stored = Path(tmp.name), Path(tmp.name) / "daf.db", None
+        self.addCleanup(lambda: setattr(calibrewrite, "_stored", was[2]))
+        self.addCleanup(lambda: (setattr(config, "STATE", was[0]), setattr(config, "DB_PATH", was[1])))
 
     def put(self, jid, **j):
         self.W._jobs[jid] = dict({"started": time.time()}, **j)
@@ -175,6 +196,138 @@ class Endpoints(Base):
         self.assertEqual(rows["r"]["label"], "Restore the originals of “One”")
         self.assertEqual(rows["c"]["label"], "Convert 2 books to MOBI")
         self.assertEqual((rows["p"]["kind"], rows["r"]["kind"], rows["c"]["kind"]), ("polish", "restore", "convert"))
+
+
+class KeptRows(Base):
+    """The named jobs' rows in Daf's database (kv calibre_jobs), read back after a restart."""
+    def restart(self):
+        self.W._jobs.clear()
+        self.W._stored = None                                       # a new process: nothing read yet
+
+    def test_after_a_restart(self):
+        W, now = self.W, time.time()
+        W.name(self.put("done1", running=False, done=2, total=2, failed=[{"id": 4, "error": "bad file"}], ended=now - 60), "polish", "x", "Polish {} books", [4, 5])
+        W.name(self.put("run1", running=True, done=1, total=3, failed=[], stoppable=True), "convert", "x", "Convert {} books to MOBI", [1, 2, 3])
+        W.name(self.put("old", running=False, ended=now - 2 * 86400, started=now - 2 * 86400), "save", "x", "Save {} books to disk", [1, 2])
+        self.put("unnamed", running=False, ended=now)
+        W.finished("unnamed")
+        self.restart()
+        rows = {r["id"]: r for r in W.jobs_list(lambda ids: {4: "Book Four"})}
+        self.assertEqual(set(rows), {"done1", "run1"})                # the old one dropped, the unnamed never kept
+        self.assertEqual(rows["done1"]["state"], "done")
+        self.assertEqual(rows["done1"]["label"], "Polish 2 books")
+        self.assertEqual(rows["done1"]["errors"], [{"id": 4, "error": "bad file", "title": "Book Four"}])
+        self.assertEqual(rows["run1"]["state"], "interrupted")       # running when Daf stopped
+        self.assertEqual((rows["run1"]["done"], rows["run1"]["total"]), (1, 3))
+        self.assertFalse(rows["run1"]["stoppable"])
+
+    def test_a_job_kept_when_it_finishes(self):
+        W = self.W
+        with mock.patch.object(W.threading, "Thread", Now):
+            jid = W.start_job(lambda: 7)
+        W.name(jid, "pages", "x", "Count pages of {} books", [1, 2])     # named after it finished: kept as done
+        later = Held()
+        with mock.patch.object(W.threading, "Thread", later):
+            jid2 = W.start_job(lambda: W.name(jid2, "pages", "x", "Count pages of {} books", [1, 2]) and 1)
+        self.assertEqual(W.job(jid2)["running"], True)
+        later.go()                                                       # named while it runs, then it finishes
+        self.restart()
+        self.assertEqual({r["id"]: r["state"] for r in W.jobs_list()}, {jid: "done", jid2: "done"})
+
+    def test_a_broken_database_doesnt_stop_a_job(self):
+        W = self.W
+        with mock.patch.object(W, "_store_save", side_effect=OSError("disk full")):
+            W.name(self.put("a", running=True), "polish", "x", "Polish {} books", [1, 2])
+        self.assertEqual(W.jobs_list()[0]["id"], "a")
+
+
+class StopMore(Base):
+    def test_start_job_that_can_stop(self):
+        W, seen, box = self.W, [], {}
+
+        def fn(stop):
+            for step in range(5):
+                if step == 2:
+                    self.assertTrue(W.stop(box["jid"]))          # Stop pressed before the third step
+                if stop():
+                    break
+                seen.append(step)
+            return seen
+        later = Held()
+        with mock.patch.object(W.threading, "Thread", later):
+            box["jid"] = W.start_job(fn, stoppable=True)
+        later.go()
+        j = W.job(box["jid"])
+        self.assertEqual(j["done"], [0, 1])
+        self.assertTrue(j["stopped"])
+        self.assertFalse(W.stop(box["jid"]))                      # done now
+        with mock.patch.object(W.threading, "Thread", Now):
+            self.assertFalse(W.job(W.start_job(lambda: 1)).get("stoppable"))   # a plain one can't
+
+    def test_find_details_for_many(self):
+        from daf import calibrefind
+        W = self.W
+        books = {i: {"title": "Book %d" % i, "authors": ["A Writer"], "identifiers_map": {}, "id": i} for i in (1, 2, 3, 4)}
+        asked = []
+
+        def sources(title, *a, **k):
+            asked.append(title)
+            if len(asked) == 2:                                     # Stop pressed while the second book is looked up
+                self.assertTrue(W.stop(next(k for k, j in W._jobs.items() if j.get("kind") == "fill")))
+            return [{"title": title}]
+
+        class Serial:                                               # the four lookers, one after another
+            def __init__(self, max_workers):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def map(self, fn, items):
+                return [fn(x) for x in items]
+        with mock.patch("daf.catalog.brief", return_value=(books, set())), mock.patch.object(calibrefind, "_tidy_found"), \
+                mock.patch.object(calibrefind, "calibre_sources", side_effect=sources), mock.patch.object(calibrefind, "same_book", return_value=True), \
+                mock.patch.object(calibrefind, "_hardcover_answer", return_value=None), \
+                mock.patch.object(calibrefind, "proposals", side_effect=lambda b, ans, f, ck: ({"publisher": "P"}, {"publisher": "Calibre"})), \
+                mock.patch("concurrent.futures.ThreadPoolExecutor", Serial), mock.patch.object(calibrefind.threading, "Thread", Now):
+            jid = calibrefind.fill_start([1, 2, 3, 4], ["publisher"])
+        j = W.job(jid)
+        self.assertEqual(asked, ["Book 1", "Book 2"])
+        self.assertEqual((j["state"], j["done"], j["total"], j["stopped"]), ("done", 2, 4, True))
+        self.assertEqual([b["id"] for b in j["books"]], [1, 2])     # what was found so far, for the sheet
+        W.name(jid, "fill", "x", "Find details for {} books", [1, 2, 3, 4])
+        self.assertEqual(W.jobs_list()[0]["state"], "stopped")
+
+    def test_import_list(self):
+        from daf import app, calibrewrite as W, importlist
+        rows = [{"title": "Made Up %d" % i, "authors": ["A Writer"]} for i in range(25)]
+        runs, made = [], {}
+
+        def run(ops, timeout):
+            runs.append(ops[0])
+            if ops[0]["op"] == "add_empty":
+                n = len(runs) * 100
+                ids = list(range(n, n + len(ops[0]["books"])))
+                return {"added": ids, **{i: {"title": "t", "authors": ["a"]} for i in ids}}
+            return {}
+
+        def start(fn, stoppable=False):
+            self.assertTrue(stoppable)
+            presses = iter([False, True])                           # Stop pressed after the first ten
+            made["done"] = fn(lambda: next(presses, True))
+            return "job9"
+        with mock.patch.object(W, "run", side_effect=run), mock.patch.object(W, "start_job", side_effect=start), \
+                mock.patch.object(importlist, "clean_rows", side_effect=lambda r: list(r or [])), \
+                mock.patch.object(importlist, "add_daf_rows") as rows_in, mock.patch.object(app, "_after_removal"), \
+                mock.patch("daf.catalog.calibre_rows", return_value=({}, [])):
+            out = app.post_importlist_apply({"add": rows, "add_tag": "Imported"}, None)
+        self.assertEqual(out, {"job": "job9"})
+        self.assertEqual([len(o["books"]) for o in runs], [10])                 # the first ten went in, the rest were left
+        self.assertEqual(made["done"]["added"], list(range(100, 110)))
+        self.assertEqual(sorted(rows_in.call_args[0][1]), list(range(100, 110)))  # and the ones added got their Daf rows
 
 
 if __name__ == "__main__":

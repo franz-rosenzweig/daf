@@ -92,6 +92,7 @@ def lookup_start(text):
         with ThreadPoolExecutor(3) as ex:
             list(ex.map(one, todo))
         job["state"] = "done"
+        W.finished(jid)
     threading.Thread(target=work, daemon=True).start()
     return jid
 

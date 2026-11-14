@@ -136,6 +136,7 @@ L.side = () => {
     '<div class="l2corner">' +
       '<button class="l2round" data-act="add" aria-label="Add to Daf" title="Add a link, a book or a PDF">' + PLUS + '</button>' +
       '<button class="l2search" data-act="palette">Search</button>' +
+      (C.Jobs ? C.Jobs.corner() : '') +
       '<button class="l2mins" data-go="stats" aria-label="Stats">' + ringSvg(goal ? done / goal : 0) + (d ? '<span>' + done + ' of ' + goal + '</span>' : '') + '</button>' +
       '<button class="l2round" data-act="l2menu" aria-label="More">' + DOTS + '</button>' +
     '</div>' +
