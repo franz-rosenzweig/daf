@@ -74,6 +74,22 @@ def state(conn, book_id):
     return dict(r) if r else None
 
 
+def on_device(conn):
+    """Calibre's On device column, for the Kindle: {Daf book id: {"state", "shelf"}}. "Waiting" is in
+    the queue for the Kindle's next Wi-Fi sync; "Kindle" is on it, as its plugin last reported the
+    files there (kindle_files), or delivered since that report."""
+    out = {}
+    last = conn.execute("SELECT MAX(seen) FROM kindle_files").fetchone()[0] or 0
+    for r in conn.execute("SELECT book_id, shelf FROM kindle_files WHERE book_id IS NOT NULL ORDER BY path DESC"):
+        out[r[0]] = {"state": "Kindle", "shelf": r[1]}
+    for r in conn.execute("SELECT ref, shelf, delivered, error FROM kindle_queue WHERE kind = 'book' AND ref IS NOT NULL"):
+        if r[2] is None and r[3] is None:
+            out[r[0]] = {"state": "Waiting", "shelf": r[1]}
+        elif r[2] and r[3] is None and r[2] >= last and r[0] not in out:
+            out[r[0]] = {"state": "Kindle", "shelf": r[1]}
+    return out
+
+
 def inbox(conn):
     """For the plugin: what to download, oldest first. One the plugin turned down (a different file by
     that name on the Kindle, too big, no room) isn't offered again until it's sent again from Daf: a

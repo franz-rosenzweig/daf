@@ -3038,3 +3038,41 @@ body.ebxopen{overflow:hidden}
 .ibisbn{font-variant-numeric:tabular-nums}
 @media (pointer:coarse){ .ibrow{padding:10px 2px} .ibrow input{width:22px;height:22px} }
 @media (max-width:699px){ .ibsheet{width:auto} .ibrow{grid-template-columns:22px 34px minmax(0,1fr) auto} .ibisbn{display:none} }
+
+/* Send to Kindle (senddevice.js) and Save to disk (savetodisk.js): Calibre's Send to device and Save to disk for the chosen books */
+.sdsheet,.svsheet{width:min(720px,calc(100vw - 32px))}
+.sdbody,.svbody{overflow:auto}
+.sdbody h3{margin:18px 0 6px;font-size:13px;font-weight:600;color:var(--fg-2)}
+.sdbody .berow .field{width:auto;min-width:200px}
+.sdlist{display:flex;flex-direction:column}
+.sdrow{display:grid;grid-template-columns:22px 40px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.sdrow input{accent-color:var(--accent);margin:0;width:16px;height:16px}
+.sdrow img,.sdrow .befnc{width:40px;height:58px;object-fit:cover;border-radius:4px;background:var(--panel);display:block}
+.sdrow.off{opacity:.5;cursor:default}
+.sdfmt{text-align:right;white-space:nowrap}
+.svbody{display:flex;flex-direction:column;gap:14px}
+.svsheet .berow{grid-template-columns:150px minmax(0,1fr)}
+.svtpl{display:flex;gap:8px;align-items:center}
+.svtpl .field{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px}
+.svfmts{display:flex;flex-wrap:wrap;gap:6px 18px}
+.svopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px;padding-top:12px;border-top:1px solid var(--line)}
+.svchk{display:flex;gap:8px;align-items:center;font-size:14px;min-width:0;cursor:pointer}
+.svchk input{accent-color:var(--accent);flex:none;margin:0;width:16px;height:16px}
+.svchk:has(input:disabled){opacity:.6;cursor:default}
+@media (pointer:coarse){
+  .sdrow{min-height:48px}
+  .sdrow input,.svchk input{width:22px;height:22px}
+  .svchk{min-height:40px}
+  .svtpl .btn{min-height:40px}
+}
+@media (max-width:699px){
+  .sdsheet,.svsheet{width:auto}
+  .sdsheet .field,.svsheet .field{font-size:16px}
+  .sdbody .berow .field{width:100%;min-width:0}
+  .sdrow{grid-template-columns:22px 34px minmax(0,1fr);gap:2px 8px}
+  .sdrow input,.sdrow img,.sdrow .befnc{grid-row:span 2}
+  .sdrow img,.sdrow .befnc{width:34px;height:50px}
+  .sdfmt{grid-column:3;text-align:left;white-space:normal}
+  .svsheet .berow{grid-template-columns:minmax(0,1fr);gap:4px}
+  .svopts{grid-template-columns:minmax(0,1fr)}
+}

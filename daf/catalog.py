@@ -9,7 +9,7 @@ Search (Calibre's syntax, mostly):
   rating:>3  pages:<200  size:>5mb  highlights:>0  progress:>=50
   added:>30daysago  added:thismonth  published:<1950  modified:2026-11  (today, yesterday, thisweek,
   thismonth, thisyear, lastmonth, lastyear, Ndaysago, YYYY, YYYY-MM, YYYY-MM-DD; date: = added:)
-  formats:false (no file)  cover:false  #read:=Finished  #pages:>300
+  formats:false (no file)  cover:false  #read:=Finished  #pages:>300  ondevice:true (on the Kindle or waiting for it)
   and, or, not, (…)     "-" before a field term is not too
 """
 import csv
@@ -48,6 +48,7 @@ BUILTIN = [
     ("calibre_id", "Calibre ID", "number", ("id",)),
     ("duplicate", "Duplicate", "bool", ("duplicates", "dupe", "dupes")),
     ("marked", "Marked", "bool", ("mark",)),
+    ("ondevice", "On device", "text", ("on_device",)),       # the Kindle (kindlequeue.on_device): "Kindle", "Waiting" or nothing
 ]
 DEFAULT_COLS = ["title", "authors", "series", "tags", "rating", "added", "formats", "#pages", "status", "progress"]
 STATUS = {"to-read": "To read", "reading": "Reading", "read": "Read", "paused": "Paused", "dropped": "Dropped"}
@@ -215,6 +216,8 @@ def rows(conn, settings=None, private=False):
         shelves.setdefault(bid, []).append(name)
         shelf_ids.setdefault(bid, []).append(sid)
     marks = set(marked(settings))
+    from . import kindlequeue
+    dev = kindlequeue.on_device(conn)
     out = []
     for cid, b in cal.items():
         d = daf.get(cid) or {}
@@ -228,7 +231,7 @@ def rows(conn, settings=None, private=False):
             "progress": d.get("progress"), "progress_note": d.get("progress_note"),
             "last_read": datetime.fromtimestamp(lr, tz).date().isoformat() if lr else None,
             "audio": d.get("audio_pct"), "highlights": hl.get(bid, 0), "shelves": shelves.get(bid, []), "shelf_ids": shelf_ids.get(bid, []),
-            "marked": cid in marks,
+            "marked": cid in marks, "ondevice": (dev.get(bid) or {}).get("state"),
         })
     return out, columns(custom)
 
