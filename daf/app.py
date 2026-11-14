@@ -1565,6 +1565,67 @@ async def put_catalog_cover(cid: int, request: Request):
     return {"ok": True}
 
 
+# Calibre's Add your own columns: its column kinds, in its words, and what each is made as.
+COLUMN_TYPES = [("text", "Text, column shown in the Tag browser"), ("*text", "Comma separated text, like tags, shown in the Tag browser"),
+                ("comments", "Long text, like comments, not shown in the Tag browser"), ("series", "Text column for keeping series-like information"),
+                ("enumeration", "Text, but with a fixed set of permitted values"), ("datetime", "Date"), ("float", "Floating point numbers"),
+                ("int", "Integers"), ("rating", "Ratings, shown with stars"), ("bool", "Yes/No")]
+
+
+@app.get("/api/catalog/columns", dependencies=[Depends(user)])
+def get_catalog_columns():
+    """My own Calibre columns ({key, label (its heading), dtype, multi, enum}) and the kinds a new one can be."""
+    _books, custom = catalog.calibre_rows()
+    return {"columns": [{k: c.get(k) for k in ("key", "label", "dtype", "multi", "enum")} for c in custom],
+            "types": [{"key": k, "label": l} for k, l in COLUMN_TYPES]}
+
+
+@app.post("/api/catalog/columns", dependencies=[Depends(user)])
+def post_catalog_column(b=Depends(json_body)):
+    """A new column of my own: {label (the lookup name, #label), heading, type, values (a fixed set's)}."""
+    b = b if isinstance(b, dict) else {}
+    label = str(b.get("label") or "").strip().lstrip("#").lower()
+    heading = str(b.get("heading") or "").strip()[:100]
+    typ = str(b.get("type") or "")
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,39}", label):
+        raise HTTPException(400, "A lookup name is lower-case letters, digits and _, and starts with a letter")
+    if not heading:
+        raise HTTPException(400, "A column needs a heading")
+    if typ not in dict(COLUMN_TYPES):
+        raise HTTPException(400, "Which kind of column")
+    display = {}
+    if typ == "enumeration":
+        vals = list(dict.fromkeys(str(v).strip()[:100] for v in (b.get("values") or []) if str(v).strip()))[:200]
+        if not vals:
+            raise HTTPException(400, "A fixed set needs its values")
+        display = {"enum_values": vals, "enum_colors": []}
+    elif typ == "*text":
+        display = {"is_names": False}
+    elif typ == "comments":
+        display = {"heading_position": "hide", "interpret_as": "html"}
+    elif typ == "rating":
+        display = {"allow_half_stars": True}
+    _calibre([{"op": "create_column", "label": label, "heading": heading, "datatype": typ.lstrip("*"), "multiple": typ == "*text", "display": display}])
+    return {"key": "#" + label}
+
+
+@app.put("/api/catalog/columns/{label}", dependencies=[Depends(user)])
+def put_catalog_column(label: str, b=Depends(json_body)):
+    """A column of mine gets a new heading: {heading}."""
+    heading = str((b or {}).get("heading") or "").strip()[:100] if isinstance(b, dict) else ""
+    if not heading:
+        raise HTTPException(400, "A column needs a heading")
+    _calibre([{"op": "column_heading", "label": label.lstrip("#").lower(), "heading": heading}])
+    return {"ok": True}
+
+
+@app.delete("/api/catalog/columns/{label}", dependencies=[Depends(user)])
+def delete_catalog_column(label: str):
+    """A column of mine, and what every book had in it, gone (Calibre's Delete column)."""
+    _calibre([{"op": "delete_column", "label": label.lstrip("#").lower()}])
+    return {"ok": True}
+
+
 @app.delete("/api/catalog/book/{cid}/cover", dependencies=[Depends(user)])
 def delete_catalog_cover(cid: int):
     """Calibre's Remove cover: the book has none afterwards."""
