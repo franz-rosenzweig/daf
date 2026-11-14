@@ -3109,3 +3109,34 @@ body.ebxopen{overflow:hidden}
   .jbpanel{left:0;right:0;bottom:0;width:auto;max-height:80vh;border-radius:16px 16px 0 0;border-width:1px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
   .calsw.jbbtn{gap:4px}
 }
+
+/* Metadata download (dlprefs.js): Calibre's Preferences → Metadata download, over Find details too */
+.mdshade{z-index:57}
+.mdsheet{z-index:58;width:min(720px,calc(100vw - 32px))}
+.mdbody{display:flex;flex-direction:column;gap:18px}
+.mdsec{display:flex;flex-direction:column;gap:8px}
+.mdsec h3{margin:0;font-size:13px;font-weight:600;color:var(--fg-2)}
+.mdsrc{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:10px;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)}
+.mdsrc .cvchk{flex-wrap:wrap}
+.mdsrc .field{min-height:34px;padding:5px 9px}
+.mdsrc .field:disabled{opacity:.35}
+.mdsrch{font-size:12px;color:var(--fg-2);border-bottom:0}
+.mdfields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px}
+.mdbtns{display:flex;gap:8px;flex-wrap:wrap}
+.mdsheet .berow{grid-template-columns:minmax(0,1fr) auto}
+.mdsheet .berow .field{width:90px}
+.mdrule{display:grid;grid-template-columns:120px 170px minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center}
+.mdrule .field{min-height:34px;padding:5px 8px;font-size:13.5px}
+.mdrule .field:disabled{opacity:.35}
+@media (pointer:coarse){
+  .mdsrc .field,.mdrule .field{min-height:40px}
+  .mdfields .cvchk{min-height:40px}
+}
+@media (max-width:699px){
+  .mdsheet{width:auto}
+  .mdsheet .field{font-size:16px}
+  .mdfields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mdsheet .berow{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+  .mdrule{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .mdrule .emacts{grid-column:1 / -1;justify-content:flex-end}
+}

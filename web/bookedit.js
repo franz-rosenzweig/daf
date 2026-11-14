@@ -271,7 +271,7 @@ function frPreview(){
     (r.list.length > 40 ? '<span class="mute tiny">' + (r.list.length - 40) + ' more</span>' : '');
 }
 document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#bedit [data-fr]')) frPreview(); });
-document.addEventListener('change', e => { if (e.target.closest && e.target.closest('#bedit [data-fr]')) frPreview(); });
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('#bedit [data-fr]')) frPreview(); if (e.target.matches && e.target.matches('#bedit [data-fillf]')) L.touched = true; });
 
 async function saveBulk(){
   const s = $('#bedit'), btn = $('[data-be="save"]', s), ch = changed();
@@ -410,7 +410,10 @@ function convert(src, to){
 }
 
 /* ---------- Find details: Calibre's own Download metadata, and Hardcover (calibrefind.py) ---------- */
-const F = { snap: null, orig: null, results: null, pick: null, seq: 0, covs: {}, cov: null };
+const F = { snap: null, orig: null, results: null, pick: null, seq: 0, covs: {}, cov: null, prefs: {} };
+// Calibre's names for the fields Metadata download can leave out (its ignore_fields), by the sheet's keys.
+const CALF = { title: 'title', authors: 'authors', series: 'series', tags: 'tags', publisher: 'publisher', published: 'pubdate', languages: 'languages', comments: 'comments' };
+const ignored = k => (F.prefs.ignore_fields || []).includes(CALF[k]);
 const far = u => '/api/catalog/coverproxy?u=' + encodeURIComponent(u);          // through the server
 // A cover to show: one Calibre found and keeps (found:job/name), small, or an address, through the server.
 const coverSrc = u => String(u).startsWith('found:') ? '/api/catalog/found/' + String(u).slice(6) + '?thumb=1' : far(u);
@@ -420,7 +423,7 @@ async function find(title, author){
   if (!F.snap) leaveForm();
   F.covs = {};
   const n = ++F.seq, d = E.d;
-  sheet('<div class="behead"><h2>Find details</h2><span class="spacer"></span><button class="btn sm" data-be="findback">Back</button></div>' +
+  sheet('<div class="behead"><h2>Find details</h2><span class="spacer"></span>' + (C.DlPrefs ? '<button class="btn sm" data-be="dlprefs">Configure download</button>' : '') + '<button class="btn sm" data-be="findback">Back</button></div>' +
     '<div class="bebody one befind"><form class="befq" data-be="findform"><input class="field" name="t" value="' + esc(title || F.snap.title || d.title) + '" aria-label="Title">' +
     '<input class="field" name="a" value="' + esc(author || (F.snap.authors || '').split('&')[0].trim()) + '" aria-label="Author"><button class="btn sm">Search</button></form>' +
     '<div id="befres"><p class="mute">Searching…</p></div></div>');
@@ -433,7 +436,7 @@ async function find(title, author){
       const j = await api('/api/catalog/jobs/' + job);
       if (j.state === 'running') continue;
       if (j.state === 'failed') throw new Error(j.error || 'Nothing came back');
-      F.results = j.results || [];
+      F.results = j.results || []; F.prefs = j.prefs || {};
       list(j.errors || []);
       return;
     }
@@ -480,7 +483,7 @@ function compare(i){
   const rows = FIELDS.filter(([k]) => has(k)).map(([k, label]) => {
     const now = nowVal(k), got = foundVal(x, k);
     if (!show(got)) return '';
-    let tick = !show(now);
+    let tick = !show(now) && !ignored(k);          // Calibre's picker shows every field and leaves the ones it doesn't download out
     if (k === 'identifiers') tick = Object.keys(x.identifiers || {}).some(t => !String(now).split('\n').some(l => l.trim().startsWith(t + ':')));
     const same = show(now).trim() === show(got).trim();
     return '<label class="befrow' + (same ? ' same' : '') + '"><input type="checkbox" data-take="' + esc(k) + '"' + (tick && !same ? ' checked' : '') + (same ? ' disabled' : '') + '><span class="befl">' + esc(label) +
@@ -531,7 +534,10 @@ async function take(){
   if (on('publisher')) v.publisher = x.publisher || '';
   if (on('published')) v.published = (x.published || '').slice(0, 10);
   if (on('languages')) v.languages = (x.languages || []).join(', ');
-  if (on('comments')) v.comments = x.comments_html ? cleanHTML(x.comments_html) : (x.comments || '').split(/\n{2,}/).map(p => '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>').join('');
+  if (on('comments')) {
+    const got = x.comments_html ? cleanHTML(x.comments_html) : (x.comments || '').split(/\n{2,}/).map(p => '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>').join('');
+    v.comments = F.prefs.append_comments && htmlText(v.comments || '').trim() ? (v.comments || '') + got : got;     // Append comments to existing, as Calibre merges them
+  }
   if (on('#pages')) v['#pages'] = String(x.pages || '');
   if (on('identifiers')) {
     const have = {}; String(v.identifiers || '').split('\n').forEach(l => { const m = l.match(/^\s*([^:\s]+)\s*:\s*(.+?)\s*$/); if (m) have[m[1]] = m[2]; });
@@ -590,6 +596,7 @@ document.addEventListener('click', e => {
   else if (k === 'merge') doMerge();
   else if (k === 'findback') { F.seq++; backToForm(); F.snap = null; }
   else if (k === 'findlist') sheetList(F.results);
+  else if (k === 'dlprefs') { if (C.DlPrefs) C.DlPrefs.open(); }
   else if (k === 'take') take();
   else if (k === 'save') save();
   else if (k === 'next') step(1);
@@ -609,7 +616,7 @@ document.addEventListener('submit', e => {
 });
 // Back from one answer to the list, without asking again.
 function sheetList(results){
-  sheet('<div class="behead"><h2>Find details</h2><span class="spacer"></span><button class="btn sm" data-be="findback">Back</button></div>' +
+  sheet('<div class="behead"><h2>Find details</h2><span class="spacer"></span>' + (C.DlPrefs ? '<button class="btn sm" data-be="dlprefs">Configure download</button>' : '') + '<button class="btn sm" data-be="findback">Back</button></div>' +
     '<div class="bebody one befind"><form class="befq" data-be="findform"><input class="field" name="t" value="' + esc(F.snap.title || '') + '" aria-label="Title">' +
     '<input class="field" name="a" value="' + esc((F.snap.authors || '').split('&')[0].trim()) + '" aria-label="Author"><button class="btn sm">Search</button></form><div id="befres"></div></div>');
   F.results = results; list([]);
@@ -771,10 +778,18 @@ document.addEventListener('focusout', e => { const t = e.target; if (t.matches &
 const FILL = [['publisher', 'Publisher'], ['published', 'Published'], ['comments', 'Description'], ['tags', 'Tags'], ['series', 'Series'], ['languages', 'Languages'], ['identifiers', 'Identifiers'], ['#pages', 'Pages'], ['cover', 'Cover']];
 const L = { books: null, res: null, seq: 0 };
 function fill(books){
-  E.d = E.ids = E.orig = null; L.books = books; L.res = null; L.seq++;
+  E.d = E.ids = E.orig = null; L.books = books; L.res = null; L.seq++; L.touched = false;
   sheet('<div class="behead"><h2>Find details for ' + books.length + ' book' + (books.length === 1 ? '' : 's') + '</h2><span class="spacer"></span><button class="btn sm" data-be="cancel">Cancel</button><button class="btn sm primary" data-befill="start">Look up</button></div>' +
     '<div class="bebody one befill"><h3>Fill in</h3><div class="befields">' + FILL.map(([k, l]) => '<label><input type="checkbox" data-fillf="' + esc(k) + '" checked> ' + esc(l) + '</label>').join('') + '</div>' +
     '<div class="bebooks">' + books.map(b => '<div class="mute tiny">' + esc(b.title) + '</div>').join('') + '</div></div>');
+
+  // The fields Metadata download leaves out start unticked, as Calibre's bulk download never takes them.
+  const n = L.seq, CAL = { published: 'pubdate' };
+  api('/api/catalog/download-prefs').then(r => {
+    if (n !== L.seq || !$('#bedit [data-fillf]') || L.touched) return;
+    const ign = new Set((r.prefs || {}).ignore_fields || []);
+    $$('#bedit [data-fillf]').forEach(c => { if (ign.has(CAL[c.dataset.fillf] || c.dataset.fillf)) c.checked = false; });
+  }).catch(() => {});
 }
 async function fillStart(){
   const fields = $$('#bedit [data-fillf]').filter(c => c.checked).map(c => c.dataset.fillf);

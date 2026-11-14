@@ -2082,6 +2082,32 @@ def delete_catalog_items(b=Depends(json_body)):
     return {"ok": True}
 
 
+@app.get("/api/catalog/download-prefs", dependencies=[Depends(user)])
+def get_download_prefs():
+    """Calibre's Preferences → Metadata download for Daf's Calibre (calibreprefs.py): {sources, fields,
+    prefs, defaults, labels}, read by Calibre."""
+    from . import calibreprefs
+    try:
+        return calibreprefs.read()
+    except calibreprefs.PrefsError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.put("/api/catalog/download-prefs", dependencies=[Depends(user)])
+def put_download_prefs(b=Depends(json_body)):
+    """The Metadata download sheet's changes: {prefs: {txt_comments, swap_author_names, append_comments,
+    keep_dups, fewer_tags, max_tags, wait_after_first_identify_result, wait_after_first_cover_result,
+    ignore_fields, tag_map_rules}, sources: {name: {enabled, priority}}}, only what changed, checked and
+    written by Calibre. → the new state, as GET."""
+    from . import calibreprefs
+    if not isinstance(b, dict) or not isinstance(b.get("prefs", {}), dict) or not isinstance(b.get("sources", {}), dict):
+        raise HTTPException(400, "prefs and sources: objects")
+    try:
+        return calibreprefs.write(b)
+    except calibreprefs.PrefsError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.post("/api/catalog/fill", dependencies=[Depends(user)])
 def fill_catalog_books(b=Depends(json_body)):
     """Find details for many books: {ids, fields}. A job (GET /api/catalog/jobs/{job}: done, total,
