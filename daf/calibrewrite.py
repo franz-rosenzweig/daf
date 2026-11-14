@@ -40,6 +40,13 @@ def main():
     def day(v):                                     # a date alone: noon UTC, the same day everywhere
         y, m, dd = (int(x) for x in str(v)[:10].split("-"))
         return datetime(y, m, dd, 12, 0, tzinfo=timezone.utc)
+    def _check_template(tpl):                       # Calibre's own formatter tries it on a made-up book first
+        from calibre.ebooks.metadata.book.base import Metadata
+        from calibre.ebooks.metadata.book.formatter import SafeFormat
+        mi = Metadata("Title", ["Author"])
+        r = SafeFormat().safe_format(tpl, mi, "TEMPLATE ERROR", mi)
+        if str(r).startswith("TEMPLATE ERROR"):
+            raise ValueError("The template: " + str(r)[14:].strip()[:200])
     job = json.loads(sys.stdin.read())
     ldb = _db(job["lib"])
     d = ldb.new_api
@@ -122,7 +129,7 @@ def main():
             elif k == "cover":
                 data = base64.b64decode(op["data"]) if op.get("data") else None
                 d.set_cover({ids[0]: data})
-            elif k in ("create_column", "column_heading", "delete_column"):    # Calibre's Add your own columns
+            elif k in ("create_column", "column_heading", "column_template", "delete_column"):    # Calibre's Add your own columns
                 import re as _re
                 label = str(op["label"]).strip().lower()
                 cols = ldb.custom_column_label_map
@@ -131,12 +138,19 @@ def main():
                         raise ValueError("A lookup name is lower-case letters, digits and _, and starts with a letter")
                     if label in cols or label in d.field_metadata.keys() or ("#" + label) in d.field_metadata.keys():
                         raise ValueError("There's a column called %s already" % label)
-                    ldb.create_custom_column(label, str(op["heading"]).strip(), op["datatype"], bool(op.get("multiple")), editable=True, display=op.get("display") or {})
+                    if op["datatype"] == "composite":
+                        _check_template(op["display"]["composite_template"])
+                    ldb.create_custom_column(label, str(op["heading"]).strip(), op["datatype"], bool(op.get("multiple")), editable=op["datatype"] != "composite", display=op.get("display") or {})
                 else:
                     if label not in cols:
                         raise ValueError("Calibre has no column %s" % label)
                     if k == "column_heading":
                         ldb.set_custom_column_metadata(cols[label]["num"], name=str(op["heading"]).strip())
+                    elif k == "column_template":
+                        if cols[label]["datatype"] != "composite":
+                            raise ValueError("Only a column built from other columns has a template")
+                        _check_template(op["template"])
+                        ldb.set_custom_column_metadata(cols[label]["num"], display=dict(cols[label]["display"] or {}, composite_template=op["template"]))
                     else:
                         ldb.delete_custom_column(label=label)      # gone for good the next time Calibre opens the library
                         _db(job["lib"])                            # which is now

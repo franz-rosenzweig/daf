@@ -46,7 +46,7 @@ class OwnColumns(unittest.TestCase):
     def test_script(self):
         from daf import calibrewrite
         compile(calibrewrite.SCRIPT, "calibre-script", "exec")
-        self.assertIn('"create_column", "column_heading", "delete_column"', calibrewrite.SCRIPT)
+        self.assertIn('"create_column", "column_heading", "column_template", "delete_column"', calibrewrite.SCRIPT)
 
 
 if __name__ == "__main__":

@@ -3160,3 +3160,7 @@ body.ebxopen{overflow:hidden}
 .catletter span{flex:1;font-weight:600;color:var(--fg)} .catletter b{font-weight:500;font-size:12px;color:var(--fg-3)}
 .catvl{padding-left:14px}
 @media (pointer:coarse){ .catletter{padding:9px 6px 9px 2px;font-size:14.5px} }
+
+/* columns built from other columns in Add your own columns; Highlight pressed */
+.octpl{font-family:ui-monospace,Menlo,monospace}
+.calsearch .catb[aria-pressed="true"]{background:var(--active);color:var(--fg)}
