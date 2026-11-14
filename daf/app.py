@@ -1515,6 +1515,89 @@ def get_catalog_download(ids: str = ""):
                         background=BackgroundTask(lambda: os.unlink(tmp.name)))
 
 
+# ---- Calibre's Send to device, for the Kindle (web/senddevice.js), and Save to disk (savetodisk.py) ----
+def _cids(v, most=500):
+    vals = v.split(",") if isinstance(v, str) else v if isinstance(v, list) else []
+    return list(dict.fromkeys(int(i) for i in vals if str(i).strip().isdigit()))[:most]
+
+
+def _daf_ids(c, cids):
+    """{calibre id: Daf book id} for the books Daf has a row for."""
+    if not cids:
+        return {}
+    q = f"SELECT calibre_id, id FROM books WHERE calibre_id IN ({','.join('?' * len(cids))})"
+    return {r[0]: r[1] for r in c.execute(q, cids)}
+
+
+@app.get("/api/catalog/kindle", dependencies=[Depends(user)])
+def get_catalog_kindle(ids: str = "", c=Depends(conn)):
+    """What the Send to Kindle sheet shows: the Kindle's shelves, and for each book the format that
+    would go (the file Daf reads: EPUB first, as the queue picks it) and whether it's on the Kindle
+    already or waiting for it ({state: Kindle | Waiting, shelf})."""
+    from . import kindlequeue
+    cids = _cids(ids)
+    daf, dev = _daf_ids(c, cids), kindlequeue.on_device(c)
+    books = []
+    for cid in cids:
+        fmts = catalog.formats_of(cid)
+        fmt = next((f for f in ebooks.READABLE if f in fmts and catalog.book_file(cid, f)), None)
+        books.append({"id": cid, "format": fmt, "kindle": dev.get(daf.get(cid) or f"cal:{cid}")})
+    return {"shelves": kindlequeue.shelves(c), "books": books}
+
+
+@app.post("/api/catalog/kindle", dependencies=[Depends(user)])
+def post_catalog_kindle(b=Depends(json_body), c=Depends(conn)):
+    """{ids, shelf}: the books to the Kindle on its next Wi-Fi sync, as a book's page sends one. A
+    Calibre book Daf has no row for yet gets one first (importlist.add_daf_rows, as Import list
+    does), so the queue has a book to point at. A book with no file is skipped."""
+    from . import importlist, kindlequeue
+    b = b if isinstance(b, dict) else {}
+    cids = _cids(b.get("ids"))
+    if not cids:
+        raise HTTPException(400, "No books")
+    shelf = str(b.get("shelf") or "").strip()[:180] or kindlequeue.DEFAULT_SHELF
+    daf = _daf_ids(c, cids)
+    cal = catalog.calibre_rows()[0]
+    new = {cid: (cal[cid]["title"], cal[cid]["authors"]) for cid in cids if cid not in daf and cid in cal}
+    if new:
+        importlist.add_daf_rows(c, new, config.load_settings())
+        daf.update(_daf_ids(c, list(new)))
+    queued, skipped = {}, []
+    for cid in cids:
+        try:
+            if cid not in daf:
+                raise LookupError("not in Calibre")
+            queued[cid] = kindlequeue.queue_book(c, daf[cid], shelf)
+        except (LookupError, OSError):
+            skipped.append(cid)
+    return {"queued": len(queued), "skipped": skipped, "books": {str(k): v for k, v in queued.items()}}
+
+
+@app.post("/api/catalog/save", dependencies=[Depends(user)])
+def post_catalog_save(b=Depends(json_body)):
+    """Save to disk, Calibre's way: {ids, template, formats ("all" or [EPUB, …]), cover, opf,
+    underscores, ascii, lowercase, single}. Calibre names the folders and files (savetodisk.py) and
+    Daf zips the books that way, as a job: GET /api/catalog/jobs/{job} has done = {file, name,
+    books, skipped}, and GET /api/catalog/save/{file} is the zip."""
+    from . import calibrewrite, savetodisk
+    b = b if isinstance(b, dict) else {}
+    cids = _cids(b.get("ids"))
+    if not cids:
+        raise HTTPException(400, "No books")
+    opts = savetodisk.clean(b)
+    return {"job": calibrewrite.start_job(lambda: savetodisk.build(cids, opts))}
+
+
+@app.get("/api/catalog/save/{token}", dependencies=[Depends(user)])
+def get_catalog_save(token: str):
+    from . import savetodisk
+    from starlette.background import BackgroundTask
+    p, name = savetodisk.ready(token)
+    if not p:
+        raise HTTPException(404, "Not there any more: save again")
+    return FileResponse(p, filename=name, media_type="application/zip", background=BackgroundTask(savetodisk.forget, token))
+
+
 def _image(data):
     if not data or len(data) > 15 * 1024 * 1024:
         raise HTTPException(400, "A cover is an image of 15 MB or less")

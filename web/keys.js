@@ -39,7 +39,7 @@ const DEFS = {
     ['next', 'Next book', ['ArrowDown']], ['prev', 'Previous book', ['ArrowUp']], ['first', 'First book', ['Home']], ['last', 'Last book', ['End']],
     ['open', 'Open the book’s page', ['Enter']], ['search', 'Search', ['/']], ['quickview', 'Quickview', ['q']], ['cell', 'Edit the cell', ['F2']],
     ['add', 'Add books', ['a']], ['edit', 'Edit metadata', ['e']], ['convert', 'Convert books', ['c']], ['read', 'Read', ['v']], ['ebook', 'Edit book', ['t']],
-    ['polish', 'Polish books', ['p']], ['find', 'Find details', ['d']], ['merge', 'Merge books', ['m']], ['download', 'Download', ['s']],
+    ['polish', 'Polish books', ['p']], ['find', 'Find details', ['d']], ['merge', 'Merge books', ['m']], ['download', 'Download', ['s']], ['send', 'Send to Kindle', []],
     ['remove', 'Remove books', ['Delete', 'Backspace']]]],
   manga: ['Manga', [
     ['left', 'Page to the left', ['ArrowLeft']], ['right', 'Page to the right', ['ArrowRight']], ['next', 'Next page', [' ', 'PageDown', 'ArrowDown']],

@@ -39,7 +39,8 @@ const TOOLS = [
   ['shelves', 'Shelves', TB('<path d="M6 3h8v14l-4-3-4 3z"/>'), 'n'],
   ['merge', 'Merge books', TB('<path d="M5 3v3.5c0 3 5 4 5 7V17M15 3v3.5c0 3-5 4-5 7"/>'), 2],
   ['epubmerge', 'EpubMerge', TB('<rect x="3" y="3" width="5.5" height="7" rx="1"/><rect x="11.5" y="3" width="5.5" height="7" rx="1"/><path d="M5.75 10v2.5h8.5V10M10 12.5V17M7.5 15l2.5 2 2.5-2"/>'), 2],      // epubmerge.js
-  ['dl', 'Download', TB('<path d="M10 3v9.5M6 9l4 4 4-4M4 16.5h12"/>'), 'n'],
+  ['dl', 'Download', TB('<path d="M10 3v9.5M6 9l4 4 4-4M4 16.5h12"/>'), 'n'],      // several books: Save to disk (savetodisk.js)
+  ['send', 'Send to Kindle', TB('<rect x="5" y="2.5" width="10" height="15" rx="1.5"/><path d="M10 5.5v6M7.5 9l2.5 2.5L12.5 9M8.5 14.5h3"/>'), 'n'],      // senddevice.js
   ['openwith', 'Open with', TB('<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 13l5-5M9 8h4v4"/>'), 1],
   ['remove', 'Remove books', TB('<path d="M4 6h12M8 6V4h4v2M5.8 6l.9 11h6.6l.9-11"/>'), 'n'],
   ['library', 'Library', TB('<path d="M4 3.5v13M7.5 3.5v13M11 4.5l3.5 12.5M3 16.5h14"/>'), 0],
@@ -69,7 +70,7 @@ const P = Object.assign({}, DEF, saved, { data: null, facets: null, side: store.
   open: new Set(store.get('catalogOpen', ['added', 'missing', 'tidy', 'status', 'tags'])), all: new Set(), fq: '', scroll: 0, seq: 0, sel: new Set(), anchor: null });
 const keep = () => store.set('catalog', { q: P.q, sort: P.sort, desc: P.desc, then: P.then, cols: P.cols, widths: P.widths, priv: P.priv, view: P.view, lastView: P.lastView });
 const WIDTH = { title: 300, authors: 180, series: 170, tags: 200, rating: 112, added: 112, published: 100, modified: 112, publisher: 160, languages: 90,
-  formats: 110, size: 80, isbn: 130, identifiers: 240, cover: 70, status: 96, progress: 120, last_read: 112, audio: 110, highlights: 92, shelves: 160, calibre_id: 90 };
+  formats: 110, size: 80, isbn: 130, identifiers: 240, cover: 70, status: 96, progress: 120, last_read: 112, audio: 110, highlights: 92, shelves: 160, calibre_id: 90, ondevice: 96 };
 const NUMERIC = new Set(['number', 'rating', 'percent', 'size']);
 const colsNow = () => { const all = P.data ? P.data.columns : []; const known = new Set(all.map(c => c.key));
   const want = (P.cols || (P.data && P.data.default_columns) || ['title']).filter(k => known.has(k));
@@ -375,7 +376,7 @@ async function moreMenu(anchor){
   if (P.priv) qs.set('private', '1');
   let emb = { pending: 0 };
   try { emb = await api('/api/catalog/embed'); } catch(e){}
-  openPop(anchor, (P.sel.size ? '<button data-catm="pages"><i></i>Count pages</button><hr>' : '') + '<button data-catm="items"><i></i>Tags, authors and series</button>' +
+  openPop(anchor, (P.sel.size ? '<button data-catm="savedisk"><i></i>Save to disk…</button><button data-catm="pages"><i></i>Count pages</button><hr>' : '') + '<button data-catm="items"><i></i>Tags, authors and series</button>' +
     (emb.pending ? '<button disabled><i></i>Writing details into files · ' + emb.pending + ' left</button>' : '<button data-catm="embedall"><i></i>Write details into every file</button>') + '<hr>' +
     '<a href="/api/catalog/export?' + qs.toString() + '" download><i></i>Export as CSV</a>' +
     '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>' +
@@ -470,7 +471,8 @@ document.addEventListener('click', async e => {
     else if (k === 'trash') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.trash(P.priv); }
     else if (k === 'items') { $('#pop').hidden = true; if (C.BookEdit) C.BookEdit.items('tags'); }
     else if (k === 'conv') { $('#pop').hidden = true; if (C.ConvertSheet) C.ConvertSheet.open(P.data.books.filter(x => P.sel.has(x.calibre_id)), { to: m.dataset.to }); }     // convertsheet.js
-    else if (k === 'dl') { $('#pop').hidden = true; const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + [...P.sel].join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
+    else if (k === 'dl') { $('#pop').hidden = true; download(chosenBooks()); }
+    else if (k === 'savedisk') { $('#pop').hidden = true; if (C.SaveDisk) C.SaveDisk.open(chosenBooks()); }
     else if (k === 'check') { $('#pop').hidden = true; checkLibrary(); }
     else if (k === 'import') { $('#pop').hidden = true; if (C.ImportList) C.ImportList.open(); }
     else if (k === 'isbn') { $('#pop').hidden = true; if (C.IsbnAdd) C.IsbnAdd.open(); }
@@ -523,7 +525,8 @@ document.addEventListener('click', e => {
     else if (k === 'merge' && C.BookEdit) C.BookEdit.merge(chosen);
     else if (k === 'polish' && C.Polish) C.Polish.open(chosen);
     else if (k === 'epubmerge' && C.EpubMerge) C.EpubMerge.open(chosen);
-    else if (k === 'dl') { const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + ids.join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
+    else if (k === 'dl') download(chosen);
+    else if (k === 'send' && C.SendDevice) C.SendDevice.open(chosen);
     else if (k === 'remove' && C.BookEdit) C.BookEdit.remove(chosen).then(done => { if (done) { P.sel.clear(); bulkBar(); } });
     else if (k === 'library') moreMenu(tool);
     else if (k === 'openwith' && one) openWithMenu(tool, one);
@@ -648,6 +651,12 @@ document.addEventListener('pointercancel', endDrag, true);
 
 /* ---------- more of Calibre's main window ---------- */
 const chosenBooks = () => P.data ? P.data.books.filter(b => P.sel.has(b.calibre_id)) : [];
+// Download: one book's file straight away; several open Save to disk (savetodisk.js), Calibre's folders and names in a zip.
+function download(books){
+  if (!books.length) return;
+  if (books.length > 1 && C.SaveDisk) { C.SaveDisk.open(books); return; }
+  const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + books.map(b => b.calibre_id).join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove();
+}
 const anchorBook = () => { const id = P.sel.has(P.anchor) ? P.anchor : P.sel.size === 1 ? [...P.sel][0] : null; return id != null && P.data ? P.data.books.find(x => x.calibre_id === id) : null; };
 const valsOf = (b, f) => { const v = b && b[f]; return v == null || v === '' ? [] : Array.isArray(v) ? v : [v]; };
 
@@ -865,7 +874,7 @@ document.addEventListener('focusout', e => { const el = e.target; if (el.matches
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.catediting')) e.stopPropagation(); }, true);
 
 /* Calibre's keys in All books (keys.js "catalog": the letters can be changed in Preferences → Keyboard). */
-const TOOLKEY = { add: 'add', edit: 'edit', convert: 'conv', read: 'read', ebook: 'ebook', polish: 'polish', find: 'find', merge: 'merge', download: 'dl', remove: 'remove' };
+const TOOLKEY = { add: 'add', edit: 'edit', convert: 'conv', read: 'read', ebook: 'ebook', polish: 'polish', find: 'find', merge: 'merge', download: 'dl', send: 'send', remove: 'remove' };
 const moveTo = (by, extend) => {
   const ids = P.data.books.map(x => x.calibre_id); if (!ids.length) return;
   const at = ids.indexOf(P.anchor);
