@@ -2924,3 +2924,28 @@ body.ebxopen{overflow:hidden}
   .emrow img,.emrow .befnc{width:34px;height:50px}
   .emacts{grid-column:3}
 }
+
+/* Polish books (polish.js) */
+.plsheet{width:min(720px,calc(100vw - 32px))}
+.plbody{overflow:auto}
+.plbody h3{margin:18px 0 6px;font-size:13px;font-weight:600;color:var(--fg-2)}
+.plopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}
+.plopts label,.plkeep{display:flex;gap:8px;align-items:center;font-size:14px;min-width:0}
+.plkeep{padding-top:12px;border-top:1px solid var(--line)}
+.plopts input,.plkeep input{accent-color:var(--accent);flex:none;margin:0}
+.pllist{display:flex;flex-direction:column}
+.plrow{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line)}
+.plrow img,.plrow .befnc{width:40px;height:58px;object-fit:cover;border-radius:4px;background:var(--panel);display:block}
+.plrow.off{opacity:.5}
+.plfmt{text-align:right}
+@media (pointer:coarse){
+  .plopts label,.plkeep{min-height:40px}
+  .plopts input,.plkeep input{width:20px;height:20px}
+}
+@media (max-width:699px){
+  .plsheet{width:auto}
+  .plopts{grid-template-columns:minmax(0,1fr)}
+  .plrow{grid-template-columns:34px minmax(0,1fr);gap:2px 8px}
+  .plrow img,.plrow .befnc{width:34px;height:50px;grid-row:span 2}
+  .plfmt{grid-column:2;text-align:left}
+}
