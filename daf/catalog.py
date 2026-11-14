@@ -508,7 +508,31 @@ def search(books, q, cols):
 
 
 # ---------- sorting ----------
-def sort(books, key, desc=False, cols=None):
+def sort(books, key, desc=False, cols=None, then=()):
+    """By one column, then by each of `then` [(key, desc)] where the ones before are the same (Calibre's
+    sort on several columns); a book without a value goes after the rest, for each column."""
+    out = sorted(books, key=lambda x: fold(x.get("title_sort")))
+    for k, d in reversed([(key, desc)] + [t for t in then if t[0] != key]):
+        f = _sort_key(k, cols)
+        have = [b for b in out if f(b) is not None]
+        none = [b for b in out if f(b) is None]
+        have.sort(key=f, reverse=bool(d))         # Python's sort keeps the order of equals, reversed or not
+        out = have + none
+    return out
+
+
+def parse_then(s, cols):
+    """The page's "then" (key:1,key:0) → [(key, desc)], known columns only, three at most."""
+    known = {c["key"] for c in cols}
+    out = []
+    for part in str(s or "").split(","):
+        k, _, d = part.strip().rpartition(":")
+        if k in known and k not in [x[0] for x in out]:
+            out.append((k, d == "1"))
+    return out[:3]
+
+
+def _sort_key(key, cols):
     typ = next((c["type"] for c in (cols or []) if c["key"] == key), "text")
 
     def k(x):
@@ -526,12 +550,7 @@ def sort(books, key, desc=False, cols=None):
         if typ == "bool":
             return int(bool(v))
         return fold(v) if v not in (None, "") else None
-    have = [b for b in books if k(b) is not None]
-    none = [b for b in books if k(b) is None]
-    have.sort(key=lambda x: fold(x.get("title_sort")))
-    have.sort(key=k, reverse=bool(desc))
-    none.sort(key=lambda x: fold(x.get("title_sort")))
-    return have + none
+    return k
 
 
 # ---------- facets: the values to filter by, with counts (Calibre's Tag browser) ----------
@@ -564,7 +583,7 @@ def facets(books, cols):
 
 
 # ---------- the view as a whole ----------
-def view(conn, q="", sort_key="added", desc=True, private=False, with_facets=False):
+def view(conn, q="", sort_key="added", desc=True, private=False, with_facets=False, then=""):
     s = config.load_settings()
     books, cols = rows(conn, s, private)
     total = len(books)
@@ -575,10 +594,12 @@ def view(conn, q="", sort_key="added", desc=True, private=False, with_facets=Fal
         found, err = [], str(e)
     if sort_key not in {c["key"] for c in cols}:
         sort_key = "added"
-    found = sort(found, sort_key, desc, cols)
+    then = parse_then(then, cols)
+    found = sort(found, sort_key, desc, cols, then)
     for b in found:
         b.pop("_hay", None)
     out = {"total": total, "count": len(found), "books": found, "columns": cols, "error": err, "sort": sort_key, "desc": bool(desc),
+           "then": [[k, d] for k, d in then],
            "default_columns": DEFAULT_COLS, "views": s.get("catalog_views") or [], "marks": len(marked(s))}
     if with_facets:
         out["facets"] = facets(books, cols)
@@ -622,8 +643,9 @@ def clean_views(views):
             continue
         cols = [c for c in v.get("cols") or [] if isinstance(c, str) and len(c) < 60][:40]
         widths = {k: int(w) for k, w in (v.get("widths") or {}).items() if isinstance(k, str) and isinstance(w, (int, float)) and 40 <= w <= 900}
+        then = [[str(t[0])[:60], bool(t[1])] for t in v.get("then") or [] if isinstance(t, list) and len(t) == 2 and isinstance(t[0], str)][:3]
         out.append({"name": v["name"].strip()[:60], "q": str(v.get("q") or "")[:500], "sort": str(v.get("sort") or "added")[:60],
-                    "desc": bool(v.get("desc")), "cols": cols, "widths": widths})
+                    "desc": bool(v.get("desc")), "then": then, "cols": cols, "widths": widths})
     seen, uniq = set(), []
     for v in out:
         if v["name"].lower() not in seen:

@@ -39,6 +39,18 @@ class Marks(unittest.TestCase):
         self.assertIn("marked", {c["key"] for c in cols})
 
 
+class SortSeveral(unittest.TestCase):
+    def test_then_by(self):
+        cols = catalog.columns([])
+        books = [{"title": t, "title_sort": t, "authors": [a], "author_sort": a, "series": s, "series_sort": s, "series_index": i, "rating": r}
+                 for t, a, s, i, r in [("C", "Bee", "Saga", 2, 3), ("A", "Bee", "Saga", 1, None), ("B", "Ant", None, None, 5), ("D", "Bee", None, None, 3)]]
+        order = lambda key, desc=False, then=(): [b["title"] for b in catalog.sort(books, key, desc, cols, then)]
+        self.assertEqual(order("authors", then=[("series", False)]), ["B", "A", "C", "D"])      # no series last, within the author
+        self.assertEqual(order("authors", True, [("title", True)]), ["D", "C", "A", "B"])
+        self.assertEqual(order("rating", True, [("title", False)]), ["B", "C", "D", "A"])     # no rating last
+        self.assertEqual(catalog.parse_then("series:1,nope:0,title:0,series:0", cols), [("series", True), ("title", False)])
+
+
 class MarksKept(unittest.TestCase):
     def test_settings_keep_the_marks(self):
         import json

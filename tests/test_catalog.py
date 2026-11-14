@@ -90,7 +90,7 @@ class Search(unittest.TestCase):
 
     def test_views(self):
         v = catalog.clean_views([{"name": " Mine ", "q": "tags:x", "cols": ["title", 3], "widths": {"title": 2000, "tags": 120}}, {"name": "mine"}, {"q": "no name"}])
-        self.assertEqual(v, [{"name": "Mine", "q": "tags:x", "sort": "added", "desc": False, "cols": ["title"], "widths": {"tags": 120}}])
+        self.assertEqual(v, [{"name": "Mine", "q": "tags:x", "sort": "added", "desc": False, "then": [], "cols": ["title"], "widths": {"tags": 120}}])
 
 
 if __name__ == "__main__":

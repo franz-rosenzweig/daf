@@ -2749,6 +2749,12 @@ a.catchkrow:hover{background:var(--hover)}
   .qvtabs .calsw{padding:6px 8px}
 }
 
+/* Sort on several columns (catalog.js multiSort) */
+.msrows{display:flex;flex-direction:column;gap:8px;margin:6px 0 14px}
+.msrow{display:grid;grid-template-columns:minmax(0,1fr) 140px 34px;gap:8px;align-items:center}
+.msbtns{display:flex;gap:8px;align-items:center}
+@media (max-width:699px){ .msrow{grid-template-columns:minmax(0,1fr) 116px 34px} }
+
 /* Import list (importlist.js): a sheet like the edit sheet's */
 .ilbody{display:flex;flex-direction:column;gap:12px}
 .ilbody h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);margin:10px 0 0}

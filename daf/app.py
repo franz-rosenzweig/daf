@@ -1179,16 +1179,17 @@ def get_books(private: int = 0, c=Depends(conn)):
 
 # ---- All books (#catalog): the Calibre library as a spreadsheet (catalog.py) ----------------
 @app.get("/api/catalog", dependencies=[Depends(user)])
-def get_catalog(q: str = "", sort: str = "added", desc: int = 1, private: int = 0, facets: int = 0, c=Depends(conn)):
+def get_catalog(q: str = "", sort: str = "added", desc: int = 1, private: int = 0, facets: int = 0, then: str = "", c=Depends(conn)):
     """Every Calibre book with Daf's side (status, progress, highlights, shelves), searched the way
-    Calibre searches (q), sorted by any column. facets=1 adds the values to filter by, with counts."""
-    return catalog.view(c, q, sort, bool(desc), bool(private), bool(facets))
+    Calibre searches (q), sorted by any column, then by others where those are the same (then=key:1,key:0).
+    facets=1 adds the values to filter by, with counts."""
+    return catalog.view(c, q, sort, bool(desc), bool(private), bool(facets), then)
 
 
 @app.get("/api/catalog/export", dependencies=[Depends(user)])
-def export_catalog(q: str = "", sort: str = "added", desc: int = 1, private: int = 0, cols: str = "", c=Depends(conn)):
+def export_catalog(q: str = "", sort: str = "added", desc: int = 1, private: int = 0, cols: str = "", then: str = "", c=Depends(conn)):
     """What the page shows, as CSV: its search, its order and its columns (cols=title,authors,…)."""
-    r = catalog.view(c, q, sort, bool(desc), bool(private))
+    r = catalog.view(c, q, sort, bool(desc), bool(private), then=then)
     if r["error"]:
         raise HTTPException(400, r["error"])
     import datetime as _dt
