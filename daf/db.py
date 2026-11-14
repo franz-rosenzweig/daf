@@ -257,6 +257,9 @@ CREATE TABLE IF NOT EXISTS greader_ids (       -- each Feed item's id in the rea
 CREATE TABLE IF NOT EXISTS kindle_files (    -- every book on the Kindle, as its plugin last reported them (kindleshelves.py)
   path TEXT PRIMARY KEY,                      -- from its home folder: "Recovery/Title - Author (342).pdf"
   md5 TEXT, book_id TEXT, shelf TEXT NOT NULL DEFAULT '', seen INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS calibre_pushed (  -- Daf's own highlights written into Calibre for its viewer (calibreannots.py): what was sent last
+  hl_id TEXT PRIMARY KEY, uuid TEXT NOT NULL, cal_id INTEGER NOT NULL, fmt TEXT NOT NULL, hash TEXT NOT NULL,
+  removed INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS kindle_moves (    -- a book Daf asked the Kindle to move to another shelf, until its plugin has
   id INTEGER PRIMARY KEY AUTOINCREMENT,       -- (dest "" is the home folder, off every shelf)
   path TEXT NOT NULL, dest TEXT NOT NULL, book_id TEXT, requested INTEGER NOT NULL, done INTEGER, error TEXT);
@@ -379,7 +382,7 @@ MIGRATIONS = [("areas", "plan", "TEXT"), ("areas", "plan_draft", "TEXT"), ("area
               ("docs", "tags", "TEXT"), ("docs", "ai_summary", "TEXT"),
               ("docs", "starred", "INTEGER"), ("sessions", "pages", "INTEGER"),
               ("docs", "feed", "TEXT"), ("shelves", "hc_list", "INTEGER"), ("shelves", "kindle", "TEXT"), ("docs", "full", "INTEGER"),
-              ("docs", "deleted", "INTEGER"),
+              ("docs", "deleted", "INTEGER"), ("book_marks", "calibre", "TEXT"),   # a bookmark made in Calibre's viewer: its key there (calibrehl.import_bookmarks)
               # what a feed says about an episode (episodes.parse_feed)
               ("gp_episodes", "guid", "TEXT"), ("gp_episodes", "author", "TEXT"), ("gp_episodes", "image", "TEXT"),
               ("gp_episodes", "duration", "INTEGER"), ("gp_episodes", "notes", "TEXT"), ("gp_episodes", "transcript_url", "TEXT"),

@@ -209,6 +209,8 @@ def main():
                     os.unlink(f.name)
             elif k == "remove_formats":
                 d.remove_formats({ids[0]: [x.upper() for x in op["fmts"]]})
+            elif k == "annotations":                    # Daf's highlights for Calibre's viewer, merged as the viewer saves its own (calibreannots.py)
+                d.merge_annotations_for_book(ids[0], op["fmt"].upper(), op["annots"], user_type="local", user="viewer")
             elif k == "convert":
                 import shutil
                 src = d.format_abspath(ids[0], op["from"].upper())

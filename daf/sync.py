@@ -99,6 +99,24 @@ def run():
             log.exception("highlights")
         conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
         try:
+            from .sources import calibrehl
+            n = calibrehl.import_bookmarks(conn, settings)          # Calibre viewer's bookmarks, as Daf's
+            if n:
+                report["calibre bookmarks"] = f"{n} bookmarks"
+        except Exception as e:  # noqa: BLE001
+            report["calibre bookmarks"] = f"failed: {e}"
+            log.exception("calibre bookmarks")
+        conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
+        try:
+            from . import calibreannots
+            n = calibreannots.push(conn, settings)                  # Daf's own highlights, for Calibre's viewer
+            if n:
+                report["calibre highlights"] = f"{n} written for Calibre's viewer"
+        except Exception as e:  # noqa: BLE001
+            report["calibre highlights"] = f"failed: {e}"
+            log.exception("calibre highlights")
+        conn.commit()      # each source in its own transaction: the write lock isn't held through the next one's network calls
+        try:
             new, total = feedsrc.get().sync(conn, settings)
             reader.apply_edits(conn)
             _status(conn, "freshrss", True, f"{new} new, {total} unread", int(time.time()))
