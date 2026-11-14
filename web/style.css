@@ -2710,6 +2710,42 @@ a.catchkrow:hover{background:var(--hover)}
   .calgrid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:16px 10px;padding:12px}
 }
 
+/* All books: Quickview under the books, marks, a cell being edited (catalog.js) */
+.catmid{flex:1;min-width:0;display:flex;flex-direction:column}
+.catmid .catscroll{min-height:0}
+.catqv{display:none;flex:none;height:250px;flex-direction:column;border-top:1px solid var(--line);background:var(--panel);min-height:0}
+.catpage.qv .catqv:not(:empty){display:flex}
+.qvhead{flex:none;display:flex;align-items:center;gap:6px;padding:6px 10px 6px 14px;border-bottom:1px solid var(--line)}
+.qvtabs{display:flex;gap:2px;flex-wrap:wrap}
+.qvtabs .calsw:disabled{opacity:.4;cursor:default} .qvtabs .calsw:disabled:hover{background:none}
+.qvvals{flex:none;display:flex;gap:6px;flex-wrap:wrap;padding:8px 14px 0;max-height:68px;overflow:auto}
+.qvv{all:unset;box-sizing:border-box;padding:3px 10px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;cursor:pointer;color:var(--fg-2)}
+.qvv:hover{background:var(--hover)} .qvv.on{background:var(--active);color:var(--fg);border-color:transparent}
+.qvlist{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));align-content:start;gap:2px 10px;padding:8px 10px 12px}
+.qvrow{all:unset;box-sizing:border-box;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:center;padding:5px 6px;border-radius:8px;cursor:pointer;min-width:0}
+.qvrow:hover{background:var(--hover)} .qvrow:focus-visible{outline:2px solid var(--accent)} .qvrow.on{background:var(--active)}
+.qvrow img,.qvrow .cv{width:30px;height:auto;aspect-ratio:2/3;object-fit:cover;border-radius:3px;display:block}
+.qvrow > span{min-width:0;display:flex;flex-direction:column}
+.qvrow b{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qvrow b + span{font-size:12px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qvlist .befcvwait{width:30px;margin:6px}
+.catpin{color:var(--accent);flex:none;vertical-align:-1px;margin-right:4px}
+.cattable td.catediting{padding:2px 4px;overflow:visible}
+.catin{width:100%;min-width:0;height:30px;padding:2px 8px;font-size:13.5px}
+.cattable td.catsaving{opacity:.55}
+.begen{grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin:8px 0 12px}
+@media (pointer:coarse){ .qvrow{padding:8px 6px} .qvv{padding:7px 12px} .catin{height:38px;font-size:15px} }
+@media (max-width:1100px){
+  .catpage.qv:has(.catqv:not(:empty)) .catshade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:43}
+  .catqv{position:fixed;left:0;right:0;bottom:0;height:auto;max-height:62vh;z-index:44;border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.18);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .qvhead{padding:10px 12px 8px 16px}
+  .qvlist{min-height:180px}
+}
+@media (max-width:700px){
+  .catqv{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  .qvlist{grid-template-columns:1fr}
+}
+
 /* Import list (importlist.js): a sheet like the edit sheet's */
 .ilbody{display:flex;flex-direction:column;gap:12px}
 .ilbody h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2);margin:10px 0 0}

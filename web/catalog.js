@@ -23,6 +23,8 @@ const IC = {
   side: svg('<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 4v12"/>'),
   det: svg('<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M12 4v12"/>'),
   grid: svg('<rect x="3.5" y="3.5" width="5" height="5" rx="1"/><rect x="11.5" y="3.5" width="5" height="5" rx="1"/><rect x="3.5" y="11.5" width="5" height="5" rx="1"/><rect x="11.5" y="11.5" width="5" height="5" rx="1"/>'),
+  qv: svg('<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 11.5h14M6 14h3"/>'),
+  pin: '<svg class="catpin" width="13" height="13" viewBox="0 0 20 20" aria-label="Marked" role="img" fill="currentColor"><path d="M12.6 2.4l5 5-2.3.7-3.4 3.4.4 4.1-1.4 1.4-3.5-3.5L3.2 17.7l-.9-.9 4.2-4.2L3 9.1l1.4-1.4 4.1.4 3.4-3.4z"/></svg>',
 };
 // Calibre's toolbar: [key, label, icon, when it can be pressed: 0 always, 1 one book, 'n' some, 2 two or more]
 const TB = s => '<svg width="24" height="24" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">' + s + '</svg>';
@@ -62,6 +64,7 @@ const ORDER = ['authors', 'languages', 'series', 'formats', 'publisher', 'rating
 const DEF = { q: '', sort: 'added', desc: true, cols: null, widths: {}, priv: false, view: null };
 const saved = store.get('catalog', {});
 const P = Object.assign({}, DEF, saved, { data: null, facets: null, side: store.get('calSide', true), det: store.get('calDet', true), grid: store.get('calGrid', false), info: new Map(),
+  qv: store.get('calQv', false), qvField: store.get('calQvField', 'authors'), qvVal: null, cell: 'title',
   open: new Set(store.get('catalogOpen', ['added', 'missing', 'tidy', 'status', 'tags'])), all: new Set(), fq: '', scroll: 0, seq: 0, sel: new Set(), anchor: null });
 const keep = () => store.set('catalog', { q: P.q, sort: P.sort, desc: P.desc, cols: P.cols, widths: P.widths, priv: P.priv, view: P.view, lastView: P.lastView });
 const WIDTH = { title: 300, authors: 180, series: 170, tags: 200, rating: 112, added: 112, published: 100, modified: 112, publisher: 160, languages: 90,
@@ -80,7 +83,7 @@ const stars = n => { if (n == null) return ''; const full = Math.floor(n), half 
   return '<span class="catstars" aria-label="' + n + ' stars">' + '★'.repeat(full) + (half ? '½' : '') + '<i>' + '★'.repeat(5 - full - (half ? 1 : 0)) + '</i></span>'; };
 function cellHtml(b, c){
   const v = b[c.key];
-  if (c.key === 'title') return '<a class="catt" href="#book/' + encodeURIComponent(b.id) + '">' + (b.cover ? '<img class="cv catcv" src="/api/cover/' + encodeURIComponent(b.id) + '?v=' + (b.cover_v || 0) + '" alt="" loading="lazy">' : C.cover({ id: b.id, title: b.title }, 'cv catcv')) + '<span>' + esc(b.title) + '</span></a>';
+  if (c.key === 'title') return '<a class="catt" href="#book/' + encodeURIComponent(b.id) + '">' + (b.cover ? '<img class="cv catcv" src="/api/cover/' + encodeURIComponent(b.id) + '?v=' + (b.cover_v || 0) + '" alt="" loading="lazy">' : C.cover({ id: b.id, title: b.title }, 'cv catcv')) + '<span>' + (b.marked ? IC.pin : '') + esc(b.title) + '</span></a>';
   if (c.key === 'series') return v ? esc(v) + ' <span class="mute">#' + (Math.round((b.series_index || 0) * 10) / 10) + '</span>' : '';
   if (v == null || v === '' || (Array.isArray(v) && !v.length)) return '';
   if (c.type === 'rating') return stars(v);
@@ -96,19 +99,20 @@ function cellHtml(b, c){
 /* ---------- the page ---------- */
 const narrow = () => matchMedia('(max-width:1100px)').matches;        // there the side panels are sheets over the books
 C.views.catalog = async () => {
-  if (narrow()) { P.side = false; P.det = false; }
+  if (narrow()) { P.side = false; P.det = false; P.qv = false; }
   $('#main').innerHTML = '<div class="top cattop caltop"><h1 class="sr">All books</h1><div class="caltools" id="caltools" role="toolbar" aria-label="Calibre">' +
     TOOLS.filter(([k]) => k !== 'openwith' || canOpenWith()).map(([k, l, ic]) => '<button class="caltool' + (k === 'library' ? ' end' : '') + '" data-cal="' + k + '">' + ic + '<span>' + l + '</span></button>').join('') + '</div></div>' +
     '<div class="calsearch"><button class="btn sm catb" data-act="cat:views" id="catviewb">' + IC.views + '<span>' + esc(P.view || 'Views') + '</span></button>' +
     '<input class="field catq" id="catq" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search" value="' + esc(P.q) + '">' +
     '<button class="btn sm catb" data-act="cat:sort">' + IC.sort + '<span>Sort</span></button>' +
     '<button class="btn sm catb" data-act="cat:cols">' + IC.cols + '<span>Columns</span></button></div>' +
-    '<div class="catpage' + (P.side ? ' filt' : '') + (P.det ? ' det' : '') + '" id="catpage"><div class="catshade" data-catm="shade"></div><aside class="catside" id="catside" aria-label="Tag browser"></aside>' +
-    '<div class="catscroll" id="catscroll"><p class="mute catmsg">Loading…</p></div><aside class="catdet" id="catdet" aria-label="Book details"></aside></div>' +
+    '<div class="catpage' + (P.side ? ' filt' : '') + (P.det ? ' det' : '') + (P.qv ? ' qv' : '') + '" id="catpage"><div class="catshade" data-catm="shade"></div><aside class="catside" id="catside" aria-label="Tag browser"></aside>' +
+    '<div class="catmid"><div class="catscroll" id="catscroll"><p class="mute catmsg">Loading…</p></div><section class="catqv" id="catqv" aria-label="Quickview"></section></div><aside class="catdet" id="catdet" aria-label="Book details"></aside></div>' +
     '<div class="calstatus" id="calstatus"><span class="num" id="catn"></span><span id="calsel"></span><span class="spacer"></span>' +
     '<button class="calsw" data-act="cat:side" aria-pressed="' + P.side + '">' + IC.side + '<span>Tag browser</span></button>' +
     '<button class="calsw" data-act="cat:det" aria-pressed="' + P.det + '">' + IC.det + '<span>Book details</span></button>' +
-    '<button class="calsw" data-act="cat:grid" aria-pressed="' + P.grid + '">' + IC.grid + '<span>Cover grid</span></button></div>';
+    '<button class="calsw" data-act="cat:grid" aria-pressed="' + P.grid + '">' + IC.grid + '<span>Cover grid</span></button>' +
+    '<button class="calsw" data-act="cat:qv" aria-pressed="' + P.qv + '">' + IC.qv + '<span>Quickview</span></button></div>';
   await load(P.side);
   if (P.side) drawSide();
 };
@@ -138,7 +142,7 @@ function draw(){
     h = '<div class="calgrid">' + r.books.map(b => '<div class="calcell' + (P.sel.has(b.calibre_id) ? ' sel' : '') + (b.private ? ' priv' : '') + '" data-cid="' + esc(b.id) + '" data-cal="' + b.calibre_id + '" tabindex="0">' +
       '<span class="calcv">' + (b.cover ? '<img src="/api/cover/' + encodeURIComponent(b.id) + '?v=' + (b.cover_v || 0) + '" alt="" loading="lazy">' : C.cover({ id: b.id, title: b.title }, 'cv')) +
       '<input type="checkbox" data-catsel' + (P.sel.has(b.calibre_id) ? ' checked' : '') + ' aria-label="Choose"></span>' +
-      '<span class="calct">' + esc(b.title) + '</span><span class="calca">' + esc((b.authors || []).join(' & ')) + '</span></div>').join('') + '</div>';
+      '<span class="calct">' + (b.marked ? IC.pin : '') + esc(b.title) + '</span><span class="calca">' + esc((b.authors || []).join(' & ')) + '</span></div>').join('') + '</div>';
   } else {
     const total = cols.reduce((s, c) => s + widthOf(c), 0) + CK;
     const allOn = r.books.length && r.books.every(b => P.sel.has(b.calibre_id));
@@ -170,7 +174,7 @@ function bulkBar(){
   const cn = $('#catn'); if (cn && P.data) cn.textContent = P.data.count === P.data.total ? P.data.total + ' books' : P.data.count + ' of ' + P.data.total + ' books';
   const s = $('#calsel');
   if (s) s.innerHTML = n ? '<b>' + n + ' chosen</b>' + (n < all ? '<button class="linkbtn" data-catb="all">Choose all ' + all + '</button>' : '') + '<button class="linkbtn" data-catb="none">Clear</button>' : '';
-  drawDet();
+  drawDet(); drawQv();
 }
 // Book details (Calibre's panel on the right): the book last chosen, as its page shows it.
 async function drawDet(){
@@ -250,21 +254,21 @@ function cycle(t){
 function drawSide(keepFocus){
   const side = $('#catside'); if (!side) return;
   const fq = P.fq.trim().toLowerCase();
-  const val = (t, label, n) => { const st = stateOf(t);
-    return '<button class="catv ' + st + '" data-catt="' + esc(t) + '" aria-pressed="' + (st === 'in') + '"><i>' + (st === 'in' ? '✓' : st === 'out' ? '−' : '') + '</i><span>' + label + '</span>' + (n != null ? '<b>' + n + '</b>' : '') + '</button>'; };
+  const val = (t, label, n, k, name) => { const st = stateOf(t);
+    return '<button class="catv ' + st + '" data-catt="' + esc(t) + '"' + (k && manageable(k) ? ' data-catk="' + esc(k) + '" data-catn="' + esc(name) + '"' : '') + ' aria-pressed="' + (st === 'in') + '"><i>' + (st === 'in' ? '✓' : st === 'out' ? '−' : '') + '</i><span>' + label + '</span>' + (n != null ? '<b>' + n + '</b>' : '') + '</button>'; };
   const group = (key, label, items, icon, row) => {
     if (fq) items = items.filter(x => x[1].toLowerCase().includes(fq) || label.toLowerCase().includes(fq));
     if (!items.length) return '';
     const open = fq || P.open.has(key), many = !fq && !P.all.has(key) && items.length > 30;
     return '<section class="catg"><button class="catgh" data-catg="' + esc(key) + '">' + IC.chev(open) + svg(GI[icon || key] || GI.custom) + '<span>' + esc(label) + '</span><b>' + items.length + '</b></button>' +
-      (open ? '<div class="catvs">' + (many ? items.slice(0, 30) : items).map(row || (x => val(x[0], x[1], x[2]))).join('') +
+      (open ? '<div class="catvs">' + (many ? items.slice(0, 30) : items).map(row || (x => val(x[0], x[1], x[2], x[3], x[4]))).join('') +
         (many ? '<button class="linkbtn tiny catall" data-catall="' + esc(key) + '">Show all ' + items.length + '</button>' : '') + '</div>' : '') + '</section>';
   };
   let h = '<div class="catsh"><input class="field sm" id="catfq" type="search" placeholder="Find" autocomplete="off" value="' + esc(P.fq) + '" aria-label="Find in the Tag browser">' +
     (P.q ? '<button class="btn sm" data-catm="clear">Clear</button>' : '') + '<button class="btn sm catdone" data-catm="side">Done</button></div>';
   const fs = (P.facets || []).slice().sort((a, b) => { const i = k => { const n = ORDER.indexOf(k); return n < 0 ? 50 + (a.key.startsWith('#') ? 0 : 1) : n; }; return i(a.key) - i(b.key); });
   const calibre = fs.filter(f => ORDER.includes(f.key) || f.key.startsWith('#')), daf = fs.filter(f => !calibre.includes(f));
-  const facet = f => group(f.key, f.label, f.values.map(([v, n]) => [term(f.key, v), f.key === 'rating' ? stars(v) : esc(v), n]), f.key.startsWith('#') ? 'custom' : f.key);
+  const facet = f => group(f.key, f.label, f.values.map(([v, n]) => [term(f.key, v), f.key === 'rating' ? stars(v) : esc(v), n, f.key, v]), f.key.startsWith('#') ? 'custom' : f.key);
   h += calibre.map(facet).join('');
   const vs = (P.data && P.data.views) || [];
   h += group('views', 'Saved searches', vs.map(v => [v.name, esc(v.name)]), 'views',
@@ -279,6 +283,7 @@ function drawSide(keepFocus){
 function toggleSide(on){
   P.side = on == null ? !P.side : on; if (!narrow()) store.set('calSide', P.side);
   if (P.side && narrow() && P.det) toggleDet(false, true);           // one sheet at a time
+  if (P.side && narrow() && P.qv) toggleQv(false);
   const pg = $('#catpage'); if (pg) pg.classList.toggle('filt', P.side);
   const b = $('[data-act="cat:side"]'); if (b) b.setAttribute('aria-pressed', P.side);
   if (P.side) { if (P.facets) drawSide(); else load(true).then(drawSide); }
@@ -338,6 +343,8 @@ async function moreMenu(anchor){
     (emb.pending ? '<button disabled><i></i>Writing details into files · ' + emb.pending + ' left</button>' : '<button data-catm="embedall"><i></i>Write details into every file</button>') + '<hr>' +
     '<a href="/api/catalog/export?' + qs.toString() + '" download><i></i>Export as CSV</a>' +
     '<button data-catm="priv"' + (P.priv ? ' class="on"' : '') + '><i>' + (P.priv ? '✓' : '') + '</i>Show private books</button>' +
+    (P.sel.size ? '<hr><button data-catm="mark"><i></i>' + (chosenBooks().every(b => b.marked) ? 'Unmark' : 'Mark') + '</button>' : '') +
+    ((P.data && P.data.marks) ? (P.sel.size ? '' : '<hr>') + '<button data-catm="marked"><i></i>Marked books · ' + P.data.marks + '</button><button data-catm="unmarkall"><i></i>Clear marks</button>' : '') +
     '<hr><button data-catm="import"><i></i>Import list</button><button data-catm="check"><i></i>Check library</button><button data-catm="trash"><i></i>Calibre’s trash</button>');
 }
 // Many books into one format: one job on the server, a book at a time; the toast says when it's done.
@@ -406,8 +413,9 @@ document.addEventListener('click', async e => {
   if (a) {
     const k = a.dataset.act.slice(4);
     if (k === 'side') toggleSide();
-    else if (k === 'det') { if (narrow() && !P.det && P.side) toggleSide(false); toggleDet(); }
+    else if (k === 'det') { if (narrow() && !P.det) { if (P.side) toggleSide(false); if (P.qv) toggleQv(false); } toggleDet(); }
     else if (k === 'grid') { P.grid = !P.grid; store.set('calGrid', P.grid); a.setAttribute('aria-pressed', P.grid); draw(); }
+    else if (k === 'qv') toggleQv();
     else if (!P.data) return;
     else if (k === 'sort') sortMenu(a);
     else if (k === 'cols') colsMenu(a);
@@ -438,7 +446,7 @@ document.addEventListener('click', async e => {
   if (m) {
     const k = m.dataset.catm;
     if (k === 'side') toggleSide(false);
-    else if (k === 'shade') { if (P.side) toggleSide(false); if (P.det && narrow()) toggleDet(false); }
+    else if (k === 'shade') { if (P.side) toggleSide(false); if (P.det && narrow()) toggleDet(false); if (P.qv && narrow()) toggleQv(false); }
     else if (k === 'detx') toggleDet(false);
     else if (k === 'clear') setQ('');
     else if (k === 'colsreset') { P.cols = null; P.widths = {}; P.view = dirtyView(); keep(); draw(); $('#pop').hidden = true; }
@@ -449,6 +457,9 @@ document.addEventListener('click', async e => {
     else if (k === 'check') { $('#pop').hidden = true; checkLibrary(); }
     else if (k === 'import') { $('#pop').hidden = true; if (C.ImportList) C.ImportList.open(); }
     else if (k === 'pages') { $('#pop').hidden = true; countPages([...P.sel]); }
+    else if (k === 'mark') { $('#pop').hidden = true; toggleMarks(); }
+    else if (k === 'marked') { $('#pop').hidden = true; setQ('marked:true'); }
+    else if (k === 'unmarkall') { $('#pop').hidden = true; setMarks(null, false); }
     else if (k === 'embedall') { $('#pop').hidden = true;
       if (confirm('Write the details into the files of all ' + (P.data ? P.data.total : '') + ' books?'))
         api('/api/catalog/embed', { method: 'POST', body: JSON.stringify({ all: true }) }).then(r => toast('Writing details into ' + r.pending + ' books’ files')).catch(err => toast(err.message)); }
@@ -512,6 +523,8 @@ document.addEventListener('click', e => {
   const tr = t.closest('#catscroll tbody tr, #catscroll .calcell'); if (!tr) return;
   if (t.closest('a.catt')) { P.scroll = ($('#catscroll') || {}).scrollTop || 0; return; }
   if (Date.now() - held < 600) return;
+  if (t.closest('.catediting')) return;
+  const td = t.closest('td'); if (td && td.cellIndex > 0) P.cell = (colsNow()[td.cellIndex - 1] || {}).key || 'title';
   const id = +tr.dataset.cal, ids = P.data.books.map(x => x.calibre_id);
   if (t.closest('[data-catsel]') || e.metaKey || e.ctrlKey) choose(id, !P.sel.has(id));
   else if (e.shiftKey && P.anchor != null && ids.includes(P.anchor)) {
@@ -523,11 +536,17 @@ document.addEventListener('click', e => {
 });
 // Right-click a row, or hold it and let go (dragbooks.js): Edit details, shelves, the book's page.
 let held = 0;
-function rowMenu(tr, x, y){
-  const p = $('#pop'), id = tr.dataset.cid, cal = +tr.dataset.cal;
+function rowMenu(tr, x, y, td){
+  const p = $('#pop'), id = tr.dataset.cid, cal = +tr.dataset.cal, b = P.data && P.data.books.find(z => z.calibre_id === cal);
+  const col = td && td.cellIndex > 0 && !P.grid ? colsNow()[td.cellIndex - 1] : null;
+  const many = P.sel.size > 1 && P.sel.has(cal), marks = many ? chosenBooks() : [b].filter(Boolean);
   p.onclick = p.oninput = p.onkeydown = null;
-  p.innerHTML = '<div class="menu catmenu"><button data-catrow="edit" data-cal="' + cal + '"><i></i>Edit details</button><button data-catrow="shelves" data-cal="' + cal + '"><i></i>Shelves and collection</button><a href="#book/' + encodeURIComponent(id) + '"><i></i>Open the book’s page</a>' +
-    (P.sel.size > 1 && P.sel.has(cal) ? '<hr><button data-catrow="bulk"><i></i>Edit the ' + P.sel.size + ' chosen</button>' : '') + '</div>';
+  p.innerHTML = '<div class="menu catmenu"><button data-catrow="edit" data-cal="' + cal + '"><i></i>Edit details</button>' +
+    (editable(col) ? '<button data-catrow="cell" data-cal="' + cal + '" data-col="' + esc(col.key) + '"><i></i>Edit ' + esc(col.label) + '</button>' : '') +
+    '<button data-catrow="shelves" data-cal="' + cal + '"><i></i>Shelves and collection</button><a href="#book/' + encodeURIComponent(id) + '"><i></i>Open the book’s page</a>' +
+    (many ? '<hr><button data-catrow="bulk"><i></i>Edit the ' + P.sel.size + ' chosen</button>' : '') +
+    '<button data-catrow="mark" data-cal="' + cal + '"><i></i>' + (marks.length && marks.every(z => z.marked) ? 'Unmark' : 'Mark') + (many ? ' the ' + P.sel.size + ' chosen' : '') + '</button>' +
+    (b ? '<hr>' + SIM.filter(([f]) => valsOf(b, f).length).map(([f, l]) => '<button data-catrow="sim" data-cal="' + cal + '" data-f="' + f + '"><i></i>' + l + '</button>').join('') : '') + '</div>';
   p.hidden = false;
   if (matchMedia('(max-width:700px)').matches) { p.style.left = ''; p.style.top = ''; return; }
   p.style.left = Math.max(8, Math.min(innerWidth - p.offsetWidth - 8, x)) + 'px';
@@ -535,7 +554,7 @@ function rowMenu(tr, x, y){
 }
 document.addEventListener('contextmenu', e => {
   const tr = e.target.closest && e.target.closest('#catscroll tbody tr, #catscroll .calcell'); if (!tr) return;
-  e.preventDefault(); rowMenu(tr, e.clientX, e.clientY);
+  e.preventDefault(); rowMenu(tr, e.clientX, e.clientY, e.target.closest('td'));
 });
 document.addEventListener('click', e => {
   const m = e.target.closest && e.target.closest('[data-catrow]'); if (!m) return;
@@ -543,6 +562,9 @@ document.addEventListener('click', e => {
   if (m.dataset.catrow === 'edit' && C.BookEdit) C.BookEdit.open(m.dataset.cal);
   else if (m.dataset.catrow === 'shelves' && C.DragBooks) C.DragBooks.sheet(P.data.books.filter(b => b.calibre_id === +m.dataset.cal));
   else if (m.dataset.catrow === 'bulk' && C.BookEdit) C.BookEdit.bulk([...P.sel]);
+  else if (m.dataset.catrow === 'cell') editCell(+m.dataset.cal, m.dataset.col);
+  else if (m.dataset.catrow === 'mark') { const cal = +m.dataset.cal; toggleMarks(P.sel.size > 1 && P.sel.has(cal) ? null : [cal]); }
+  else if (m.dataset.catrow === 'sim') { const b = P.data.books.find(z => z.calibre_id === +m.dataset.cal); if (b) similar(b, m.dataset.f); }
 });
 
 /* ---------- dragging: a column's edge (its width), its header (its place), a row in Columns ---------- */
@@ -599,8 +621,263 @@ const endDrag = e => {
 document.addEventListener('pointerup', endDrag, true);
 document.addEventListener('pointercancel', endDrag, true);
 
+/* ---------- more of Calibre's main window ---------- */
+const chosenBooks = () => P.data ? P.data.books.filter(b => P.sel.has(b.calibre_id)) : [];
+const anchorBook = () => { const id = P.sel.has(P.anchor) ? P.anchor : P.sel.size === 1 ? [...P.sel][0] : null; return id != null && P.data ? P.data.books.find(x => x.calibre_id === id) : null; };
+const valsOf = (b, f) => { const v = b && b[f]; return v == null || v === '' ? [] : Array.isArray(v) ? v : [v]; };
+
+// Similar books (Calibre's Alt+A, Alt+S, Alt+T, Alt+P): any of the authors, the series, every tag, the publisher.
+const SIM = [['authors', 'Books by the same author', 'KeyA'], ['series', 'Books in this series', 'KeyS'], ['tags', 'Books with the same tags', 'KeyT'], ['publisher', 'Books by this publisher', 'KeyP']];
+function similar(b, f){
+  const ts = valsOf(b, f).map(v => term(f, v)); if (!ts.length) return;
+  setQ(ts.length === 1 ? ts[0] : f === 'tags' ? ts.join(' and ') : '(' + ts.join(' or ') + ')');
+}
+
+// Mark books: a pin on the books to come back to, the same on every device; marked:true finds them.
+async function setMarks(ids, on){
+  let r;
+  try { r = await api('/api/catalog/marks', { method: 'PUT', body: JSON.stringify(ids == null ? { clear: true } : on ? { add: ids } : { remove: ids }) }); }
+  catch(e){ toast(e.message); return; }
+  const m = new Set(r.marks);
+  if (P.data) { P.data.books.forEach(b => { b.marked = m.has(b.calibre_id); }); P.data.marks = r.marks.length; }
+  if (/\bmarked:/i.test(P.q)) load(); else draw();
+}
+function toggleMarks(ids){
+  const bs = ids ? P.data.books.filter(b => ids.includes(b.calibre_id)) : chosenBooks();
+  if (bs.length) setMarks(bs.map(b => b.calibre_id), !bs.every(b => b.marked));
+}
+
+/* Quickview (Calibre's Q): for the chosen book, the other books with its author, series, tags or
+   publisher, under the list; a click chooses one in the list, Search puts them in the list. */
+const QVF = [['authors', 'Authors'], ['series', 'Series'], ['tags', 'Tags'], ['publisher', 'Publisher']];
+const qvCache = new Map();
+function toggleQv(on){
+  P.qv = on == null ? !P.qv : on; if (!narrow()) store.set('calQv', P.qv);
+  if (P.qv && narrow()) { if (P.side) toggleSide(false); if (P.det) toggleDet(false, true); }
+  const pg = $('#catpage'); if (pg) pg.classList.toggle('qv', P.qv);
+  const b = $('[data-act="cat:qv"]'); if (b) b.setAttribute('aria-pressed', P.qv);
+  const box = $('#catqv'); if (box) { box.dataset.key = ''; if (!P.qv) box.innerHTML = ''; }
+  drawQv();
+}
+async function drawQv(){
+  const box = $('#catqv'); if (!box || !P.qv) return;
+  const b = anchorBook();
+  if (!b) { box.innerHTML = ''; box.dataset.key = ''; return; }
+  let f = P.qvField; if (!valsOf(b, f).length) f = (QVF.find(([k]) => valsOf(b, k).length) || ['authors'])[0];
+  const vals = valsOf(b, f), v = vals.includes(P.qvVal) ? P.qvVal : vals[0];
+  const key = JSON.stringify([b.calibre_id, f, v, P.priv]);
+  if (box.dataset.key === key && box.firstChild) return;
+  box.dataset.key = key; P.qvNow = { f, v };
+  box.innerHTML = '<div class="qvhead"><span class="qvtabs" role="tablist">' + QVF.map(([k, l]) => '<button role="tab" class="calsw" data-qvf="' + k + '" aria-pressed="' + (k === f) + '"' + (valsOf(b, k).length ? '' : ' disabled') + '>' + l + '</button>').join('') + '</span>' +
+    '<span class="spacer"></span>' + (v != null ? '<button class="btn sm" data-qv="search">Search</button>' : '') + '<button class="btn sm ib" data-qv="close" aria-label="Close">' + IC.x + '</button></div>' +
+    (vals.length > 1 ? '<div class="qvvals">' + vals.map(x => '<button class="qvv' + (x === v ? ' on' : '') + '" data-qvv="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>' : '') +
+    '<div class="qvlist" id="qvlist">' + (v == null ? '' : '<span class="befcvwait"></span>') + '</div>';
+  if (v == null) return;
+  const qs = new URLSearchParams({ q: term(f, v), sort: f === 'series' ? 'series' : 'title', desc: '0' }); if (P.priv) qs.set('private', '1');
+  let r = qvCache.get(qs.toString());
+  if (!r) { try { r = await api('/api/catalog?' + qs.toString()); qvCache.set(qs.toString(), r); } catch(e){ const l = $('#qvlist'); if (l) l.innerHTML = '<span class="mute tiny">' + esc(e.message) + '</span>'; return; } }
+  const list = $('#qvlist'); if (!list || box.dataset.key !== key) return;
+  list.innerHTML = r.books.map(x => '<button class="qvrow' + (x.calibre_id === b.calibre_id ? ' on' : '') + '" data-qvb="' + x.calibre_id + '" data-cid="' + esc(x.id) + '">' +
+    (x.cover ? '<img src="/api/cover/' + encodeURIComponent(x.id) + '?v=' + (x.cover_v || 0) + '" alt="" loading="lazy">' : C.cover({ id: x.id, title: x.title }, 'cv')) +
+    '<span><b>' + esc(x.title) + '</b><span>' + esc([(x.authors || []).join(' & '), x.series ? x.series + ' #' + (Math.round((x.series_index || 0) * 10) / 10) : ''].filter(Boolean).join(' · ')) + '</span></span></button>').join('');
+}
+// The list scrolled just enough to show a row (scrollIntoView would move the page around it too).
+function reveal(id){
+  const box = $('#catscroll'), el = box && $('[data-cal="' + id + '"]', box); if (!el) return;
+  const r = el.getBoundingClientRect(), br = box.getBoundingClientRect(), head = (($('thead', box) || {}).offsetHeight) || 0;
+  if (r.top < br.top + head) box.scrollTop -= br.top + head - r.top;
+  else if (r.bottom > br.bottom) box.scrollTop += r.bottom - br.bottom;
+}
+function chooseOnly(id){ [...P.sel].forEach(x => { if (x !== id) choose(x, false); }); choose(id, true); P.anchor = id; chosenSync(); reveal(id); }
+document.addEventListener('click', e => {
+  const t = e.target; if (!t.closest || !t.closest('#catqv')) return;
+  const tab = t.closest('[data-qvf]'); if (tab && !tab.disabled) { P.qvField = tab.dataset.qvf; P.qvVal = null; store.set('calQvField', P.qvField); drawQv(); return; }
+  const vv = t.closest('[data-qvv]'); if (vv) { P.qvVal = vv.dataset.qvv; drawQv(); return; }
+  const a = t.closest('[data-qv]');
+  if (a) { if (a.dataset.qv === 'close') toggleQv(false);
+    else if (P.qvNow && P.qvNow.v != null) setQ(term(P.qvNow.f, P.qvNow.v));
+    return; }
+  const row = t.closest('[data-qvb]');
+  if (row) { const id = +row.dataset.qvb;
+    if (P.data.books.some(x => x.calibre_id === id)) { P.qvVal = P.qvNow ? P.qvNow.v : null; chooseOnly(id); }
+    else location.hash = 'book/' + encodeURIComponent(row.dataset.cid); }
+});
+document.addEventListener('dblclick', e => { const row = e.target.closest && e.target.closest('#catqv [data-qvb]'); if (row) location.hash = 'book/' + encodeURIComponent(row.dataset.cid); });
+
+/* The Tag browser's menu (right-click a name, or hold it): search for it or for everything but it,
+   rename it, delete it, or open the manager for its kind, all across the library. */
+const MANAGE = { tags: 'Manage tags', authors: 'Manage authors', series: 'Manage series', publisher: 'Manage publishers' };
+const manageable = k => !!MANAGE[k] || (k.startsWith('#') && !!P.data && P.data.columns.some(c => c.key === k && c.custom && ['text', 'series'].includes(c.dtype)));
+function tagMenu(el, x, y){
+  const k = el.dataset.catk, n = el.dataset.catn, t = el.dataset.catt, label = MANAGE[k] || 'Manage ' + ((P.data.columns.find(c => c.key === k) || {}).label || k);
+  const p = $('#pop'); p.onclick = p.oninput = p.onkeydown = null;
+  p.innerHTML = '<div class="menu catmenu"><button data-tbm="in"><i></i>Search for “' + esc(n) + '”</button><button data-tbm="out"><i></i>Everything but “' + esc(n) + '”</button><hr>' +
+    '<button data-tbm="rename"><i></i>Rename “' + esc(n) + '”</button>' + (k !== 'authors' ? '<button data-tbm="delete"><i></i>Delete “' + esc(n) + '”</button>' : '') +
+    '<hr><button data-tbm="manage"><i></i>' + esc(label) + '</button></div>';
+  p.dataset.tbk = k; p.dataset.tbn = n; p.dataset.tbt = t;
+  p.hidden = false;
+  if (matchMedia('(max-width:700px)').matches) { p.style.left = ''; p.style.top = ''; return; }
+  p.style.left = Math.max(8, Math.min(innerWidth - p.offsetWidth - 8, x)) + 'px';
+  p.style.top = Math.max(8, Math.min(innerHeight - p.offsetHeight - 8, y)) + 'px';
+}
+// What the search had for the old name, now for the new one (or gone).
+function swapTerm(t, to){
+  const re = new RegExp('(^|[\\s(])(not )?' + esc_re(t) + '(?=$|[\\s)])', 'gi');
+  if (re.test(P.q)) setQ(P.q.replace(re, (m, a, nt) => to ? a + (nt || '') + to : a));
+}
+async function tagAct(act){
+  const p = $('#pop'), k = p.dataset.tbk, n = p.dataset.tbn, t = p.dataset.tbt; p.hidden = true;
+  if (act === 'in') { setQ(t); return; }
+  if (act === 'out') { setQ('not ' + t); return; }
+  if (act === 'manage') { if (C.BookEdit) C.BookEdit.items(k); return; }
+  try {
+    if (act === 'rename') {
+      const to = (prompt('Rename “' + n + '”', n) || '').trim();
+      if (!to || to === n) return;
+      const known = ((P.facets || []).find(f => f.key === k) || { values: [] }).values.some(([v]) => v === to);
+      if (known && !confirm('Combine “' + n + '” into “' + to + '”?')) return;
+      await api('/api/catalog/items/rename', { method: 'POST', body: JSON.stringify({ field: k, from: [n], to }) });
+      swapTerm(t, term(k, to));
+    } else if (act === 'delete') {
+      if (!confirm('Delete “' + n + '” from every book that has it?')) return;
+      await api('/api/catalog/items/delete', { method: 'POST', body: JSON.stringify({ field: k, names: [n] }) });
+      swapTerm(t, '');
+    }
+    qvCache.clear(); P.facets = null; C.Catalog.reload();
+  } catch(e){ toast(e.message); }
+}
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('#pop [data-tbm]'); if (b) tagAct(b.dataset.tbm); });
+document.addEventListener('contextmenu', e => {
+  const v = e.target.closest && e.target.closest('#catside .catv[data-catn]'); if (!v) return;
+  e.preventDefault(); const r = v.getBoundingClientRect();
+  tagMenu(v, e.clientX || r.left + 24, e.clientY || r.bottom);
+});
+// Held down with a finger or the pen, a name opens the same menu, and the tap that ends it does nothing.
+const hold = { t: null, at: 0 };
+document.addEventListener('pointerdown', e => {
+  const v = e.target.closest && e.target.closest('#catside .catv[data-catn]'); if (!v || e.pointerType === 'mouse') return;
+  const x = e.clientX, y = e.clientY;
+  clearTimeout(hold.t); hold.x = x; hold.y = y;
+  hold.t = setTimeout(() => { hold.at = Date.now(); tagMenu(v, x, y); }, 550);
+});
+document.addEventListener('pointermove', e => { if (hold.t && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 8) { clearTimeout(hold.t); hold.t = null; } });
+['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => { clearTimeout(hold.t); hold.t = null; }));
+document.addEventListener('click', e => { if (Date.now() - hold.at < 700 && e.target.closest && e.target.closest('#catside .catv')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+
+/* Editing a cell where it is (Calibre's F2, or the row's menu): Enter or leaving it saves it in
+   Calibre, Esc puts it back. Series takes "Name [3]" for its number, as Calibre's does. */
+const EDIT = new Set(['title', 'authors', 'series', 'tags', 'rating', 'published', 'publisher', 'languages']);
+const CEDIT = new Set(['text', 'series', 'int', 'float', 'bool', 'datetime', 'rating', 'enumeration']);
+const editable = c => !!c && (EDIT.has(c.key) || (!!c.custom && CEDIT.has(c.dtype)));
+const ED = { td: null };
+function editCell(cid, key){
+  if (P.grid || !P.data) return;
+  const cols = colsNow(), i = cols.findIndex(c => c.key === key), c = cols[i], b = P.data.books.find(x => x.calibre_id === cid);
+  const tr = $('#catscroll tbody tr[data-cal="' + cid + '"]');
+  if (!editable(c) || !tr || !b) return;
+  if (ED.td) cancelCell();
+  const td = tr.children[i + 1];
+  Object.assign(ED, { td, cid, c, b });
+  td.classList.add('catediting'); td.innerHTML = editor(c, b);
+  const el = $('[data-catin]', td); el.focus();
+  if (el.tagName === 'INPUT' && el.type === 'text') el.select();
+}
+function editor(c, b){
+  const v = b[c.key], k = c.key;
+  const opts = (list, cur) => list.map(([x, l]) => '<option value="' + esc(x) + '"' + (String(x) === String(cur) ? ' selected' : '') + '>' + esc(l) + '</option>').join('');
+  if (c.type === 'rating') return '<select class="field sm catin" data-catin>' + opts([['', '—']].concat([1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(n => [n, '★'.repeat(Math.floor(n)) + (n % 1 ? '½' : '')])), v == null ? '' : v) + '</select>';
+  if (c.type === 'bool') return '<select class="field sm catin" data-catin>' + opts([['', '—'], ['true', 'Yes'], ['false', 'No']], v == null ? '' : String(!!v)) + '</select>';
+  if (c.dtype === 'enumeration' && c.enum) return '<select class="field sm catin" data-catin>' + opts([['', '—']].concat(c.enum.map(x => [x, x])), v == null ? '' : v) + '</select>';
+  if (c.type === 'date') return '<input class="field sm catin" data-catin type="date" value="' + esc(v || '') + '">';
+  if (c.type === 'number') return '<input class="field sm catin" data-catin type="number" step="any" inputmode="decimal" value="' + esc(v == null ? '' : v) + '">';
+  const text = Array.isArray(v) ? v.join(k === 'authors' ? ' & ' : ', ') : v == null ? '' : String(v);
+  const f = c.type !== 'list' && (P.facets || []).find(x => x.key === k);
+  return '<input class="field sm catin" data-catin type="text" autocomplete="off" spellcheck="false" value="' + esc(text) + '"' + (f ? ' list="catdl"' : '') + '>' +
+    (f ? '<datalist id="catdl">' + f.values.slice(0, 1500).map(([x]) => '<option value="' + esc(x) + '">').join('') + '</datalist>' : '');
+}
+// What Calibre is told for what's in the box, or null when it's what the book already has.
+function cellFields(c, raw, b){
+  const k = c.key, cur = b[k], s = String(raw).trim();
+  const same = (a, z) => JSON.stringify(a == null ? null : a) === JSON.stringify(z == null ? null : z);
+  if (k === 'title') return s && s !== cur ? { title: s } : null;
+  if (k === 'authors') { const a = s.split('&').map(x => x.trim()).filter(Boolean); return a.length && !same(a, cur || []) ? { authors: a } : null; }
+  if (k === 'series') {
+    const m = s.match(/^(.*?)\s*\[\s*(\d+(?:\.\d+)?)\s*\]$/), name = m ? m[1].trim() : s, out = {};
+    if (name !== (cur || '')) out.series = name;
+    if (m && name && +m[2] !== b.series_index) out.series_index = +m[2];
+    return Object.keys(out).length ? out : null;
+  }
+  if (c.type === 'list') { const a = [...new Set(s.split(',').map(x => x.trim()).filter(Boolean))]; return same(a, cur || []) ? null : { [k]: a }; }
+  if (c.type === 'rating' || c.type === 'number') {
+    const n = s === '' ? null : +s;
+    if (Number.isNaN(n)) { toast('Not a number'); return null; }
+    return same(n, cur) ? null : { [k]: n };
+  }
+  if (c.type === 'bool') { const n = s === '' ? null : s === 'true'; return same(n, cur == null ? null : !!cur) ? null : { [k]: n }; }
+  return s === (cur || '') ? null : { [k]: s || null };
+}
+async function commitCell(){
+  if (!ED.td) return;
+  const { td, cid, c, b } = ED, el = $('[data-catin]', td); ED.td = null;
+  const f = el ? cellFields(c, el.value, b) : null;
+  if (!f) { draw(); return; }
+  td.classList.remove('catediting'); td.classList.add('catsaving'); td.textContent = el.tagName === 'SELECT' ? el.options[el.selectedIndex].text : el.value;
+  try {
+    await api('/api/catalog/book/' + cid, { method: 'PUT', body: JSON.stringify({ fields: f }) });
+    P.info.delete(b.id); qvCache.clear();
+    load(true).then(() => { if (P.side) drawSide(); });
+  } catch(e){ toast(e.message); draw(); }
+}
+function cancelCell(){ if (!ED.td) return; ED.td = null; draw(); }
+document.addEventListener('keydown', e => {
+  const el = e.target; if (!el.matches || !el.matches('[data-catin]')) return;
+  e.stopPropagation();
+  if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); commitCell(); }
+  else if (e.key === 'Escape') { e.preventDefault(); cancelCell(); }
+}, true);
+document.addEventListener('change', e => { if (e.target.matches && e.target.matches('select[data-catin]')) commitCell(); });
+document.addEventListener('focusout', e => { const el = e.target; if (el.matches && el.matches('input[data-catin]') && ED.td && ED.td.contains(el)) setTimeout(() => { if (ED.td && !ED.td.contains(document.activeElement)) commitCell(); }, 120); });
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.catediting')) e.stopPropagation(); }, true);
+
+/* Calibre's keys in All books (keys.js "catalog": the letters can be changed in Preferences → Keyboard). */
+const TOOLKEY = { add: 'add', edit: 'edit', convert: 'conv', read: 'read', ebook: 'ebook', polish: 'polish', find: 'find', merge: 'merge', download: 'dl', remove: 'remove' };
+const moveTo = (by, extend) => {
+  const ids = P.data.books.map(x => x.calibre_id); if (!ids.length) return;
+  const at = ids.indexOf(P.anchor);
+  const i = by === Infinity ? ids.length - 1 : by === -Infinity ? 0 : at < 0 ? (by > 0 ? 0 : ids.length - 1) : Math.max(0, Math.min(ids.length - 1, at + by)), id = ids[i];
+  if (extend && at >= 0) { choose(id, true); P.anchor = id; chosenSync(); reveal(id); } else chooseOnly(id);
+};
+document.addEventListener('keydown', e => {
+  if (C.S.route[0] !== 'catalog' || !P.data || e.defaultPrevented) return;
+  const t = e.target, tag = (t.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable) return;
+  if (['#modal', '#pop', '#palette', '#bedit', '#emsheet'].some(q => $(q) && !$(q).hidden) || $('.besheet:not([hidden])')) return;
+  const K = C.Keys, mod = e.metaKey || e.ctrlKey;
+  const go = k => { const b = $('#caltools [data-cal="' + k + '"]'); if (b && !b.disabled) { e.preventDefault(); b.click(); } };
+  if (mod && !e.altKey && !e.shiftKey && e.code === 'KeyA') { e.preventDefault(); P.data.books.forEach(x => P.sel.add(x.calibre_id)); draw(); return; }
+  if (mod && !e.altKey && e.code === 'KeyD') { go('find'); return; }
+  if (mod && !e.altKey && e.code === 'KeyM') { e.preventDefault(); toggleMarks(); return; }
+  if (mod && !e.altKey && e.code === 'KeyF') { e.preventDefault(); const q = $('#catq'); if (q) { q.focus(); q.select(); } return; }
+  if (e.altKey && !mod) { const s = SIM.find(x => x[2] === e.code), b = anchorBook(); if (s && b) { e.preventDefault(); similar(b, s[0]); } return; }
+  if (mod || e.altKey) return;
+  if (e.key === '?') { e.preventDefault(); e.stopImmediatePropagation(); if (K) K.sheet('catalog', 'All books'); return; }
+  if (e.key === 'Escape') { if (P.sel.size) { e.preventDefault(); P.sel.clear(); draw(); } return; }
+  if (e.shiftKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); moveTo(e.key === 'ArrowDown' ? 1 : -1, true); return; }
+  if (!K) return;
+  const is = a => K.is(e, 'catalog', a);
+  if (is('next')) { e.preventDefault(); moveTo(1); }
+  else if (is('prev')) { e.preventDefault(); moveTo(-1); }
+  else if (is('first')) { e.preventDefault(); moveTo(-Infinity); }
+  else if (is('last')) { e.preventDefault(); moveTo(Infinity); }
+  else if (is('open')) { const b = anchorBook(); if (b) { e.preventDefault(); location.hash = 'book/' + encodeURIComponent(b.id); } }
+  else if (is('search')) { e.preventDefault(); const q = $('#catq'); if (q) { q.focus(); q.select(); } }
+  else if (is('quickview')) { e.preventDefault(); toggleQv(); }
+  else if (is('cell')) { const b = anchorBook(); if (b) { e.preventDefault(); editCell(b.calibre_id, editable(colsNow().find(c => c.key === P.cell)) ? P.cell : 'title'); } }
+  else { const a = Object.keys(TOOLKEY).find(is); if (a) go(TOOLKEY[a]); }
+});
+
 C.Catalog = {
-  rowMenu: (tr, x, y) => { held = Date.now(); rowMenu(tr, x, y); },
+  rowMenu: (tr, x, y) => { held = Date.now(); const at = document.elementFromPoint(x, y); rowMenu(tr, x, y, at && at.closest ? at.closest('td') : null); },
   // What a drag from this row carries: every chosen row when it's one of them, else just it.
   dragBooks: tr => { const id = +tr.dataset.cal; return P.data ? P.data.books.filter(b => P.sel.has(id) && P.sel.size > 1 ? P.sel.has(b.calibre_id) : b.calibre_id === id) : []; },
   search: q => { if (C.S.route[0] !== 'catalog') { P.q = q; keep(); location.hash = 'catalog'; } else setQ(q); },

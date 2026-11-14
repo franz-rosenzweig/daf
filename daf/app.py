@@ -1208,6 +1208,23 @@ def put_catalog_views(b=Depends(json_body)):
     return {"views": s["catalog_views"]}
 
 
+@app.put("/api/catalog/marks", dependencies=[Depends(user)])
+def put_catalog_marks(b=Depends(json_body)):
+    """Calibre's Mark books: {add: [ids], remove: [ids], clear: true}. Kept in Daf's settings, so the
+    marks are the same on every device; marked:true finds them."""
+    b = b if isinstance(b, dict) else {}
+    s = config.load_settings()
+    marks = [] if b.get("clear") else catalog.marked(s)
+    rem = {int(i) for i in b.get("remove") or [] if str(i).isdigit()}
+    marks = [i for i in marks if i not in rem]
+    for i in b.get("add") or []:
+        if str(i).isdigit() and int(i) not in marks:
+            marks.append(int(i))
+    s["catalog_marks"] = marks[-5000:]
+    config.save_settings(s)
+    return {"marks": s["catalog_marks"]}
+
+
 # ---- Editing Calibre from Daf: every change goes through Calibre itself (calibrewrite.py) ----
 BOOK_FORMATS = {"EPUB", "KEPUB", "AZW3", "AZW", "MOBI", "KFX", "PDF", "FB2", "CBZ", "CBR", "CB7", "TXT", "RTF", "DOCX", "HTML", "HTMLZ", "DJVU", "LIT", "ODT"}
 CONVERT_TO = ["EPUB", "AZW3", "KEPUB", "MOBI", "PDF"]
@@ -1314,6 +1331,10 @@ def bulk_catalog(b=Depends(json_body)):
     rem = [str(t).strip() for t in b.get("remove_tags") or [] if str(t).strip()]
     if add or rem:
         ops.append({"op": "tags", "ids": ids, "add": add, "remove": rem})
+    if b.get("gencover"):                           # Calibre's "Generate default cover", after the new titles and authors
+        gen = {"op": "gencover", "ids": ids}
+    else:
+        gen = None
     each = b.get("each") or {}                      # find and replace: each book its own new values, after the rest
     if not isinstance(each, dict):
         raise HTTPException(400, "each: an object")
@@ -1323,8 +1344,10 @@ def bulk_catalog(b=Depends(json_body)):
             got = _edit_fields({k: v for k, v in f.items() if k in ("title", "authors", "series", "tags", "publisher")}, keys)
             if got:
                 ops.append({"op": "set", "ids": [int(cid)], "fields": got})
+    if gen:
+        ops.append(gen)
     if ops:
-        _calibre(ops, timeout=600)
+        _calibre(ops, timeout=600 + 5 * len(ids) * bool(gen))
     return {"ok": True, "books": len(ids)}
 
 
@@ -1578,6 +1601,19 @@ def find_catalog_covers(cid: int, b=Depends(json_body), c=Depends(conn)):
         if re.fullmatch(r"[a-z0-9_:-]{1,30}", str(k)) and v:
             ids[str(k)] = str(v)[:100]
     return {"job": calibrefind.covers_start(cid, title, authors, ids)}
+
+
+@app.post("/api/catalog/book/{cid}/gencovers", dependencies=[Depends(user)])
+def gen_catalog_covers(cid: int, c=Depends(conn)):
+    """Calibre's Generate cover: one cover in each of its styles, in colours picked at random, made from
+    the book's title, series and authors as a job (GET /api/catalog/jobs/{job} has {covers} when done).
+    Nothing is saved: a cover is taken with PUT …/cover {found}."""
+    from . import calibrefind
+    d = catalog.details(c, cid)
+    if not d:
+        raise HTTPException(404, "Calibre has no such book")
+    return {"job": calibrefind.gencovers_start(cid, {"title": d["title"], "authors": d["authors"], "series": d.get("series"),
+                                                    "series_index": d.get("series_index"), "publisher": d.get("publisher")})}
 
 
 @app.get("/api/catalog/found/{jid}/{name}", dependencies=[Depends(user)])

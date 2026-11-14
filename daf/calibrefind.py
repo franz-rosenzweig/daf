@@ -228,6 +228,59 @@ def covers_start(cid, title, authors, identifiers):
     return jid
 
 
+GENCOVERS = r'''
+def main():
+    import json, os, random, sys
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from calibre.ebooks.covers import generate_cover, override_prefs, cprefs, all_styles, default_color_themes
+    from calibre.ebooks.metadata.book.base import Metadata
+    from calibre.utils.img import scale_image
+    job = json.loads(sys.stdin.read())
+    b = job["book"]
+    mi = Metadata(b["title"], b.get("authors") or [])
+    if b.get("series"):
+        mi.series, mi.series_index = b["series"], float(b.get("series_index") or 1)
+    if b.get("publisher"):
+        mi.publisher = b["publisher"]
+    d = job["dir"]
+    os.makedirs(d, exist_ok=True)
+    themes = list(default_color_themes)
+    random.shuffle(themes)
+    out = []
+    try:
+        for n, style in enumerate(sorted(all_styles())):
+            theme = themes[n % len(themes)]
+            data = generate_cover(mi, prefs=override_prefs(cprefs, override_style=style, override_color_theme=theme))
+            name = "g-%d" % n
+            with open(os.path.join(d, name + ".jpg"), "wb") as f:
+                f.write(data)
+            _w, _h, small = scale_image(data, width=360, height=540, compression_quality=82)
+            with open(os.path.join(d, name + ".thumb.jpg"), "wb") as f:
+                f.write(small)
+            out.append({"name": name, "fmt": "jpg", "source": style, "theme": theme, "width": 1200, "height": 1600})
+    except Exception as e:
+        print("DAFRESULT " + json.dumps({"ok": False, "error": str(e)}))
+        return
+    print("DAFRESULT " + json.dumps({"ok": True, "covers": out}))
+main()
+'''
+
+
+def gencovers_start(cid, book):
+    """Calibre's generated covers for a book, one in each style, as a job: {state, covers}."""
+    jid = uuid.uuid4().hex[:12]
+    W._jobs[jid] = {"state": "running", "started": time.time(), "id": cid, "kind": "covers", "covers": []}
+    _tidy_found()
+
+    def work():
+        try:
+            W._jobs[jid].update(state="done", covers=_run(GENCOVERS, {"book": book, "dir": f"{FOUND_IN}/{jid}"}, 120)["covers"])
+        except Exception as e:  # noqa: BLE001
+            W._jobs[jid].update(state="failed", error=str(e))
+    threading.Thread(target=work, daemon=True).start()
+    return jid
+
+
 def update_sources():
     """Calibre's built-in metadata sources, updated from calibre's own server the way the app does it."""
     _run(UPDATE, {}, 300)
