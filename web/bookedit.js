@@ -98,6 +98,7 @@ function draw(){
       '<label class="btn sm befile">Change cover<input type="file" accept="image/*" data-be="coverfile" hidden></label>' +
       '<button class="btn sm" data-be="coverurl">Cover from a link</button>' +
       '<button class="btn sm" data-be="gencover">Generate cover</button><div class="befcovs begen" id="begen" hidden></div>' +
+      (d.cover ? '<button class="btn sm" data-be="nocover">Remove cover</button>' : '') +
       '<h3>Files</h3><div class="befiles">' + (d.files.length ? d.files.map(f => '<div class="befilerow"><b>' + esc(f.format) + '</b><span class="mute tiny">' + MB(f.size) + '</span><span class="spacer"></span>' +
         (f.exists ? '<a class="ib" href="/api/catalog/book/' + d.calibre_id + '/files/' + esc(f.format) + '" download aria-label="Download ' + esc(f.format) + '">' + ICON.down + '</a>' : '') +
         '<button class="ib" data-be="filemenu" data-fmt="' + esc(f.format) + '" aria-label="More for ' + esc(f.format) + '">' + ICON.dots + '</button></div>').join('') : '<span class="mute tiny">No file</span>') + '</div>' +
@@ -206,6 +207,7 @@ async function bulk(ids){
       row('Languages', '<span class="beclr">' + inp('languages', '', ' list="dl-languages" autocomplete="off" placeholder="No change"') + '<label class="benone"><input type="checkbox" data-f2="clear_languages"> None</label></span>' + dl('dl-languages', d.choices.languages)) +
       (d.custom || []).filter(c => c.key !== '#isbn' && c.dtype !== 'comments').map(c => row(c.label, customCtl(c, null, true))).join('') +
       '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="gencover"> Generate covers</label></div>' +
+      '<div class="berow becheck"><span></span><label class="bectl"><input type="checkbox" data-f2="nocovers"> Remove covers</label></div>' +
       '<h3 class="befrh">Find and replace</h3>' +
       row('In', '<select class="field" data-fr="field">' + FR.map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('') + '</select>') +
       row('Find', '<input class="field" data-fr="find" autocomplete="off" autocapitalize="off" spellcheck="false">') +
@@ -261,14 +263,15 @@ async function saveBulk(){
   for (const k of ['series', 'publisher', 'languages']) if ($('[data-f2="clear_' + k + '"]', s).checked) fields[k] = k === 'languages' ? [] : null;
   const each = {};
   for (const x of frChanges().list) each[x.id] = Object.assign(each[x.id] || {}, { [x.field]: x.to });
-  const gencover = $('[data-f2="gencover"]', s).checked;
-  if (!Object.keys(fields).length && !add.length && !rem.length && !Object.keys(each).length && !gencover) { close(true); return; }
+  const gencover = $('[data-f2="gencover"]', s).checked, remove_covers = $('[data-f2="nocovers"]', s).checked;
+  if (remove_covers && !gencover && !confirm('Remove the covers of ' + E.ids.length + ' books?')) return;
+  if (!Object.keys(fields).length && !add.length && !rem.length && !Object.keys(each).length && !gencover && !remove_covers) { close(true); return; }
   if (fields.authors !== undefined) fields.authors = String(fields.authors).split('&').map(x => x.trim()).filter(Boolean);
   // In the table's order, for numbering a series.
   const order = C.Catalog && C.Catalog.books ? C.Catalog.books().map(b => String(b.calibre_id)).filter(id => E.ids.includes(id)) : E.ids;
   E.busy = true; btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    await api('/api/catalog/bulk', { method: 'POST', body: JSON.stringify({ ids: order.length === E.ids.length ? order : E.ids, fields, add_tags: add, remove_tags: rem, each, gencover }) });
+    await api('/api/catalog/bulk', { method: 'POST', body: JSON.stringify({ ids: order.length === E.ids.length ? order : E.ids, fields, add_tags: add, remove_tags: rem, each, gencover, remove_covers }) });
     toast(E.ids.length + ' books changed in Calibre'); close(true); after();
   } catch(e){ toast(e.message); btn.disabled = false; btn.textContent = 'Save'; }
   E.busy = false;
@@ -296,6 +299,15 @@ async function genCovers(){
   } catch(e){ if (n === G.seq) { box.hidden = true; toast(e.message); } return; }
   const b = $('#begen'); if (!b || n !== G.seq) return;
   b.innerHTML = covers.map(c => '<button class="befcv" data-begen="' + esc(c.ref) + '"><img src="/api/catalog/found/' + esc(c.ref) + '?thumb=1" alt=""><span class="tiny">' + esc(c.source) + '</span><span class="tiny mute">' + esc(c.theme || '') + '</span></button>').join('');
+}
+async function noCover(){
+  if (!E.d || !confirm('Remove the cover?')) return;
+  try {
+    await api('/api/catalog/book/' + E.d.calibre_id + '/cover', { method: 'DELETE' });
+    E.coverV = Date.now(); E.d.cover = false; freshCover(E.d.id);
+    const keep = values($('#bedit')), orig = E.orig; draw(); restore(keep); E.orig = orig;
+    if (C.Catalog) C.Catalog.reload();
+  } catch(e){ toast(e.message); }
 }
 async function cover(body, type){
   try {
@@ -524,6 +536,7 @@ document.addEventListener('click', e => {
   else if (k === 'take') take();
   else if (k === 'save') save();
   else if (k === 'gencover') genCovers();
+  else if (k === 'nocover') noCover();
   else if (k === 'coverurl') { const u = (prompt('The cover’s address') || '').trim(); if (u) cover(JSON.stringify({ url: u }), 'application/json'); }
   else if (k === 'filemenu') { e.stopPropagation(); fileMenu(b, b.dataset.fmt); }
 });

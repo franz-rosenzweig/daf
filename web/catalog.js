@@ -508,7 +508,11 @@ document.addEventListener('click', e => {
     return; }
   if (t.closest('[data-catall]')) { const on = t.checked; P.data.books.forEach(x => choose(x.calibre_id, on)); chosenSync(); return; }
   const tr = t.closest('#catscroll tbody tr, #catscroll .calcell'); if (!tr) return;
-  if (t.closest('a.catt')) { P.scroll = ($('#catscroll') || {}).scrollTop || 0; return; }
+  if (t.closest('a.catt')) {          // the title chooses the book like the rest of the row; clicked again, it opens its page
+    const only = P.sel.size === 1 && P.sel.has(+tr.dataset.cal);
+    if (only && !e.metaKey && !e.ctrlKey && !e.shiftKey) { P.scroll = ($('#catscroll') || {}).scrollTop || 0; return; }
+    e.preventDefault();
+  }
   if (Date.now() - held < 600) return;
   if (t.closest('.catediting')) return;
   const td = t.closest('td'); if (td && td.cellIndex > 0) P.cell = (colsNow()[td.cellIndex - 1] || {}).key || 'title';
