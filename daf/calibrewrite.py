@@ -385,6 +385,42 @@ def main():
                 finally:
                     shutil.rmtree(base, ignore_errors=True)
                 out["polished"] = [f for f, _s in todo]
+            elif k == "restore_original":               # Calibre's Restore the ORIGINAL_<fmt> format: each original back as its format, the ORIGINAL_ gone
+                import shutil
+                i = ids[0]
+                have_f = {f.upper() for f in d.formats(i) or ()}
+                want = {str(f).upper() for f in op.get("fmts") or []}
+                origs = sorted(f for f in have_f if f.startswith("ORIGINAL_") and (not want or f in want or f[9:] in want))
+                if not origs:
+                    raise ValueError("No ORIGINAL_ file to restore")
+                for f in origs:                         # every original there before anything changes
+                    p = d.format_abspath(i, f)
+                    if not p or not os.path.exists(p):
+                        raise ValueError("Calibre can't find the %s file" % f)
+                tdir = tempfile.mkdtemp(prefix="daf-restore-")
+                try:
+                    backup = {}                         # the files there now, to put back if a restore fails
+                    for f in origs:
+                        if f[9:] in have_f:
+                            backup[f[9:]] = os.path.join(tdir, "%d.%s" % (i, f[9:].lower()))
+                            d.copy_format_to(i, f[9:], backup[f[9:]])
+                    try:
+                        for f in origs:
+                            if not d.restore_original_format(i, f):
+                                raise ValueError("Calibre couldn't restore %s" % f)
+                    except Exception:
+                        for f in origs:                 # back as it was: a restored original saved again, the file that was there put back
+                            fmt, now = f[9:], {x.upper() for x in d.formats(i) or ()}
+                            if f not in now and fmt in now:
+                                d.save_original_format(i, fmt)
+                            if fmt in backup:
+                                d.add_format(i, fmt, backup[fmt], replace=True, run_hooks=False)
+                            elif fmt in now:
+                                d.remove_formats({i: [fmt]})
+                        raise
+                finally:
+                    shutil.rmtree(tdir, ignore_errors=True)
+                out["restored"] = origs
             else:
                 raise ValueError("unknown op " + k)
             touched.update(ids)
@@ -589,6 +625,11 @@ def start_convert_many(todo, to, opts=None):
 def start_polish_many(ids, opts, keep_original):
     """Polish books (the "polish" op) for each book, one after another, in one job like start_convert_many's."""
     return start_each([{"op": "polish", "id": cid, "opts": opts, "keep_original": bool(keep_original)} for cid in ids], 1800)
+
+
+def start_restore_many(ids):
+    """Every ORIGINAL_ file of each book back in place of its format (the "restore_original" op), one book a run."""
+    return start_each([{"op": "restore_original", "id": cid} for cid in ids], 600)
 
 
 def job(jid):
