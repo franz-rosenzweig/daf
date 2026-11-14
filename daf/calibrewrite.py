@@ -245,6 +245,75 @@ def main():
                 out["added"] = added
                 out["done"].append(k)
                 continue
+            elif k == "epubmerge":                      # EpubMerge (the plugin): the books' EPUBs, in this order, into one new book
+                import shutil
+                import calibre.customize.ui             # noqa: F401 - loads the plugins, so calibre_plugins.* imports
+                from calibre_plugins.epubmerge.epubmerge import doMerge
+                from calibre.ebooks.metadata.meta import set_metadata
+                if len(ids) < 2:
+                    raise ValueError("Two books or more")
+                tdir = tempfile.mkdtemp(prefix="daf-epubmerge-")
+                nid = None
+                try:
+                    books, epubs = [], []
+                    for n, i in enumerate(ids):
+                        mi = d.get_metadata(i)
+                        if not d.has_format(i, "EPUB"):
+                            raise ValueError("%s has no EPUB" % mi.title)
+                        p = os.path.join(tdir, "input_%d_%d.epub" % (n, i))
+                        d.copy_format_to(i, "EPUB", p)
+                        with open(p, "r+b") as f:       # each book's details inside it, as the plugin keeps them
+                            set_metadata(f, mi, stream_type="epub")
+                        books.append(mi)
+                        epubs.append(p)
+                    word = "Anthology"
+                    title = str(op.get("title") or "").strip()
+                    if not title:                       # the plugin's: the series, when every book is in the same one
+                        series = {b.series for b in books}
+                        title = books[0].series if len(series) == 1 and books[0].series else "%s %s" % (books[0].title, word)
+                    authors = list(val("authors", op.get("authors") or []))
+                    if not authors:
+                        for b in books:
+                            authors += [a for a in b.authors if a not in authors]
+                    from calibre.ebooks.metadata.book.base import Metadata
+                    mi = Metadata(title, authors or ["Unknown"])
+                    pubs = {b.publisher for b in books}
+                    if len(pubs) == 1:
+                        mi.publisher = pubs.pop()
+                    mi.tags = list(dict.fromkeys(t for b in books for t in (b.tags or [])))
+                    mi.languages = list(dict.fromkeys(l for b in books for l in (b.languages or [])))
+                    many = len(authors) > 1
+                    name = lambda b: "%s by %s" % (b.title, " & ".join(b.authors)) if many else b.title
+                    esc = lambda s: str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    mi.comments = "<p>%s containing:</p>" % word
+                    if op.get("descriptions"):
+                        mi.comments += '<div class="mergedbook">' + '<hr></div><div class="mergedbook">'.join(
+                            ("<p><b>%s</b></p>%s" % (esc(name(b)), b.comments)) if b.comments else "<b>%s</b><br/>" % esc(name(b)) for b in books) + "</div>"
+                    else:
+                        mi.comments += "<br/>".join(esc(name(b)) for b in books)
+                    nid = d.create_book_entry(mi, add_duplicates=True)
+                    cover = d.cover(ids[0])             # the first book's cover, as the plugin does
+                    if cover:
+                        d.set_cover({nid: cover})
+                    nmi = d.get_metadata(nid)
+                    cpath = os.path.join(job["lib"], d.field_for("path", nid), "cover.jpg") if cover else None
+                    dst = os.path.join(tdir, "merged.epub")
+                    doMerge(dst, epubs, authoropts=list(nmi.authors), titleopt=nmi.title, descopt=nmi.comments,
+                            tags=list(nmi.tags or []), languages=list(nmi.languages or []) or ["en"],
+                            titlenavpoints=True, originalnavpoints=True, keepsingletocs=False,
+                            flattentoc=bool(op.get("flatten")), printtimes=False,
+                            coverjpgpath=cpath if cpath and os.path.exists(cpath) else None, keepmetadatafiles=True)
+                    d.add_format(nid, "EPUB", dst)
+                except Exception:
+                    if nid is not None:                 # no half-made book left behind
+                        d.remove_books([nid], permanent=True)
+                    raise
+                finally:
+                    shutil.rmtree(tdir, ignore_errors=True)
+                out["added"] = [nid]
+                touched.add(nid)
+                out["done"].append(k)
+                continue
             else:
                 raise ValueError("unknown op " + k)
             touched.update(ids)
