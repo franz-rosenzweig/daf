@@ -33,9 +33,11 @@ The search box understands Calibre's search language, so anything I'd type in Ca
 
 If Daf can't make sense of something, like a date it doesn't know, the box goes red and the page says what it didn't understand.
 
+**Highlight**, beside the search, is Calibre's "highlight instead of restricting": the search then leaves every book in the table and colours the ones that match (in the cover grid the others fade), and the status bar says how many match. N and Shift N jump to the next and the previous match.
+
 ## The Tag browser
 
-The **Tag browser** is Calibre's, in Calibre's order: Authors, Languages, Series, Formats, Publishers, Rating and Tags, then my own Calibre columns, then **Saved searches** (my views), each with how many books have each value. After those come Daf's own: status, shelves, **Added** (this week, this month, the last 30 days, this year or last year), **Missing** (no file, no cover, no tags, no rating, no series) and **Tidy**. **Find** at the top narrows the long lists.
+The **Tag browser** is Calibre's, in Calibre's order: Authors, Languages, Series, Formats, Publishers, Rating and Tags, then my own Calibre columns, then **Saved searches** (my views), each with how many books have each value. After those come Daf's own: status, shelves, **Added** (this week, this month, the last 30 days, this year or last year), **Missing** (no file, no cover, no tags, no rating, no series) and **Tidy**. **Find** at the top narrows the long lists. A long list shows its thirty most used names first; **Show all** then lays it out by first letter, the way Calibre partitions its categories, and each letter opens to its names in order.
 
 Clicking a value adds it to the search, so I can see exactly what it did and change it by hand. Clicking it a second time turns it into "not that" (it gets a minus and a line through it), and a third click takes it out again. **Clear** empties the search.
 
