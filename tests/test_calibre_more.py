@@ -84,11 +84,23 @@ class Covers(unittest.TestCase):
             self.app.bulk_catalog({"ids": [1], "gencover": True})
         self.assertEqual([o["op"] for o in seen["ops"]], ["gencover"])
 
+    def test_remove_covers(self):
+        seen = {}
+        with mock.patch.object(self.app, "_calibre", side_effect=lambda ops, timeout=120: seen.update(ops=ops)), \
+                mock.patch.object(self.app, "_custom_keys", return_value=set()):
+            self.app.bulk_catalog({"ids": [1, 2], "remove_covers": True})
+            self.assertEqual(seen["ops"], [{"op": "remove_covers", "ids": [1, 2]}])
+            self.app.bulk_catalog({"ids": [1, 2], "remove_covers": True, "gencover": True})     # a new cover wins
+            self.assertEqual([o["op"] for o in seen["ops"]], ["gencover"])
+            self.app.delete_catalog_cover(7)
+            self.assertEqual(seen["ops"], [{"op": "remove_covers", "ids": [7]}])
+
     def test_scripts(self):
         from daf import calibrefind, calibrewrite
         compile(calibrewrite.SCRIPT, "calibre-script", "exec")
         compile(calibrefind.GENCOVERS, "gencovers", "exec")
         self.assertIn('elif k == "gencover"', calibrewrite.SCRIPT)
+        self.assertIn('elif k == "remove_covers"', calibrewrite.SCRIPT)
         self.assertIn("gencover", calibrewrite.EMBED_AFTER)
 
 

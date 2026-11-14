@@ -1332,6 +1332,8 @@ def bulk_catalog(b=Depends(json_body)):
     rem = [str(t).strip() for t in b.get("remove_tags") or [] if str(t).strip()]
     if add or rem:
         ops.append({"op": "tags", "ids": ids, "add": add, "remove": rem})
+    if b.get("remove_covers") and not b.get("gencover"):      # Calibre's "Remove all covers"
+        ops.append({"op": "remove_covers", "ids": ids})
     if b.get("gencover"):                           # Calibre's "Generate default cover", after the new titles and authors
         gen = {"op": "gencover", "ids": ids}
     else:
@@ -1559,6 +1561,13 @@ async def put_catalog_cover(cid: int, request: Request):
     else:
         data = await request.body()
     await run_in_threadpool(_calibre, [{"op": "cover", "id": cid, "data": calibrewrite.b64(_image(data))}])
+    return {"ok": True}
+
+
+@app.delete("/api/catalog/book/{cid}/cover", dependencies=[Depends(user)])
+def delete_catalog_cover(cid: int):
+    """Calibre's Remove cover: the book has none afterwards."""
+    _calibre([{"op": "remove_covers", "ids": [cid]}])
     return {"ok": True}
 
 

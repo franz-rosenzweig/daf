@@ -122,6 +122,8 @@ def main():
             elif k == "cover":
                 data = base64.b64decode(op["data"]) if op.get("data") else None
                 d.set_cover({ids[0]: data})
+            elif k == "remove_covers":                  # Calibre's Remove cover (and "Remove all covers" in bulk)
+                d.set_cover({i: None for i in ids})
             elif k == "gencover":                       # Calibre's own generated cover (Generate cover; Edit metadata in bulk's "Generate default cover")
                 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
                 from calibre.ebooks.covers import generate_cover
@@ -462,7 +464,7 @@ def b64(data):
 # which is what the Kindle and other readers show. After a change, Calibre writes them into the
 # files (embed_metadata), as Calibre-Web Automated does after an edit there. In the background, a
 # batch at a time, so an edit of many books doesn't wait for it.
-EMBED_AFTER = {"set", "tags", "cover", "gencover", "merge", "rename_items", "remove_items", "restore"}
+EMBED_AFTER = {"set", "tags", "cover", "gencover", "remove_covers", "merge", "rename_items", "remove_items", "restore"}
 _embed = {"pending": set(), "running": 0, "done": 0, "error": None}
 _embed_cv = threading.Condition()
 
