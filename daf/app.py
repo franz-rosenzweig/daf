@@ -1568,6 +1568,40 @@ def post_epubmerge(b=Depends(json_body)):
     return {"job": calibrewrite.start_job(lambda: calibrewrite.run([op], timeout=1800)["added"][0])}
 
 
+# Calibre's Polish books dialog: its actions, in its order; "metadata" and "do_cover" are its Update
+# metadata and Update the cover, the rest are calibre.ebooks.oeb.polish.main's own names.
+POLISH_ACTIONS = ("embed", "subset", "smarten_punctuation", "metadata", "do_cover", "jacket", "remove_jacket",
+                  "remove_unused_css", "compress_images", "download_external_resources", "add_soft_hyphens",
+                  "remove_soft_hyphens", "upgrade_book")
+POLISH_FORMATS = ("EPUB", "AZW3", "KEPUB")
+
+
+@app.post("/api/catalog/polish", dependencies=[Depends(user)])
+def post_polish(b=Depends(json_body)):
+    """Polish books, as Calibre's toolbar action does it: {ids, opts: {action: true}, keep_original}.
+    Every EPUB, AZW3 and KEPUB a book has is polished (from its ORIGINAL_ when it has one), a book at
+    a time; keep_original (on unless false) saves ORIGINAL_<format> first, as Calibre does. A book
+    with none of those formats is skipped. → {job, total, skipped}; GET /api/catalog/jobs/{job} has
+    {running, done, total, failed: [{id, error}]}."""
+    from . import calibrewrite
+    b = b if isinstance(b, dict) else {}
+    ids = list(dict.fromkeys(int(i) for i in (b.get("ids") or []) if str(i).isdigit()))
+    if not 1 <= len(ids) <= 500:
+        raise HTTPException(400, "One to 500 books")
+    o = b.get("opts") if isinstance(b.get("opts"), dict) else {}
+    opts = {a: o.get(a) is True for a in POLISH_ACTIONS}
+    if opts["jacket"]:
+        opts["metadata"] = True                     # Calibre won't add a jacket without updating the details
+    if not any(opts.values()):
+        raise HTTPException(400, "Choose something to do")
+    kinds = set(POLISH_FORMATS) | {"ORIGINAL_" + f for f in POLISH_FORMATS}
+    todo = [i for i in ids if kinds & set(catalog.formats_of(i))]
+    if not todo:
+        raise HTTPException(400, "No EPUB, AZW3 or KEPUB to polish")
+    job = calibrewrite.start_polish_many(todo, opts, b.get("keep_original") is not False)
+    return {"job": job, "total": len(todo), "skipped": len(ids) - len(todo)}
+
+
 @app.post("/api/catalog/book/{cid}/find", dependencies=[Depends(user)])
 def find_catalog_book(cid: int, b=Depends(json_body), c=Depends(conn)):
     """Find details: Hardcover and Calibre's own sources, for {title, authors} (the book's own by

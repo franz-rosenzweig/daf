@@ -321,6 +321,49 @@ def main():
                 touched.add(nid)
                 out["done"].append(k)
                 continue
+            elif k == "polish":                         # Polish books (Calibre's toolbar action), as its dialog and gui_polish job do it
+                import shutil
+                from calibre.ebooks.metadata.opf2 import metadata_to_opf
+                from calibre.ebooks.oeb.polish.main import SUPPORTED, gui_polish
+                i = ids[0]
+                acts = ("embed", "subset", "smarten_punctuation", "metadata", "do_cover", "jacket", "remove_jacket",
+                        "remove_unused_css", "compress_images", "download_external_resources", "add_soft_hyphens",
+                        "remove_soft_hyphens", "upgrade_book")
+                data = {a: bool((op.get("opts") or {}).get(a)) for a in acts}
+                if data["jacket"]:
+                    data["metadata"] = True             # the dialog won't add a jacket without the details
+                if not any(data.values()):
+                    raise ValueError("Nothing to do")
+                have_f = {f.upper() for f in d.formats(i) or ()}
+                # Every EPUB, AZW3 and KEPUB the book has, each from its ORIGINAL_ when there is one
+                todo = [(f, "ORIGINAL_" + f if "ORIGINAL_" + f in have_f else f) for f in ("EPUB", "AZW3", "KEPUB")
+                        if f in SUPPORTED and (f in have_f or "ORIGINAL_" + f in have_f)]
+                if not todo:
+                    raise ValueError("No EPUB, AZW3 or KEPUB")
+                base = tempfile.mkdtemp(prefix="daf-polish-")
+                try:
+                    mi = d.get_metadata(i)              # create_opf_file: the book's details, without the cover
+                    mi.cover = None
+                    mi.application_id = mi.uuid
+                    opf = os.path.join(base, "metadata.opf")
+                    with open(opf, "wb") as f:
+                        f.write(metadata_to_opf(mi))
+                    data.update(opf=opf, files=[])
+                    cover = os.path.join(base, "cover.jpg")
+                    if d.copy_cover_to(i, cover):
+                        data["cover"] = cover
+                    for fmt, src in todo:
+                        p = os.path.join(base, "%d.%s" % (i, fmt.lower()))
+                        d.copy_format_to(i, src, p)
+                        data["files"].append(p)
+                    gui_polish(data)                    # every copy polished before any goes back: a failure leaves the book as it was
+                    for fmt, src in todo:
+                        if op.get("keep_original") and src == fmt:
+                            d.save_original_format(i, fmt)
+                        d.add_format(i, fmt, os.path.join(base, "%d.%s" % (i, fmt.lower())), replace=True, run_hooks=False)
+                finally:
+                    shutil.rmtree(base, ignore_errors=True)
+                out["polished"] = [f for f, _s in todo]
             else:
                 raise ValueError("unknown op " + k)
             touched.update(ids)
@@ -487,21 +530,32 @@ def start_job(fn):
     return jid
 
 
-def start_convert_many(todo, to):
-    """[(cid, from)] into `to`, one after another, in one job: {running, done, total, failed: [{id, error}]}."""
+def start_each(ops, timeout=1000, **info):
+    """One op a book, one after another, each its own run, in one job: {running, done, total,
+    failed: [{id, error}], **info}."""
     jid = uuid.uuid4().hex[:12]
-    j = _jobs[jid] = {"running": True, "started": time.time(), "done": 0, "total": len(todo), "failed": [], "to": to}
+    j = _jobs[jid] = {"running": True, "started": time.time(), "done": 0, "total": len(ops), "failed": [], **info}
 
     def work():
-        for cid, src in todo:
+        for op in ops:
             try:
-                run([{"op": "convert", "id": cid, "from": src, "to": to}], timeout=1000)
+                run([op], timeout=timeout)
             except Exception as e:  # noqa: BLE001 - one book's failure doesn't stop the rest
-                j["failed"].append({"id": cid, "error": str(e)[:300]})
+                j["failed"].append({"id": op.get("id"), "error": str(e)[:300]})
             j["done"] += 1
         j["running"] = False
     threading.Thread(target=work, daemon=True).start()
     return jid
+
+
+def start_convert_many(todo, to):
+    """[(cid, from)] into `to`, one after another, in one job: {running, done, total, failed: [{id, error}]}."""
+    return start_each([{"op": "convert", "id": cid, "from": src, "to": to} for cid, src in todo], 1000, to=to)
+
+
+def start_polish_many(ids, opts, keep_original):
+    """Polish books (the "polish" op) for each book, one after another, in one job like start_convert_many's."""
+    return start_each([{"op": "polish", "id": cid, "opts": opts, "keep_original": bool(keep_original)} for cid in ids], 1800)
 
 
 def job(jid):

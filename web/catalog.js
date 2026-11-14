@@ -34,6 +34,7 @@ const TOOLS = [
   ['conv', 'Convert books', TB('<path d="M4 7h11l-3-3M16 13H5l3 3"/>'), 'n'],
   ['read', 'Read', TB('<path d="M10 5.5C8.5 4.3 6.5 4 3 4v11c3.5 0 5.5.3 7 1.5 1.5-1.2 3.5-1.5 7-1.5V4c-3.5 0-5.5.3-7 1.5z"/><path d="M10 5.5v11"/>'), 1],
   ['ebook', 'Edit book', TB('<path d="M7 6.5L3.5 10 7 13.5M13 6.5l3.5 3.5-3.5 3.5M11.2 4.5l-2.4 11"/>'), 1],      // ebookedit.js
+  ['polish', 'Polish books', TB('<path d="M8.5 3l1.4 4.1L14 8.5l-4.1 1.4L8.5 14l-1.4-4.1L3 8.5l4.1-1.4z"/><path d="M14.5 12.5v4M12.5 14.5h4"/>'), 'n'],      // polish.js
   ['find', 'Find details', TB('<circle cx="8.5" cy="8.5" r="5"/><path d="M12.2 12.2L17 17"/><path d="M8.5 6v5M6 8.5h5"/>'), 'n'],
   ['shelves', 'Shelves', TB('<path d="M6 3h8v14l-4-3-4 3z"/>'), 'n'],
   ['merge', 'Merge books', TB('<path d="M5 3v3.5c0 3 5 4 5 7V17M15 3v3.5c0 3-5 4-5 7"/>'), 2],
@@ -501,6 +502,7 @@ document.addEventListener('click', e => {
       else C.BookEdit.fill(chosen); }
     else if (k === 'shelves' && C.DragBooks) C.DragBooks.sheet(chosen, tool);
     else if (k === 'merge' && C.BookEdit) C.BookEdit.merge(chosen);
+    else if (k === 'polish' && C.Polish) C.Polish.open(chosen);
     else if (k === 'epubmerge' && C.EpubMerge) C.EpubMerge.open(chosen);
     else if (k === 'dl') { const a = document.createElement('a'); a.href = '/api/catalog/download?ids=' + ids.join(','); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
     else if (k === 'remove' && C.BookEdit) C.BookEdit.remove(chosen).then(done => { if (done) { P.sel.clear(); bulkBar(); } });
