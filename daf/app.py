@@ -2068,6 +2068,28 @@ def rename_catalog_items(b=Depends(json_body)):
     return {"ok": True}
 
 
+@app.post("/api/catalog/items/author", dependencies=[Depends(user)])
+def post_catalog_author(b=Depends(json_body)):
+    """Calibre's Manage authors: {name, sort?, link?}. An empty sort is Calibre's own for the name; the
+    link is an address (http or https) or nothing."""
+    b = b if isinstance(b, dict) else {}
+    name = str(b.get("name") or "").strip()[:300]
+    if not name:
+        raise HTTPException(400, "Which author")
+    op = {"op": "author_meta", "name": name}
+    if "sort" in b:
+        op["sort"] = str(b.get("sort") or "").strip()[:300]
+    if "link" in b:
+        link = str(b.get("link") or "").strip()[:1000]
+        if link and not re.match(r"^https?://\S+$", link):
+            raise HTTPException(400, "A link starts with http")
+        op["link"] = link
+    if len(op) == 2:
+        raise HTTPException(400, "Nothing to change")
+    _calibre([op], timeout=300)
+    return {"ok": True}
+
+
 @app.post("/api/catalog/items/delete", dependencies=[Depends(user)])
 def delete_catalog_items(b=Depends(json_body)):
     """{field, names}: the names off every book that has them (not authors: every book needs one)."""

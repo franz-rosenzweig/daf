@@ -3143,3 +3143,10 @@ body.ebxopen{overflow:hidden}
 
 /* every sheet's boxes in Daf's own colour (the newer sheets left them the browser's blue) */
 .besheet input[type=checkbox],.besheet input[type=radio]{accent-color:var(--accent)}
+
+/* Manage authors: an author's name, sort and link (bookedit.js authorEditor) */
+.bemname span{display:block} .bemname .tiny{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bemauthor{flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px 0}
+.bemauthor input[data-bemlink]{grid-column:1 / -1}
+.bemauthorbtns{grid-column:1 / -1;display:flex;justify-content:flex-end;gap:6px}
+@media (max-width:699px){ .bemauthor{grid-template-columns:1fr} }

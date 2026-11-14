@@ -142,6 +142,20 @@ def main():
                         _db(job["lib"])                            # which is now
                 out["done"].append(k)
                 continue
+            elif k == "author_meta":                    # Calibre's Manage authors: an author's sort and link
+                from calibre.ebooks.metadata import author_to_author_sort
+                name = str(op["name"])
+                amap = {n: i for i, n in d.get_id_map("authors").items()}
+                aid = amap.get(name, amap.get(name.replace(",", "|")))
+                if aid is None:
+                    raise ValueError("Calibre has no author %s" % name)
+                if "sort" in op:
+                    d.set_sort_for_authors({aid: str(op["sort"]).strip() or author_to_author_sort(name.replace("|", ","))})
+                if "link" in op:
+                    d.set_link_for_authors({aid: str(op["link"]).strip()})
+                touched.update(d.books_for_field("authors", aid))
+                out["done"].append(k)
+                continue
             elif k == "drop":                           # books dropped on a name in the Tag browser, as Calibre's handle_drop does it
                 key, v = op["field"], op["value"]
                 fm = d.field_metadata[key]

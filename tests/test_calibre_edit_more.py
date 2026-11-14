@@ -63,3 +63,23 @@ class FileMeta(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AuthorMeta(unittest.TestCase):
+    def setUp(self):
+        from daf import app
+        self.app, self.ops = app, []
+        p = mock.patch.object(app, "_calibre", side_effect=lambda ops, timeout=120: self.ops.extend(ops))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_sort_and_link(self):
+        self.app.post_catalog_author({"name": " Some One ", "sort": " One, Some ", "link": "https://example.org/x"})
+        self.assertEqual(self.ops[-1], {"op": "author_meta", "name": "Some One", "sort": "One, Some", "link": "https://example.org/x"})
+        self.app.post_catalog_author({"name": "Some One", "sort": ""})          # empty: Calibre's own sort
+        self.assertEqual(self.ops[-1], {"op": "author_meta", "name": "Some One", "sort": ""})
+
+    def test_turned_away(self):
+        for b in ({"name": "", "sort": "x"}, {"name": "Some One"}, {"name": "Some One", "link": "javascript:alert(1)"}, None):
+            with self.assertRaises(HTTPException):
+                self.app.post_catalog_author(b)
