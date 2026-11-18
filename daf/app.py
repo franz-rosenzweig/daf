@@ -5702,6 +5702,8 @@ from . import greader  # noqa: E402 - the reader apps' Google Reader API (/api/g
 app.include_router(greader.router())
 from . import soundscape  # noqa: E402 - Sound: the scene's sounds under the book, in Daf and from the Kindle's page
 app.include_router(soundscape.router())
+from . import music  # noqa: E402 - Music: your own quiet music under the page, beside Sound (/api/music)
+app.include_router(music.router())
 
 
 @app.get("/api/extension/{name}", dependencies=[Depends(user)])
