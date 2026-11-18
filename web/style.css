@@ -2247,6 +2247,31 @@ select.edpast{appearance:auto;padding-right:6px}
 .sndrow{align-items:center;gap:10px}
 .sndrow .sndvol{max-width:120px}
 @media (max-width:700px){ .sndrow{flex-wrap:wrap} .sndrow .sndvol{order:3;max-width:none;flex-basis:100%} }
+/* Music (music.js), in the Sound menu: its volume, what's playing, the moods and their tags as chips, the albums */
+#pop:has(> .sndpop.mus){width:344px;max-width:calc(100vw - 16px);box-sizing:border-box;max-height:calc(100vh - 24px);overflow:auto;overscroll-behavior:contain}
+.sndpop .mush{display:flex;align-items:center;gap:10px;padding:8px 12px 4px;font-size:14px;min-height:34px}
+.sndpop .mush b{flex:1;min-width:0}
+.sndpop .musvol{flex:1;min-width:80px;max-width:150px;accent-color:var(--accent)}
+.sndpop .musnow{display:flex;align-items:center;gap:2px;padding:2px 4px 4px 12px}
+.sndpop .musname{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3;text-align:left}
+.sndpop .musname b,.sndpop .musname i{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:normal}
+.sndpop .musname b{font-size:13.5px;font-weight:600}
+.sndpop .musname i{font-size:12.5px;color:var(--fg-3)}
+.sndpop .muschips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 12px}
+.pop .menu.sndpop .chip{display:inline-flex;justify-content:center;gap:0;background:var(--bg);color:var(--fg-2);border:1px solid var(--line-2);padding:4px 12px;border-radius:999px;font-size:13px;min-height:32px}
+.pop .menu.sndpop .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.pop .menu.sndpop .mustags .chip{font-size:12.5px;min-height:28px;padding:3px 10px}
+.pop .menu.sndpop .chip.musmore{border-style:dashed;color:var(--fg-3)}
+.pop .menu.sndpop .ib{width:36px;height:36px;padding:0;justify-content:center;flex:none;color:var(--fg-2)}
+.sndpop .musalbums{display:flex;flex-direction:column}
+.sndpop .musalbums .mute{font-size:12.5px;flex:none;color:var(--fg-3)}
+.sndpop .musadd{display:flex;gap:8px;padding:6px 12px 8px}
+.sndpop .musadd .field{flex:1;min-width:0;min-height:34px;padding:5px 10px;font-size:14px}
+.pop .menu.sndpop .musadd .btn{justify-content:center;padding:0 12px;border:1px solid var(--line-2)}
+@media (pointer:coarse){ .pop .menu.sndpop .chip{min-height:36px;padding:5px 14px} .pop .menu.sndpop .mustags .chip{min-height:34px;padding:4px 12px} .pop .menu.sndpop .ib{width:42px;height:42px} }
+@media (max-width:700px){
+  #pop:has(> .sndpop.mus){left:0!important;right:0;top:auto!important;bottom:0;width:auto;max-width:none;border-radius:20px 20px 0 0;border-bottom:0;padding:12px 14px calc(16px + env(safe-area-inset-bottom,0px));max-height:82vh}
+}
 
 /* The Feeds page and the menu on a folder or a feed (feeds.js) */
 .fdpage{padding-bottom:90px}
