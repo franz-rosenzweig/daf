@@ -19,6 +19,8 @@ you've sorted plays. What plays is a listening copy, an MP3 Daf makes the first 
 asked for (STATE/cache/music), set to one loudness so a quiet piece and a loud one sit at the same
 level. A Daf without DAF_MUSIC_DIR or without a catalogue just has no Music.
 """
+import contextlib
+import fcntl
 import hashlib
 import json
 import logging
@@ -76,6 +78,17 @@ def load():
                 d = {}
             _cat.update(at=at, data={"moods": list(d.get("moods") or []), "tracks": dict(d.get("tracks") or {})})
         return _cat["data"]
+
+
+@contextlib.contextmanager
+def changing():
+    """Held around read, change and save, so the server and tools/music.py don't write over each other."""
+    with _lock:
+        CATALOGUE.parent.mkdir(parents=True, exist_ok=True)
+        with open(CATALOGUE.with_suffix(".lock"), "w") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            _cat.update(at=None, data=None)            # whatever the other one wrote, read it
+            yield
 
 
 def save(cat):
@@ -208,7 +221,7 @@ def _spread(rows, n):
 
 def correct(i, b):
     """What you say about a track while it plays: {off}, {moods}, {tags}, {energy}. The track as it's now kept."""
-    with _lock:
+    with changing():
         cat = load()
         t = cat["tracks"].get(i)
         if t is None:
@@ -301,7 +314,7 @@ def copy_of(i):
                 log.warning("music: measuring %s: %s", i, e)
                 m = {}
             if m:
-                with _lock:
+                with changing():
                     cat = load()
                     if i in cat["tracks"]:
                         t = {**cat["tracks"][i], **{k: v for k, v in m.items() if v is not None}}

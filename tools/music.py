@@ -79,15 +79,20 @@ def _same(t):
 
 def scan(root, only=None, workers=6, forget=False, say=print):
     """Reads the folder into the catalogue. → (new, kept, moved, gone)."""
-    cat = music.load()
-    old = dict(cat["tracks"])
     found = list(files(root, only))
     if not found:                                      # an empty or unmounted folder: nothing is forgotten over that
         raise SystemExit(f"No music found in {root / only if only else root}")
     rel = {p: p.relative_to(root).as_posix() for p in found}
-    todo = [p for p in found if music.track_id(rel[p]) not in old]
+    todo = [p for p in found if music.track_id(rel[p]) not in music.load()["tracks"]]
     with ThreadPoolExecutor(workers) as ex:
         probed = dict(zip(todo, ex.map(probe, todo)))
+    with music.changing():
+        return _scan(root, only, forget, say, found, rel, probed)
+
+
+def _scan(root, only, forget, say, found, rel, probed):
+    cat = music.load()
+    old = dict(cat["tracks"])
     tracks = {}
     new = kept = moved = 0
     scope = (only.rstrip("/") + "/") if only else ""
@@ -104,7 +109,7 @@ def scan(root, only=None, workers=6, forget=False, say=print):
             tracks[i] = {k: v for k, v in old[i].items() if k != "gone"}
             kept += 1
             continue
-        t = probed.get(p)
+        t = probed.get(p) or probe(p)
         if t is None:
             continue
         was = lost.pop(_same(t), None)
@@ -126,6 +131,11 @@ def scan(root, only=None, workers=6, forget=False, say=print):
 
 def tag(rules, over=False, say=print):
     """Moods, tags and energy onto the tracks a tagging file names. → how many tracks it changed."""
+    with music.changing():
+        return _tag(rules, over, say)
+
+
+def _tag(rules, over, say):
     cat = music.load()
     said_for = rules.get("places") or {}
     places = sorted(said_for, key=len)                 # the longer (closer) place last, so it wins
@@ -189,7 +199,7 @@ def measure(every=False, workers=3, say=print):
 
 
 def _keep(done):
-    with music._lock:                                  # noqa: SLF001 - one writer at a time, with the server
+    with music.changing():                             # one writer at a time, with the server
         cat = music.load()
         tracks = dict(cat["tracks"])
         for i, m in done.items():
