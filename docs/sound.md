@@ -58,7 +58,7 @@ I pick a mood and the music starts: **Still**, **Strings**, **Piano** and so on.
 
 Music has its own volume, and it starts low because it's meant to stay behind the page. One track fades into the next over a few seconds. It plays while a book is open and stops when I close it. If I start an audiobook or a podcast it waits, and under Listen it drops back so the voice stays on top.
 
-When a track turns out wrong for reading, the three dots beside its name let me fix it right there. I can change its moods and tags, add a tag of my own, or choose **Not for reading**, which skips it from then on.
+When a track turns out wrong for reading, the three dots beside its name let me fix it right there. I can change its moods and tags, add a mood or a tag of my own, or choose **Not for reading**, which skips it from then on. A new mood shows up in the row with the others as soon as one track has it, so the moods can grow into whatever I actually reach for.
 
 Daf doesn't change anything in the music folder. It keeps its own list of what each track is, and the first time a track comes up it makes a small copy for playing, set to the same loudness as the others so a quiet piece and a loud one don't make me reach for the volume. Pointing Daf at the folder and sorting the music into moods is in the [working notes](OPERATIONS.md).
 

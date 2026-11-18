@@ -169,15 +169,19 @@ function albumsHTML(){
   return '<div class="mush"><button class="ib" data-mus="back" title="Back" aria-label="Back"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b>Albums</b></div>' +
     '<div class="musalbums">' + M.albums.map(a => '<button data-mus="album" data-id="' + a.id + '"' + (M.pick.album === a.id ? ' aria-checked="true"' : '') + '><span class="musname"><b>' + esc(a.album || a.by) + '</b><i>' + esc(a.by) + '</i></span><span class="mute">' + hm(a.secs) + '</span></button>').join('') + '</div>';
 }
+// A word of your own: a mood no track had yet joins the row of moods, a tag the tags under its moods.
+const add = (what, text) => '<form class="musadd" data-mus-add="' + what + '"><input class="field" name="w" maxlength="24" autocomplete="off" autocapitalize="none" aria-label="' + text + '" placeholder="' + text + '"><button class="btn sm" type="submit">Add</button></form>';
 function trackHTML(){
   const t = M.cur, all = [];
   M.moods.forEach(m => { if (t.moods.includes(m.id)) m.tags.forEach(g => { if (!all.includes(g.id)) all.push(g.id); }); });
   const tags = t.tags.concat(all.filter(g => !t.tags.includes(g)).slice(0, 24));
   return '<div class="mush"><button class="ib" data-mus="back" title="Back" aria-label="Back"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
     '<span class="musname"><b>' + esc(t.title) + '</b><i>' + esc(t.artist) + '</i></span></div>' +
-    '<div class="mh">Moods</div><div class="muschips">' + M.moods.map(m => chip('tmood', m.id, label(m.id), t.moods.includes(m.id))).join('') + '</div>' +
+    '<div class="mh">Moods</div><div class="muschips">' + M.moods.map(m => chip('tmood', m.id, label(m.id), t.moods.includes(m.id))).join('') +
+      t.moods.filter(w => !M.moods.some(m => m.id === w)).map(w => chip('tmood', w, label(w), true)).join('') + '</div>' +
+    add('moods', 'New mood') +
     '<div class="mh">Tags</div><div class="muschips mustags">' + tags.map(g => chip('ttag', g, label(g), t.tags.includes(g))).join('') + '</div>' +
-    '<form class="musadd" data-mus-add><input class="field" name="w" maxlength="24" autocomplete="off" autocapitalize="none" aria-label="New tag" placeholder="New tag"><button class="btn sm" type="submit">Add</button></form>' +
+    add('tags', 'New tag') +
     '<hr><button data-mus="off">Not for reading</button>';
 }
 M.redraw = () => { if (C.Sound && C.Sound.redraw) C.Sound.redraw(); };
@@ -191,9 +195,9 @@ document.addEventListener('input', e => { if (e.target.classList && e.target.cla
 document.addEventListener('submit', e => {
   const f = e.target.closest && e.target.closest('[data-mus-add]'); if (!f) return;
   e.preventDefault();
-  const w = f.elements.w.value.trim().toLowerCase(); if (!w || !M.cur) return;
+  const w = f.elements.w.value.trim().toLowerCase(), what = f.dataset.musAdd === 'moods' ? 'moods' : 'tags'; if (!w || !M.cur) return;
   f.elements.w.value = '';
-  if (!M.cur.tags.includes(w)) say({ tags: M.cur.tags.concat(w) });
+  if (!M.cur[what].includes(w)) say({ [what]: M.cur[what].concat(w) });
 });
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-mus]'); if (!b) return;
