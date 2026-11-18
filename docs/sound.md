@@ -48,6 +48,18 @@ There are a hundred and thirty-four now, all recordings that loop without a seam
 
 Thirty of them are the recordings [Chataltul](https://stuffs.tiresia.xyz/kavana/) plays (its [list of sounds](https://github.com/franz-rosenzweig/kavana/blob/master/docs/sounds.md) names who recorded each one), and Daf fetches its own copy of one the first time it's needed. The rest are Daf's own. I found them on Freesound, and they're all Creative Commons 0 too, which means the people who recorded them gave them away to everyone. Nobody has to credit them for that, but I want to, so [The sounds and who recorded them](sound-list.md) names every one.
 
+## Music
+
+The sounds are short loops. I also have a lot of quiet music of my own, and some evenings that's what I want under the book, instead of the rain or along with it. So the Sound menu has a **Music** part, and it plays from the music folder on my server.
+
+I pick a mood and the music starts: **Still**, **Strings**, **Piano** and so on. Those are my words for my music, and yours can be any words you like. Under the moods are the finer tags for whatever I picked, like **Sad**, **Warm** or **Night**, and tapping a few of those narrows it down. A lot of music sits between two kinds, so a track can be in several moods and carry several tags, and it turns up wherever it fits. A mood plays as a shuffle that doesn't come back to the same track for a good while. **Albums** plays one album through in its order.
+
+Music has its own volume, and it starts low because it's meant to stay behind the page. One track fades into the next over a few seconds. It plays while a book is open and stops when I close it. If I start an audiobook or a podcast it waits, and under Listen it drops back so the voice stays on top.
+
+When a track turns out wrong for reading, the three dots beside its name let me fix it right there. I can change its moods and tags, add a tag of my own, or choose **Not for reading**, which skips it from then on.
+
+Daf doesn't change anything in the music folder. It keeps its own list of what each track is, and the first time a track comes up it makes a small copy for playing, set to the same loudness as the others so a quiet piece and a loud one don't make me reach for the volume. Pointing Daf at the folder and sorting the music into moods is in the [working notes](OPERATIONS.md).
+
 ## Good to know
 
 - A book needs to be an EPUB for Sound, since Daf reads its text to find the scenes.

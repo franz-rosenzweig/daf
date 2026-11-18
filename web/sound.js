@@ -68,6 +68,7 @@ S.open = id => {
   if (S.book) S.closed();
   S.book = { id, place: null, t: null, again: null }; S.r = null;
   if (S.on() && S.mode !== 'kindle') S.mode = 'book';
+  if (C.Music) C.Music.opened();
 };
 S.moved = place => {
   const b = S.book; if (!b || !place) return;
@@ -75,7 +76,7 @@ S.moved = place => {
   if (S.mode !== 'book') return;
   clearTimeout(b.t); b.t = setTimeout(() => ask(place), 1200);
 };
-S.closed = () => { if (S.mode === 'book') { hush(); S.mode = null; } if (S.book) { clearTimeout(S.book.t); clearTimeout(S.book.again); } S.book = null; S.r = null; };
+S.closed = () => { if (S.mode === 'book') { hush(); S.mode = null; } if (S.book) { clearTimeout(S.book.t); clearTimeout(S.book.again); } S.book = null; S.r = null; if (C.Music) C.Music.closed(); };
 S.toggle = () => {
   if (S.mode === 'book') { store.set('soundOn', false); hush(); S.mode = null; S.r = null; draw(); return false; }
   if (S.mode === 'kindle') stopKindle();
@@ -148,22 +149,28 @@ function drawToday(r){
 const shortT = t => String(t || '').split(/:\s/)[0];
 
 /* ---------- the reader's button and its menu ---------- */
+const playing = () => S.mode === 'book' || !!(C.Music && C.Music.on && C.Music.open);
 function draw(){
   const b = $('[data-bk="sound"]');
-  if (b) { b.classList.toggle('on', S.mode === 'book'); b.title = S.mode === 'book' && S.r && S.r.scene ? S.r.scene : 'Sound'; }
-  const p = $('#pop .sndpop'); if (p) p.outerHTML = popHTML();
+  if (b) { b.classList.toggle('on', playing()); b.title = S.mode === 'book' && S.r && S.r.scene ? S.r.scene : 'Sound'; }
+  const p = $('#pop .sndpop'), f = document.activeElement;
+  // not under a finger on a slider, nor under a word half typed
+  if (p && !p.querySelector('input[type=range]:active') && !(f && p.contains(f) && f.matches('input.field') && f.value)) { p.outerHTML = popHTML(); place(); }
   if ($('#sndtoday') && (S.mode === 'kindle' || $('#sndtoday').innerHTML)) drawToday();
 }
 function popHTML(){
-  const on = S.mode === 'book', r = S.r || {};
+  const on = S.mode === 'book', r = S.r || {}, Mu = C.Music, mus = Mu ? Mu.section() : '';
+  if (mus && Mu.view !== 'main') return '<div class="menu sndpop mus">' + mus + '</div>';      // Music's albums, or the track that's playing
   const what = !on ? '' : r.state === 'ready' ? (r.scene || '') : r.state === 'reading' ? '…' : r.why || '';
-  return '<div class="menu sndpop">' + (on ? '<div class="sndscene"' + (what ? '' : ' hidden') + '>' + esc(what) + '</div>' +
+  return '<div class="menu sndpop' + (mus ? ' mus' : '') + '">' + (on ? '<div class="sndscene"' + (what ? '' : ' hidden') + '>' + esc(what) + '</div>' +
     '<label class="sndvl"><span>Volume</span><input type="range" class="sndvol" min="0" max="100" value="' + Math.round(S.vol * 100) + '"></label><hr>' : '') +
-    '<button data-snd="toggle">' + (on ? 'Turn off Sound' : 'Turn on Sound') + '</button></div>';
+    '<button data-snd="toggle">' + (on ? 'Turn off Sound' : 'Turn on Sound') + '</button>' + mus + '</div>';
 }
-S.menu = anchor => {
-  const p = $('#pop'), r = anchor.getBoundingClientRect();
-  p.innerHTML = popHTML(); p.hidden = false;
+// Where the menu sits: by its button, and again whenever what's in it changes size.
+function place(){
+  const p = $('#pop'), anchor = S.anchor;
+  if (!anchor || p.hidden || !p.querySelector('.sndpop')) return;
+  const r = anchor.getBoundingClientRect();
   if (!r.width || anchor.dataset.bk === 'pmenu') {      // a phone: above the round button, where its menu was
     p.style.left = Math.max(8, window.innerWidth - p.offsetWidth - 12) + 'px';
     p.style.top = Math.max(8, (r.width ? r.top : window.innerHeight - 90) - p.offsetHeight - 12) + 'px';
@@ -171,8 +178,16 @@ S.menu = anchor => {
   }
   p.style.left = Math.max(8, Math.min(window.innerWidth - p.offsetWidth - 8, r.right - p.offsetWidth)) + 'px';
   p.style.top = (r.bottom + 8 + p.offsetHeight > window.innerHeight ? Math.max(8, r.top - p.offsetHeight - 10) : r.bottom + 8) + 'px';
+}
+S.menu = anchor => {
+  const p = $('#pop');
+  S.anchor = anchor;
+  if (C.Music) { C.Music.view = 'main'; C.Music.load(); }
+  p.innerHTML = popHTML(); p.hidden = false;
+  place();
 };
-S.button = () => '<button class="ib' + (S.mode === 'book' ? ' on' : '') + '" data-bk="sound" title="Sound" aria-label="Sound">' + ICON + '</button>';
+S.redraw = draw;
+S.button = () => '<button class="ib' + (playing() ? ' on' : '') + '" data-bk="sound" title="Sound" aria-label="Sound">' + ICON + '</button>';
 document.addEventListener('input', e => { if (e.target.classList && e.target.classList.contains('sndvol')) S.volume(e.target.value / 100); });
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-snd]'); if (!t) return;

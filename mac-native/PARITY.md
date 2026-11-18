@@ -134,6 +134,11 @@ rounds go: **here** means the Mac app has it, **not yet** means it's still to co
 - here: the mixer in AVAudioEngine: an AVAudioPlayerNode a sound, its loop PAD to PAD + whole seconds, started somewhere in it, faded in and out over 4 s, the volume on top; the files kept on the Mac
 - here: Today's Sound row beside the Kindle (GET /api/sound/kindle, seen in the last half hour): the book, the scene and the volume while it plays, Sound / Stop; it waits for the Kindle's next page and plays on with the window in the background
 
+## Music (2026-11-17)
+
+- not yet: Music in the Sound menu (music.js; shown only when GET /api/music says `on`): the moods as chips and, under them, the tags of the moods picked (several of each; the most used tags first, More / Fewer), Albums (one album in its order, looping), Music's own volume (0.35 at first), what's playing with Next, Turn On / Turn Off Music; the pick, the volume and on/off kept on this Mac; POST /api/music/queue {moods, tags, album, recent, n} → tracks with `src` (GET /api/music/tracks/{id}.mp3, the device token works; the first ask of a track can take a few seconds while its copy is made); the next track comes in over the last 4 s of this one, both fading; it plays while a book is open, waits while an audiobook, podcast or video plays, and drops to 0.55 under read-aloud
+- not yet: the playing track's page (the three dots beside it): its moods and tags as chips that turn on and off, New tag, Not for reading (POST /api/music/tracks/{id} {moods | tags | off}; after it GET /api/music again, since a new word may have joined)
+
 ## What shows where in the Feed (2026-11-10)
 
 - here: under Feed in the sidebar only what's pinned, in order (/api/docs/counts feed_pins), a pinned feed with its icon; feed_pins_hide_empty leaves out the empty ones but the one open; the Feed's count is feed_total; then Feeds
