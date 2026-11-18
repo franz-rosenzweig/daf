@@ -64,6 +64,8 @@ With Auto on, that music follows the Kindle. When the Kindle is sending its page
 
 When a track turns out wrong for reading, the three dots beside its name let me fix it right there. I can change its moods and tags, add a mood or a tag of my own, or choose **Not for reading**, which skips it from then on. A new mood shows up in the row with the others as soon as one track has it, so the moods can grow into whatever I actually reach for.
 
+The first sorting only covered the music that was plainly for reading. Everything else in the folder is still there, unsorted, and I can bring any of it in. **Albums** in the Music menu has **All albums** at the top, and that opens a page of every album I have: **Not sorted**, **Sorted** or **All**, with a search. An album opens under its row. **Play** lets me hear it first, the whole album, even though it isn't sorted yet. Then I tap the moods and tags it should have, and every track on it gets them at once. A filled chip means every track has it and a ringed one means only some do. Each track keeps whatever else it had, so the one sad track on a bright album stays sad. **Energy** says how much the album moves, which is what Auto goes by. To take an album out of reading again, I untick its moods.
+
 Daf doesn't change anything in the music folder. It keeps its own list of what each track is, and the first time a track comes up it makes a small copy for playing, set to the same loudness as the others so a quiet piece and a loud one don't make me reach for the volume. Pointing Daf at the folder and sorting the music into moods is in the [working notes](OPERATIONS.md).
 
 ## Good to know

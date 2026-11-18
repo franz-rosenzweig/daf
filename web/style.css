@@ -2261,6 +2261,37 @@ select.edpast{appearance:auto;padding-right:6px}
 .musrow .musvol{flex:0 1 120px;min-width:70px;accent-color:var(--accent)}
 .musrow .ib{flex:none}
 @media (max-width:700px){ .musrow .musvol{order:5;flex:1 1 100%;max-width:none} }
+/* The Music page (musicpage.js): every album, and under an open one its moods, tags, energy and tracks */
+.muspage{max-width:860px}
+.muspage .musbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.muspage .musbar .muschips{flex:1 1 auto;padding:0}
+.muspage .musbar .field{flex:1 1 180px;max-width:280px;min-height:38px;padding:6px 12px}
+.muspage .muschips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0}
+.muspage .chip{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--bg);color:var(--fg-2);border:1px solid var(--line-2);padding:4px 12px;border-radius:999px;font-size:13px;min-height:32px;cursor:pointer}
+.muspage .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.muspage .chip.some{border:2px solid var(--fg);color:var(--fg);padding:3px 11px}
+.muspage .chip .num{opacity:.65;font-size:12px}
+.muspage .mustags .chip{font-size:12.5px;min-height:28px;padding:3px 10px}
+.muspage .mustags .chip.some{padding:2px 9px}
+.musal{border-bottom:1px solid var(--line)}
+.musal.open{background:var(--panel);border-radius:12px;border-bottom-color:transparent;margin:6px -10px;padding:0 10px 12px}
+.musalrow{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;color:var(--fg);font:inherit;text-align:left;padding:11px 2px;min-height:52px;cursor:pointer}
+.musalrow .musname b{font-size:15px;font-weight:600}
+.musmini{flex:none;font-size:12.5px;color:var(--fg-3);max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.musaled .mh{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3);padding:10px 0 0}
+.musaled .musacts{display:flex;gap:8px;padding:2px 0 4px}
+.musaled .musadd{display:flex;gap:8px;padding:4px 0 2px;max-width:340px}
+.musaled .musadd .field{flex:1;min-width:0;min-height:36px;padding:5px 10px;font-size:14px}
+.mustracks{display:flex;flex-direction:column;margin-top:4px}
+.mustracks button{display:flex;align-items:center;gap:10px;border:0;background:none;color:var(--fg);font:inherit;font-size:14px;text-align:left;padding:8px 6px;min-height:40px;border-radius:8px;cursor:pointer}
+.mustracks button:hover{background:var(--hover)}
+.mustracks button.now{color:var(--accent);font-weight:600}
+.mustracks .num{flex:none;min-width:24px;color:var(--fg-3);font-size:12.5px}
+.mustracks .mustt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mustracks .mute{flex:none;font-size:12.5px;color:var(--fg-3)}
+.musnone{padding:24px 2px}
+@media (pointer:coarse){ .muspage .chip{min-height:36px;padding:5px 14px} .muspage .chip.some{padding:4px 13px} .muspage .mustags .chip{min-height:34px;padding:4px 12px} .muspage .mustags .chip.some{padding:3px 11px} .mustracks button{min-height:44px} }
+@media (max-width:700px){ .musmini{display:none} .muspage .musbar .field{max-width:none} }
 .sndpop .muschips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 12px}
 .pop .menu.sndpop .chip{display:inline-flex;justify-content:center;gap:0;background:var(--bg);color:var(--fg-2);border:1px solid var(--line-2);padding:4px 12px;border-radius:999px;font-size:13px;min-height:32px}
 .pop .menu.sndpop .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
