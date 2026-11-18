@@ -83,11 +83,12 @@ function play(t, secs){
 }
 async function fill(){
   const p = M.pick;
-  const f = M.follows();
-  let r; try { r = await post('/api/music/queue', { moods: p.album ? [] : p.moods, tags: p.album || f ? [] : p.tags, album: p.album || undefined,
+  const f = M.follows(), au = M.aud;
+  let r; try { r = await post('/api/music/queue', au ? { album: au.id, all: true } : { moods: p.album ? [] : p.moods, tags: p.album || f ? [] : p.tags, album: p.album || undefined,
     match: f && M.want ? M.want : undefined, recent: store.get('musicRecent', []), n: f ? 8 : 20 }); }
   catch(e){ return; }
   M.q = r.tracks || [];
+  if (au && au.from) { const k = M.q.findIndex(t => t.id === au.from); if (k > 0) M.q = M.q.slice(k); au.from = null; }      // from the track that was tapped
 }
 let turning = false;
 async function next(quick){
@@ -124,12 +125,20 @@ M.turn = on => {
   M.on = !!on;
   if (M.open) store.set('musicOn', M.on);
   M.beside = M.on && (M.beside || !M.open);
-  if (M.on) { M.fails = 0; M.start(); } else M.stop();
+  if (M.on) { M.fails = 0; M.start(); } else { M.aud = null; M.stop(); }
   if (C.Sound) { C.Sound.remix(); C.Sound.scene(); }
   M.redraw();
 };
 /* ---------- Auto: the scene picks ---------- */
-M.follows = () => M.on && M.auto && there() && !M.pick.album;
+M.follows = () => M.on && M.auto && there() && !M.pick.album && !M.aud;
+// The Music page: hear one album whole, sorted or not, from its start or from one of its tracks. It
+// isn't a pick: it plays until something is picked in the menu, or it's stopped.
+M.hear = (al, from) => {
+  M.aud = { id: al.id, name: al.album || al.by || '', from: from || null }; M.q = []; M.want = null;
+  clearTimeout(soon);
+  if (!M.on) M.turn(true); else if (M.cur) next(true); else M.start();
+  M.redraw();
+};
 const suits = (t, m) => (!m.tags.length || (t.tags || []).some(g => m.tags.includes(g))) && (!m.energy || !t.energy || Math.abs(m.energy - t.energy) <= 1);
 // The scene where you are (sound.js), with what music would suit it: {tags, energy}.
 M.scene = r => {
@@ -150,7 +159,7 @@ M.closed = () => {
 };
 M.volume = v => { M.vol = Math.max(0, Math.min(1, v)); store.set('musicVol', M.vol); run(); };
 function picked(){               // a moment after the last chip, so picking three isn't three changes of track
-  store.set('musicPick', M.pick); M.q = [];
+  store.set('musicPick', M.pick); M.q = []; M.aud = null;
   clearTimeout(soon);
   if (!M.on) { M.turn(true); return; }
   soon = setTimeout(() => next(true), 900);
@@ -164,7 +173,7 @@ M.section = () => {
   if (!M.has) return '';
   if (M.view === 'albums') return albumsHTML();
   if (M.view === 'track' && M.cur) return trackHTML();
-  const p = M.pick, tags = tagsNow(), album = p.album && M.albums.find(a => a.id === p.album);
+  const p = M.pick, tags = tagsNow(), album = M.aud ? { album: M.aud.name } : p.album && M.albums.find(a => a.id === p.album);
   const shown = M.more ? tags : tags.filter((g, k) => k < FEW || p.tags.includes(g));
   return '<hr><div class="mush"><b>Music</b>' + (M.on ? '<input type="range" class="musvol" min="0" max="100" value="' + Math.round(M.vol * 100) + '" aria-label="Music volume">' : '') + '</div>' +
     (M.on && M.cur ? '<div class="musnow"><span class="musname"><b>' + esc(M.cur.title) + '</b><i>' + esc(M.cur.artist) + '</i></span>' +
@@ -180,7 +189,7 @@ M.section = () => {
 function albumsHTML(){
   const hm = s => { const m = Math.round(s / 60); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; };
   return '<div class="mush"><button class="ib" data-mus="back" title="Back" aria-label="Back"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b>Albums</b></div>' +
-    '<div class="musalbums">' + M.albums.map(a => '<button data-mus="album" data-id="' + a.id + '"' + (M.pick.album === a.id ? ' aria-checked="true"' : '') + '><span class="musname"><b>' + esc(a.album || a.by) + '</b><i>' + esc(a.by) + '</i></span><span class="mute">' + hm(a.secs) + '</span></button>').join('') + '</div>';
+    '<div class="musalbums"><button data-mus="page"><b>All albums</b></button>' + M.albums.map(a => '<button data-mus="album" data-id="' + a.id + '"' + (M.pick.album === a.id ? ' aria-checked="true"' : '') + '><span class="musname"><b>' + esc(a.album || a.by) + '</b><i>' + esc(a.by) + '</i></span><span class="mute">' + hm(a.secs) + '</span></button>').join('') + '</div>';
 }
 // A word of your own: a mood no track had yet joins the row of moods, a tag the tags under its moods.
 const add = (what, text) => '<form class="musadd" data-mus-add="' + what + '"><input class="field" name="w" maxlength="24" autocomplete="off" autocapitalize="none" aria-label="' + text + '" placeholder="' + text + '"><button class="btn sm" type="submit">Add</button></form>';
@@ -197,7 +206,7 @@ function trackHTML(){
     add('tags', 'New tag') +
     '<hr><button data-mus="off">Not for reading</button>';
 }
-M.redraw = () => { if (C.Sound && C.Sound.redraw) C.Sound.redraw(); drawToday(); };
+M.redraw = () => { if (C.Sound && C.Sound.redraw) C.Sound.redraw(); drawToday(); if (C.MusicPage) C.MusicPage.draw(); };
 /* ---------- Today: music beside the Kindle or a paper book ---------- */
 const NOTE = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 14.5V4.8l8-1.6v9.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="6" cy="14.6" rx="2.1" ry="1.7" fill="currentColor"/><ellipse cx="14" cy="12.6" rx="2.1" ry="1.7" fill="currentColor"/></svg>';
 const NEXT = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5v11l8-5.5zM15 4.5v11" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
@@ -249,6 +258,7 @@ document.addEventListener('click', e => {
   else if (a === 'back') { M.view = 'main'; M.redraw(); }
   else if (a === 'album') { p.album = id; M.view = 'main'; picked(); }
   else if (a === 'noalbum') { p.album = null; picked(); }
+  else if (a === 'page') { $('#pop').hidden = true; location.hash = '#music'; }
   else if (a === 'edit') { M.view = 'track'; M.redraw(); }
   else if (a === 'tmood' && M.cur) say({ moods: flip(M.cur.moods, id) });
   else if (a === 'ttag' && M.cur) say({ tags: flip(M.cur.tags, id) });
