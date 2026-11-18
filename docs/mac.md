@@ -12,9 +12,22 @@ Only Daf loads in the window. Any other link opens in your browser, `obsidian://
 
 ## The sidebar
 
-The sidebar is the page's, the Mac way (see [The sidebar](today-and-goals.md#the-sidebar)): **Today**, **Edition** (once it's on), **Review**, **Library** with its kinds, **Books** (with **All Books** and the shelves under it), **Feed** with the folders and feeds I've pinned under it and **Feeds**, and **Highlights**, then what I've pinned (**Edit** beside Pinned picks them), then **Search** (⌘K), **Stats** and **Preferences** at the bottom. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
+The sidebar is the page's map turned on its side (see [Getting around](new-look.md#getting-around)). The page's six tabs are its headings, in the same order, and each tab's pages are the rows under it:
 
-⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (the icons, each with its name under it, and ☰ at the top for the full one): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
+- **Today:** Today, the **Edition** (once it's on, with how many of its pieces I've read), **Recents**, and **Recovery** while it's pinned.
+- **Books:** Books with my shelves under it, **All Books**, and **Manga** and **Torah** while they're pinned.
+- **Library:** the Library with its kinds and my saved views under it, and the **Shortlist** while it's pinned.
+- **Feed:** the Feed with the folders and feeds I've pinned under it, and **Feeds**.
+- **Learn:** **Highlights** and **Review**, and **Paper Pages** while it's pinned.
+- **Listen**, while Podcasts is pinned: **Listening**, **Shows**, **Episodes**, **Recordings**, **Audiobooks** and **Clips**, each a row of its own.
+
+**Search** (⌘K), **Stats** and **Preferences** are at the bottom, with **Sources** while it's pinned. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
+
+⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (the icons, each with its name under it, Listen as one icon, and ☰ at the top for the full one): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. A right-click on a pinned row unpins it. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
+
+## Recents
+
+**Recents**, under Today, is the page's log (see [Getting around](new-look.md#getting-around)): everything I've read, watched, listened to or opened, newest first and a day at a time. A row opens what it was: a book's page on Books, an article, a video or a manga volume in a window of its own, a podcast or an audiobook in Listen. A private sitting is listed without a link. **More** at the bottom asks for the week before.
 
 ## The Edition
 
@@ -26,7 +39,7 @@ As on the page (see [What shows where](feed-and-library.md#what-shows-where)), o
 
 ## All Books
 
-**All Books**, the first thing under **Books** in the sidebar (⇧⌘6), is the whole Calibre library as a spreadsheet, the same one as on the page (see [Calibre in Daf](calibre.md)). On the Mac it's a real Mac table. Clicking a column's name sorts by it and clicking again turns the order around, dragging a column's name moves the column, and dragging its edge makes it wider or narrower. Right-clicking the column names lists every column there is, to tick on or off, and so does **Columns** in the toolbar, where I can also drag the ones showing into a new order. The search in the toolbar is Calibre's search, just like on the page, and when Daf can't read it, a red line over the table says what it didn't understand. The window's title says how many books there are, or how many of them the search found.
+**All Books**, under **Books** in the sidebar (⇧⌘6), is the whole Calibre library as a spreadsheet, the same one as on the page (see [Calibre in Daf](calibre.md)). On the Mac it's a real Mac table. Clicking a column's name sorts by it and clicking again turns the order around, dragging a column's name moves the column, and dragging its edge makes it wider or narrower. Right-clicking the column names lists every column there is, to tick on or off, and so does **Columns** in the toolbar, where I can also drag the ones showing into a new order. The search in the toolbar is Calibre's search, just like on the page, and when Daf can't read it, a red line over the table says what it didn't understand. The window's title says how many books there are, or how many of them the search found.
 
 **Filter** opens the tag browser on the left: **Added** and **Missing**, then every status, tag, author, series and the rest, each with how many books have it. Clicking a value puts it into the search, a second click makes it "not that", and a third takes it out again, and **Clear** empties the search. **Views** keeps the search, the order and the columns under a name on the server, so the Mac, the tablet and the phone all have the same ones, and **…** has **Export as CSV…** (it's in the File menu too) and **Show Private Books**.
 
@@ -68,7 +81,7 @@ A YouTube video and a reel play in the Mac's own player above the transcript, th
 
 Podcast episodes, Audiobookshelf's recordings and audiobooks, and anything read aloud play in Daf's player, a bar along the bottom of the window that keeps playing wherever I go. A click on it opens the whole player: the picture, the time to scrub, the speed, a sleep timer (in minutes, or at the end of the chapter), the chapters, and **Go to It**. An episode starts where I last stopped, in Daf or in AntennaPod; its page has −15 and +30 (← and →), the speed, its chapters, **Clip 30s** and **Show Notes**, and its transcript follows the player. P plays and pauses, and what's playing shows in Now Playing, so the keyboard's media keys and Control Center work too. A book read aloud goes on after I close its window.
 
-**Podcasts** in the sidebar is the page's Podcasts tab: Listening, Shows, Episodes, Recordings, Audiobooks and Clips, a show's page with **Follow**, and a search that finds shows in Apple's directory too. A book that has its audiobook in Audiobookshelf has **Listen** and **Listen from Here** on its page.
+**Listen** in the sidebar is the page's Listen tab: Listening, Shows, Episodes, Recordings, Audiobooks and Clips, each a row of its own and each page named for itself, a show's page with **Follow**, and a search that finds shows in Apple's directory too. With the sidebar mini or hidden, the six are a row at the top of the page instead. A book that has its audiobook in Audiobookshelf has **Listen** and **Listen from Here** on its page.
 
 ## Searching
 

@@ -42,20 +42,33 @@ struct DafNativeApp: App {
             CommandMenu("Go") {
                 Button("Search Everything…") { model.sheet = .palette }.keyboardShortcut("k", modifiers: .command)
                 Divider()
+                // the sidebar's order: the web's six tabs and their pages (the keys are the ones they always had)
                 Button("Today") { model.place = .today }.keyboardShortcut("1")
-                Button("Review") { model.place = .review }.keyboardShortcut("2")
-                Button("Library") { model.place = .home }.keyboardShortcut("3")
-                Button("Feed") { model.place = .feed(nil) }.keyboardShortcut("4")
-                Button("Highlights") { model.place = .highlights }.keyboardShortcut("5")
+                Button("Edition") { model.place = .edition }
+                Button("Recents") { model.place = .recents }
+                Button("Recovery") { model.place = .recovery }
+                Divider()
                 Button("Books") { model.place = .books }.keyboardShortcut("6")
                 Button("All Books") { model.place = .catalog }.keyboardShortcut("6", modifiers: [.command, .shift])
                 Button("Manga") { model.place = .manga }.keyboardShortcut("7")
-                Button("Stats") { model.place = .stats }.keyboardShortcut("8")
-                Divider()
-                Button("Paper Pages") { model.place = .paper }
                 Button("Torah") { model.place = .torah }
-                Button("Recovery") { model.place = .recovery }
-                Button("Podcasts") { model.place = .podcasts }
+                Divider()
+                Button("Library") { model.place = .home }.keyboardShortcut("3")
+                Button("Shortlist") { model.place = .shortlist }
+                Divider()
+                Button("Feed") { model.place = .feed(nil) }.keyboardShortcut("4")
+                Divider()
+                Button("Highlights") { model.place = .highlights }.keyboardShortcut("5")
+                Button("Review") { model.place = .review }.keyboardShortcut("2")
+                Button("Paper Pages") { model.place = .paper }
+                Divider()
+                Menu("Listen") {
+                    ForEach(Sidebar.listen, id: \.0) { p in
+                        Button(p.1) { model.podNav = .cat(p.0); model.place = .podcasts }
+                    }
+                }
+                Divider()
+                Button("Stats") { model.place = .stats }.keyboardShortcut("8")
                 Button("Sources") { model.place = .sources }
             }
             CommandMenu("Article") {

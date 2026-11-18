@@ -17,12 +17,19 @@ Left out on purpose: pen ink (tablet only), and Shelfmark.
 ## Still open
 
 - **What should work differently on the Mac,** beyond catching up. That list goes into the phases below once I have it.
+- **Where Music goes in the order.** It can come right after the sidebar, or wait until the rest of phase 1 is done.
 
 ## The phases
 
 **0. Clear the decks.** The 0.6.6 work from November 10 (the Tags, Authors and Series sheet, Find Details for many books at once, and Write Details into Every File) was never pushed. It's rebased onto today's master now. Its self-test crashed twice at the step that switches the sidebar between full, mini and hidden. The cause was the mini sidebar's names shrinking to fit: text that scales with the width changed the rows' height, which changed the width again, round and round until the window gave up. The names keep their size now, the self-test passes, and it ships as 0.6.6.
 
-**1. The frame and the new look.** Everything else sits inside this, so it comes first. Before anything else the self-test's pictures have to show the sidebar again: the sidebar is glass now, and a picture of the front window leaves its rows out, so I can't check the sidebar's look from them. (The test does check that the rows are there.) Then the sidebar with the web's tabs as its headings and their pages under them, the toolbar with Back and Forward, Search, Add, the ⋯ menu for each screen and the minutes ring, Recents and the Edition under Today, and Listen's pages named for themselves. Today's card in the current book's cover colour with the lines where I left off (`GET /api/books/{id}/excerpt`), and the cover colours on a book's page, on Books and on the player. The themes and Rooms with the new look's colours. Preferences one page at a time, the way the Mac's own Settings are, with Devices & extension as a page of its own.
+**1. The frame and the new look.** Everything else sits inside this, so it comes first. It goes out in four parts:
+- *1a, the sidebar:* the web's tabs as its headings with their pages under them, Recents under Today, and Listen's pages named for themselves. The self-test's pictures of the window leave the sidebar's rows out now that the sidebar is glass, so the test takes the sidebar's own pictures two other ways, and it has a short run of just the frame.
+- *1b, the toolbar:* Back and Forward, Search, Add, the ⋯ menu for each screen and the minutes ring.
+- *1c, the look:* Today's card in the current book's cover colour with the lines where I left off (`GET /api/books/{id}/excerpt`), the cover colours on a book's page, on Books and on the player, and the themes and Rooms with the new look's colours.
+- *1d, Preferences:* one page at a time, the way the Mac's own Settings are, with Devices & extension as a page of its own.
+
+**Music.** The web got Music on November 17: whole tracks from my own music folder, played quietly under the page. On the Mac it's six things, built in this order: the player (two players taking turns, so one track fades into the next), Music in the Sound menu, the playing track's page, Auto (the scene picks what plays), Today's Music row, and the Music page. Radio stations and a Music button in the article and PDF readers come after, once the web has them. Track, album and artist names are my own listening, so they never go into the repo, a pull request, the docs, a test or a picture that leaves my machines.
 
 **2. Reading.** The Study reader: Margin (the page to the left and a line for each highlight beside it) and Side by side (a second book on the right half). The one Notebook, with its Pages and List, as the first tab of the reader's panel beside Info and Ask. Page turns (None, Slide, Curl). MOBI, AZW3 and FB2 read natively instead of in the web reader. A book's Details card, Add a book → Public domain, and videos picking up where I left them.
 
@@ -37,4 +44,4 @@ Left out on purpose: pen ink (tablet only), and Shelfmark.
 
 ## How each phase ships
 
-Each phase is built on a branch from master in its own worktree, compiled on the Mac, and checked with `selftest.sh`, which takes over the Mac's screen for about nine minutes, so it only runs after a heads-up. The self-test uses its own copy of Daf's data, and anything that would write to Calibre is a stand-in there, so it never touches the real library. Then a pull request, which gets merged when I say so, and the release, which I usually run myself.
+Each phase is built on a branch from master in its own worktree, compiled on the Mac, and checked with `selftest.sh`, which takes over the Mac's screen for about nine minutes (or about one for just the frame), so it only runs after a heads-up. The self-test uses its own copy of Daf's data, and anything that would write to Calibre is a stand-in there, so it never touches the real library. Then a pull request, which gets merged when I say so, and the release, which I usually run myself.

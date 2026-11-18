@@ -3,15 +3,17 @@
 # xyz.tiresia.daf.selftest, so Daf's settings, sign-in and keychain are never touched), and keeps a
 # picture of each step:
 #   ./selftest.sh BASE COOKIE [TOKEN]       → build/selftest/log.txt and *.png
+#   ./selftest.sh BASE COOKIE TOKEN frame   → only the window's frame (Today, the Library, the sidebar)
 set -euo pipefail
 cd "${0:A:h}"
-(( $# >= 2 )) || { sed -n 2,5p $0 >&2; exit 2; }
+(( $# >= 2 )) || { sed -n 2,6p $0 >&2; exit 2; }
 mkdir -p build
 DAF_TEST=1 ./build.sh > build/test-build.log 2>&1 || { echo "SELFTEST: the build failed" >&2; grep -E "error:" -A3 build/test-build.log | head -60 >&2; exit 1; }
 APP="build/test/Daf Test.app"
 OUT=$PWD/build/selftest; rm -rf $OUT; mkdir -p $OUT
 ARGS=(-SelfTestBase "$1" -SelfTestCookie "c:$2")
 (( $# >= 3 )) && ARGS+=(-SelfTestToken "t:$3")
+(( $# >= 4 )) && ARGS+=(-SelfTestOnly "$4")
 ( sleep 900; pkill -f "Daf Test.app/Contents/MacOS/Daf" ) 2>/dev/null & watchdog=$!
 open -W -n "$APP" --args -SelfTestOut "$OUT" -ApplePersistenceIgnoreState YES "${ARGS[@]}"
 kill $watchdog 2>/dev/null || true

@@ -54,12 +54,15 @@ struct PodcastCategories: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Picker("", selection: Binding(get: { cat }, set: { model.podNav = .cat($0) })) {
-                    ForEach(Self.cats, id: \.0) { Text($0.1).tag($0.0) }
+                // the full sidebar has these pages as its rows under Listen; without it, here they are
+                if Side.shared.shown != "full" || Focus.shared.main {
+                    Picker("", selection: Binding(get: { cat }, set: { model.podNav = .cat($0) })) {
+                        ForEach(Self.cats, id: \.0) { Text($0.1).tag($0.0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: 600)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 600)
                 switch cat {
                 case "shows": ShowsCat()
                 case "episodes": EpisodesCat()
@@ -73,7 +76,7 @@ struct PodcastCategories: View {
             .frame(maxWidth: 900, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .navigationTitle("Podcasts")
+        .navigationTitle(Self.cats.first { $0.0 == cat }?.1 ?? "Podcasts")     // the page's own name, as on the web
     }
 }
 
