@@ -54,6 +54,8 @@ The sounds are short loops. I also have a lot of quiet music of my own, and some
 
 I pick a mood and the music starts: **Still**, **Strings**, **Piano** and so on. Those are my words for my music, and yours can be any words you like. Under the moods are the finer tags for whatever I picked, like **Sad**, **Warm** or **Night**, and tapping a few of those narrows it down. A lot of music sits between two kinds, so a track can be in several moods and carry several tags, and it turns up wherever it fits. A mood plays as a shuffle that doesn't come back to the same track for a good while. **Albums** plays one album through in its order.
 
+**Auto** lets the book choose. With it on, I don't pick the tags. The same reading of the book that chooses the rain and the fire also says what music would suit each scene, in my own tags, things like sad, rain and lonely, or wonder and journey, and how much it should move. Daf plays the tracks that fit that best, from the moods I've picked or from all of them if I've picked none. When the scene changes and the track that's playing still fits, it plays out and the next one is chosen for the new scene. When it doesn't fit, it fades over into one that does. A book I read with Sound before I had Music gets read once more for this, a part at a time as I reach it.
+
 Music has its own volume, and it starts low because it's meant to stay behind the page. One track fades into the next over a few seconds. It plays while a book is open and stops when I close it. If I start an audiobook or a podcast it waits, and under Listen it drops back so the voice stays on top.
 
 When a track turns out wrong for reading, the three dots beside its name let me fix it right there. I can change its moods and tags, add a tag of my own, or choose **Not for reading**, which skips it from then on.
@@ -64,5 +66,6 @@ Daf doesn't change anything in the music folder. It keeps its own list of what e
 
 - A book needs to be an EPUB for Sound, since Daf reads its text to find the scenes.
 - Sound and Listen can play together: the voice reads the page and the scene plays underneath.
+- With my own music on, a scene's sounds leave out their own music (the piano, the cello and so on), since two musics at once would clash. The rain and the fire stay.
 - On the Kindle, sending the page uses a little Wi-Fi with each page turn, so I leave **Sound in Daf** off when I'm not using it.
 - Daf's own sounds live on the server it runs on. A new copy of Daf has only the thirty from Chataltul until `tools/sounds.py make` has made the rest (the [working notes](OPERATIONS.md) say how), and until then Sound just chooses from the ones it has.

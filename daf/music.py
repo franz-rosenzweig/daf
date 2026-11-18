@@ -120,6 +120,18 @@ def on():
     return bool(ROOT) and Path(ROOT).is_dir() and bool(offered())
 
 
+def vocabulary(most=60):
+    """The tags the offered tracks carry, the most used first: the words a scene's music is asked for in
+    (soundscape.py). Empty when there's no Music."""
+    if not ROOT or not Path(ROOT).is_dir():
+        return []
+    n = {}
+    for t in offered().values():
+        for g in t.get("tags") or ():
+            n[g] = n.get(g, 0) + 1
+    return [g for g, _ in sorted(n.items(), key=lambda kv: (-kv[1], kv[0]))][:most]
+
+
 def _order(cat, found):
     first = [m for m in cat.get("moods") or [] if m in found]
     return first + sorted(m for m in found if m not in first)

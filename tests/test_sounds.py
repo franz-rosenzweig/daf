@@ -88,5 +88,58 @@ class Offered(unittest.TestCase):
         self.assertIsNone(soundscape.sound_file("no-such-sound"))
 
 
+class SceneMusic(unittest.TestCase):
+    """With a music catalogue (daf/music.py) the model is asked what music suits each scene, in the
+    catalogue's own tag words; without one it isn't asked, and nothing about music is kept."""
+
+    def setUp(self):
+        self.said, self.words = [], ["sad", "rain", "tender", "battle"]
+
+        def answer(text, timeout=0):
+            self.said.append(text)
+            return json.dumps([
+                {"from": 1, "scene": "Rain", "sounds": {"rain": 0.4}, "music": {"tags": ["Sad", "rain", "made-up", "tender", "battle", "sad"], "energy": 1}},
+                {"from": 2, "scene": "Still rain", "sounds": {"rain": 0.4}, "music": {"tags": ["battle"], "energy": 7}},
+                {"from": 3, "scene": "Rain again", "sounds": {"rain": 0.4}, "music": {"tags": ["battle"], "energy": None}}])
+
+        for p in (mock.patch.object(ai, "run", answer), mock.patch.object(ai, "model", lambda: "test"),
+                  mock.patch.object(soundscape.music, "vocabulary", lambda: self.words)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def ask(self):
+        return soundscape._ask({"title": "A book"}, {"start": 0, "end": 30}, [(0, "Rain fell."), (10, "It went on."), (20, "And on.")])
+
+    def test_music_is_asked_in_the_catalogues_words(self):
+        scenes = self.ask()
+        self.assertIn("sad, rain, tender, battle", self.said[0])
+        self.assertIn('"music": {"tags"', self.said[0])
+        self.assertEqual(scenes[0]["music"], {"tags": ["sad", "rain", "tender", "battle"], "energy": 1})   # its words only, each once, four at most
+        self.assertEqual(scenes[1]["music"], {"tags": ["battle"], "energy": None})                          # a new scene for the music alone
+        self.assertEqual(len(scenes), 2)                                                                     # the same sounds and music: one scene
+
+    def test_without_music_nothing_is_asked(self):
+        self.words = []
+        scenes = self.ask()
+        self.assertNotIn("music", self.said[0].split("Answer with JSON")[0].split("Nothing fits")[1])
+        self.assertNotIn('"music"', self.said[0])
+        self.assertEqual(len(scenes), 1)
+        self.assertNotIn("music", scenes[0])
+
+    def test_a_scenes_music_sounds_are_named(self):
+        self.assertEqual(soundscape._tunes({"rain": 0.4, "piano": 0.5, "calm": 0.3}), ["piano", "calm"])
+
+
+class Vocabulary(unittest.TestCase):
+    def test_the_most_used_tags_first(self):
+        from daf import music
+        tracks = {"a": {"moods": ["x"], "tags": ["sad", "rain"]}, "b": {"moods": ["x"], "tags": ["sad"]},
+                  "c": {"tags": ["unsorted"]}, "d": {"moods": ["x"], "tags": ["off"], "off": True}}
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(music, "ROOT", d), mock.patch.object(music, "load", lambda: {"moods": [], "tracks": tracks}):
+            self.assertEqual(music.vocabulary(), ["sad", "rain"])
+        with mock.patch.object(music, "ROOT", ""):
+            self.assertEqual(music.vocabulary(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

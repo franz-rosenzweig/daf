@@ -70,10 +70,12 @@ S.open = id => {
   if (S.on() && S.mode !== 'kindle') S.mode = 'book';
   if (C.Music) C.Music.opened();
 };
+// The scene is asked for while Sound plays it, or while your music follows it (music.js's Auto).
+const following = () => S.mode === 'book' || (S.mode !== 'kindle' && !!(C.Music && C.Music.follows()));
 S.moved = place => {
   const b = S.book; if (!b || !place) return;
   b.place = place;
-  if (S.mode !== 'book') return;
+  if (!following()) return;
   clearTimeout(b.t); b.t = setTimeout(() => ask(place), 1200);
 };
 S.closed = () => { if (S.mode === 'book') { hush(); S.mode = null; } if (S.book) { clearTimeout(S.book.t); clearTimeout(S.book.again); } S.book = null; S.r = null; if (C.Music) C.Music.closed(); };
@@ -85,20 +87,33 @@ S.toggle = () => {
   return true;
 };
 async function ask(place){
-  const b = S.book; if (!b || S.mode !== 'book') return;
+  const b = S.book; if (!b || !following()) return;
   clearTimeout(b.again);
-  let r; try { r = await api('/api/ebooks/' + encodeURIComponent(b.id) + '/sound', { method: 'POST', body: JSON.stringify(place || {}) }); }
+  const body = Object.assign({}, place || {}, C.Music && C.Music.follows() ? { music: true } : {});
+  let r; try { r = await api('/api/ebooks/' + encodeURIComponent(b.id) + '/sound', { method: 'POST', body: JSON.stringify(body) }); }
   catch(e){ b.again = setTimeout(() => ask(b.place), 20000); return; }
-  if (S.book !== b || S.mode !== 'book') return;
+  if (S.book !== b || !following()) return;
   got(r);
   if (r.state === 'reading') b.again = setTimeout(() => ask(b.place), 5000);
+  else if (r.music_soon) b.again = setTimeout(() => ask(b.place), 12000);      // read before there was music to ask about: it's being read again
+}
+// With your own music playing, the scene's music loops stay out: two musics at once would clash.
+function sceneSounds(r){
+  if (!(C.Music && C.Music.on && C.Music.open) || !r.tunes || !r.tunes.length) return r.sounds;
+  const out = {}; Object.keys(r.sounds || {}).forEach(k => { if (!r.tunes.includes(k)) out[k] = r.sounds[k]; });
+  return out;
 }
 function got(r){
   S.r = r;
-  if (r.state === 'ready') mix(r.sounds);
-  else if (r.state === 'none' || r.state === 'failed') hush();
+  if (S.mode) {
+    if (r.state === 'ready') mix(sceneSounds(r));
+    else if (r.state === 'none' || r.state === 'failed') hush();
+  }
+  if (C.Music && S.mode !== 'kindle') C.Music.scene(r);
   draw();
 }
+S.scene = () => { if (S.book && S.book.place && following()) ask(S.book.place); };      // ask now: the music began to follow
+S.remix = () => { if (S.mode === 'book' && S.r && S.r.state === 'ready') mix(sceneSounds(S.r)); };
 
 /* ---------- beside the Kindle ---------- */
 let kAbort = null;

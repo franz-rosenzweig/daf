@@ -1,6 +1,7 @@
 /* Music: your own quiet music under the page (daf/music.py), in the Sound menu beside the scene's
    sounds. You pick moods, and under them the finer tags; a mood shuffles, an album plays in its
-   order. Whole tracks, so two <audio> elements take turns: the next fades in over FADE seconds
+   order. With Auto the scene picks the tags instead: Sound's reading of the book says what music
+   suits where you are (soundscape.py), and the tracks that fit it best play, within your moods. Whole tracks, so two <audio> elements take turns: the next fades in over FADE seconds
    while the last fades out. What you pick, the volume and whether it's on stay on this device.
    The track that's playing can be fixed from the menu: Not for reading, or its moods and tags. */
 (() => {
@@ -9,7 +10,8 @@ const C = window.DafCore, { api, esc, $ } = C;
 const store = { get(k, d){ try { const v = localStorage.getItem('daf.' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } }, set(k, v){ try { localStorage.setItem('daf.' + k, JSON.stringify(v)); } catch(e){} } };
 const FADE = 4, FEW = 14;
 const M = C.Music = { has: null, moods: [], albums: [], on: !!store.get('musicOn', false), vol: store.get('musicVol', 0.35),
-  pick: Object.assign({ moods: [], tags: [], album: null }, store.get('musicPick', {})), q: [], cur: null, els: [], live: -1, duck: 1,
+  pick: Object.assign({ moods: [], tags: [], album: null }, store.get('musicPick', {})), auto: !!store.get('musicAuto', false), want: null,
+  q: [], cur: null, els: [], live: -1, duck: 1,
   view: 'main', more: false, open: false, fails: 0 };
 const label = w => w.charAt(0).toUpperCase() + w.slice(1);
 const post = (url, body) => api(url, { method: 'POST', body: JSON.stringify(body) });
@@ -76,7 +78,9 @@ function play(t, secs){
 }
 async function fill(){
   const p = M.pick;
-  let r; try { r = await post('/api/music/queue', { moods: p.album ? [] : p.moods, tags: p.album ? [] : p.tags, album: p.album || undefined, recent: store.get('musicRecent', []), n: 20 }); }
+  const f = M.follows();
+  let r; try { r = await post('/api/music/queue', { moods: p.album ? [] : p.moods, tags: p.album || f ? [] : p.tags, album: p.album || undefined,
+    match: f && M.want ? M.want : undefined, recent: store.get('musicRecent', []), n: f ? 8 : 20 }); }
   catch(e){ return; }
   M.q = r.tracks || [];
 }
@@ -96,17 +100,42 @@ document.addEventListener('pointerdown', M.wake, true);
 document.addEventListener('keydown', M.wake, true);
 
 /* ---------- on, off, and what's picked ---------- */
-M.start = () => { if (!M.on || M.cur || !M.open) return; M.load().then(has => { if (has && M.on && !M.cur && M.open) next(); }); };
+let soon = null;                 // the one change of track that's waiting to happen
+M.start = () => {
+  if (!M.on || M.cur || !M.open) return;
+  M.load().then(has => {
+    if (!has || !M.on || M.cur || !M.open) return;
+    if (M.follows() && !M.want) { clearTimeout(soon); soon = setTimeout(() => { if (!M.cur) next(); }, 5000); }      // a moment for the scene to say what fits
+    else next();
+  });
+};
 M.stop = () => {
   M.els.forEach(E => E && fade(E, 0, 1.5));
   M.cur = null; M.live = -1; M.q = []; run(); M.redraw();
 };
-M.turn = on => { M.on = !!on; store.set('musicOn', M.on); if (M.on) { M.fails = 0; M.start(); } else M.stop(); M.redraw(); };
+M.turn = on => {
+  M.on = !!on; store.set('musicOn', M.on);
+  if (M.on) { M.fails = 0; M.start(); } else M.stop();
+  if (C.Sound) { C.Sound.remix(); if (M.follows()) C.Sound.scene(); }
+  M.redraw();
+};
+/* ---------- Auto: the scene picks ---------- */
+M.follows = () => M.on && M.auto && M.open && !M.pick.album;
+const suits = (t, m) => (!m.tags.length || (t.tags || []).some(g => m.tags.includes(g))) && (!m.energy || !t.energy || Math.abs(m.energy - t.energy) <= 1);
+// The scene where you are (sound.js), with what music would suit it: {tags, energy}.
+M.scene = r => {
+  if (!M.follows() || !r || r.state !== 'ready') return;
+  const m = r.music && ((r.music.tags || []).length || r.music.energy) ? { tags: r.music.tags || [], energy: r.music.energy || null } : null;
+  if (JSON.stringify(m) === JSON.stringify(M.want)) return;
+  M.want = m; M.q = [];
+  if (!M.cur) { clearTimeout(soon); next(); return; }
+  if (!m || suits(M.cur, m)) return;             // what's playing fits here too: it plays out, and the next is picked for the scene
+  clearTimeout(soon); soon = setTimeout(() => next(), 1500);      // else a slow fade into something that fits
+};
 // A book is open (sound.js): the music plays while one is, and stops with it.
 M.opened = () => { M.open = true; M.start(); };
-M.closed = () => { M.open = false; if (M.cur) M.stop(); };
+M.closed = () => { M.open = false; M.want = null; clearTimeout(soon); if (M.cur) M.stop(); };
 M.volume = v => { M.vol = Math.max(0, Math.min(1, v)); store.set('musicVol', M.vol); run(); };
-let soon = null;
 function picked(){               // a moment after the last chip, so picking three isn't three changes of track
   store.set('musicPick', M.pick); M.q = [];
   clearTimeout(soon);
@@ -129,8 +158,8 @@ M.section = () => {
       '<button class="ib" data-mus="edit" title="Moods and tags" aria-label="Moods and tags"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h.01M10 10h.01M16 10h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>' +
       '<button class="ib" data-mus="next" title="Next" aria-label="Next"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5v11l8-5.5zM15 4.5v11" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></button></div>' : '') +
     (album ? '<div class="muschips">' + chip('noalbum', '', album.album || album.by, true) + '</div>'
-      : '<div class="muschips">' + M.moods.map(m => chip('mood', m.id, label(m.id), p.moods.includes(m.id))).join('') + '</div>' +
-        (shown.length ? '<div class="muschips mustags">' + shown.map(g => chip('tag', g, label(g), p.tags.includes(g))).join('') +
+      : '<div class="muschips">' + chip('auto', '', 'Auto', M.auto) + M.moods.map(m => chip('mood', m.id, label(m.id), p.moods.includes(m.id))).join('') + '</div>' +
+        (shown.length && !M.auto ? '<div class="muschips mustags">' + shown.map(g => chip('tag', g, label(g), p.tags.includes(g))).join('') +
           (tags.length > shown.length || M.more ? '<button class="chip musmore" data-mus="more">' + (M.more ? 'Fewer' : 'More') + '</button>' : '') + '</div>' : '')) +
     '<button data-mus="albums">Albums</button>' +
     '<button data-mus="toggle">' + (M.on ? 'Turn off Music' : 'Turn on Music') + '</button>';
@@ -170,6 +199,11 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-mus]'); if (!b) return;
   const a = b.dataset.mus, id = b.dataset.id, p = M.pick;
   if (a === 'toggle') M.turn(!M.on);
+  else if (a === 'auto') {
+    M.auto = !M.auto; store.set('musicAuto', M.auto); M.want = null; M.q = [];
+    if (!M.on) M.turn(true); else if (M.auto && C.Sound) C.Sound.scene();
+    M.redraw();
+  }
   else if (a === 'mood') { p.moods = flip(p.moods, id); p.album = null; const can = tagsNow(); p.tags = p.tags.filter(g => can.includes(g)); picked(); }
   else if (a === 'tag') { p.tags = flip(p.tags, id); picked(); }
   else if (a === 'more') { M.more = !M.more; M.redraw(); }
