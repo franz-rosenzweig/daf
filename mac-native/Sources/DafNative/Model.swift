@@ -14,6 +14,7 @@ enum PodNav: Hashable {
 enum Place: Hashable {
     case today
     case edition                      // the day's paper (Edition.swift)
+    case recents                      // what was read, watched and listened to, a day at a time (Recents.swift)
     case home                         // the Library's home: its shelves
     case review
     case library(String)              // inbox, later, archive
@@ -31,13 +32,14 @@ enum Place: Hashable {
     case manga
     case torah
     case podcasts
+    case listen(String)               // a row of the sidebar only: one of Listen's pages. Being there is .podcasts at that category (podNav)
     case highlights
     case stats
     case sources
     case search
 
     /// A page of its own across the window (sidebar and page), rather than a list and what's open.
-    var isPage: Bool { self == .today || self == .edition || self == .feeds || self == .catalog || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
+    var isPage: Bool { self == .today || self == .edition || self == .recents || self == .feeds || self == .catalog || self == .review || self == .stats || self == .podcasts || self == .sources || self == .home || self == .recovery }
 
     /// A list of the Library's (Inbox, Later, Archive, or a kind).
     var isLibrary: Bool {
@@ -55,6 +57,8 @@ enum Place: Hashable {
         switch self {
         case .today: return "Today"
         case .edition: return "Edition"
+        case .recents: return "Recents"
+        case .listen(let c): return PodcastCategories.cats.first { $0.0 == c }?.1 ?? "Podcasts"
         case .home: return "Home"
         case .review: return "Review"
         case .shortlist: return "Shortlist"
@@ -453,7 +457,7 @@ final class AppModel {
                 items = []
             case .recovery:
                 items = []
-            case .review, .highlights, .stats, .podcasts, .sources, .edition, .feeds, .catalog:
+            case .review, .highlights, .stats, .podcasts, .listen, .sources, .edition, .recents, .feeds, .catalog:
                 items = []
             case .manga:
                 let j = try await API.shared.json("/api/manga")
@@ -881,6 +885,7 @@ final class AppModel {
         guard let counts else { return nil }
         switch p {
         case .shortlist: return counts.i("starred").flatMap { $0 > 0 ? $0 : nil }
+        case .catalog: return Catalog.shared.loaded && Catalog.shared.total > 0 ? Catalog.shared.total : nil     // once All Books has been opened
         case .review:
             guard let r = today?.o("review"), let total = r.i("total") else { return nil }
             let left = total - (r.i("done") ?? 0)

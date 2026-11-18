@@ -176,14 +176,13 @@ struct BulkActions: View {
 
 // MARK: the sidebar's views and shelves
 
-/// Books, opening onto All Books and the shelves.
+/// Books, opening onto the shelves.
 struct BooksRow: View {
     @Environment(AppModel.self) private var model
     @AppStorage("shelvesOpen") private var open = false
 
     var body: some View {
         DisclosureGroup(isExpanded: $open) {
-            Label("All Books", systemImage: "tablecells").tag(Place.catalog)
             ForEach(model.shelves, id: \.self) { s in
                 // a Kindle shelf is a folder on the Kindle: made, renamed and removed there (kindleshelves.py)
                 let kindle = s.s("kindle") != nil

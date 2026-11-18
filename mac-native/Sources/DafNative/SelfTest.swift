@@ -5,6 +5,7 @@ import PDFKit
 
 /// The app testing itself against a sandbox Daf, never the real one:
 ///   DafNative -SelfTestBase http://… -SelfTestCookie c:<cookie> -SelfTestOut <dir>
+/// With -SelfTestOnly frame it stops after the window's frame (Today, the Library, the sidebar): under a minute.
 /// Each check is a PASS or FAIL line in <dir>/log.txt, with a picture of the window at each step;
 /// it ends with "SELFTEST passed" or "SELFTEST n failed" and quits.
 @MainActor
@@ -196,6 +197,7 @@ enum SelfTest {
             }.count
             check(rows >= 5 && shown >= 5, "the sidebar lists its places", "\(rows) rows, \(shown) of the first \(min(rows, 12)) laid out")
         }
+        await captureSidebar("02s-sidebar", m)
 
         // the sidebar: ⌘\ hides it and shows it again; full or mini when it shows
         if let w = main, let s = Focus.split(w), let side = s.splitViewItems.first {
@@ -207,6 +209,7 @@ enum SelfTest {
             let mini = await until(3) { !side.isCollapsed && wide() < 90 }
             await pause(0.8)
             capture("02b-sidebar-mini")
+            await captureSidebar("02t-sidebar-mini", m)
             Side.shared.toggle()
             let hidden = await until(3) { side.isCollapsed }
             Side.shared.toggle()
@@ -221,6 +224,44 @@ enum SelfTest {
                   "mini \(mini), hidden \(hidden), back \(back) (\(backWide) wide; \(backState); 2 s later \(later)), full \(full) (\(Int(wide())) wide)")
             Side.shared.mode = mode0 == "hidden" ? "full" : mode0         // shown for what follows
         }
+        // the web's map on its side: its tabs as the headings, Recents under Today, Listen's pages as rows
+        if let w = main, let side = Focus.split(w)?.splitViewItems.first?.viewController.view {
+            func table(_ v: NSView) -> NSTableView? { (v as? NSTableView) ?? v.subviews.lazy.compactMap(table).first }
+            func has(_ v: NSView, _ name: String) -> Bool { String(describing: type(of: v)).contains(name) || v.subviews.contains { has($0, name) } }
+            // the sidebar's list as it is now: a page and a list have different split views, each with its own
+            let now = { (Focus.split(w)?.splitViewItems.first?.viewController.view).flatMap(table) }
+            _ = await until(3) { (table(side)?.numberOfRows ?? 0) > 10 }
+            let rows = now()?.numberOfRows ?? 0
+            let heads = (0..<rows).filter { r in now()?.rowView(atRow: r, makeIfNecessary: true).map { has($0, "HeaderView") } ?? false }.count
+            let listens = Side.shared.pins(m.today?.o("settings")).contains("podcasts")
+            check(heads == (listens ? 6 : 5), "the sidebar's headings are the web's tabs (Today, Books, Library, Feed, Learn, Listen)", "\(heads) headings over \(rows) rows")
+            await go(m, .recents)
+            let rc = try? await API.shared.json("/api/recents?n=7")
+            await pause(1.5)
+            capture("02r-recents")
+            check(m.place == .recents && m.place?.isPage == true && rc?.raw["days"] != nil, "Recents is a page under Today, a day at a time",
+                  "\(rc?.a("days").count ?? -1) days, \(rc?.a("days").first?.a("items").count ?? 0) things in the newest")
+            if listens {
+                m.podNav = .cat("")
+                m.place = .podcasts
+                await pause(1)
+                _ = await until(3) { (now()?.selectedRow ?? -1) >= 0 }
+                let listening = now()?.selectedRow ?? -1
+                m.podNav = .cat("shows")
+                _ = await until(3) { (now()?.selectedRow ?? -1) == listening + 1 }
+                let shows = now()?.selectedRow ?? -1
+                now()?.selectRowIndexes([listening + 4], byExtendingSelection: false)
+                let books = await until(3) { m.podNav == .cat("audiobooks") && m.place == .podcasts }
+                await pause(0.8)
+                capture("02u-listen-audiobooks")
+                await captureSidebar("02u-sidebar-listen", m)
+                check(listening >= 0 && shows == listening + 1 && books, "Listen's pages are rows of their own, each opening the Podcasts page at its part",
+                      "rows \(listening) and \(shows), then Audiobooks \(books)")
+                m.podNav = .cat("")
+            }
+            await go(m, .library("inbox"))
+        }
+        if UserDefaults.standard.string(forKey: "SelfTestOnly") == "frame" { return finish(nil, only: "the frame") }
         // Library › Articles, with Inbox, Later and Archive
         await go(m, .kind("article"))
         let arts = m.items
@@ -238,6 +279,7 @@ enum SelfTest {
         let keptPins = (try? await API.shared.json("/api/settings"))?.raw["nav_pins"] as? [String] ?? []
         await pause(0.6)
         capture("02c-sidebar-pins")
+        await captureSidebar("02c-sidebar-pins-side", m)
         check(keptPins.contains("sources") && !keptPins.contains("torah") && Side.shared.pins(m.today?.o("settings")) == keptPins, "the sidebar's pins are kept in Daf", keptPins.joined(separator: ", "))
         await Side.shared.setPins(pins0)
         await go(m, .library("inbox"))
@@ -300,6 +342,7 @@ enum SelfTest {
         let paperLook = Theme.rgb(Theme.family("paper").light.bg).usingColorSpace(.sRGB)
         let pageBG = drawn(r.textView?.backgroundColor, in: r.textView)
         let sheet = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 342, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
+        sheet.isReleasedWhenClosed = false          // ours to let go: left as it is, closing it lets it go too, and the test crashed at its very end
         sheet.contentView = NSHostingView(rootView: ThemesPanel().environment(m))
         sheet.orderFront(nil)
         await pause(1)
@@ -2081,9 +2124,37 @@ enum SelfTest {
         await pause(0.5)
     }
 
-    static func finish(_ why: String?) {
+    /// The sidebar's own pictures. A picture of the window leaves the sidebar's rows out (the sidebar is glass,
+    /// and its rows aren't drawn into a bitmap of the window), so they're taken two other ways: `-rows` is the
+    /// window's own list drawn alone (its true rows and layout, in black on nothing), and `-look` is the same
+    /// Sidebar in a window of its own that never comes to the front (its colours, as a window behind others has them).
+    private static var sideWindow: NSWindow?
+    static func captureSidebar(_ name: String, _ m: AppModel) async {
+        guard let w = main, let side = Focus.split(w)?.splitViewItems.first, !side.isCollapsed else { return }
+        let view = side.viewController.view
+        func table(_ v: NSView) -> NSTableView? { (v as? NSTableView) ?? v.subviews.lazy.compactMap(table).first }
+        func shot(_ v: NSView, _ file: String) {
+            guard let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
+            v.cacheDisplay(in: v.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: out.appendingPathComponent(file + ".png"))
+        }
+        if let t = table(view) { shot(t, name + "-rows") }
+        let off = sideWindow ?? NSWindow(contentRect: NSRect(origin: .zero, size: view.frame.size), styleMask: [.borderless], backing: .buffered, defer: false)
+        if sideWindow == nil {
+            off.isReleasedWhenClosed = false
+            // on the window's own colour: the mini sidebar draws no background of its own (the glass is behind it)
+            off.contentView = NSHostingView(rootView: Sidebar().environment(m).background(Color(nsColor: .windowBackgroundColor)))
+            sideWindow = off
+        }
+        off.setContentSize(view.frame.size)
+        off.contentView?.layoutSubtreeIfNeeded()
+        await pause(1.2)
+        if let host = off.contentView { shot(host, name + "-look") }
+    }
+
+    static func finish(_ why: String?, only: String? = nil) {
         if let why { check(false, why) }
-        log(failures == 0 ? "SELFTEST passed" : "SELFTEST \(failures) failed")
+        log(failures == 0 ? "SELFTEST passed" + (only.map { " (only \($0))" } ?? "") : "SELFTEST \(failures) failed")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { NSApp.terminate(nil) }
     }
 }

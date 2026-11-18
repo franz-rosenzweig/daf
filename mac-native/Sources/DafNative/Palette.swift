@@ -23,7 +23,7 @@ struct PaletteSheet: View {
     }
 
     private static let places: [(String, Place)] = [
-        ("Today", .today), ("Edition", .edition), ("Feeds", .feeds), ("All Books", .catalog), ("Daily Review", .review), ("Home", .home), ("Inbox", .library("inbox")), ("Later", .library("later")),
+        ("Today", .today), ("Edition", .edition), ("Recents", .recents), ("Feeds", .feeds), ("All Books", .catalog), ("Daily Review", .review), ("Home", .home), ("Inbox", .library("inbox")), ("Later", .library("later")),
         ("Shortlist", .shortlist), ("Archive", .library("archive")), ("All Feeds", .feed(nil)), ("Books", .books), ("Manga", .manga),
         ("Highlights", .highlights), ("Stats", .stats), ("Torah", .torah), ("Recovery", .recovery), ("Podcasts", .podcasts),
         ("Paper Pages", .paper), ("Sources", .sources),
@@ -42,6 +42,7 @@ struct PaletteSheet: View {
             out.append(Row(id: out.count, label: label, sub: sub, snip: snip, serif: serif, go: go))
         }
         for (label, p) in Self.places where has(label) { add(label, "Go to") { model.place = p } }
+        for (cat, label, _) in Sidebar.listen where has(label) { add(label, "Go to") { model.podNav = .cat(cat); model.place = .podcasts } }
         for (label, tab) in Self.settings where has(label) {
             add(label, "Go to") { UserDefaults.standard.set(tab, forKey: "prefsTab"); model.showSettings = true }
         }
