@@ -93,14 +93,16 @@ final class Side {
     }
 }
 
-/// A row's look: its icon and name, or in the mini sidebar the icon with its name under it.
+/// A row's look: its icon and name, or in the mini sidebar the icon with its name under it. The name never
+/// shrinks to fit: text that scales with the width changes the rows' height, and in a sidebar 68–84 wide
+/// that fed back into the width until AppKit gave up on the window (the 0.6.6 self-test crash at mini).
 struct SideLabelStyle: LabelStyle {
     let mini: Bool
     func makeBody(configuration: Configuration) -> some View {
         if mini {
             VStack(spacing: 2) {
                 configuration.icon.font(.title3)
-                configuration.title.font(.system(size: 9.5, weight: .medium)).lineLimit(1).minimumScaleFactor(0.75)
+                configuration.title.font(.system(size: 9.5, weight: .medium)).lineLimit(1).truncationMode(.tail)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 2)
@@ -192,7 +194,7 @@ struct Sidebar: View {
                 bottom("Preferences", "gearshape", "⌘,", mini) { openSettings() }
             }
             .labelStyle(SideLabelStyle(mini: mini))
-            .padding(.horizontal, mini ? 6 : 10)
+            .padding(.horizontal, mini ? 4 : 10)
             .padding(.vertical, 8)
         }
     }
@@ -216,7 +218,7 @@ struct Sidebar: View {
                 Label(title, systemImage: icon)
                 if !mini, let key { Spacer(); Text(key).font(.caption).foregroundStyle(.tertiary) }
             }
-            .padding(.horizontal, 8).padding(.vertical, 5)
+            .padding(.horizontal, mini ? 1 : 8).padding(.vertical, 5)       // mini: the whole width for the name
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(on ? Color.secondary.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 6))
             .contentShape(Rectangle())

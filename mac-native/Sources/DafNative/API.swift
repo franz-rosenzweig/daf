@@ -126,7 +126,13 @@ final class API {
         if let opID { r.setValue(opID, forHTTPHeaderField: "X-Daf-Op") }
         do {
             if Connection.shared.forced { throw URLError(.notConnectedToInternet) }
-            let (data, response) = try await (slow ? slowSession : session).data(for: r)
+            let (data, response): (Data, URLResponse)
+            do { (data, response) = try await (slow ? slowSession : session).data(for: r) }
+            catch let e as URLError where e.code == .networkConnectionLost {
+                // a connection Daf had already closed (it lets one go after 5 s idle): once more on a new one
+                // before it counts as offline; the same X-Daf-Op, so a change that did get there isn't done twice
+                (data, response) = try await (slow ? slowSession : session).data(for: r)
+            }
             Connection.shared.reached()
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let parsed = (try? JSONSerialization.jsonObject(with: data)) ?? [:]

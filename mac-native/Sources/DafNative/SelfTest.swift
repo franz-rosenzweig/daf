@@ -186,6 +186,16 @@ enum SelfTest {
         check(!m.items.isEmpty, "the Library's Inbox lists its articles", "\(m.items.count)")
         check(m.count(.library("inbox")) != nil, "with the counts beside the sidebar")
         capture("02-library")
+        // the sidebar's own rows are in the window: a picture of the frontmost window leaves them out
+        if let w = main, let side = Focus.split(w)?.splitViewItems.first?.viewController.view {
+            func table(_ v: NSView) -> NSTableView? { (v as? NSTableView) ?? v.subviews.lazy.compactMap(table).first }
+            let t = table(side), rows = t?.numberOfRows ?? 0
+            let shown = (0..<min(rows, 12)).filter { r in
+                guard let rv = t?.rowView(atRow: r, makeIfNecessary: false) else { return false }
+                return !rv.isHiddenOrHasHiddenAncestor && rv.alphaValue > 0.01 && rv.frame.height > 8 && rv.frame.width > 40
+            }.count
+            check(rows >= 5 && shown >= 5, "the sidebar lists its places", "\(rows) rows, \(shown) of the first \(min(rows, 12)) laid out")
+        }
 
         // the sidebar: ⌘\ hides it and shows it again; full or mini when it shows
         if let w = main, let s = Focus.split(w), let side = s.splitViewItems.first {
@@ -1334,6 +1344,7 @@ enum SelfTest {
 
         await allBooks(m)
         await calibreEdit(m)
+        await calibreMore(m)
 
         // Stats
         await go(m, .stats)
@@ -1646,6 +1657,127 @@ enum SelfTest {
         check(ff["authors_flip"] as? Bool == true && ff["authors"] == nil, "several books' “Last, First” names turned around")
     }
 
+    /// Calibre, the rest (#42): tags, authors and series across the library, Find details for many,
+    /// the details into the files. Only against the sandbox, whose Calibre is a stand-in.
+    static func calibreMore(_ m: AppModel) async {
+        let cat = Catalog.shared
+        func ops() async -> [J] {
+            guard let d = try? await API.shared.data("/api/sandbox/calibre"), let j = J(try? JSONSerialization.jsonObject(with: d)) else { return [] }
+            return j.a("ops")
+        }
+        guard (try? await API.shared.data("/api/sandbox/calibre")) != nil else {
+            log("SKIP  tags, authors and series, and Find details for many: this Daf isn't the sandbox with Calibre's stand-in")
+            return
+        }
+        func table() -> NSTableView? {
+            func find(_ v: NSView) -> NSTableView? { (v as? CatalogTableView) ?? v.subviews.lazy.compactMap(find).first }
+            return window?.contentView.flatMap(find)
+        }
+        cat.resetAll()
+        await go(m, .catalog)
+        _ = await until(20) { cat.loaded && !cat.books.isEmpty }
+
+        // Tags, authors and series: every name with its count; rename, combine, delete, each through Calibre
+        CalibreNames.open = nil
+        m.sheet = .calibreNames
+        _ = await until(15) { CalibreNames.open?.loaded == true }
+        await pause(1.2)
+        capture("52a-names")
+        if let nm = CalibreNames.open, nm.loaded {
+            let keys = nm.fields.map(\.key)
+            check(nm.items.count > 1 && ["tags", "authors", "series"].allSatisfy(keys.contains), "Tags, Authors and Series lists every tag with its count, and the other fields",
+                  "\(nm.items.count) tags · \(nm.fields.map(\.label).joined(separator: ", "))")
+            let a = nm.items[0].name, b = nm.items[1].name
+            var n = await ops().count
+            nm.editing = b
+            await pause(1)
+            capture("52b-names-rename")
+            nm.editing = nil
+            await nm.rename([b], to: b + " (self-test)")
+            await nm.rename([a, b], to: a)
+            await nm.delete([b])
+            var got = Array(await ops().dropFirst(n))
+            let r1 = got.first?.o("renames")?.raw as? [String: String], r2 = got.dropFirst().first?.o("renames")?.raw as? [String: String]
+            check(got.map { $0.s("op") ?? "" } == ["rename_items", "rename_items", "remove_items"] && got.allSatisfy { $0.s("field") == "tags" }
+                  && r1 == [b: b + " (self-test)"] && r2 == [b: a] && got.last?.strings("names") == [b],
+                  "a tag renamed, two combined into the most used, and one deleted, each through Calibre", got.map { $0.s("op") ?? "" }.joined(separator: ", "))
+            nm.q = String(a.prefix(3))
+            check(!nm.shown.isEmpty && nm.shown.allSatisfy { $0.name.lowercased().contains(nm.q.lowercased()) }, "Find a Name narrows the list", "\(nm.shown.count) for “\(nm.q)”")
+            nm.q = ""
+            let q = nm.search(a)                // the tag's own search, made while the sheet is still on tags
+            await nm.load("authors")
+            await pause(1)
+            capture("52c-names-authors")
+            n = await ops().count
+            let refused = await nm.delete([nm.items.first?.name ?? ""])
+            got = Array(await ops().dropFirst(n))
+            check(nm.field == "authors" && !nm.items.isEmpty && !refused && got.isEmpty, "authors are listed too, and an author is never deleted",
+                  "\(nm.items.count) authors, \(nm.alike.count) look-alike groups")
+            if let g = nm.alike.first {
+                let to = nm.byUse(g)[0]
+                n = await ops().count
+                await nm.rename(g, to: to)
+                got = Array(await ops().dropFirst(n))
+                let r = got.first?.o("renames")?.raw as? [String: String]
+                check(got.first?.s("op") == "rename_items" && r == Dictionary(uniqueKeysWithValues: g.filter { $0 != to }.map { ($0, to) }),
+                      "Look Alike's Combine puts the group into the most used name", g.joined(separator: " · "))
+            }
+            m.sheet = nil
+            cat.setQ(q)
+            _ = await until(8) { cat.q == q && cat.loaded && cat.searchError == nil && cat.books.count < cat.total }
+            check(cat.searchError == nil && !cat.books.isEmpty && cat.books.allSatisfy { $0.strings("tags").contains(a) }, "a name's count shows its books in All Books", "\(q): \(cat.books.count)")
+            cat.setQ("")
+            _ = await until(8) { cat.q.isEmpty && cat.books.count == cat.total }
+        } else { check(false, "Tags, Authors and Series opens", CalibreNames.open?.failed ?? "") }
+        m.sheet = nil
+        await pause(0.8)
+
+        // Find details for many: only what each book is missing; a line taken out stays as the book has it
+        _ = await until(10) { (table()?.numberOfRows ?? 0) > 5 }
+        table()?.selectRowIndexes(IndexSet(0..<6), byExtendingSelection: false)
+        _ = await until(5) { cat.chosen.count == 6 }
+        let six = cat.chosenCals
+        BookFill.open = nil
+        m.sheet = .fillBooks(six)
+        _ = await until(10) { BookFill.open?.ids == six }
+        await pause(1)
+        capture("52d-fill-pick")
+        if let f = BookFill.open, f.ids == six {
+            await f.look()
+            await pause(1)
+            capture("52e-fill-results")
+            check(f.step == .results && f.failed == nil && f.results.count == six.count && !f.some.isEmpty,
+                  "Find Details for six books looks them all up (the sandbox's stand-in for Hardcover)", "\(f.some.count) with something, \(f.none.count) without" + (f.failed.map { " · " + $0 } ?? ""))
+            if let i = f.results.firstIndex(where: { !$0.fill.isEmpty }) {
+                let r = f.results[i], k = r.fill["series"] != nil ? "series" : (r.lines.first ?? "cover")
+                f.results[i].off.insert(k)
+                let sent = f.chosen.first { ($0["id"] as? Int) == r.id }?["fill"] as? [String: Any]
+                check(sent != nil && sent?[k] == nil && (k != "series" || sent?["series_index"] == nil), "a line taken out isn't sent", "\(r.title): \(k)")
+                let n = await ops().count
+                let want = f.chosen.count
+                let wantCovers = f.chosen.filter { (($0["fill"] as? [String: Any])?["cover"]) != nil }.count
+                let ok = await f.save()
+                let got = Array(await ops().dropFirst(n))
+                let sets = got.filter { $0.s("op") == "set" }, covers = got.filter { $0.s("op") == "cover" }
+                let mine = sets.first { $0.list("ids").compactMap { ($0 as? NSNumber)?.intValue } == [r.id] }
+                check(ok && sets.count == want && covers.count == wantCovers && (mine == nil || mine?.o("fields")?.raw[k] == nil),
+                      "Save fills in the ticked books through Calibre, covers too", "\(sets.count) books, \(covers.count) covers")
+            }
+        } else { check(false, "Find Details for the chosen books opens") }
+        m.sheet = nil
+        cat.chosen = []
+        await pause(0.8)
+
+        // the details into the files: the ⋯ menu says how many are left, then offers it again
+        do { try await cat.embedAll() } catch { log("embed: \(error.localizedDescription)") }
+        let counting = cat.embedPending > 0
+        let n0 = cat.embedPending
+        let drained = await until(20) { cat.embedPending == 0 }
+        let sent = await ops().last
+        check(counting && drained && sent?.s("op") == "embed" && (sent?.i("count") ?? 0) >= cat.total,
+              "Write Details into Every File asks for the whole library, and counts down while Calibre works", "\(n0) to go, then \(cat.embedPending)")
+    }
+
     /// A book Calibre has only as a PDF: its pages in the PDF view, its place kept as the book's.
     static func pdfBook(_ m: AppModel) async {
         var pdfID: String?
@@ -1701,7 +1833,9 @@ enum SelfTest {
             check(k == bm.section && at >= vis.location && at <= NSMaxRange(vis), "it opens at the place Daf kept", "\(pos) → chapter \(k ?? -1), character \(at); showing \(vis.location)–\(NSMaxRange(vis))")
             let mine = t0.cfi(at).map { CFI.join(epub.sections[bm.section].cfi, $0) } ?? ""
             let theirs = CFI.wrap(CFI.string(parsed.collapse()))
-            check(mine == theirs, "a place written here is the very CFI the page writes", "page \(theirs), here \(mine)")
+            // one kept from the Kindle is a range on Calibre's page-break marks: that comes back as the same character
+            let same = mine == theirs || (pos.contains(",") && at >= 0 && t0.range(of: CFI.parse(mine))?.location == at)
+            check(same, "a place written here is the very CFI the page writes", "page \(theirs), here \(mine)")
         }
 
         // every highlight made in the page's reader lands on its own words

@@ -145,6 +145,8 @@ struct MainView: View {
             case .editBooks(let ids): BookEditSheet(ids: ids).environment(model)
             case .mergeBooks(let ids): MergeSheet(ids: ids).environment(model)
             case .calibreTrash: TrashSheet().environment(model)
+            case .fillBooks(let ids): FillSheet(ids: ids).environment(model)
+            case .calibreNames: NamesSheet().environment(model)
             }
         }
         .importsItemProviders([.image]) { PaperPages.take($0) }        // Continuity Camera: File › Import from iPhone

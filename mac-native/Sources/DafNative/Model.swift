@@ -312,6 +312,7 @@ final class AppModel {
         case addLink, paper, follow, renameFeed(String), saveView, newShelf(String?), renameShelf(String), feedback, palette, shortcuts
         case editBooks([Int])                // Calibre ids: one book's details, or several at once (BookEdit.swift)
         case mergeBooks([Int]), calibreTrash
+        case fillBooks([Int]), calibreNames    // Find details for many; tags, authors and series (CalibreNames.swift)
         var id: String {
             switch self {
             case .addLink: return "addLink"
@@ -327,6 +328,8 @@ final class AppModel {
             case .editBooks(let ids): return "edit " + ids.map(String.init).joined(separator: ",")
             case .mergeBooks(let ids): return "merge " + ids.map(String.init).joined(separator: ",")
             case .calibreTrash: return "calibreTrash"
+            case .fillBooks(let ids): return "fill " + ids.map(String.init).joined(separator: ",")
+            case .calibreNames: return "calibreNames"
             }
         }
     }
