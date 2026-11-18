@@ -171,6 +171,80 @@ def _public(i, t):
             "energy": t.get("energy") or None, "src": f"/api/music/tracks/{i}.mp3"}
 
 
+# ---- every album, sorted or not: the Music page ---------------------------------------------------
+
+def _in_order(rows):
+    return sorted(rows, key=lambda r: (r[1].get("disc") or 1, r[1].get("n") or 0, r[1].get("path") or ""))
+
+
+def _counts(tracks, field):
+    n = {}
+    for t in tracks:
+        for w in t.get(field) or ():
+            n[w] = n.get(w, 0) + 1
+    return [{"id": w, "n": k} for w, k in sorted(n.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
+def _album(aid, tracks):
+    t0 = tracks[0]
+    en = [t["energy"] for t in tracks if t.get("energy")]
+    return {"id": aid, "album": t0.get("album") or "", "by": t0.get("by") or t0.get("artist") or "", "n": len(tracks),
+            "secs": round(sum(t.get("secs") or 0 for t in tracks)), "sorted": sum(1 for t in tracks if t.get("moods")),
+            "off": sum(1 for t in tracks if t.get("off")), "moods": _counts(tracks, "moods"), "tags": _counts(tracks, "tags"),
+            "energy": max(set(en), key=en.count) if en else None}
+
+
+def albums():
+    """Every album in the catalogue, whether any of it is sorted into a mood yet: {id, album, by, n, secs,
+    sorted (tracks with a mood), off, moods: [{id, n}], tags: [{id, n}], energy (the most usual)}."""
+    by = {}
+    for t in load()["tracks"].values():
+        if not t.get("gone"):
+            by.setdefault(album_id(t), []).append(t)
+    out = [_album(a, ts) for a, ts in by.items()]
+    out.sort(key=lambda a: ((a["by"] or "\uffff").lower(), a["album"].lower()))
+    return out
+
+
+def album(aid):
+    """One album with its tracks in order, each as the queue gives it plus {off, n}."""
+    rows = _in_order([(i, t) for i, t in load()["tracks"].items() if not t.get("gone") and album_id(t) == aid])
+    if not rows:
+        return None
+    return {**_album(aid, [t for _, t in rows]), "tracks": [{**_public(i, t), "off": bool(t.get("off")), "n": t.get("n")} for i, t in rows]}
+
+
+def album_say(aid, b):
+    """A whole album at once: {add: {moods, tags}, remove: {moods, tags}, energy}. Each track keeps what
+    else it had, so the one sad track on a bright album stays sad. The album as it is now."""
+    add, rem = (b.get(k) if isinstance(b.get(k), dict) else {} for k in ("add", "remove"))
+    with changing():
+        cat = load()
+        tracks, n = dict(cat["tracks"]), 0
+        order = list(cat.get("moods") or [])
+        for i, t in cat["tracks"].items():
+            if t.get("gone") or album_id(t) != aid:
+                continue
+            t = dict(t)
+            for field, most in (("moods", 6), ("tags", 12)):
+                have = [w for w in t.get(field) or [] if w not in words(rem.get(field), 40)]
+                have += [w for w in words(add.get(field), 40) if w not in have]
+                if have or field in t:
+                    t[field] = have[:most]
+            if b.get("energy") in (1, 2, 3):
+                t["energy"] = b["energy"]
+            t["said"] = int(time.time())
+            tracks[i] = t
+            n += 1
+        if not n:
+            return None
+        for m in words(add.get("moods"), 40):
+            if m not in order:
+                order.append(m)
+        save({"moods": order, "tracks": tracks})
+    return album(aid)
+
+
 def fit(t, match):
     """How well a track suits what a scene asks for ({tags, energy}): a point for each tag they
     share, less for every step its energy is away."""
@@ -181,10 +255,11 @@ def fit(t, match):
     return s
 
 
-def queue(moods=(), tags=(), album=None, recent=(), n=25, match=None, rng=random):
+def queue(moods=(), tags=(), album=None, recent=(), n=25, match=None, rng=random, every=False):
     """The next tracks to play.
 
-    - album: that album, in its order.
+    - album: that album, in its order. every: all of it, the tracks with no mood yet and the ones
+      turned off too, to hear an album before sorting it (the Music page).
     - moods and tags: a shuffle of the tracks in any of those moods (every mood, with none named),
       kept to those with any of those tags when tags are named. What played lately comes last, and
       two from one album don't follow each other when it can be helped.
@@ -192,9 +267,8 @@ def queue(moods=(), tags=(), album=None, recent=(), n=25, match=None, rng=random
     """
     can = offered()
     if album:
-        rows = [(i, t) for i, t in can.items() if album_id(t) == album]
-        rows.sort(key=lambda r: (r[1].get("disc") or 1, r[1].get("n") or 0, r[1].get("path") or ""))
-        return [_public(i, t) for i, t in rows]
+        src = {i: t for i, t in load()["tracks"].items() if not t.get("gone")} if every else can
+        return [_public(i, t) for i, t in _in_order([(i, t) for i, t in src.items() if album_id(t) == album])]
     moods, tags = set(words(moods)), set(words(tags))
     pool = [(i, t) for i, t in can.items() if (not moods or moods & set(t["moods"])) and (not tags or tags & set(t.get("tags") or ()))]
     recent = list(recent or ())
@@ -302,9 +376,10 @@ _few = threading.BoundedSemaphore(2)
 
 
 def copy_of(i):
-    """The listening copy of a track, made now if it isn't there. None: no such track, or its file is gone."""
-    t = offered().get(i)
-    if t is None:
+    """The listening copy of a track, made now if it isn't there. None: no such track, or its file is gone.
+    Any track in the catalogue, sorted or not, so an album can be heard before it's sorted."""
+    t = load()["tracks"].get(i)
+    if t is None or t.get("gone"):
         return None
     out = COPIES / f"{i}.mp3"
     if out.exists():
@@ -388,7 +463,7 @@ def router():
 
     @r.post("/api/music/queue", dependencies=[Depends(user_or_device)])
     async def post_queue(b=Depends(json_body)):
-        """{moods, tags, album, recent, n, match: {tags, energy}} → {tracks}: what to play next (queue)."""
+        """{moods, tags, album, all, recent, n, match: {tags, energy}} → {tracks}: what to play next (queue)."""
         try:
             n = min(60, max(1, int(b.get("n") or 25)))
         except (TypeError, ValueError):
@@ -398,7 +473,7 @@ def router():
         match = b.get("match") if isinstance(b.get("match"), dict) else None
         if match:
             match = {"tags": words(match.get("tags")), "energy": match.get("energy") if match.get("energy") in (1, 2, 3) else None}
-        tracks = await run_in_threadpool(queue, b.get("moods") or (), b.get("tags") or (), album, recent, n, match)
+        tracks = await run_in_threadpool(queue, b.get("moods") or (), b.get("tags") or (), album, recent, n, match, random, bool(b.get("all")))
         ahead([t["id"] for t in tracks[:2]])
         return {"tracks": tracks}
 
@@ -421,5 +496,25 @@ def router():
         if t is None:
             raise HTTPException(404, "No such track")
         return t
+
+    @r.get("/api/music/albums", dependencies=[Depends(user)])
+    async def get_albums():
+        """Every album in the catalogue, sorted or not (albums), for the Music page."""
+        return {"albums": await run_in_threadpool(albums)}
+
+    @r.get("/api/music/albums/{aid}", dependencies=[Depends(user)])
+    async def get_album(aid: str):
+        a = await run_in_threadpool(album, aid) if ID.fullmatch(aid) else None
+        if a is None:
+            raise HTTPException(404, "No such album")
+        return a
+
+    @r.post("/api/music/albums/{aid}", dependencies=[Depends(user)])
+    async def post_album(aid: str, b=Depends(json_body)):
+        """{add: {moods, tags}, remove: {moods, tags}, energy}: a whole album at once (album_say)."""
+        a = await run_in_threadpool(album_say, aid, b) if ID.fullmatch(aid) else None
+        if a is None:
+            raise HTTPException(404, "No such album")
+        return a
 
     return r

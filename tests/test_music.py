@@ -157,6 +157,58 @@ class Correct(Base):
         self.assertEqual(len(music.queue()), 1)
 
 
+class Albums(Base):
+    """The Music page: every album, sorted or not, and saying something about a whole album at once."""
+
+    def setUp(self):
+        super().setUp()
+        self.a1, self.a2, self.b1, self.b2, self.c1 = self.keep(
+            track("a/1.flac", moods=["piano"], tags=["sad"], energy=1),
+            track("a/2.flac", moods=["piano"], tags=["bright"], energy=1, n=2, off=True),
+            track("b/1.flac", album="High Water"), track("b/2.flac", album="High Water", n=2),
+            track("c/1.flac", album="Salt", moods=["still"], gone=True), moods=["piano"])
+        self.low, self.high = (music.album_id(music.load()["tracks"][i]) for i in (self.a1, self.b1))
+
+    def test_every_album_is_listed_with_how_far_its_sorted(self):
+        got = {a["album"]: a for a in music.albums()}
+        self.assertEqual(set(got), {"Low Tide", "High Water"})                         # not the one whose files are gone
+        low, high = got["Low Tide"], got["High Water"]
+        self.assertEqual((low["n"], low["sorted"], low["off"], low["energy"]), (2, 2, 1, 1))
+        self.assertEqual(low["moods"], [{"id": "piano", "n": 2}])
+        self.assertEqual(low["tags"], [{"id": "bright", "n": 1}, {"id": "sad", "n": 1}])
+        self.assertEqual((high["n"], high["sorted"], high["moods"], high["energy"]), (2, 0, [], None))
+
+    def test_an_album_gives_its_tracks_in_order(self):
+        a = music.album(self.low)
+        self.assertEqual([(t["id"], t["off"]) for t in a["tracks"]], [(self.a1, False), (self.a2, True)])
+        self.assertIsNone(music.album("0" * 12))
+
+    def test_a_whole_album_is_sorted_at_once(self):
+        a = music.album_say(self.high, {"add": {"moods": ["Story", "late night"], "tags": ["Sea"]}, "energy": 2})
+        self.assertEqual((a["sorted"], a["energy"]), (2, 2))
+        self.assertEqual(a["moods"], [{"id": "late night", "n": 2}, {"id": "story", "n": 2}])
+        cat = music.load()
+        self.assertEqual(cat["moods"], ["piano", "story", "late night"])                # the new moods join the row
+        self.assertTrue(all(cat["tracks"][i]["said"] for i in (self.b1, self.b2)))
+        self.assertEqual({t["id"] for t in music.queue(moods=["story"])}, {self.b1, self.b2})
+
+    def test_each_track_keeps_what_else_it_had(self):
+        music.album_say(self.low, {"add": {"moods": ["still"], "tags": ["night"]}, "remove": {"tags": ["bright"]}})
+        t = music.load()["tracks"]
+        self.assertEqual((t[self.a1]["moods"], t[self.a1]["tags"]), (["piano", "still"], ["sad", "night"]))
+        self.assertEqual((t[self.a2]["moods"], t[self.a2]["tags"], t[self.a2]["off"]), (["piano", "still"], ["night"], True))
+        music.album_say(self.low, {"remove": {"moods": ["piano", "still"]}})            # no mood left: not offered any more
+        self.assertEqual(music.album(self.low)["sorted"], 0)
+        self.assertEqual(music.queue(), [])
+        self.assertIsNone(music.album_say("0" * 12, {"add": {"moods": ["x"]}}))
+
+    def test_an_unsorted_album_can_be_heard_whole(self):
+        self.assertEqual(music.queue(album=self.high), [])
+        self.assertEqual([t["id"] for t in music.queue(album=self.high, every=True)], [self.b1, self.b2])
+        self.assertEqual([t["id"] for t in music.queue(album=self.low, every=True)], [self.a1, self.a2])   # the one turned off too
+        self.assertEqual([t["id"] for t in music.queue(album=self.low)], [self.a1])
+
+
 class Copies(Base):
     def test_a_path_cant_leave_the_folder(self):
         (self.tmp / "secret.flac").write_bytes(b"x")
@@ -195,6 +247,14 @@ class Copies(Base):
         with mock.patch.object(music.subprocess, "run", side_effect=AssertionError("made twice")):
             self.assertEqual(music.copy_of(a), p)
         self.assertIsNone(music.copy_of("0" * 12))
+
+    @unittest.skipUnless(FFMPEG, "needs ffmpeg")
+    def test_an_unsorted_track_can_be_heard_but_not_a_gone_one(self):
+        tone(self.root / "a" / "1.wav")
+        tone(self.root / "a" / "2.wav")
+        a, b = self.keep(track("a/1.wav"), track("a/2.wav", moods=["still"], gone=True))
+        self.assertTrue(music.copy_of(a))
+        self.assertIsNone(music.copy_of(b))
 
 
 class Tool(Base):
