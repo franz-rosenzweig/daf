@@ -138,6 +138,59 @@ class SendToKindle(unittest.TestCase):
         self.assertEqual((r["queued"], r["skipped"]), (0, [99]))
         self.assertEqual(self.c.execute("SELECT COUNT(*) FROM kindle_queue").fetchone()[0], 0)
 
+    def test_a_book_calibre_wrote_again_goes_at_its_new_size(self):
+        self.app.post_catalog_kindle({"ids": [1]}, c=self.c)
+        epub = self.dbp.parent / "Some Writer/A Made Up Novel (1)/A Made Up Novel - Some Writer.epub"
+        self.assertEqual(kindlequeue.inbox(self.c)[0]["size"], 6)
+        epub.write_bytes(b"PK one, with its details written in")      # as Calibre does after a change to the book's details
+        self.assertEqual(kindlequeue.inbox(self.c)[0]["size"], epub.stat().st_size)
+        self.assertEqual(self.c.execute("SELECT size FROM kindle_queue WHERE id = 'book:cal:1'").fetchone()[0], epub.stat().st_size)
+
+
+class Inbox(unittest.TestCase):
+    """What the Kindle's plugin is told is waiting: each file at the size it is when the Kindle asks."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.c = daf_conn()
+        self.addCleanup(self.c.close)
+        self.f = Path(self.tmp.name) / "Some Articles.epub"
+        self.f.write_bytes(b"PK articles")
+        kindlequeue.queue_file(self.c, self.f)
+
+    def size(self):
+        return self.c.execute("SELECT size FROM kindle_queue WHERE id = 'file:Some Articles.epub'").fetchone()[0]
+
+    def test_as_it_was_queued(self):
+        self.assertEqual(kindlequeue.inbox(self.c), [{"id": "file:Some Articles.epub", "name": "Some Articles.epub", "shelf": "Daf", "size": 11}])
+        self.assertEqual(self.size(), 11)
+
+    def test_a_file_that_grew_is_reported_at_its_new_size(self):
+        with open(self.f, "ab") as fh:
+            fh.write(b" and a few more bytes")
+        self.assertEqual(self.size(), 11)                                 # the row still has the size it was queued at
+        self.assertEqual(kindlequeue.inbox(self.c)[0]["size"], 32)
+        self.assertEqual(self.size(), 32)                                 # and is put right as the Kindle asks
+
+    def test_a_file_that_shrank(self):
+        self.f.write_bytes(b"PK")
+        self.assertEqual(kindlequeue.inbox(self.c)[0]["size"], 2)
+        self.assertEqual(self.size(), 2)
+
+    def test_a_file_thats_gone_leaves_the_inbox(self):
+        self.f.unlink()
+        self.assertEqual(kindlequeue.inbox(self.c), [])
+        row = self.c.execute("SELECT size, error FROM kindle_queue").fetchone()
+        self.assertEqual(tuple(row), (11, "The file isn't on the server any more"))
+
+    def test_one_delivered_is_left_as_it_was(self):
+        kindlequeue.done(self.c, "file:Some Articles.epub")
+        with open(self.f, "ab") as fh:
+            fh.write(b" more")
+        self.assertEqual(kindlequeue.inbox(self.c), [])
+        self.assertEqual(self.size(), 11)
+
 
 class Options(unittest.TestCase):
     def test_calibres_defaults(self):

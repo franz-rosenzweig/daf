@@ -93,13 +93,21 @@ def on_device(conn):
 def inbox(conn):
     """For the plugin: what to download, oldest first. One the plugin turned down (a different file by
     that name on the Kindle, too big, no room) isn't offered again until it's sent again from Daf: a
-    download that failed on the way never reaches /done, so an error here is always a refusal."""
+    download that failed on the way never reaches /done, so an error here is always a refusal.
+
+    The size is the file's as it is now, not as it was when it was queued: Calibre writes a book's
+    file again whenever its details change, a few bytes bigger or smaller, and the plugin turns down
+    a download that isn't the size it was told. The row is kept in step."""
     out = []
     for r in conn.execute("SELECT * FROM kindle_queue WHERE delivered IS NULL AND error IS NULL ORDER BY requested").fetchall():
-        if not Path(r["path"]).exists():
+        try:
+            size = Path(r["path"]).stat().st_size
+        except OSError:
             conn.execute("UPDATE kindle_queue SET error = ? WHERE id = ?", ("The file isn't on the server any more", r["id"]))
             continue
-        out.append({"id": r["id"], "name": r["name"], "shelf": r["shelf"], "size": r["size"]})
+        if size != r["size"]:
+            conn.execute("UPDATE kindle_queue SET size = ? WHERE id = ?", (size, r["id"]))
+        out.append({"id": r["id"], "name": r["name"], "shelf": r["shelf"], "size": size})
     return out
 
 
