@@ -2261,6 +2261,8 @@ select.edpast{appearance:auto;padding-right:6px}
 .musrow .musvol{flex:0 1 120px;min-width:70px;accent-color:var(--accent)}
 .musrow .ib{flex:none}
 @media (max-width:700px){ .musrow .musvol{order:5;flex:1 1 100%;max-width:none} }
+.musbtn.on{color:var(--accent)}
+@media (max-width:600px){ #rtop .musbtn{display:none} }
 /* The Music page (musicpage.js): every album, and under an open one its moods, tags, energy and tracks */
 .muspage{max-width:860px}
 .muspage .musbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
@@ -2299,6 +2301,11 @@ select.edpast{appearance:auto;padding-right:6px}
 .pop .menu.sndpop .chip.musmore{border-style:dashed;color:var(--fg-3)}
 .pop .menu.sndpop .ib{width:36px;height:36px;padding:0;justify-content:center;flex:none;color:var(--fg-2)}
 .sndpop .musalbums{display:flex;flex-direction:column}
+.sndpop .musst{display:flex;align-items:center;gap:2px}
+.sndpop .musst > button:first-child{flex:1;min-width:0}
+.pop .menu.sndpop .mush .btn{flex:none;justify-content:center;padding:0 12px;border:1px solid var(--line-2);min-height:32px;font-size:13px}
+.sndpop .musradd{flex-wrap:wrap}
+.sndpop .musradd .field{flex:1 1 130px}
 .sndpop .musalbums .mute{font-size:12.5px;flex:none;color:var(--fg-3)}
 .sndpop .musadd{display:flex;gap:8px;padding:6px 12px 8px}
 .sndpop .musadd .field{flex:1;min-width:0;min-height:34px;padding:5px 10px;font-size:14px}

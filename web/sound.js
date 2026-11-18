@@ -180,7 +180,7 @@ function draw(){
   if (b) { b.classList.toggle('on', playing()); b.title = S.mode === 'book' && S.r && S.r.scene ? S.r.scene : 'Sound'; }
   const p = $('#pop .sndpop'), f = document.activeElement;
   // not under a finger on a slider, nor under a word half typed
-  if (p && !p.querySelector('input[type=range]:active') && !(f && p.contains(f) && f.matches('input.field') && f.value)) { p.outerHTML = popHTML(); place(); }
+  if (p && !p.querySelector('input[type=range]:active') && !(f && p.contains(f) && [...p.querySelectorAll('input.field')].some(i => i.value))) { p.outerHTML = popHTML(); place(); }
   if ($('#sndtoday') && (S.mode === 'kindle' || $('#sndtoday').innerHTML)) drawToday();
 }
 function popHTML(){
@@ -194,7 +194,7 @@ function popHTML(){
 // Where the menu sits: by its button, and again whenever what's in it changes size.
 function place(){
   const p = $('#pop');
-  if (S.only && S.anchor && !S.anchor.isConnected) S.anchor = $('#mustoday [data-mus="menu"]') || S.anchor;      // Today's row was drawn again
+  if (S.only && S.anchor && !S.anchor.isConnected) S.anchor = $('#mustoday [data-mus="menu"]') || $('.musbtn:not([hidden])') || $('[data-ract="more"]') || S.anchor;      // its row or bar was drawn again
   const anchor = S.anchor;
   if (!anchor || p.hidden || !p.querySelector('.sndpop')) return;
   const r = anchor.getBoundingClientRect();

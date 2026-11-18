@@ -59,6 +59,7 @@ C.views.pdf = async args => {
     '<button class="ib pvz" data-pv="out" aria-label="Smaller" title="Smaller' + tip('smaller') + '">−</button><button class="ib pvz" data-pv="in" aria-label="Larger" title="Larger' + tip('larger') + '">+</button>' +
     '<button class="ib" data-pv="find" title="Search in the PDF' + tip('search') + '" aria-label="Search in the PDF">' + IC.search + '</button>' +
     '<button class="ib" data-pv="view" title="View" aria-label="View">' + IC.view + '</button>' +
+    (C.Music ? C.Music.button() : '') +       // your own music under the pages (music.js)
     (book ? '' : '<a class="btn sm" href="#read/' + encodeURIComponent(id) + '" data-swap title="The text, reflowed">Text</a>') +
     (C.Sketch ? C.Sketch.button('pdf') : '') + (C.Focus ? C.Focus.button('article') : '') + '</div>' +
     '<div class="pdfbody"><aside class="pdfside" id="pside" aria-label="Pages and contents"></aside><div class="pscrim" data-pv="sideclose"></div>' +

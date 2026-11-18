@@ -995,6 +995,7 @@ function drawReaderTop(){
     (feed || pod ? '<button class="ib" data-dact="save" data-id="' + esc(d.id) + '" title="Save to Library' + K.tip('article', 'save') + '" aria-label="Save to Library">' + ICON.save + '</button>' : '') +
     (pod ? '' : '<button class="ib" data-dact="' + (feed ? 'seen' : 'archive') + '" data-id="' + esc(d.id) + '" title="Done' + K.tip('article', 'archive') + '" aria-label="Done">' + ICON.done + '</button>') +
     (d.has_pdf ? '<a class="btn sm" href="#pdf/' + encodeURIComponent(d.id) + '" data-swap title="The PDF as printed, to read and highlight on">Pages</a>' : '') +
+    (C.Music ? C.Music.button() : '') +       // your own music under the page (music.js); on a phone it's in the … menu
     '<button class="ib" data-ract="more" title="More actions (m)" aria-label="More actions"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg></button>' +
     // one button for the side panel: the Notebook, Info and Ask (sketchbook.js)
     (C.Sketch ? C.Sketch.button() : '<button class="ib' + (R.panelOpen ? ' on' : '') + '" data-ract="panel" title="Info' + K.tip('article', 'panel') + '" aria-label="Info">' + ICON.panel + '</button>');
@@ -1010,7 +1011,7 @@ function openMore(anchor){
   const phone = matchMedia('(max-width:600px)').matches, pv = neighbor(d.id, -1), nx = neighbor(d.id, 1);
   p.innerHTML = '<div class="menu">' +
     (nx ? it('nextdoc', 'Next in the list', K.label('article', 'nextdoc')) : '') + (pv ? it('prevdoc', 'Previous in the list', K.label('article', 'prevdoc')) : '') +
-    (phone ? it('panel', R.panelOpen ? 'Hide the info' : 'Info', '') + (d.has_pdf && d.blocks.length ? it('pages', 'The PDF as printed', '') : '') : '') +
+    (phone ? it('panel', R.panelOpen ? 'Hide the info' : 'Info', '') + (d.has_pdf && d.blocks.length ? it('pages', 'The PDF as printed', '') : '') + (C.Music && C.Music.has ? it('music', 'Music', '') : '') : '') +
     (!feed ? it('star', d.starred ? 'Off the Shortlist' : 'Shortlist', K.label('article', 'star')) : '') +
     (C.Focus ? it('focus', C.Focus.on() ? 'Leave focus mode' : 'Focus mode', K.label('article', 'focus')) : '') + '<hr>' +
     it('note', 'Add a document note', K.label('article', 'docnote')) +
@@ -1043,6 +1044,7 @@ function moreAct(a){
   else if (a === 'full') loadFull(d.id);
   else if (a === 'device') deviceList().then(on => keepOnDevice(d.id, !(on && on.pinned.has(d.id))));
   else if (a === 'pages') C.swap('#pdf/' + encodeURIComponent(d.id));
+  else if (a === 'music') { const b = $('[data-ract="more"]'); if (b && C.Sound) C.Sound.menu(b, true); }
   else if (a === 'note') { R.panel = 'info'; openPanel(); drawPanel(); setTimeout(() => { const x = $('#docnote'); if (x) x.focus(); }, 40); }
   else if (a === 'listen') { if (R.tts.on && R.tts.doc === d.id) stopTTS(); else startTTS(); }
   else if (a === 'margin' && C.Margin) C.Margin.toggle();

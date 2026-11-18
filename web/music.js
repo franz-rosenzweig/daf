@@ -3,7 +3,8 @@
    order. With Auto the scene picks the tags instead: Sound's reading of the book says what music
    suits where you are (soundscape.py), and the tracks that fit it best play, within your moods.
    It plays in two places: in the reader while a book is open (kept on for the next book), and
-   from Today's Music row with no book open, beside the Kindle or a paper book, until it's stopped. Whole tracks, so two <audio> elements take turns: the next fades in over FADE seconds
+   from Today's Music row with no book open, beside the Kindle or a paper book, until it's stopped.
+   Radio is the third thing it can play: one of your own stations, passed on by the server. Whole tracks, so two <audio> elements take turns: the next fades in over FADE seconds
    while the last fades out. What you pick, the volume and whether it's on stay on this device.
    The track that's playing can be fixed from the menu: Not for reading, or its moods and tags. */
 (() => {
@@ -14,7 +15,7 @@ const FADE = 4, FEW = 14;
 const M = C.Music = { has: null, moods: [], albums: [], on: false, open: false, beside: false, vol: store.get('musicVol', 0.35),
   pick: Object.assign({ moods: [], tags: [], album: null }, store.get('musicPick', {})), auto: !!store.get('musicAuto', false), want: null,
   q: [], cur: null, els: [], live: -1, duck: 1,
-  view: 'main', more: false, fails: 0 };
+  view: 'main', more: false, fails: 0, rad: null, stations: null, radEdit: false };
 // on: it's wanted now. open: a book is open in the reader. beside: it was started from Today.
 const there = () => M.open || M.beside;
 M.going = () => M.on && there();
@@ -40,7 +41,13 @@ function el(k){
   if (!M.els[k]) {
     const a = new Audio(); a.preload = 'auto';
     a.addEventListener('ended', () => { if (k === M.live) next(); });
-    a.addEventListener('error', () => { if (k === M.live && a.getAttribute('src')) { M.fails++; if (M.fails < 4) next(true); else M.stop(); } });
+    a.addEventListener('error', () => {
+      if (k !== M.live || !a.getAttribute('src')) return;
+      M.fails++;
+      if (M.fails < 4) next(true);
+      else if (M.rad) { M.rad = null; if (C.toast) C.toast('The station didn’t answer'); M.turn(false); }
+      else M.stop();
+    });
     a.addEventListener('playing', () => { if (k === M.live) M.fails = 0; });
     M.els[k] = { a, g: 0, to: 0, per: 0 };
   }
@@ -60,6 +67,7 @@ function tick(){
     if (E.g !== E.to) E.g = E.to > E.g ? Math.min(E.to, E.g + E.per * dt) : Math.max(E.to, E.g - E.per * dt);
     E.a.volume = Math.max(0, Math.min(1, M.vol * E.g * M.duck));
     if (k !== M.live && E.g === 0 && !E.a.paused) E.a.pause();
+    if (k !== M.live && E.g === 0 && E.radio) { E.radio = false; E.a.removeAttribute('src'); E.a.load(); }      // a station that's faded out is let go of
   });
   const L = M.els[M.live];
   if (L && M.cur) {
@@ -74,11 +82,12 @@ function play(t, secs){
   const old = M.els[M.live]; if (old) fade(old, 0, secs);
   M.live = M.live === 0 ? 1 : 0;
   const E = el(M.live);
-  E.a.src = t.src; E.g = 0; E.a.volume = 0; fade(E, 1, secs);
+  E.a.src = t.src; E.radio = !!t.radio; E.g = 0; E.a.volume = 0; fade(E, 1, secs);
   M.cur = t; M.held = false;
   E.a.play().then(() => { M.blocked = false; }).catch(() => { M.blocked = true; });      // a browser may wait for a tap (wake)
-  const seen = store.get('musicRecent', []).filter(i => i !== t.id); seen.push(t.id); store.set('musicRecent', seen.slice(-150));
   run(); M.redraw();
+  if (t.radio) return;
+  const seen = store.get('musicRecent', []).filter(i => i !== t.id); seen.push(t.id); store.set('musicRecent', seen.slice(-150));
   if (M.q[0]) setTimeout(() => { if (M.q[0]) fetch(M.q[0].src, { headers: { Range: 'bytes=0-1' }, credentials: 'same-origin' }).catch(() => {}); }, 8000);   // its copy gets made ahead
 }
 async function fill(){
@@ -95,6 +104,10 @@ async function next(quick){
   if (turning || !M.on) return;
   turning = true;
   try {
+    if (M.rad) {                 // a station: the one stream, joined again if it drops
+      play({ id: 'radio-' + M.rad.id, title: M.rad.name, artist: 'Radio', src: '/api/music/radio/' + M.rad.id + '/stream?at=' + Date.now(), moods: [], tags: [], radio: true }, quick ? 1.2 : FADE);
+      return;
+    }
     if (!M.q.length) await fill();
     const t = M.q.shift();
     if (!t || !M.on) { if (!t) M.stop(); return; }
@@ -125,18 +138,25 @@ M.turn = on => {
   M.on = !!on;
   if (M.open) store.set('musicOn', M.on);
   M.beside = M.on && (M.beside || !M.open);
-  if (M.on) { M.fails = 0; M.start(); } else { M.aud = null; M.stop(); }
+  if (M.on) { M.fails = 0; M.start(); } else { M.aud = null; M.rad = null; M.stop(); }
   if (C.Sound) { C.Sound.remix(); C.Sound.scene(); }
   M.redraw();
 };
 /* ---------- Auto: the scene picks ---------- */
-M.follows = () => M.on && M.auto && there() && !M.pick.album && !M.aud;
+M.follows = () => M.on && M.auto && there() && !M.pick.album && !M.aud && !M.rad;
 // The Music page: hear one album whole, sorted or not, from its start or from one of its tracks. It
 // isn't a pick: it plays until something is picked in the menu, or it's stopped.
 M.hear = (al, from) => {
-  M.aud = { id: al.id, name: al.album || al.by || '', from: from || null }; M.q = []; M.want = null;
+  M.aud = { id: al.id, name: al.album || al.by || '', from: from || null }; M.rad = null; M.q = []; M.want = null;
   clearTimeout(soon);
   if (!M.on) M.turn(true); else if (M.cur) next(true); else M.start();
+  M.redraw();
+};
+// Radio: one of your stations, until something is picked in the menu or it's stopped.
+M.tune = st => {
+  M.rad = { id: st.id, name: st.name }; M.aud = null; M.q = []; M.want = null; M.view = 'main'; M.fails = 0;
+  clearTimeout(soon);
+  if (!M.on) M.turn(true); else next(true);
   M.redraw();
 };
 const suits = (t, m) => (!m.tags.length || (t.tags || []).some(g => m.tags.includes(g))) && (!m.energy || !t.energy || Math.abs(m.energy - t.energy) <= 1);
@@ -159,7 +179,7 @@ M.closed = () => {
 };
 M.volume = v => { M.vol = Math.max(0, Math.min(1, v)); store.set('musicVol', M.vol); run(); };
 function picked(){               // a moment after the last chip, so picking three isn't three changes of track
-  store.set('musicPick', M.pick); M.q = []; M.aud = null;
+  store.set('musicPick', M.pick); M.q = []; M.aud = null; M.rad = null;
   clearTimeout(soon);
   if (!M.on) { M.turn(true); return; }
   soon = setTimeout(() => next(true), 900);
@@ -172,24 +192,40 @@ const chip = (act, id, text, on) => '<button class="chip' + (on ? ' on' : '') + 
 M.section = () => {
   if (!M.has) return '';
   if (M.view === 'albums') return albumsHTML();
-  if (M.view === 'track' && M.cur) return trackHTML();
-  const p = M.pick, tags = tagsNow(), album = M.aud ? { album: M.aud.name } : p.album && M.albums.find(a => a.id === p.album);
+  if (M.view === 'radio') return radioHTML();
+  if (M.view === 'track' && M.cur && !M.cur.radio) return trackHTML();
+  const p = M.pick, tags = tagsNow(), album = M.rad ? { album: M.rad.name } : M.aud ? { album: M.aud.name } : p.album && M.albums.find(a => a.id === p.album);
   const shown = M.more ? tags : tags.filter((g, k) => k < FEW || p.tags.includes(g));
   return '<hr><div class="mush"><b>Music</b>' + (M.on ? '<input type="range" class="musvol" min="0" max="100" value="' + Math.round(M.vol * 100) + '" aria-label="Music volume">' : '') + '</div>' +
-    (M.on && M.cur ? '<div class="musnow"><span class="musname"><b>' + esc(M.cur.title) + '</b><i>' + esc(M.cur.artist) + '</i></span>' +
+    (M.on && M.cur && M.cur.radio ? '<div class="musnow"><span class="musname"><b>' + esc(M.cur.title) + '</b><i>' + esc(M.cur.artist) + '</i></span></div>' : '') +
+    (M.on && M.cur && !M.cur.radio ? '<div class="musnow"><span class="musname"><b>' + esc(M.cur.title) + '</b><i>' + esc(M.cur.artist) + '</i></span>' +
       '<button class="ib" data-mus="edit" title="Moods and tags" aria-label="Moods and tags"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h.01M10 10h.01M16 10h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>' +
       '<button class="ib" data-mus="next" title="Next" aria-label="Next"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5v11l8-5.5zM15 4.5v11" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></button></div>' : '') +
     (album ? '<div class="muschips">' + chip('noalbum', '', album.album || album.by, true) + '</div>'
       : '<div class="muschips">' + chip('auto', '', 'Auto', M.auto) + M.moods.map(m => chip('mood', m.id, label(m.id), p.moods.includes(m.id))).join('') + '</div>' +
         (shown.length && !M.auto ? '<div class="muschips mustags">' + shown.map(g => chip('tag', g, label(g), p.tags.includes(g))).join('') +
           (tags.length > shown.length || M.more ? '<button class="chip musmore" data-mus="more">' + (M.more ? 'Fewer' : 'More') + '</button>' : '') + '</div>' : '')) +
-    '<button data-mus="albums">Albums</button>' +
+    '<button data-mus="albums">Albums</button><button data-mus="radio">Radio</button>' +
     '<button data-mus="toggle">' + (M.on ? 'Turn off Music' : 'Turn on Music') + '</button>';
 };
 function albumsHTML(){
   const hm = s => { const m = Math.round(s / 60); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; };
   return '<div class="mush"><button class="ib" data-mus="back" title="Back" aria-label="Back"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b>Albums</b></div>' +
     '<div class="musalbums"><button data-mus="page"><b>All albums</b></button>' + M.albums.map(a => '<button data-mus="album" data-id="' + a.id + '"' + (M.pick.album === a.id ? ' aria-checked="true"' : '') + '><span class="musname"><b>' + esc(a.album || a.by) + '</b><i>' + esc(a.by) + '</i></span><span class="mute">' + hm(a.secs) + '</span></button>').join('') + '</div>';
+}
+const BACK = '<button class="ib" data-mus="back" title="Back" aria-label="Back"><svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+// Your stations. Edit shows a way to take each off, and the two fields a new one needs.
+function radioHTML(){
+  const st = M.stations || [];
+  return '<div class="mush">' + BACK + '<b>Radio</b>' + (st.length ? '<button class="btn sm" data-mus="radedit">' + (M.radEdit ? 'Done' : 'Edit') + '</button>' : '') + '</div>' +
+    '<div class="musalbums">' + st.map(x => '<div class="musst"><button data-mus="station" data-id="' + x.id + '"' + (M.rad && M.rad.id === x.id ? ' aria-checked="true"' : '') + '><b>' + esc(x.name) + '</b></button>' +
+      (M.radEdit ? '<button class="ib" data-mus="raddel" data-id="' + x.id + '" title="Remove" aria-label="Remove ' + esc(x.name) + '"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' : '') + '</div>').join('') + '</div>' +
+    (M.radEdit || (M.stations && !st.length) ? '<form class="musadd musradd" data-mus-radio><input class="field" name="n" maxlength="80" autocomplete="off" aria-label="Name" placeholder="Name">' +
+      '<input class="field" name="u" type="url" inputmode="url" autocomplete="off" autocapitalize="none" aria-label="Address" placeholder="Address"><button class="btn sm" type="submit">Add</button></form>' : '');
+}
+async function radio(){
+  try { M.stations = (await api('/api/music/radio')).stations || []; } catch(e){ M.stations = M.stations || []; }
+  M.redraw();
 }
 // A word of your own: a mood no track had yet joins the row of moods, a tag the tags under its moods.
 const add = (what, text) => '<form class="musadd" data-mus-add="' + what + '"><input class="field" name="w" maxlength="24" autocomplete="off" autocapitalize="none" aria-label="' + text + '" placeholder="' + text + '"><button class="btn sm" type="submit">Add</button></form>';
@@ -206,10 +242,15 @@ function trackHTML(){
     add('tags', 'New tag') +
     '<hr><button data-mus="off">Not for reading</button>';
 }
-M.redraw = () => { if (C.Sound && C.Sound.redraw) C.Sound.redraw(); drawToday(); if (C.MusicPage) C.MusicPage.draw(); };
+M.redraw = () => {
+  if (C.Sound && C.Sound.redraw) C.Sound.redraw(); drawToday(); if (C.MusicPage) C.MusicPage.draw();
+  document.querySelectorAll('.musbtn').forEach(b => { b.hidden = !M.has; b.classList.toggle('on', M.going()); });
+};
 /* ---------- Today: music beside the Kindle or a paper book ---------- */
 const NOTE = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 14.5V4.8l8-1.6v9.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="6" cy="14.6" rx="2.1" ry="1.7" fill="currentColor"/><ellipse cx="14" cy="12.6" rx="2.1" ry="1.7" fill="currentColor"/></svg>';
 const NEXT = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5v11l8-5.5zM15 4.5v11" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+// The readers that have no Sound of their own (an article, a PDF) put this in their bar: Music's menu alone.
+M.button = () => '<button class="ib musbtn' + (M.going() ? ' on' : '') + '" data-mus="menu" title="Music" aria-label="Music"' + (M.has ? '' : ' hidden') + '>' + NOTE + '</button>';
 M.todayNotice = () => { setTimeout(() => M.load().then(drawToday), 0); return '<div id="mustoday"></div>'; };
 function drawToday(){
   const el = $('#mustoday'); if (!el) return;
@@ -219,7 +260,7 @@ function drawToday(){
   el.innerHTML = '<div class="notice sndrow musrow"><span style="color:var(--accent)">' + NOTE + '</span>' +
     '<span class="musname">' + (t ? '<b>' + esc(t.title) + '</b><i>' + esc(t.artist) + '</i>' : '<b>Music</b>') + '</span>' +
     (on ? '<input type="range" class="musvol" min="0" max="100" value="' + Math.round(M.vol * 100) + '" aria-label="Music volume">' +
-      '<button class="ib" data-mus="next" title="Next" aria-label="Next">' + NEXT + '</button>' : '') +
+      (M.rad ? '' : '<button class="ib" data-mus="next" title="Next" aria-label="Next">' + NEXT + '</button>') : '') +
     '<button class="btn sm" data-mus="menu">Moods</button>' +
     '<button class="btn sm' + (on ? '' : ' primary') + '" data-mus="toggle">' + (on ? 'Stop' : 'Play') + '</button></div>';
 }
@@ -230,7 +271,15 @@ async function say(change){                    // what you say about the track t
   M.load(true);
 }
 document.addEventListener('input', e => { if (e.target.classList && e.target.classList.contains('musvol')) M.volume(e.target.value / 100); });
-document.addEventListener('submit', e => {
+document.addEventListener('submit', async e => {
+  const rf = e.target.closest && e.target.closest('[data-mus-radio]');
+  if (rf) {                         // a station of your own
+    e.preventDefault();
+    const name = rf.elements.n.value.trim(), url = rf.elements.u.value.trim(); if (!name || !url) return;
+    try { M.stations = (await post('/api/music/radio', { name, url })).stations; rf.elements.n.value = ''; rf.elements.u.value = ''; }
+    catch(err){ if (C.toast) C.toast(err.message); }
+    M.redraw(); return;
+  }
   const f = e.target.closest && e.target.closest('[data-mus-add]'); if (!f) return;
   e.preventDefault();
   const w = f.elements.w.value.trim().toLowerCase(), what = f.dataset.musAdd === 'moods' ? 'moods' : 'tags'; if (!w || !M.cur) return;
@@ -253,15 +302,22 @@ document.addEventListener('click', e => {
   else if (a === 'mood') { p.moods = flip(p.moods, id); p.album = null; const can = tagsNow(); p.tags = p.tags.filter(g => can.includes(g)); picked(); }
   else if (a === 'tag') { p.tags = flip(p.tags, id); picked(); }
   else if (a === 'more') { M.more = !M.more; M.redraw(); }
-  else if (a === 'next') { clearTimeout(soon); next(true); }
+  else if (a === 'next') { if (!M.rad) { clearTimeout(soon); next(true); } }
   else if (a === 'albums') { M.view = 'albums'; M.redraw(); }
-  else if (a === 'back') { M.view = 'main'; M.redraw(); }
+  else if (a === 'radio') { M.view = 'radio'; M.radEdit = false; M.redraw(); radio(); }
+  else if (a === 'radedit') { M.radEdit = !M.radEdit; M.redraw(); }
+  else if (a === 'station') { const st = (M.stations || []).find(x => x.id === id); if (st) M.tune(st); }
+  else if (a === 'raddel') {
+    api('/api/music/radio/' + id, { method: 'DELETE' }).then(r => { M.stations = r.stations || []; if (M.rad && M.rad.id === id) M.turn(false); M.redraw(); }).catch(err => { if (C.toast) C.toast(err.message); });
+  }
+  else if (a === 'back') { M.view = 'main'; M.radEdit = false; M.redraw(); }
   else if (a === 'album') { p.album = id; M.view = 'main'; picked(); }
   else if (a === 'noalbum') { p.album = null; picked(); }
   else if (a === 'page') { $('#pop').hidden = true; location.hash = '#music'; }
-  else if (a === 'edit') { M.view = 'track'; M.redraw(); }
+  else if (a === 'edit') { if (M.cur && !M.cur.radio) { M.view = 'track'; M.redraw(); } }
   else if (a === 'tmood' && M.cur) say({ moods: flip(M.cur.moods, id) });
   else if (a === 'ttag' && M.cur) say({ tags: flip(M.cur.tags, id) });
   else if (a === 'off' && M.cur) { const t = M.cur; M.view = 'main'; post('/api/music/tracks/' + t.id, { off: true }).then(() => M.load(true)).catch(() => {}); M.q = M.q.filter(x => x.id !== t.id); next(true); }
 });
+setTimeout(() => M.load(), 1500);      // whether there's Music at all, for the buttons drawn before anyone asks
 })();

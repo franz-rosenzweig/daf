@@ -58,7 +58,11 @@ I pick a mood and the music starts: **Still**, **Strings**, **Piano** and so on.
 
 In the reader, Music has its own volume, and it starts low because it's meant to stay behind the page. One track fades into the next over a few seconds. It plays while a book is open and stops when I close it. If I start an audiobook or a podcast it waits, and under Listen it drops back so the voice stays on top.
 
+**Radio** is in the same menu, for the nights I'd rather not choose at all. It's my own list of internet stations, the quiet ones first. A tap plays one, and it keeps going until I pick a mood or an album or stop it. **Edit** takes a station off the list or adds one by its name and the address of its stream. A station plays through my server, so the station only ever sees the server, and a station with a plain http address still works.
+
 Most of my reading isn't in Daf's reader, though. It's on the Kindle or in a paper book, with the tablet or the computer nearby. So Today has a **Music** row. **Play** starts the music from whatever I picked last, and **Moods** opens the same menu as in the reader, with the moods, the tags, Albums and Auto. It keeps playing while I move around Daf, and if I open a book in Daf it carries on there, until I press **Stop**.
+
+An article and a PDF have no scenes for Sound to follow, but they have the music: a note button in their bar opens the Music menu (on a phone it's **Music** in an article's **…** menu). It's the same music as Today's row, so it plays on when I leave the article.
 
 With Auto on, that music follows the Kindle. When the Kindle is sending its page (**Sound in Daf** in KOReader's menu, the same switch the Sound row uses), Daf knows the scene I'm in over there, and the music changes with it just as it does in the reader. Without the Kindle's page Auto has nothing to go by, and it plays from my moods.
 
