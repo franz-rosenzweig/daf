@@ -50,6 +50,7 @@ class Base(unittest.TestCase):
         self.root.mkdir()
         self.patches = [mock.patch.object(music, "ROOT", str(self.root)),
                         mock.patch.object(music, "CATALOGUE", self.tmp / "state" / "music" / "catalogue.json"),
+                        mock.patch.object(music, "RADIO", self.tmp / "state" / "music" / "radio.json"),
                         mock.patch.object(music, "COPIES", self.tmp / "state" / "cache" / "music")]
         for p in self.patches:
             p.start()
@@ -207,6 +208,82 @@ class Albums(Base):
         self.assertEqual([t["id"] for t in music.queue(album=self.high, every=True)], [self.b1, self.b2])
         self.assertEqual([t["id"] for t in music.queue(album=self.low, every=True)], [self.a1, self.a2])   # the one turned off too
         self.assertEqual([t["id"] for t in music.queue(album=self.low)], [self.a1])
+
+
+class FakeStream:
+    """What a station's server answers: a media type and some bytes."""
+
+    def __init__(self, kind, body=b""):
+        self.kind, self.body, self.closed = kind, body, False
+        self.headers = mock.Mock(get_content_type=lambda: kind)
+
+    def read(self, n=-1):
+        out, self.body = self.body[:n], self.body[n:]
+        return out
+
+    def close(self):
+        self.closed = True
+
+
+class Radio(Base):
+    def test_a_station_needs_a_name_and_a_web_address(self):
+        self.assertEqual(music.stations(), [])
+        self.assertIsNone(music.station_add("", "https://radio.example/stream"))
+        self.assertIsNone(music.station_add("Quiet FM", "file:///etc/passwd"))
+        self.assertIsNone(music.station_add("Quiet FM", "not an address"))
+        a = music.station_add("  Quiet   FM ", "http://radio.example/stream")
+        b = music.station_add("Harbour Radio", "https://harbour.example/live.mp3")
+        self.assertEqual([(s["id"], s["name"]) for s in music.stations()], [(a, "Quiet FM"), (b, "Harbour Radio")])
+        self.assertEqual(music.station_add("Quiet FM at night", "http://radio.example/stream"), a)     # the same address: renamed
+        self.assertEqual([s["name"] for s in music.stations()], ["Quiet FM at night", "Harbour Radio"])
+        self.assertTrue(music.station_remove(a))
+        self.assertFalse(music.station_remove(a))
+        self.assertEqual([s["id"] for s in music.stations()], [b])
+
+    def tune(self, answers, public=lambda host: True):
+        asked = []
+
+        class Opener:
+            def open(_, req, timeout=0):
+                asked.append(req.full_url)
+                return answers[req.full_url]
+        sid = music.stations()[0]["id"]
+        return music.tune(sid, opener=Opener(), public=public), asked
+
+    def test_a_stream_is_opened_as_it_is(self):
+        music.station_add("Quiet FM", "http://radio.example/stream")
+        s = FakeStream("audio/aacp")
+        (r, kind), asked = self.tune({"http://radio.example/stream": s})
+        self.assertEqual((r, kind, asked), (s, "audio/aacp", ["http://radio.example/stream"]))
+        (r, kind), _ = self.tune({"http://radio.example/stream": FakeStream("application/octet-stream")})
+        self.assertEqual(kind, "audio/mpeg")
+        self.assertIsNone(music.tune("0" * 12))
+
+    def test_a_playlist_is_followed_to_its_stream(self):
+        music.station_add("Quiet FM", "http://radio.example/listen.pls")
+        lst = FakeStream("audio/x-scpls", b"[playlist]\nFile1=http://streams.example/quiet\nTitle1=Quiet FM\n")
+        s = FakeStream("audio/mpeg")
+        (r, kind), asked = self.tune({"http://radio.example/listen.pls": lst, "http://streams.example/quiet": s})
+        self.assertEqual((r, asked), (s, ["http://radio.example/listen.pls", "http://streams.example/quiet"]))
+        self.assertTrue(lst.closed)
+
+    def test_only_addresses_on_the_web(self):
+        music.station_add("Inside", "http://printer.example/stream")
+        with self.assertRaises(RuntimeError):
+            self.tune({}, public=lambda host: False)
+        # nor through a playlist that points inside
+        music.station_remove(music.stations()[0]["id"])
+        music.station_add("Sneaky", "http://radio.example/listen.m3u")
+        lst = FakeStream("audio/x-mpegurl", b"http://inside.example/stream\n")
+        with self.assertRaises(RuntimeError):
+            self.tune({"http://radio.example/listen.m3u": lst}, public=lambda host: host != "inside.example")
+
+    def test_a_stream_daf_cant_play_says_so(self):
+        music.station_add("Segments", "https://radio.example/live.m3u8")
+        s = FakeStream("application/vnd.apple.mpegurl")
+        with self.assertRaises(RuntimeError):
+            self.tune({"https://radio.example/live.m3u8": s})
+        self.assertTrue(s.closed)
 
 
 class Copies(Base):
