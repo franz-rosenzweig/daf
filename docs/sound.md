@@ -56,7 +56,11 @@ I pick a mood and the music starts: **Still**, **Strings**, **Piano** and so on.
 
 **Auto** lets the book choose. With it on, I don't pick the tags. The same reading of the book that chooses the rain and the fire also says what music would suit each scene, in my own tags, things like sad, rain and lonely, or wonder and journey, and how much it should move. Daf plays the tracks that fit that best, from the moods I've picked or from all of them if I've picked none. When the scene changes and the track that's playing still fits, it plays out and the next one is chosen for the new scene. When it doesn't fit, it fades over into one that does. A book I read with Sound before I had Music gets read once more for this, a part at a time as I reach it.
 
-Music has its own volume, and it starts low because it's meant to stay behind the page. One track fades into the next over a few seconds. It plays while a book is open and stops when I close it. If I start an audiobook or a podcast it waits, and under Listen it drops back so the voice stays on top.
+In the reader, Music has its own volume, and it starts low because it's meant to stay behind the page. One track fades into the next over a few seconds. It plays while a book is open and stops when I close it. If I start an audiobook or a podcast it waits, and under Listen it drops back so the voice stays on top.
+
+Most of my reading isn't in Daf's reader, though. It's on the Kindle or in a paper book, with the tablet or the computer nearby. So Today has a **Music** row. **Play** starts the music from whatever I picked last, and **Moods** opens the same menu as in the reader, with the moods, the tags, Albums and Auto. It keeps playing while I move around Daf, and if I open a book in Daf it carries on there, until I press **Stop**.
+
+With Auto on, that music follows the Kindle. When the Kindle is sending its page (**Sound in Daf** in KOReader's menu, the same switch the Sound row uses), Daf knows the scene I'm in over there, and the music changes with it just as it does in the reader. Without the Kindle's page Auto has nothing to go by, and it plays from my moods.
 
 When a track turns out wrong for reading, the three dots beside its name let me fix it right there. I can change its moods and tags, add a mood or a tag of my own, or choose **Not for reading**, which skips it from then on. A new mood shows up in the row with the others as soon as one track has it, so the moods can grow into whatever I actually reach for.
 

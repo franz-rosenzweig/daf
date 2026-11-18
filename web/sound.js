@@ -99,7 +99,7 @@ async function ask(place){
 }
 // With your own music playing, the scene's music loops stay out: two musics at once would clash.
 function sceneSounds(r){
-  if (!(C.Music && C.Music.on && C.Music.open) || !r.tunes || !r.tunes.length) return r.sounds;
+  if (!(C.Music && C.Music.going()) || !r.tunes || !r.tunes.length) return r.sounds;
   const out = {}; Object.keys(r.sounds || {}).forEach(k => { if (!r.tunes.includes(k)) out[k] = r.sounds[k]; });
   return out;
 }
@@ -109,38 +109,48 @@ function got(r){
     if (r.state === 'ready') mix(sceneSounds(r));
     else if (r.state === 'none' || r.state === 'failed') hush();
   }
-  if (C.Music && S.mode !== 'kindle') C.Music.scene(r);
+  if (C.Music) C.Music.scene(r);
   draw();
 }
-S.scene = () => { if (S.book && S.book.place && following()) ask(S.book.place); };      // ask now: the music began to follow
+// Ask now, since who follows the scene changed (music.js): the open book's, or with none open the Kindle's.
+S.scene = () => { if (S.book && S.book.place && following()) ask(S.book.place); kindleLoop(); };
 S.remix = () => { if (S.mode === 'book' && S.r && S.r.state === 'ready') mix(sceneSounds(S.r)); };
 
 /* ---------- beside the Kindle ---------- */
-let kAbort = null;
-async function listenKindle(after){
-  if (S.mode !== 'kindle') return;
-  kAbort = new AbortController();
-  let r;
-  try { r = await api('/api/sound/kindle?after=' + (after || 0) + '&wait=25', { signal: kAbort.signal }); }
-  catch(e){ if (S.mode === 'kindle') setTimeout(() => listenKindle(after), 15000); return; }
-  if (S.mode !== 'kindle') return;
-  got(r);
-  // the model still reading the Kindle's chapter: ask again soon; else wait for the next page
-  if (r.state === 'reading') setTimeout(() => listenKindle(0), 5000);
-  else listenKindle(r.seen || Date.now() / 1000);
+// The Kindle's page is listened for while Sound plays its scene, or while music started from Today
+// follows it (music.js's Auto) with no book open here. One loop at a time: starting again ends the last.
+const kWanted = () => S.mode === 'kindle' || (!S.book && !!(C.Music && C.Music.beside && C.Music.follows()));
+let kAbort = null, kGen = 0;
+function kindleLoop(){
+  const g = ++kGen;
+  if (kAbort) kAbort.abort();
+  const listen = async after => {
+    if (g !== kGen || !kWanted()) return;
+    kAbort = new AbortController();
+    let r;
+    try { r = await api('/api/sound/kindle?after=' + (after || 0) + '&wait=25' + (C.Music && C.Music.follows() ? '&music=1' : ''), { signal: kAbort.signal }); }
+    catch(e){ if (g === kGen) setTimeout(() => listen(after), 15000); return; }
+    if (g !== kGen || !kWanted()) return;
+    got(r);
+    // the model still reading the Kindle's chapter: ask again soon; else wait for the next page
+    if (r.state === 'reading') setTimeout(() => listen(0), 5000);
+    else if (r.music_soon) setTimeout(() => listen(0), 12000);
+    else listen(r.seen || Date.now() / 1000);
+  };
+  listen(0);
 }
 function startKindle(){
   if (S.mode === 'book') { S.mode = null; }
-  S.mode = 'kindle'; ctx(); listenKindle(0);
+  S.mode = 'kindle'; ctx(); kindleLoop();
   draw();
 }
-function stopKindle(){ S.mode = null; if (kAbort) kAbort.abort(); hush(); S.r = null; draw(); }
+function stopKindle(){ S.mode = null; hush(); S.r = null; kindleLoop(); draw(); }
 S.kindle = () => S.mode === 'kindle';
 
 // Today: a row for the Kindle's book when it has sent a page in the last half hour (Sound on there).
 S.todayNotice = () => {
   setTimeout(fillToday, 0);
-  return '<div id="sndtoday"></div>';
+  return '<div id="sndtoday"></div>' + (C.Music ? C.Music.todayNotice() : '');      // and Music's row under it (music.js)
 };
 async function fillToday(){
   const el = $('#sndtoday'); if (!el) return;
@@ -164,7 +174,7 @@ function drawToday(r){
 const shortT = t => String(t || '').split(/:\s/)[0];
 
 /* ---------- the reader's button and its menu ---------- */
-const playing = () => S.mode === 'book' || !!(C.Music && C.Music.on && C.Music.open);
+const playing = () => S.mode === 'book' || !!(C.Music && C.Music.going());
 function draw(){
   const b = $('[data-bk="sound"]');
   if (b) { b.classList.toggle('on', playing()); b.title = S.mode === 'book' && S.r && S.r.scene ? S.r.scene : 'Sound'; }
@@ -175,7 +185,7 @@ function draw(){
 }
 function popHTML(){
   const on = S.mode === 'book', r = S.r || {}, Mu = C.Music, mus = Mu ? Mu.section() : '';
-  if (mus && Mu.view !== 'main') return '<div class="menu sndpop mus">' + mus + '</div>';      // Music's albums, or the track that's playing
+  if (mus && (Mu.view !== 'main' || S.only)) return '<div class="menu sndpop mus">' + mus + '</div>';      // Music alone: from Today, or its albums or playing track
   const what = !on ? '' : r.state === 'ready' ? (r.scene || '') : r.state === 'reading' ? '…' : r.why || '';
   return '<div class="menu sndpop' + (mus ? ' mus' : '') + '">' + (on ? '<div class="sndscene"' + (what ? '' : ' hidden') + '>' + esc(what) + '</div>' +
     '<label class="sndvl"><span>Volume</span><input type="range" class="sndvol" min="0" max="100" value="' + Math.round(S.vol * 100) + '"></label><hr>' : '') +
@@ -183,7 +193,9 @@ function popHTML(){
 }
 // Where the menu sits: by its button, and again whenever what's in it changes size.
 function place(){
-  const p = $('#pop'), anchor = S.anchor;
+  const p = $('#pop');
+  if (S.only && S.anchor && !S.anchor.isConnected) S.anchor = $('#mustoday [data-mus="menu"]') || S.anchor;      // Today's row was drawn again
+  const anchor = S.anchor;
   if (!anchor || p.hidden || !p.querySelector('.sndpop')) return;
   const r = anchor.getBoundingClientRect();
   if (!r.width || anchor.dataset.bk === 'pmenu') {      // a phone: above the round button, where its menu was
@@ -194,9 +206,9 @@ function place(){
   p.style.left = Math.max(8, Math.min(window.innerWidth - p.offsetWidth - 8, r.right - p.offsetWidth)) + 'px';
   p.style.top = (r.bottom + 8 + p.offsetHeight > window.innerHeight ? Math.max(8, r.top - p.offsetHeight - 10) : r.bottom + 8) + 'px';
 }
-S.menu = anchor => {
+S.menu = (anchor, only) => {              // only: Music's part alone (Today's Music row)
   const p = $('#pop');
-  S.anchor = anchor;
+  S.anchor = anchor; S.only = !!only;
   if (C.Music) { C.Music.view = 'main'; C.Music.load(); }
   p.innerHTML = popHTML(); p.hidden = false;
   place();

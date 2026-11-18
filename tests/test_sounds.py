@@ -126,6 +126,22 @@ class SceneMusic(unittest.TestCase):
         self.assertEqual(len(scenes), 1)
         self.assertNotIn("music", scenes[0])
 
+    def test_the_kindles_scene_can_be_asked_for_music(self):
+        asked = []
+
+        def at(conn, book_id, place, want_music=False):
+            asked.append((book_id, place, want_music))
+            return {"state": "ready", "scene": "Rain", "sounds": {}, "music": {"tags": ["sad"], "energy": 1}}
+
+        where = {"book_id": "b1", "text": "Rain fell.", "fraction": 0.25, "at": 123.0}
+        with mock.patch.object(soundscape, "at", at), mock.patch.object(soundscape, "kindle_now", lambda conn: where):
+            r = soundscape.kindle_scene(None, True)
+            soundscape.kindle_scene(None)
+        self.assertEqual(asked, [("b1", {"text": "Rain fell.", "fraction": 0.25}, True), ("b1", {"text": "Rain fell.", "fraction": 0.25}, False)])
+        self.assertEqual((r["music"], r["seen"]), ({"tags": ["sad"], "energy": 1}, 123.0))
+        with mock.patch.object(soundscape, "kindle_now", lambda conn: None):
+            self.assertEqual(soundscape.kindle_scene(None, True)["state"], "none")
+
     def test_a_scenes_music_sounds_are_named(self):
         self.assertEqual(soundscape._tunes({"rain": 0.4, "piano": 0.5, "calm": 0.3}), ["piano", "calm"])
 
