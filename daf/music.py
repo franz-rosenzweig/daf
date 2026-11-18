@@ -18,6 +18,10 @@ A track with no mood isn't offered, so the catalogue can hold the whole library 
 you've sorted plays. What plays is a listening copy, an MP3 Daf makes the first time a track is
 asked for (STATE/cache/music), set to one loudness so a quiet piece and a loud one sit at the same
 level. A Daf without DAF_MUSIC_DIR or without a catalogue just has no Music.
+
+Radio is the third thing Music can play, beside a mood and an album: your own list of stations
+(STATE/music/radio.json, a name and a stream's address each). A station plays through Daf, so a
+plain-http stream works on an https page and the station sees the server, not the reader.
 """
 import contextlib
 import fcntl
@@ -31,6 +35,8 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from . import config
@@ -336,6 +342,89 @@ def correct(i, b):
         return {**_public(i, t), "off": bool(t.get("off"))}
 
 
+# ---- radio: your own stations -------------------------------------------------------------------
+
+RADIO = config.STATE / "music" / "radio.json"         # {"stations": [{"id", "name", "url"}]}, in the order they show
+LISTS = ("audio/x-mpegurl", "audio/mpegurl", "audio/x-scpls", "application/pls+xml", "text/plain")
+HLS = ("application/vnd.apple.mpegurl", "application/x-mpegurl")
+
+
+def stations():
+    try:
+        d = json.loads(RADIO.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [x for x in d.get("stations") or [] if isinstance(x, dict) and ID.fullmatch(str(x.get("id") or "")) and x.get("url")]
+
+
+def _keep_stations(rows):
+    RADIO.parent.mkdir(parents=True, exist_ok=True)
+    tmp = RADIO.with_suffix(".part")
+    tmp.write_text(json.dumps({"stations": rows}, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(RADIO)
+
+
+def station_add(name, url):
+    """A station by its name and its stream's address (http or https). Its id, or None if either is missing.
+    The same address again is the same station, renamed."""
+    name = " ".join(str(name or "").split())[:80]
+    u = urllib.parse.urlparse(str(url or "").strip())
+    if not name or u.scheme not in ("http", "https") or not u.hostname:
+        return None
+    url = u.geturl()
+    sid = hashlib.sha1(url.encode("utf-8")).hexdigest()[:12]
+    with changing():
+        rows = stations()
+        if any(x["id"] == sid for x in rows):
+            rows = [{**x, "name": name} if x["id"] == sid else x for x in rows]
+        else:
+            rows.append({"id": sid, "name": name, "url": url})
+        _keep_stations(rows)
+    return sid
+
+
+def station_remove(sid):
+    with changing():
+        rows = stations()
+        left = [x for x in rows if x["id"] != sid]
+        if len(left) != len(rows):
+            _keep_stations(left)
+        return len(left) != len(rows)
+
+
+def tune(sid, opener=None, public=None):
+    """A station's stream, opened: (the response to read from, its media type). None: no such station.
+    Only ever to an address on the web (kindlesend's rule, so not this server or the tailnet), through
+    redirects too, and a playlist (.m3u, .pls) is followed to the stream it names."""
+    s = next((x for x in stations() if x["id"] == sid), None)
+    if s is None:
+        return None
+    if opener is None or public is None:
+        from . import kindlesend
+        opener, public = opener or kindlesend._OPENER, public or kindlesend._public     # noqa: SLF001
+    url = s["url"]
+    for _ in range(3):
+        u = urllib.parse.urlparse(url)
+        if u.scheme not in ("http", "https") or not u.hostname or not public(u.hostname):
+            raise RuntimeError("That isn't an address on the web")
+        r = opener.open(urllib.request.Request(url, headers={"User-Agent": "Daf/1.0 (personal reading app)"}), timeout=20)
+        kind = (r.headers.get_content_type() or "").lower()
+        path = u.path.lower()
+        if kind in HLS or path.endswith(".m3u8"):
+            r.close()
+            raise RuntimeError("This station only has a kind of stream Daf can't play")
+        if kind in LISTS or path.endswith((".m3u", ".pls")):
+            text = r.read(8192).decode("utf-8", "replace")
+            r.close()
+            m = re.search(r"https?://[^\s\"'<>]+", text)
+            if not m:
+                raise RuntimeError("The station's list names no stream")
+            url = m.group(0)
+            continue
+        return r, kind if kind.startswith("audio/") or kind == "application/ogg" else "audio/mpeg"
+    raise RuntimeError("The station kept pointing somewhere else")
+
+
 # ---- the listening copies -----------------------------------------------------------------------
 
 def source(t):
@@ -516,5 +605,50 @@ def router():
         if a is None:
             raise HTTPException(404, "No such album")
         return a
+
+    @r.get("/api/music/radio", dependencies=[Depends(user_or_device)])
+    def get_radio():
+        """Your stations, in their order: {stations: [{id, name}]}. The addresses stay on the server."""
+        return {"stations": [{"id": x["id"], "name": x.get("name") or ""} for x in stations()]}
+
+    @r.post("/api/music/radio", dependencies=[Depends(user)])
+    async def post_radio(b=Depends(json_body)):
+        """{name, url}: a station of your own (station_add)."""
+        sid = await run_in_threadpool(station_add, b.get("name"), b.get("url"))
+        if not sid:
+            raise HTTPException(400, "A station needs a name and an address that starts with http")
+        return {"id": sid, "stations": [{"id": x["id"], "name": x.get("name") or ""} for x in stations()]}
+
+    @r.delete("/api/music/radio/{sid}", dependencies=[Depends(user)])
+    async def delete_radio(sid: str):
+        if not ID.fullmatch(sid) or not await run_in_threadpool(station_remove, sid):
+            raise HTTPException(404, "No such station")
+        return {"stations": [{"id": x["id"], "name": x.get("name") or ""} for x in stations()]}
+
+    @r.get("/api/music/radio/{sid}/stream", dependencies=[Depends(user_or_device)])
+    def get_radio_stream(sid: str):
+        """A station, playing: its stream passed on as it comes, until the listener goes."""
+        from fastapi.responses import StreamingResponse
+        if not ID.fullmatch(sid):
+            raise HTTPException(404, "No such station")
+        try:
+            got = tune(sid)
+        except Exception as e:                    # noqa: BLE001
+            raise HTTPException(502, f"The station didn't answer: {e}") from e
+        if got is None:
+            raise HTTPException(404, "No such station")
+        resp, kind = got
+        read = getattr(resp, "read1", None) or resp.read
+
+        def body():
+            try:
+                while True:
+                    chunk = read(16384)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                resp.close()
+        return StreamingResponse(body(), media_type=kind, headers={"Cache-Control": "no-store"})
 
     return r
