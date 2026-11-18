@@ -1,7 +1,9 @@
 /* Music: your own quiet music under the page (daf/music.py), in the Sound menu beside the scene's
    sounds. You pick moods, and under them the finer tags; a mood shuffles, an album plays in its
    order. With Auto the scene picks the tags instead: Sound's reading of the book says what music
-   suits where you are (soundscape.py), and the tracks that fit it best play, within your moods. Whole tracks, so two <audio> elements take turns: the next fades in over FADE seconds
+   suits where you are (soundscape.py), and the tracks that fit it best play, within your moods.
+   It plays in two places: in the reader while a book is open (kept on for the next book), and
+   from Today's Music row with no book open, beside the Kindle or a paper book, until it's stopped. Whole tracks, so two <audio> elements take turns: the next fades in over FADE seconds
    while the last fades out. What you pick, the volume and whether it's on stay on this device.
    The track that's playing can be fixed from the menu: Not for reading, or its moods and tags. */
 (() => {
@@ -9,10 +11,13 @@
 const C = window.DafCore, { api, esc, $ } = C;
 const store = { get(k, d){ try { const v = localStorage.getItem('daf.' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } }, set(k, v){ try { localStorage.setItem('daf.' + k, JSON.stringify(v)); } catch(e){} } };
 const FADE = 4, FEW = 14;
-const M = C.Music = { has: null, moods: [], albums: [], on: !!store.get('musicOn', false), vol: store.get('musicVol', 0.35),
+const M = C.Music = { has: null, moods: [], albums: [], on: false, open: false, beside: false, vol: store.get('musicVol', 0.35),
   pick: Object.assign({ moods: [], tags: [], album: null }, store.get('musicPick', {})), auto: !!store.get('musicAuto', false), want: null,
   q: [], cur: null, els: [], live: -1, duck: 1,
-  view: 'main', more: false, open: false, fails: 0 };
+  view: 'main', more: false, fails: 0 };
+// on: it's wanted now. open: a book is open in the reader. beside: it was started from Today.
+const there = () => M.open || M.beside;
+M.going = () => M.on && there();
 const label = w => w.charAt(0).toUpperCase() + w.slice(1);
 const post = (url, body) => api(url, { method: 'POST', body: JSON.stringify(body) });
 
@@ -102,9 +107,9 @@ document.addEventListener('keydown', M.wake, true);
 /* ---------- on, off, and what's picked ---------- */
 let soon = null;                 // the one change of track that's waiting to happen
 M.start = () => {
-  if (!M.on || M.cur || !M.open) return;
+  if (!M.on || M.cur || !there()) return;
   M.load().then(has => {
-    if (!has || !M.on || M.cur || !M.open) return;
+    if (!has || !M.on || M.cur || !there()) return;
     if (M.follows() && !M.want) { clearTimeout(soon); soon = setTimeout(() => { if (!M.cur) next(); }, 5000); }      // a moment for the scene to say what fits
     else next();
   });
@@ -113,14 +118,18 @@ M.stop = () => {
   M.els.forEach(E => E && fade(E, 0, 1.5));
   M.cur = null; M.live = -1; M.q = []; run(); M.redraw();
 };
+// In a book this is the reader's Music, kept for the next book. With no book open it's the music
+// beside the Kindle or a paper book, which plays on from page to page of Daf until it's stopped.
 M.turn = on => {
-  M.on = !!on; store.set('musicOn', M.on);
+  M.on = !!on;
+  if (M.open) store.set('musicOn', M.on);
+  M.beside = M.on && (M.beside || !M.open);
   if (M.on) { M.fails = 0; M.start(); } else M.stop();
-  if (C.Sound) { C.Sound.remix(); if (M.follows()) C.Sound.scene(); }
+  if (C.Sound) { C.Sound.remix(); C.Sound.scene(); }
   M.redraw();
 };
 /* ---------- Auto: the scene picks ---------- */
-M.follows = () => M.on && M.auto && M.open && !M.pick.album;
+M.follows = () => M.on && M.auto && there() && !M.pick.album;
 const suits = (t, m) => (!m.tags.length || (t.tags || []).some(g => m.tags.includes(g))) && (!m.energy || !t.energy || Math.abs(m.energy - t.energy) <= 1);
 // The scene where you are (sound.js), with what music would suit it: {tags, energy}.
 M.scene = r => {
@@ -133,8 +142,12 @@ M.scene = r => {
   clearTimeout(soon); soon = setTimeout(() => next(), 1500);      // else a slow fade into something that fits
 };
 // A book is open (sound.js): the music plays while one is, and stops with it.
-M.opened = () => { M.open = true; M.start(); };
-M.closed = () => { M.open = false; M.want = null; clearTimeout(soon); if (M.cur) M.stop(); };
+M.opened = () => { M.open = true; if (!M.beside) M.on = !!store.get('musicOn', false); M.start(); };
+M.closed = () => {
+  M.open = false; M.want = null; clearTimeout(soon);
+  if (M.beside) { if (C.Sound) C.Sound.scene(); return; }      // started from Today: it plays on, and follows the Kindle again
+  M.on = false; if (M.cur) M.stop();
+};
 M.volume = v => { M.vol = Math.max(0, Math.min(1, v)); store.set('musicVol', M.vol); run(); };
 function picked(){               // a moment after the last chip, so picking three isn't three changes of track
   store.set('musicPick', M.pick); M.q = [];
@@ -184,7 +197,23 @@ function trackHTML(){
     add('tags', 'New tag') +
     '<hr><button data-mus="off">Not for reading</button>';
 }
-M.redraw = () => { if (C.Sound && C.Sound.redraw) C.Sound.redraw(); };
+M.redraw = () => { if (C.Sound && C.Sound.redraw) C.Sound.redraw(); drawToday(); };
+/* ---------- Today: music beside the Kindle or a paper book ---------- */
+const NOTE = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 14.5V4.8l8-1.6v9.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="6" cy="14.6" rx="2.1" ry="1.7" fill="currentColor"/><ellipse cx="14" cy="12.6" rx="2.1" ry="1.7" fill="currentColor"/></svg>';
+const NEXT = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5v11l8-5.5zM15 4.5v11" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+M.todayNotice = () => { setTimeout(() => M.load().then(drawToday), 0); return '<div id="mustoday"></div>'; };
+function drawToday(){
+  const el = $('#mustoday'); if (!el) return;
+  if (!M.has) { el.innerHTML = ''; return; }
+  if (el.querySelector('input[type=range]:active')) return;            // not under a finger on the slider
+  const on = M.going(), t = on && M.cur;
+  el.innerHTML = '<div class="notice sndrow musrow"><span style="color:var(--accent)">' + NOTE + '</span>' +
+    '<span class="musname">' + (t ? '<b>' + esc(t.title) + '</b><i>' + esc(t.artist) + '</i>' : '<b>Music</b>') + '</span>' +
+    (on ? '<input type="range" class="musvol" min="0" max="100" value="' + Math.round(M.vol * 100) + '" aria-label="Music volume">' +
+      '<button class="ib" data-mus="next" title="Next" aria-label="Next">' + NEXT + '</button>' : '') +
+    '<button class="btn sm" data-mus="menu">Moods</button>' +
+    '<button class="btn sm' + (on ? '' : ' primary') + '" data-mus="toggle">' + (on ? 'Stop' : 'Play') + '</button></div>';
+}
 async function say(change){                    // what you say about the track that's playing
   const t = M.cur; if (!t) return;
   Object.assign(t, change); M.redraw();
@@ -202,10 +231,14 @@ document.addEventListener('submit', e => {
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-mus]'); if (!b) return;
   const a = b.dataset.mus, id = b.dataset.id, p = M.pick;
-  if (a === 'toggle') M.turn(!M.on);
+  if (a === 'toggle') M.turn(!M.going());
+  else if (a === 'menu') {          // its own button again puts the menu away, as menus do (app.js keeps what was open when the click began)
+    if (C.S && C.S.popAtClick && C.S.popAtClick.includes('sndpop')) $('#pop').hidden = true;
+    else if (C.Sound) C.Sound.menu(b, true);
+  }
   else if (a === 'auto') {
     M.auto = !M.auto; store.set('musicAuto', M.auto); M.want = null; M.q = [];
-    if (!M.on) M.turn(true); else if (M.auto && C.Sound) C.Sound.scene();
+    if (!M.on) M.turn(true); else if (C.Sound) C.Sound.scene();
     M.redraw();
   }
   else if (a === 'mood') { p.moods = flip(p.moods, id); p.album = null; const can = tagsNow(); p.tags = p.tags.filter(g => can.includes(g)); picked(); }

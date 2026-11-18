@@ -525,12 +525,12 @@ def kindle_now(conn):
     return json.loads(r[0]) if r else None
 
 
-def kindle_scene(conn):
+def kindle_scene(conn, want_music=False):
     w = kindle_now(conn)
     if not w:
         return {"state": "none", "why": "", "at": 0}
     place = {"text": w.get("text") or None, "fraction": w.get("fraction")}
-    r = at(conn, w["book_id"], {k: v for k, v in place.items() if v is not None})
+    r = at(conn, w["book_id"], {k: v for k, v in place.items() if v is not None}, want_music)
     return {**r, "seen": w["at"]}
 
 
@@ -586,16 +586,17 @@ def router():
         return {"ok": True}
 
     @r.get("/api/sound/kindle", dependencies=[Depends(user)])
-    async def get_kindle_sound(after: float = 0, wait: int = 0):
+    async def get_kindle_sound(after: float = 0, wait: int = 0, music: int = 0):
         """The scene on the Kindle's page. With `after`, waits (up to `wait` seconds, at most 25) for a
-        page newer than that, so a page can listen without a timer."""
+        page newer than that, so a page can listen without a timer. `music`: music beside the Kindle
+        follows the scene, so a part read before there was music is read again (at)."""
         end = time.time() + min(max(wait, 0), 25)
         while True:
             c = db.connect()
             try:
                 w = kindle_now(c)
                 if not after or (w and w["at"] > after) or time.time() >= end:
-                    return await run_in_threadpool(kindle_scene, c)
+                    return await run_in_threadpool(kindle_scene, c, bool(music))
             finally:
                 c.close()
             await asyncio.sleep(1)

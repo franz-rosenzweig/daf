@@ -2253,10 +2253,14 @@ select.edpast{appearance:auto;padding-right:6px}
 .sndpop .mush b{flex:1;min-width:0}
 .sndpop .musvol{flex:1;min-width:80px;max-width:150px;accent-color:var(--accent)}
 .sndpop .musnow{display:flex;align-items:center;gap:2px;padding:2px 4px 4px 12px}
-.sndpop .musname{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3;text-align:left}
-.sndpop .musname b,.sndpop .musname i{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:normal}
+.musname{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3;text-align:left}
+.musname b,.musname i{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:normal}
 .sndpop .musname b{font-size:13.5px;font-weight:600}
-.sndpop .musname i{font-size:12.5px;color:var(--fg-3)}
+.musname i{font-size:12.5px;color:var(--fg-3)}
+.sndpop > hr:first-child{display:none}
+.musrow .musvol{flex:0 1 120px;min-width:70px;accent-color:var(--accent)}
+.musrow .ib{flex:none}
+@media (max-width:700px){ .musrow .musvol{order:5;flex:1 1 100%;max-width:none} }
 .sndpop .muschips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 12px}
 .pop .menu.sndpop .chip{display:inline-flex;justify-content:center;gap:0;background:var(--bg);color:var(--fg-2);border:1px solid var(--line-2);padding:4px 12px;border-radius:999px;font-size:13px;min-height:32px}
 .pop .menu.sndpop .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
