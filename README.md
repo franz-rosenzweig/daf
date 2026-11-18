@@ -56,6 +56,7 @@ Daf gathers the minutes from everywhere I read, the Kindle, Audiobookshelf, the 
 - **PDFs.** Read as text, or as printed with pdf.js, with highlights on the page.
 - **Listen.** Any article or book read aloud by Kokoro, in the voice I pick, following along sentence by sentence, and the time counts.
 - **Sound.** A quiet bed of rain, fire, sea or a crowd under a book that changes with the scene, in Daf's reader or on a phone beside the Kindle as I turn its pages.
+- **Music.** My own quiet music under the page, from the music folder on my server: I pick a mood and narrow it with finer tags, or let the scene I'm reading pick. It plays in the reader, or from Today beside the Kindle or a paper book.
 - **The Torah shelf.** The week's parasha and haftarah from Sefaria, Hebrew beside the English, the week's divrei Torah, and the essays in the vault for that parasha.
 - **Look it up.** Select a word for a definition (Hebrew from Sefaria's dictionaries, English from Wiktionary), or ask about the passage you're in.
 - **Keys and Undo.** Keys for every list, article, book and the review, which I can change in Preferences, and an Undo for everything I do to a list, Delete included.
