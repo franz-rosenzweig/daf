@@ -114,7 +114,7 @@ struct Item: Identifiable, Hashable {
 @MainActor
 @Observable
 final class AppModel {
-    var place: Place? = .today
+    var place: Place? = .today { didSet { if place != oldValue { visited() } } }
     var items: [Item] = []
     /// The one item open; several chosen at once are `chosen`, and then nothing is open.
     var selection: Item.ID? {
@@ -298,9 +298,46 @@ final class AppModel {
     /// A route to open in a window of its own ("#ebook/…", "#mread/…"), from code (menus, the self-test).
     var openRoute: String?
     /// Where the Podcasts page is: a category, a show (its feed), or one of Audiobookshelf's recordings.
-    var podNav: PodNav = .cat("") { didSet { if case .cat(let c) = podNav { podCat = c } } }
+    var podNav: PodNav = .cat("") {
+        didSet {
+            if case .cat(let c) = podNav { podCat = c }
+            if podNav != oldValue, place == .podcasts { visited() }
+        }
+    }
     /// The Podcasts page's last category, for Back from a show.
     var podCat = ""
+
+    // MARK: Back and Forward
+
+    /// Somewhere I've been: a place, and on the Podcasts page which part of it (a page of Listen, a show).
+    struct Visit: Equatable { let place: Place; let pod: PodNav }
+    /// Where I've been, oldest first, and where in it I am now: Back and Forward step through it, as a
+    /// browser's do through the page's.
+    private(set) var visits: [Visit] = [Visit(place: .today, pod: .cat(""))]
+    private(set) var visitAt = 0
+    @ObservationIgnored private var stepping = false
+    var canGoBack: Bool { visitAt > 0 }
+    var canGoForward: Bool { visitAt < visits.count - 1 }
+
+    /// Somewhere new: it goes after where I am, and what was ahead (after going back) is forgotten.
+    private func visited() {
+        guard !stepping, let place else { return }
+        let v = Visit(place: place, pod: place == .podcasts ? podNav : .cat(""))
+        guard visits[visitAt] != v else { return }
+        visits = Array(visits.prefix(visitAt + 1).suffix(59)) + [v]
+        visitAt = visits.count - 1
+    }
+
+    /// Back (⌘[) or Forward (⌘]).
+    func go(back: Bool) {
+        let to = visitAt + (back ? -1 : 1)
+        guard visits.indices.contains(to) else { return }
+        stepping = true
+        defer { stepping = false }
+        visitAt = to
+        if visits[to].place == .podcasts { podNav = visits[to].pod }
+        place = visits[to].place
+    }
     /// The show open on the Podcasts page (its feed), or nil.
     var podcastShow: String? {
         get { if case .show(let f) = podNav { return f } else { return nil } }

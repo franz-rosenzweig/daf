@@ -72,11 +72,11 @@ final class Side {
     // MARK: pinned
 
     /// What can be pinned: the key Daf keeps (settings.nav_pins), its name, its place, its icon. Podcasts is the
-    /// whole of Listen; Sources sits with Stats at the bottom.
+    /// whole of Listen. Sources and Learn can be pinned on the web's old look only: here Sources is in the ⋯ menu.
     static let pinnable: [(String, String, Place, String)] = [
         ("podcasts", "Podcasts", .podcasts, "headphones"), ("manga", "Manga", .manga, "book.pages"), ("torah", "Torah", .torah, "scroll"),
         ("recovery", "Recovery", .recovery, "sunrise"), ("shortlist", "Shortlist", .shortlist, "star"),
-        ("paper", "Paper Pages", .paper, "camera.viewfinder"), ("sources", "Sources", .sources, "arrow.triangle.2.circlepath"),
+        ("paper", "Paper Pages", .paper, "camera.viewfinder"),
     ]
     static let pinnedByDefault = ["podcasts", "manga", "torah", "recovery", "shortlist"]
 
@@ -86,7 +86,9 @@ final class Side {
     }
 
     func setPins(_ keys: [String]) async {
-        let ordered = Self.pinnable.map(\.0).filter(keys.contains)
+        // in the order they show; a key only the web knows (sources, learn) is kept as it was
+        let known = Self.pinnable.map(\.0)
+        let ordered = known.filter(keys.contains) + keys.filter { !known.contains($0) }
         do {
             try await API.shared.send("PUT", "/api/settings", ["nav_pins": ordered])
             AppModel.shared.pinned(ordered)
@@ -164,11 +166,7 @@ struct Sidebar: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 4)
                 }
-                bottom("Search", "magnifyingglass", "⌘K", mini) { model.sheet = .palette }
-                bottom("Stats", "chart.bar", nil, mini, on: model.place == .stats) { model.place = .stats }
-                if pins.contains("sources") {
-                    bottom("Sources", "arrow.triangle.2.circlepath", nil, mini, on: model.place == .sources) { model.place = .sources }
-                }
+                // Search, Stats and Sources are in the toolbar now (FrameTools): its Search, its ring and its ⋯
                 bottom("Preferences", "gearshape", "⌘,", mini) { openSettings() }
             }
             .labelStyle(SideLabelStyle(mini: mini))

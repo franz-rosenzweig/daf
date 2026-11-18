@@ -21,6 +21,10 @@ final class Focus {
     @ObservationIgnored private var mouse: Any?
     /// The main window's panes as they were (collapsed or not) before focus mode put them away.
     @ObservationIgnored private var panes: [Int: [Bool]] = [:]
+    /// While focus mode is on, the panes it put away are watched: SwiftUI brings the sidebar back whenever it
+    /// lays the split view out again (its own sidebar state, in SplitViewCoordinator.updateSidebarItem), and
+    /// that can come late, after the window has gone full screen and Daf has put it away again.
+    @ObservationIgnored private var keepers: [Int: [NSKeyValueObservation]] = [:]
 
     private static let options: NSApplication.PresentationOptions = [.fullScreen, .autoHideMenuBar, .autoHideToolbar, .autoHideDock]
 
@@ -81,6 +85,25 @@ final class Focus {
         guard let s = Self.split(w), s.splitViewItems.count > 1 else { return }
         panes[w.windowNumber] = s.splitViewItems.map(\.isCollapsed)
         for item in s.splitViewItems.dropLast() where !item.isCollapsed { item.animator().isCollapsed = true }
+        keep(w, s)
+    }
+
+    /// A pane that comes back while focus mode is on goes away again, a moment later, unless the pointer is at
+    /// the screen's left edge, where full screen brings a hidden sidebar out on purpose.
+    private func keep(_ w: NSWindow, _ s: NSSplitViewController) {
+        let n = w.windowNumber
+        keepers[n] = s.splitViewItems.dropLast().map { item in
+            item.observe(\.isCollapsed, options: [.new]) { [weak w] item, change in
+                guard change.newValue == false else { return }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        guard let w, Focus.shared.isOn(w), !item.isCollapsed else { return }
+                        if let screen = w.screen, NSEvent.mouseLocation.x - screen.frame.minX < 40 { return }
+                        item.isCollapsed = true
+                    }
+                }
+            }
+        }
     }
 
     /// Once the window is full screen: a pane the change of size brought back (the sidebar) put away
@@ -95,6 +118,7 @@ final class Focus {
     }
 
     private func uncollapse(_ w: NSWindow) {
+        keepers.removeValue(forKey: w.windowNumber)?.forEach { $0.invalidate() }
         guard let was = panes.removeValue(forKey: w.windowNumber), let s = Self.split(w) else { return }
         for (item, c) in zip(s.splitViewItems, was) where item.isCollapsed != c { item.animator().isCollapsed = c }
         if Self.isMain(w) { Side.shared.applySoon() }          // the sidebar as it is now (full, mini, hidden, reading)

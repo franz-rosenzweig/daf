@@ -172,7 +172,7 @@ struct ShortcutsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private static let groups: [(String, [(String, String)])] = [
-        ("Everywhere", [("⌘K", "Search everything, or go somewhere"), ("⌘1 to ⌘8", "Today, Review, Inbox, Feed, Highlights, Books, Manga, Stats"),
+        ("Everywhere", [("⌘K", "Search everything, or go somewhere"), ("⌘1 to ⌘8", "Today, Review, Library, Feed, Highlights, Books, Manga, Stats"), ("⌘[ and ⌘]", "Back and Forward"),
                         ("⌘L", "Add a link, a book or a PDF"), ("⌘V", "Add the link or the files copied (nothing to paste into)"),
                         ("⇧⌘P", "Log paper minutes"), ("⌘R", "Refresh"), ("⌘Z", "Undo")]),
         ("Library and Feed lists", [("J or ↓", "Next item"), ("K or ↑", "Previous item"), ("Return", "Open it in a window of its own"),
