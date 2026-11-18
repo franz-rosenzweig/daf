@@ -31,7 +31,7 @@ import zipfile
 
 from lxml import etree
 
-from . import ai, audiomap, config, db, ebooks
+from . import ai, audiomap, config, db, ebooks, music
 
 log = logging.getLogger("daf.soundscape")
 
@@ -326,12 +326,24 @@ three of these sounds (nothing else):
 - The music sounds are for when no place can be heard: an essay, a reflection, a letter, a prayer, a
   memory. A book that is all argument or instruction can have one calm bed throughout, or nothing.
 - Nothing fits, or anything would distract: give the scene no sounds.
-
+{music}
 Answer with JSON only, a list, the first scene at the first paragraph:
-[{{"from": 1, "scene": "A few words, e.g. Rain on the moor", "sounds": {{"empty-wind": 0.6, "drizzle": 0.5}}}}]
+[{{"from": 1, "scene": "A few words, e.g. Rain on the moor", "sounds": {{"empty-wind": 0.6, "drizzle": 0.5}}{example}}}]
 
 {text}
 """
+
+# Asked as well when Daf has a music catalogue (music.py): what the reader's own music should feel like here.
+MUSIC = """
+The reader may also have their own music playing quietly under the page, and Daf picks the tracks
+by what you say here. So give each scene a "music" too: up to four of these words, the ones that
+matter most first, and an energy from 1 (still) to 3 (driving):
+{words}
+- Go by how the scene feels more than where it is: grief, ease, dread, wonder, a journey, home.
+- Reading mostly wants energy 1 or 2. Keep 3 for a battle, a chase, or a storm the story is about.
+- A new scene only for the music isn't needed: scenes that sound the same can share their music too.
+"""
+EXAMPLE = ', "music": {{"tags": ["sad", "rain", "lonely"], "energy": 1}}'
 
 
 def _ask(meta, part, ps):
@@ -340,7 +352,9 @@ def _ask(meta, part, ps):
     can = offered()
     sounds = "\n".join(f"{k}: {v[1]}" for k, v in can.items())
     text = "\n".join(f"[{i + 1}] {t}" for i, (_, t) in enumerate(ps))
-    out = ai.run(PROMPT.format(title=meta.get("title") or "a book", by=by, where=where, sounds=sounds, text=text), timeout=300)
+    words = music.vocabulary()                       # none: this Daf has no music, and the model isn't asked
+    out = ai.run(PROMPT.format(title=meta.get("title") or "a book", by=by, where=where, sounds=sounds, text=text,
+                               music=MUSIC.format(words=", ".join(words)) if words else "", example=EXAMPLE.format() if words else ""), timeout=300)
     m = re.search(r"\[.*\]", out, re.S)
     if not m:
         raise RuntimeError("The model's answer had no scenes")
@@ -368,7 +382,12 @@ def _ask(meta, part, ps):
             name, cut = name[:61].rsplit(" ", 1)[0], None
             while cut != name:
                 cut, name = name, re.sub(r"[\s,;:–-]+(the|a|an|of|and|over|by|in|on|at|to|with|from)?$", "", name)
-        scenes.append({"start": ps[n - 1][0], "scene": name, "sounds": snd})
+        scene = {"start": ps[n - 1][0], "scene": name, "sounds": snd}
+        if words:                                     # asked for, so kept even when empty: the part has been read for music
+            m = x.get("music") if isinstance(x.get("music"), dict) else {}
+            tags = [w for w in music.words(m.get("tags")) if w in words][:4]
+            scene["music"] = {"tags": tags, "energy": m.get("energy") if m.get("energy") in (1, 2, 3) else None}
+        scenes.append(scene)
     scenes.sort(key=lambda s: s["start"])
     if not scenes:
         raise RuntimeError("The model's answer had no scenes")
@@ -377,7 +396,7 @@ def _ask(meta, part, ps):
     for s in scenes:
         if keep and s["start"] == keep[-1]["start"]:
             keep[-1] = s
-        elif not keep or s["sounds"] != keep[-1]["sounds"]:
+        elif not keep or s["sounds"] != keep[-1]["sounds"] or s.get("music") != keep[-1].get("music"):
             keep.append(s)
     return keep
 
@@ -386,8 +405,12 @@ _busy = set()
 _lock = threading.Lock()
 
 
-def _make(book_id, path, key, part, meta, then=None):
-    """Reads one part in its own thread and keeps the scenes (or the error); then the next, if asked."""
+_again = {}                                          # (book, part) → when it was last read again for music
+
+
+def _make(book_id, path, key, part, meta, then=None, again=False):
+    """Reads one part in its own thread and keeps the scenes (or the error); then the next, if asked.
+    again: a second reading for music. If it fails, the scenes already kept stay."""
     c = db.connect()
     try:
         ps = [p for p in _paras(str(path), key) if part["start"] <= p[0] < part["end"]]
@@ -397,6 +420,8 @@ def _make(book_id, path, key, part, meta, then=None):
         except Exception as e:                        # noqa: BLE001 - kept, shown, tried again later
             log.warning("soundscape %s @%s: %s", book_id, part["start"], e)
             scenes, err = [], str(e)[:300]
+        if again and err:
+            return
         c.execute("INSERT OR REPLACE INTO soundscapes (book_id, file, start, end, scenes, made, model, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                   (book_id, key, part["start"], part["end"], json.dumps(scenes), int(time.time()), ai.model(), err))
         c.commit()
@@ -413,29 +438,41 @@ def _row(conn, book_id, key, start):
                         (book_id, key, start)).fetchone()
 
 
-def ensure(book_id, path, key, part, meta, then=None, conn=None):
-    """Starts reading a part unless it's read, being read, or failed lately. True when it's being read."""
+def ensure(book_id, path, key, part, meta, then=None, conn=None, again=False):
+    """Starts reading a part unless it's read, being read, or failed lately. True when it's being read.
+    again: read it once more though it's been read (it was read before Daf had music to ask about)."""
     c = conn or db.connect()
     try:
         r = _row(c, book_id, key, part["start"])
     finally:
         if conn is None:
             c.close()
-    if r and (not r["error"] or time.time() - r["made"] < RETRY):
+    if r and not again and (not r["error"] or time.time() - r["made"] < RETRY):
         return False
     with _lock:
         if (book_id, part["start"]) in _busy:
             return True
+        if again:
+            if time.time() - _again.get((book_id, part["start"]), 0) < RETRY:
+                return False
+            _again[(book_id, part["start"])] = time.time()
         _busy.add((book_id, part["start"]))
-    threading.Thread(target=_make, args=(book_id, path, key, part, meta, then), daemon=True, name="soundscape").start()
+    threading.Thread(target=_make, args=(book_id, path, key, part, meta, then, again), daemon=True, name="soundscape").start()
     return True
 
 
 # ---- where you are → the scene -----------------------------------------------------------------
 
-def at(conn, book_id, place):
+def _tunes(sounds):
+    """Those of a scene's sounds that are music, which the reader's own music takes the place of."""
+    return [k for k in sounds if k in SOUNDS and SOUNDS[k][1].startswith("music:")]
+
+
+def at(conn, book_id, place, want_music=False):
     """The scene at a place in a book: {state: "ready" | "reading" | "failed" | "none", scene, sounds,
-    part, why}. "reading": the model is on it, ask again in a few seconds."""
+    tunes, music, part, why}. "reading": the model is on it, ask again in a few seconds.
+    want_music: the reader's own music follows the scene (music.py). A part read before there was
+    music to ask about is read again in the background, and `music_soon` says to ask again."""
     B, key = _book(conn, book_id)
     if B is None:
         return {"state": "none", "why": key}
@@ -464,7 +501,10 @@ def at(conn, book_id, place):
     for x in scenes:
         if x["start"] <= c:
             s = x
-    return {**out, "state": "ready", "scene": s["scene"], "sounds": s["sounds"]}
+    out = {**out, "state": "ready", "scene": s["scene"], "sounds": s["sounds"], "tunes": _tunes(s["sounds"]), "music": s.get("music")}
+    if want_music and scenes and not any("music" in x for x in scenes) and music.vocabulary():
+        out["music_soon"] = ensure(book_id, path, key, part, meta, conn=conn, again=True)
+    return out
 
 
 def forget(conn, book_id):
@@ -523,12 +563,13 @@ def router():
 
     @r.post("/api/ebooks/{book_id}/sound", dependencies=[Depends(user)])
     async def post_book_sound(book_id: str, b=Depends(json_body), c=Depends(conn)):
-        """{cfi, fraction, text}: the reader's place (without one, the book's kept place) → the scene there and its sounds (at)."""
+        """{cfi, fraction, text, music}: the reader's place (without one, the book's kept place) → the scene there, its
+        sounds and, for the reader's own music, what would suit it (at)."""
         place = {k: b.get(k) for k in ("cfi", "fraction", "text") if b.get(k) is not None}
         if not place:                             # no page sent: the place Daf keeps for the book
             pos = c.execute("SELECT cfi, fraction FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
             place = {k: v for k, v in dict(pos).items() if v is not None} if pos else {}
-        return await run_in_threadpool(at, c, book_id, place)
+        return await run_in_threadpool(at, c, book_id, place, bool(b.get("music")))
 
     @r.post("/api/kindle/where")
     def post_kindle_where(b=Depends(json_body), name=Depends(device), c=Depends(conn)):
