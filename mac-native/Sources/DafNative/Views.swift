@@ -66,7 +66,8 @@ struct MainView: View {
                     page
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .themed()
-                        .toolbar { ToolbarItem(placement: .navigation) { SidebarButton() } }
+                        .toolbar { FrameNav() }
+                        .overlay(FrameTail())
                 }
             } else {
                 NavigationSplitView(columnVisibility: columns(page: false, focusing: Focus.shared.main)) {
@@ -82,11 +83,12 @@ struct MainView: View {
                     }
                     .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 520)
                     .themed()
-                    .toolbar { ToolbarItem(placement: .navigation) { SidebarButton() } }
+                    .toolbar { FrameNav() }
                 } detail: {
                     opened
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .themed()
+                        .overlay(FrameTail())
                 }
             }
         }

@@ -21,9 +21,17 @@ The sidebar is the page's map turned on its side (see [Getting around](new-look.
 - **Learn:** **Highlights** and **Review**, and **Paper Pages** while it's pinned.
 - **Listen**, while Podcasts is pinned: **Listening**, **Shows**, **Episodes**, **Recordings**, **Audiobooks** and **Clips**, each a row of its own.
 
-**Search** (⌘K), **Stats** and **Preferences** are at the bottom, with **Sources** while it's pinned. A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
+**Preferences** is at the bottom; Search, Stats and Sources are in [the toolbar](#the-toolbar). A kind of the Library (Articles, Videos and the rest) has **Inbox**, **Later** and **Archive** at the top of its list.
 
 ⌘\ and the button at the top left show and hide it. When it shows, it's full or mini (the icons, each with its name under it, Listen as one icon, and ☰ at the top for the full one): **View → Sidebar** picks which, and so does **Settings → General**, along with the pins, which Daf keeps for every device. A right-click on a pinned row unpins it. The Mac remembers how I left it. Opening something to read leaves it where it is, since the list stays beside the article anyway. For nothing but the page, there's Focus Mode.
+
+## The toolbar
+
+Every screen has the same few things in its toolbar, around its own. Beside the sidebar's button are **Back** and **Forward** (⌘[ and ⌘]). They step through where I've been, Listen's pages and a show's page included, the way a browser's do on the page.
+
+At the far end, after the screen's own buttons and before its search, are **+** (Add to Daf, ⌘L), the **⋯** menu, and today's minutes as a ring with the number beside it. A click on the ring opens Stats. All Books keeps its own **⋯**, with these at the bottom of it. Today, the Edition, Recents, Review and Recovery have no search of their own, so there a **Search** button opens ⌘K's.
+
+The **⋯** menu has what the screen can do that has no button of its own: Goals on Today, Log Paper Minutes and Goals on Stats, New Shelf on Books, Check for New Posts, Follow a Site and What Shows Where in the Feed, Review More on Review, Sync Now in the Library. Under those it has **Search Everything**, **Stats**, **Sources** and **Preferences**, as the page's does (see [The corner's ⋯ menu](new-look.md#the-corners--menu)).
 
 ## Recents
 

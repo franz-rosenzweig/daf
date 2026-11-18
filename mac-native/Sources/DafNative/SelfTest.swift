@@ -261,6 +261,40 @@ enum SelfTest {
             }
             await go(m, .library("inbox"))
         }
+        // the frame's toolbar: Back and Forward step through where I've been, Listen's pages too
+        await go(m, .today)
+        await go(m, .stats)
+        m.podNav = .cat("shows")
+        m.place = .podcasts
+        await pause(0.4)
+        m.podNav = .cat("clips")
+        await pause(0.4)
+        m.go(back: true)
+        let toShows = m.place == .podcasts && m.podNav == .cat("shows")
+        m.go(back: true)
+        let toStats = m.place == .stats
+        m.go(back: false)
+        let forwardAgain = m.place == .podcasts && m.podNav == .cat("shows") && m.canGoBack && m.canGoForward
+        await go(m, .recents)                    // somewhere new: what was ahead is forgotten
+        check(toShows && toStats && forwardAgain && !m.canGoForward && m.canGoBack, "Back and Forward step through where I've been, Listen's pages too",
+              "back to Shows \(toShows), to Stats \(toStats), forward again \(forwardAgain), nothing ahead after somewhere new \(!m.canGoForward)")
+        m.podNav = .cat("")
+        await go(m, .today)
+        await pause(1)
+        let barItems = main?.toolbar?.items.map { $0.label.isEmpty ? $0.itemIdentifier.rawValue : $0.label } ?? []
+        capture("02v-toolbar-today")
+        check(barItems.contains("Add to Daf") && barItems.contains("More") && barItems.contains("Search"), "the toolbar has Search, Add and the ⋯ menu on Today", barItems.joined(separator: " · "))
+        await go(m, .library("inbox"))
+        m.selection = m.items.first?.id
+        await pause(2)
+        capture("02w-toolbar-reading")
+        m.selection = nil
+        await go(m, .feed(nil))
+        m.selection = m.items.first?.id
+        await pause(2)
+        capture("02x-toolbar-feed")
+        m.selection = nil
+        await go(m, .library("inbox"))
         if UserDefaults.standard.string(forKey: "SelfTestOnly") == "frame" { return finish(nil, only: "the frame") }
         // Library › Articles, with Inbox, Later and Archive
         await go(m, .kind("article"))
@@ -380,6 +414,17 @@ enum SelfTest {
             }
             let panesBefore = panes(), textView = r.textView
             Focus.shared.enter(w)
+            // the panes over the next seconds, for the check below: SwiftUI has brought the sidebar back late
+            var seen: [String] = []
+            let watch = Task { @MainActor in
+                let t0 = Date()
+                var last = ""
+                while !Task.isCancelled && Date().timeIntervalSince(t0) < 8 {
+                    let now = Focus.split(w)?.splitViewItems.map { $0.isCollapsed ? "shut" : "open" }.joined(separator: " ") ?? "-"
+                    if now != last { seen.append(String(format: "%.1f", Date().timeIntervalSince(t0)) + "s " + now); last = now }
+                    try? await Task.sleep(nanoseconds: 50_000_000)
+                }
+            }
             let full = await until(10) { w.styleMask.contains(.fullScreen) }
             await pause(1.5)
             check(full && Focus.shared.main && Focus.shared.barTucked(w), "focus mode puts the article on the whole screen, the toolbar hidden till the top",
@@ -391,6 +436,9 @@ enum SelfTest {
             check(panes() == 1 && m.reader?.textView === textView, "with only the article, the sidebar and the list gone, and the same reader still open",
                   "panes \(panesBefore) → \(panes()) (\(Focus.split(w)?.splitViewItems.map { $0.isCollapsed ? "shut" : "open" }.joined(separator: " ") ?? "-")); the pointer was \(edge ? "at the left edge" : "away from the edge") (\(Int(pointer.x)), \(Int(pointer.y)))")
             capture("70-focus")
+            await pause(3)              // and it stays so (SwiftUI once brought the sidebar back two seconds in)
+            watch.cancel()
+            check(panes() == 1, "and it stays so", seen.joined(separator: " → "))
             // nothing over the page at the top of the screen (an empty title bar once stayed, a dark strip)
             check(atTop(w, textView), "in focus mode the article goes to the top of the screen, no bar over it", topReport(w, textView))
             Focus.shared.leave(w)
@@ -429,6 +477,7 @@ enum SelfTest {
             }
         }
 
+        if UserDefaults.standard.string(forKey: "SelfTestOnly") == "reader" { return finish(nil, only: "the frame and the reader up to focus mode") }
         // a highlight from a selection
         let before = r.highlights.count
         // a paragraph with no highlight yet (a highlight over one would merge into it)

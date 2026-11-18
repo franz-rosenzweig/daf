@@ -4,9 +4,10 @@
 # picture of each step:
 #   ./selftest.sh BASE COOKIE [TOKEN]       → build/selftest/log.txt and *.png
 #   ./selftest.sh BASE COOKIE TOKEN frame   → only the window's frame (Today, the Library, the sidebar)
+#   ./selftest.sh BASE COOKIE TOKEN reader  → the frame, then an article up to focus mode (full screen)
 set -euo pipefail
 cd "${0:A:h}"
-(( $# >= 2 )) || { sed -n 2,6p $0 >&2; exit 2; }
+(( $# >= 2 )) || { sed -n 2,7p $0 >&2; exit 2; }
 mkdir -p build
 DAF_TEST=1 ./build.sh > build/test-build.log 2>&1 || { echo "SELFTEST: the build failed" >&2; grep -E "error:" -A3 build/test-build.log | head -60 >&2; exit 1; }
 APP="build/test/Daf Test.app"

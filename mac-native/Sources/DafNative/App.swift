@@ -40,6 +40,8 @@ struct DafNativeApp: App {
                 Button("Send Feedback…") { model.sheet = .feedback }
             }
             CommandMenu("Go") {
+                Button("Back") { model.go(back: true) }.keyboardShortcut("[", modifiers: .command).disabled(!model.canGoBack)
+                Button("Forward") { model.go(back: false) }.keyboardShortcut("]", modifiers: .command).disabled(!model.canGoForward)
                 Button("Search Everything…") { model.sheet = .palette }.keyboardShortcut("k", modifiers: .command)
                 Divider()
                 // the sidebar's order: the web's six tabs and their pages (the keys are the ones they always had)

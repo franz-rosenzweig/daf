@@ -474,6 +474,8 @@ struct CatalogPage: View {
                     Toggle("Show Private Books", isOn: Binding(get: { cat.priv }, set: { cat.showPrivate($0) }))
                     Divider()
                     Button("Calibre's Trash…") { model.sheet = .calibreTrash }
+                    Divider()
+                    MoreFoot()                  // the frame's own ⋯ steps back here: one ⋯ a screen
                 } label: { Label("More", systemImage: "ellipsis.circle") }
                 .help("More")
             }
