@@ -761,8 +761,10 @@ function notePage(l){
   if (B.pageKey !== key) { B.pageKey = key; B.pageAt = now; }
 }
 function onRelocate(e){
-  const l = e.detail; B.loc = l; notePage(l); drawNextChapter(l);
-  if (Date.now() - B.opened > 2500) hideChrome();
+  const l = e.detail, moved = !B.loc || B.loc.cfi !== l.cfi; B.loc = l; notePage(l); drawNextChapter(l);
+  // the bars go when the page turns; foliate also says where it is after every touch on the page, a
+  // tap too, and that one (the same place) put away the bars the tap had just brought
+  if (moved && Date.now() - B.opened > 2500) hideChrome();
   followBar();
   if (B.forget && Date.now() - (B.forgetAt || 0) > 2000) B.forget = false;   // reading on after Forget: the place counts again
   const pct = Math.round((l.fraction || 0) * 100);
