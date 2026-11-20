@@ -4533,6 +4533,12 @@ def get_podcast_audio(u: str, request: Request, c=Depends(conn)):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"The podcast's server didn't answer: {e}")
     out = {k: r.headers[k] for k in ("Content-Length", "Content-Range", "Accept-Ranges") if r.headers.get(k)}
+    # The podcast's server picks what it sends, so it never gets to be a page on Daf's address:
+    # only sound or video types pass, and the answer can't run anything if a browser opens it.
+    kind = r.headers.get_content_type() or "audio/mpeg"
+    if not (kind.startswith(("audio/", "video/")) or kind == "application/ogg"):
+        kind = "audio/mpeg"
+    out["Content-Security-Policy"] = "default-src 'none'; sandbox"
 
     def body():
         try:
@@ -4543,7 +4549,7 @@ def get_podcast_audio(u: str, request: Request, c=Depends(conn)):
                 yield chunk
         finally:
             r.close()
-    return StreamingResponse(body(), status_code=r.status, media_type=r.headers.get_content_type() or "audio/mpeg", headers=out)
+    return StreamingResponse(body(), status_code=r.status, media_type=kind, headers=out)
 
 
 @app.post("/api/podcasts/token", dependencies=[Depends(user)])

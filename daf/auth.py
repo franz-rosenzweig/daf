@@ -53,6 +53,8 @@ def set_password(password, user=None, rotate=False):
 def set_user(user):
     a = _load() or {}
     a["user"] = user.strip().lower()
+    if not a.get("secret"):
+        a["secret"] = secrets.token_hex(32)
     _save(a)
 
 
@@ -85,25 +87,34 @@ def check_login(user, password):
 
 
 def _sign(payload):
-    a = _load() or {}
-    key = bytes.fromhex(a.get("secret", "00"))
-    return hmac.new(key, payload, hashlib.sha256).hexdigest()
+    """The cookie signature, or None while auth.json has no secret. Then no cookie is valid at all,
+    rather than every cookie signed with a key anyone could guess."""
+    s = (_load() or {}).get("secret")
+    try:
+        key = bytes.fromhex(s) if s else b""
+    except (TypeError, ValueError):
+        key = b""
+    return hmac.new(key, payload, hashlib.sha256).hexdigest() if key else None
 
 
 def make_cookie():
     payload = base64.urlsafe_b64encode(json.dumps({"exp": int(time.time()) + COOKIE_DAYS * 86400}).encode())
-    return payload.decode() + "." + _sign(payload)
+    sig = _sign(payload)
+    if sig is None:
+        raise RuntimeError("auth.json has no secret yet: run `daf set-password` first")
+    return payload.decode() + "." + sig
 
 
 def check_cookie(value):
     if not value or "." not in value:
         return False
     payload, sig = value.rsplit(".", 1)
-    if not hmac.compare_digest(_sign(payload.encode()), sig):
+    good = _sign(payload.encode())
+    if good is None or not hmac.compare_digest(good.encode(), sig.encode()):
         return False
     try:
         return json.loads(base64.urlsafe_b64decode(payload))["exp"] > time.time()
-    except (ValueError, KeyError):
+    except (ValueError, KeyError, TypeError):
         return False
 
 
