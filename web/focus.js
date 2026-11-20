@@ -97,10 +97,12 @@ document.addEventListener('click', e => {
   // a chapter or a heading chosen in the contents drawer: the drawer goes once it's there
   if (root.classList.contains('ftoc') && e.target.closest && e.target.closest('.toc [data-jump], .toc .tocit, .toc .sres')) setTimeout(close, 60);
 });
-// A touch on the page puts the bar away again.
+// A touch on the page puts the bar away again. Not one on what comes with the bar (a phone's slider
+// and round menu under a book, the player): put away as the finger lands, its tap went through to
+// the page and turned it instead.
 document.addEventListener('pointerdown', e => {
   if (!F.on || !root.classList.contains('fbar')) return;
-  if (e.target.closest && e.target.closest('.rv > .top, .pdfv > .top, .bookfoot, #pop, #fedges, .inkpal, .inkpop, #selbar, .modal')) return;
+  if (e.target.closest && e.target.closest('.rv > .top, .pdfv > .top, .bookfoot, .bctl, .player, #pop, #fedges, .inkpal, .inkpop, #selbar, .modal')) return;
   bar(false);
 }, true);
 document.addEventListener('keydown', e => {
