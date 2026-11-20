@@ -375,6 +375,12 @@ def connect():
                      "FROM doc_content c LEFT JOIN docs d ON d.id = c.id WHERE json_valid(c.blocks)")
         conn.execute("INSERT INTO kv (k, v) VALUES ('fts_v1', '1') ON CONFLICT(k) DO NOTHING")
         conn.commit()
+    if not conn.execute("SELECT 1 FROM kv WHERE k = 'kk_desc_escaped'").fetchone():
+        # Once: escape Karakeep descriptions that were kept as raw html (sources/karakeep.py).
+        from .sources import karakeep
+        n = karakeep.repair_descriptions(conn)
+        conn.execute("INSERT INTO kv (k, v) VALUES ('kk_desc_escaped', ?) ON CONFLICT(k) DO NOTHING", (str(n),))
+        conn.commit()
     return conn
 
 

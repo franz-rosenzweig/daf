@@ -6,6 +6,7 @@
 import { makeBook } from './vendor/foliate-js/view.js';
 import * as CFI from './vendor/foliate-js/epubcfi.js';
 import { FootnoteHandler } from './vendor/foliate-js/footnotes.js';
+import { inertBook, outsideLink } from './bookguard.js';
 
 const C = window.DafCore, { api, esc, toast, $, $$, I, epochDate } = C, H = C.HL;
 const store = { get(k, d){ try { const v = localStorage.getItem('daf.' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } }, set(k, v){ try { localStorage.setItem('daf.' + k, JSON.stringify(v)); } catch(e){} } };
@@ -134,7 +135,7 @@ async function openBook(id, at){
   $('#bstage').innerHTML = ''; $('#bstage').append(view);
   B.view = view;
   // a book of scanned pages is found before foliate opens it: its progress goes a page at a time (scans.js)
-  try { const book = await makeBook(file), scans = C.Scans && await C.Scans.detect(book, id); if (B.id === id) B.scans = scans; await view.open(book); }
+  try { const book = await makeBook(file); inertBook(book); const scans = C.Scans && await C.Scans.detect(book, id); if (B.id === id) B.scans = scans; await view.open(book); }
   catch(e){ $('#bstage').innerHTML = '<div class="placeholder">This file wouldn’t open: ' + esc(e.message || String(e)) + '</div>'; return; }
   if (B.id !== id) { view.close?.(); return; }
   if (B.scans) B.scans.attach(view);
@@ -166,7 +167,7 @@ async function openBook(id, at){
     if (doc.getSelection && !doc.getSelection().isCollapsed) return;   // a new selection over it wins
     H.show(H.hlBar(h, { kindle: !!k }), rectFor(doc, e.detail.range), { h, cfi: v, kindle: !!k });
   });
-  view.addEventListener('external-link', e => { e.preventDefault(); window.open(e.detail.href_, '_blank', 'noopener'); });
+  view.addEventListener('external-link', e => { e.preventDefault(); if (outsideLink(e.detail.href_)) window.open(e.detail.href_, '_blank', 'noopener'); });
   view.addEventListener('link', e => footnotes.handle(view.book, e)?.catch(err => console.warn('footnote', err)));
   for (const h of d.highlights) { try { h.index = view.resolveNavigation(h.pos.cfi)?.index; } catch(err){ h.index = null; } }
   try { B.secFrac = view.getSectionFractions(); } catch(e){ B.secFrac = []; }

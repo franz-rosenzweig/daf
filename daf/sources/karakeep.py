@@ -6,6 +6,7 @@ new links and archives. "read" is the move to Daf keeping the Library itself (pa
 writes nothing to Karakeep any more, and a bookmark made in Karakeep (its own extension or app)
 still comes in, once. "off": Karakeep isn't asked anything. "Later" is Daf's own status either way.
 """
+import html
 import json
 import re
 import time
@@ -132,14 +133,39 @@ def _have_url(conn, url):
     return bool(d and d["where_"] == "library")
 
 
+def repair_descriptions(conn):
+    """Once (db.connect): bookmarks read before fetch_content escaped the description kept it raw as
+    the block's 'h'. Such a block has 'h' equal to its plain text 'x' with markup characters in it;
+    a block the sanitizer made never does, since it escapes those. Returns how many were fixed."""
+    n = 0
+    for did, raw in conn.execute("SELECT id, blocks FROM doc_content WHERE id LIKE 'kk:%'").fetchall():
+        try:
+            bl = json.loads(raw or "[]")
+        except ValueError:
+            continue
+        changed = False
+        for b in bl if isinstance(bl, list) else []:
+            x = b.get("x") if isinstance(b, dict) else None
+            if isinstance(x, str) and b.get("t") != "img" and b.get("h") == x and re.search(r"[<>&]", x):
+                b["h"] = html.escape(x, quote=False)
+                changed = True
+        if changed:
+            conn.execute("UPDATE doc_content SET blocks = ? WHERE id = ?", (json.dumps(bl), did))
+            n += 1
+    return n
+
+
 def fetch_content(conn, doc_id):
     """The archived text of one bookmark, cleaned, cached in doc_content."""
     b = _req("GET", f"/bookmarks/{doc_id[3:]}?includeContent=true")
     c = b.get("content") or {}
     raw = c.get("htmlContent") or ""
     bl = content.blocks(raw)
-    if not bl and c.get("description"):
-        bl = [{"t": "p", "h": c["description"], "x": c["description"]}]
+    desc = " ".join(str(c.get("description") or "").split())
+    if not bl and desc:
+        # The page's own description, which Karakeep keeps as the page wrote it: plain text, so the
+        # block's 'h' (safe inline html, see content.py) gets it escaped, never as markup.
+        bl = [{"t": "p", "h": html.escape(desc, quote=False), "x": desc}]
     if not bl:
         return bl            # Karakeep hasn't read the page yet: keep nothing, so the next open asks again
     conn.execute("INSERT OR REPLACE INTO doc_content (id, blocks, fetched) VALUES (?, ?, ?)", (doc_id, json.dumps(bl), int(time.time())))
