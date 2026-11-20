@@ -48,7 +48,7 @@ def db():
 class Audio(unittest.TestCase):
     def ask(self, kind, rng=None):
         req = SimpleNamespace(headers={"range": rng} if rng else {})
-        with mock.patch("urllib.request.urlopen", return_value=Upstream(kind)):
+        with mock.patch("daf.outbound.open_public", return_value=Upstream(kind)):
             return app.get_podcast_audio(URL, req, db())
 
     def test_page_types_become_audio(self):

@@ -14,6 +14,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -79,6 +80,9 @@ class Downloads(State):
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
         self.base = f"http://127.0.0.1:{self.srv.server_address[1]}"
         self._free, downloads.MIN_FREE = downloads.MIN_FREE, 0          # a test's folder is small, and in memory
+        pub = mock.patch("daf.kindlesend._public", return_value=True)    # the test's server is on this machine
+        pub.start()
+        self.addCleanup(pub.stop)
 
     def tearDown(self):
         self.srv.shutdown()

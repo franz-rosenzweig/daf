@@ -143,6 +143,12 @@ def _reading(conn, settings, n=6):
     return [_book(b, readable) for b in books[:n]]
 
 
+def shown(it, settings):
+    """Whether a device may name this Feed or Edition item: not when its title, source or author has a
+    private title in it (the same rule as /api/tools/feed). Daf's own pages still list it."""
+    return not library.is_private(" ".join(str(it.get(k) or "") for k in ("title", "source", "publication", "author", "by")), settings)
+
+
 def _piece(it, label=None):
     return {"id": it["id"], "title": it.get("title") or "", "source": it.get("publication") or it.get("source") or "",
             "kind": it.get("kind") or "article", "minutes": it.get("minutes") or it.get("mins"),
@@ -155,7 +161,7 @@ def _edition(conn, settings):
     e = edition.public(conn, T.today(settings)).get("edition")
     if not e:
         return None
-    items = [_piece(it) | {"done": bool(it.get("done") or it.get("opened"))} for it in e["items"]]
+    items = [_piece(it) | {"done": bool(it.get("done") or it.get("opened"))} for it in e["items"] if shown(it, settings)]
     return {"day": e["day"], "number": e.get("number"), "done": e.get("done", 0), "total": len(items), "items": items}
 
 
@@ -166,7 +172,7 @@ def _spotlight(conn, settings, ed, n=10):
     for d in reader.list_docs(conn, settings, "feed", "unseen", None, None, 60, 0, "new", None, {}, ""):    # the Feed as it shows
         if len(out) >= n:
             break
-        if d.get("thumb") and d["id"] not in seen and d.get("title"):
+        if d.get("thumb") and d["id"] not in seen and d.get("title") and shown(d, settings):
             out.append(_piece(d, d.get("source")))
     return out[:n]
 
@@ -234,7 +240,8 @@ def widget_feed(conn, settings, src="", limit=20):
     """A Feed widget's headlines: what's unseen in the whole Feed, a folder ("folder:Name") or a feed ("feed:id")."""
     cat = src[7:] if src.startswith("folder:") else None
     feed = src[5:] if src.startswith("feed:") else None
-    items = reader.list_docs(conn, settings, "feed", "unseen", None, cat, max(1, min(limit, 40)), 0, "new", feed, {}, "")
+    items = [d for d in reader.list_docs(conn, settings, "feed", "unseen", None, cat, max(1, min(limit, 40)), 0, "new", feed, {}, "")
+             if shown(d, settings)]
     return {"src": src, "items": [{"id": d["id"], "title": d["title"] or "", "source": d.get("source") or "",
                                    "published": d.get("published") or d.get("added"), "thumb": d.get("thumb") or None,
                                    "kind": d.get("kind") or "article", "route": "#read/" + d["id"]} for d in items]}

@@ -203,9 +203,12 @@ def _one_each(chips):
 
 
 def _outside(got, check=None):
-    """Things from outside the area the model offers: only the ones whose link opens (a book needs none)."""
+    """Things from outside the area the model offers: at most the three it's asked for, and only the ones
+    whose link opens (a book needs none)."""
     keep = []
     for o in got if isinstance(got, list) else []:
+        if len(keep) >= 3:
+            break
         if not isinstance(o, dict) or o.get("kind") not in KNAME or not _clip(o.get("title"), 200):
             continue
         o = {"kind": o["kind"], "title": _clip(o["title"], 200), "by": _clip(o.get("by"), 120), "url": str(o.get("url") or "").strip()}

@@ -22,7 +22,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from . import config, db
+from . import config, db, outbound
 
 log = logging.getLogger("daf.downloads")
 MODES = ("off", "new", "all")
@@ -167,7 +167,7 @@ def fetch(audio):
         if free() < MIN_FREE:
             raise RuntimeError("the disk is nearly full")
         req = urllib.request.Request(audio, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with outbound.open_public(req, timeout=60) as resp:          # the feed chose the address
             ctype = resp.headers.get_content_type() or "audio/mpeg"
             name = _name(audio, ctype)
             part = folder() / (name + ".part")
