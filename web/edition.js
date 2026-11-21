@@ -154,7 +154,8 @@ function drawTaste(){
     '<input class="field" id="edtopicwords" aria-label="Words" placeholder="Words" enterkeyhint="done"><button class="btn sm" data-ed="addtopic">Add</button></div>';
   const srcs = T.sources.map(x => '<div class="edsrc"><div><span>' + esc(x.name) + '</span><em>' + esc(facts(x.facts)) + '</em></div>' + seg3('source', x.name, x.adj) + '</div>').join('');
   const muted = T.muted.map(m => '<div class="edsrc muted"><div><span>' + esc(m.replace(/^folder:/, '')) + '</span><em>' + (m.startsWith('folder:') ? 'folder' : '') + '</em></div><button class="linkbtn tiny" data-unmute="' + esc(m) + '">Unmute</button></div>').join('');
-  const mix = MIX.map(m => '<div class="edmrow"><span>' + m[1] + '</span><div class="edstep"><button data-step="' + m[0] + '" data-d="-1" aria-label="Less">−</button><b>' + esc(fmt(m, s[m[0]])) + '</b><button data-step="' + m[0] + '" data-d="1" aria-label="More">+</button></div></div>').join('');
+  const step = (attr, k, label, shown) => '<div class="edmrow"><span>' + esc(label) + '</span><div class="edstep"><button ' + attr + '="' + esc(k) + '" data-d="-1" aria-label="Less">−</button><b>' + esc(shown) + '</b><button ' + attr + '="' + esc(k) + '" data-d="1" aria-label="More">+</button></div></div>';
+  const mix = MIX.map(m => step('data-step', m[0], m[1], fmt(m, s[m[0]])) + (m[0] === 'torah' ? (s.desks || []).map(d => step('data-deskstep', d.key, d.name, d.at_least ? 'at least ' + d.at_least : 'none')).join('') : '')).join('');
   const sw = (k, l) => '<label class="edmrow"><span>' + l + '</span><input type="checkbox" class="sw" data-flag="' + k + '"' + (s[k] ? ' checked' : '') + '></label>';
   const days = '<div class="edmrow"><span>Days</span><div class="eddays">' + DAYS.map(([k, l]) => '<button class="' + (s.days.includes(k) ? 'on' : '') + '" data-day="' + k + '">' + l + '</button>').join('') + '</div></div>';
   const rp = T.report || {}, rise = (T.rising || []).map(r => '<span class="edlchip">' + esc(r.word) + '</span>').join('');
@@ -211,6 +212,11 @@ document.addEventListener('click', async e => {
     const c = T.pool.find(x => x.folder === pm.dataset.poolmute); if (c) c.muted = on; drawTaste(); return; }
   const u = e.target.closest && e.target.closest('[data-unmute]');
   if (u) { await put({ source: { name: u.dataset.unmute, adj: '' } }); T.muted = T.muted.filter(m => m !== u.dataset.unmute); drawTaste(); return; }
+  const ds = e.target.closest && e.target.closest('[data-deskstep]');
+  if (ds) {
+    const d = (T.settings.desks || []).find(x => x.key === ds.dataset.deskstep); if (!d) return;
+    d.at_least = Math.max(0, Math.min(3, d.at_least + Number(ds.dataset.d))); drawTaste(); await put({ desk: { key: d.key, at_least: d.at_least } }); return;
+  }
   const st = e.target.closest && e.target.closest('[data-step]');
   if (st) {
     const m = MIX.find(x => x[0] === st.dataset.step), v = Math.max(m[2], Math.min(m[3], (T.settings[m[0]] || 0) + m[4] * Number(st.dataset.d)));

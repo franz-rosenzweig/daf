@@ -9,7 +9,8 @@ The Feed never ends, and that's the trouble with it. A few hundred posts come in
 **Edition** in the sidebar (and on the phone's bottom bar) opens today's. At the top is the date, the Hebrew date and the issue's number, and a row of ten marks that fill in as I get through it, with how much reading is left.
 
 - **The lead** is the best read of the day, usually an article of five to twenty minutes, with its opening lines under the headline. Beside it, **Today** lists the whole edition, crossed off as I go.
-- **The rest** come in a grid like a front page: articles, something on this week's parasha, and one **Wildcard** from a source I don't usually read, so the paper doesn't shrink to what I already know.
+- **The news pages** come right after the lead: a piece from each of my **news desks**, the places I want the news from. They're chosen for being real reporting from the last day or so rather than for my taste, and within a desk a story about the city itself comes ahead of one about the wider region.
+- **The rest** come in a grid like a front page: articles, something on this week's parasha, and one **Wildcard** from a source I don't usually read, so the paper doesn't shrink to what I already know. The order is a paper's too: the lead, the news, the features with a section's pieces side by side, the Torah column, and the wildcard at the back.
 - **Everything in it is real text.** A feed that sends only a summary or a link gets its whole article fetched from the page before the Edition is chosen, and a piece whose page won't give its text (a robot check, a paywall, a link with nothing behind it) is left out. The text is kept, so it opens in full in Daf and goes to the Kindle in full. Videos and podcast episodes stay out unless **Videos** or **Podcasts** in the mix says otherwise.
 - Every piece has a small line saying **why it's there**: "You've watched 24 Fireship videos", "This week's parasha", "You've opened 20 from The Conversation", or "Outside your usual" for the wildcard. These come only from what Daf actually knows, never made up.
 - **👍 and 👎** under each piece tell the Edition more or less like this. A piece it showed me that I never opened counts a little against it too.
@@ -43,6 +44,16 @@ The pool stays out of the Feed. Its posts aren't in any Feed list or count, the 
 
 The pool is simply every folder set to **Hidden** on the [Feeds page](feed-and-library.md#what-shows-where), so a feed goes into it by putting it in one of those folders, or by setting the feed itself to Hidden. `daf pool-add list.json` adds a checked list, each feed into its category's folder, and makes a new folder Hidden. On the Taste page, **Pool** shows each hidden folder with its feeds and what came in the last two days, and **Mute** keeps a whole folder out. (Until November 10 a pool folder's name started with "Pool · "; Daf took that off and set those folders to Hidden.)
 
+### The news desks
+
+A news desk is a place I want the news from, and none are built in: they live in Daf's settings, under `edition.desks`, since they're my own places. Each one has a name (it becomes the section's name and the row in the **Mix**), how many pieces at least, the feeds that are always on it, the Feed folders it reads, whether every post in those folders counts or only the ones that name the place, the words that name the place, and the closer places that come first within it:
+
+    "desks": [{"key": "home", "name": "Lisbon", "at_least": 1,
+               "folders": ["Portugal"], "any": true, "sources": [],
+               "words": ["lisbon", "portugal", "sintra", "porto"], "lean": ["lisbon"]}]
+
+A story from any feed of mine counts too when its headline names the place. The pool is the natural home for a desk's feeds: a hidden folder of the local papers and newsrooms that give their whole stories in their feeds (`daf pool-add` with a checked list). When I move, the desk is the one thing to change.
+
 ## Taste
 
 **Taste**, at the top of the Edition, shows what Daf thinks I like, and it's where I change it. At the top, **Last 2 weeks** says how it's doing: how many pieces it showed, how many I opened and read, and my thumbs. **Picking up on** lists the words I've taken up lately.
@@ -51,11 +62,13 @@ The pool is simply every folder set to **Hidden** on the [Feeds page](feed-and-l
 - **Topics of my own:** the model only knows what I've already been reading, so when I want the paper to follow something new I type it into **Add a topic** under the list, "woodworking" for instance, and press **Add**. A topic is really a handful of words Daf looks for in titles and summaries. If I know which words I want, I put them in **Words**. If I leave that empty, Daf asks the model for fifteen or so, which takes a few seconds, and if the model is off it goes by the words in the name. A topic I add starts on **More**, so it counts from the next edition, and resting the pointer on any topic's name shows its words.
 - **Removing a topic:** the **×** at the end of a row takes that topic off the list, the model's or mine, after asking. It stays gone, because **Name them again** replaces only the model's topics: mine are kept as I set them, and a name I removed isn't brought back. If I change my mind I add it again.
 - **Sources:** the ones that count most, with what I've done with each ("24 watched", "20 opened"), and the same three buttons. **Mute** with a name, or with `folder:Releases` for a whole Feed folder, keeps something out for good; **Muted** lists them, each with **Unmute**.
-- **Mix:** **Every morning** turns the daily edition on; **Days** (Sunday to Friday by default); how many **Pieces**, **Videos**, **Podcasts**, **Torah** and **Wildcard**; the **Longest piece**; how fast **Habits fade**; when it's **Ready by**; whether it goes to the **Kindle**; and whether it's **Chosen by the model**.
+- **Mix:** **Every morning** turns the daily edition on; **Days** (Sunday to Friday by default); how many **Pieces**, **Videos**, **Podcasts**, **Torah**, pieces from each news desk (a row with the desk's name) and **Wildcard**; the **Longest piece**; how fast **Habits fade**; when it's **Ready by**; whether it goes to the **Kindle**; and whether it's **Chosen by the model**.
 
 ## On the Kindle
 
 Each edition goes to the Kindle as one book, "Daf, Tuesday 10 November 2026", through the same plugin as Send to Kindle. It opens on a contents page with the sections and the reasons, then every piece Daf has text for. A video or an episode goes in as its transcript once Daf has it, so the Kindle copy waits up to 25 minutes for the transcripts before it's made. Highlights made on the Kindle come back to the articles, and the time I spend in it counts, which is how the Kindle teaches the Edition too.
+
+The Kindle doesn't wait for me to pick it up. When it goes to sleep, the Daf plugin sets an alarm for a quarter past the edition's **Ready by** hour on the next edition day, which Daf tells it. The alarm wakes it behind the sleep screen; it turns on the Wi-Fi if it has to, brings in the edition, sets the next alarm and goes back to sleep, all in a minute or two and without changing what the screen shows. If the edition wasn't there yet, it tries again every half hour until late morning. It never wakes on a day without an edition. The plugin needs to be on the Kindle from November 20, 2026 or later for this.
 
 ## Setting it up
 

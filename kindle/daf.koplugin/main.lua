@@ -18,6 +18,8 @@ Daf for KOReader.
     gesture. Works offline from the last answer; taps are queued.
   * Books from Daf (inbox.lua): on the Wi-Fi sync, what Daf has waiting for the Kindle goes into
     its shelf, downloaded in the background.
+  * The morning's Edition: going to sleep, the Kindle sets an alarm for when Daf says the Edition is
+    ready; woken by it, it brings it in behind the sleep screen and sleeps again (morningFetch).
   * Home (home.lua) and the shelves (shelf.lua), drawn with canvas.lua, with book covers from
     covers.lua (made ahead for the whole library after Home appears); and outside a book,
     the book's global settings in KOReader's menu too (readerprefs.lua).
@@ -55,7 +57,15 @@ local Daf = WidgetContainer:extend{
     GOAL = GOAL,
 }
 
+-- The Daf plugin of the screen that's open (the file browser's or the book's), for the morning alarm,
+-- which has to be one function that stays the same while the screens come and go.
+local current
+local function morningTask()
+    if current then current:morningFetch() end
+end
+
 function Daf:init()
+    current = self
     self.settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/daf.lua")
     self.last_refresh = 0
     self.ui.menu:registerToMainMenu(self)
@@ -349,7 +359,7 @@ function Daf:fetchToday()
     if res then
         self.settings:saveSetting("tz_offset", res.tz_offset)
         self.settings:saveSetting("cache", { date = res.date, other = res.other or 0, year_day = res.year_day, year_hours = res.year_hours,
-                                             goal = res.goal, main = res.main, fetched = os.time() })
+                                             goal = res.goal, main = res.main, wake = res.wake, fetched = os.time() })
         self.settings:flush()
     end
 end
@@ -965,6 +975,66 @@ function Daf:onSuspend()
     flushStatistics()
     self:refreshSleepMessage(true)
     if online() then pcall(function() self:flushReview(); self:send(true, true) end) end
+    pcall(function() self:scheduleMorning() end)
+end
+
+-- ---------------------------------------------------------------- the morning's Edition
+-- Daf says when the Kindle should next wake by itself (`wake` in /api/kindle/today: a little after the
+-- Edition is ready, and again soon while today's copy isn't here). Going to sleep, the plugin sets
+-- KOReader's alarm for then. Woken by it, the Kindle stays up a few minutes behind its sleep screen,
+-- gets on Wi-Fi, brings in what Daf has waiting, sets the next alarm and goes back to sleep.
+
+local function powerd(prop, value)
+    pcall(function() os.execute(string.format("lipc-set-prop -i com.lab126.powerd %s %d", prop, value)) end)
+end
+
+function Daf:scheduleMorning()
+    local mgr = require("device").wakeup_mgr
+    if not mgr or not self:configured() then return end
+    mgr:removeTasks(nil, morningTask)
+    local wake = tonumber((self.settings:readSetting("cache") or {}).wake)
+    local wait = wake and (wake - os.time())
+    if wait and wait > 60 and wait < 8 * 86400 then
+        mgr:addTask(wait, morningTask)
+        logger.info("[Daf] morning: alarm at", os.date("!%Y-%m-%d %H:%M UTC", wake))
+    end
+end
+
+function Daf:morningFetch()
+    if self.morning then return end
+    self.morning = true
+    local NetworkMgr = require("ui/network/manager")
+    local started, turned_on = os.time(), false
+    powerd("deferSuspend", 240)         -- seconds the Kindle waits before it sleeps again: the Wi-Fi and a download
+    logger.info("[Daf] morning: awake for the Edition")
+    local function finish(what)
+        logger.info("[Daf] morning:", what)
+        if online() then pcall(function() self:fetchToday() end) end     -- when to wake next
+        pcall(function() self:scheduleMorning() end)
+        if turned_on then pcall(function() NetworkMgr:turnOffWifi() end) end
+        self.morning = nil
+        powerd("deferSuspend", 1)
+    end
+    local function step()
+        if online() then
+            local ok, sent = pcall(function() return self:send(true) end)
+            if not (ok and sent) and os.time() - started < 150 then
+                return UIManager:scheduleIn(10, step)
+            end
+            local function wait()
+                if Inbox.busy() and os.time() - started < 230 then return UIManager:scheduleIn(3, wait) end
+                finish(Inbox.busy() and "still downloading as it goes back to sleep" or (ok and sent and "done" or "Daf didn't answer"))
+            end
+            return UIManager:scheduleIn(2, wait)
+        end
+        if os.time() - started >= 100 then return finish("no Wi-Fi") end
+        if not turned_on and not NetworkMgr:isWifiOn() then
+            turned_on = true
+            pcall(function() NetworkMgr:restoreWifiAsync() end)      -- on, without any of the Wi-Fi screens
+        end
+        UIManager:scheduleIn(3, step)
+    end
+    step()
 end
 
 function Daf:onCloseDocument()
