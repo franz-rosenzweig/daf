@@ -1363,7 +1363,12 @@ document.addEventListener('visibilitychange', () => {
 });
 setTimeout(() => newer(false), 8000);
 setInterval(() => { if (!document.hidden) newer(false); }, 30 * 60000);
-window.addEventListener('hashchange', () => { show(); if (S.stale && settled()) fresh(); });
+// (and on the way into a reader: the book opens in the new Daf, not in the old one it would keep till you leave)
+let wasAt = route()[0];
+window.addEventListener('hashchange', () => {
+  const at = route()[0], into = at !== wasAt && ['read', 'ebook', 'mread', 'paper'].includes(at); wasAt = at;
+  show(); if (S.stale && (settled() || (into && !busy() && !document.body.classList.contains('playing')))) fresh();
+});
 
 // The same thing seen another way (an article's text and its PDF's pages): it takes this page's place
 // in the history, so Back leaves the document instead of going round between the two.

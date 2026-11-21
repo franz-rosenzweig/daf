@@ -87,7 +87,7 @@ window.addEventListener('daf-type', () => { applyBookType(); setTimeout(redrawAl
 /* ---------- open ---------- */
 async function openBook(id, at){
   cleanup();
-  B.id = id; B.loc = null; B.forget = false; B.pageKey = null; B.pagesNew = new Set(); B.byCfi = new Map(); B.kindleByCfi = new Map(); B.sel = null; B.opened = Date.now(); B.offeredNext = false; B.offeredEnd = false; B.temp = new Set();
+  B.id = id; B.loc = null; B.spot = null; B.forget = false; B.pageKey = null; B.pagesNew = new Set(); B.byCfi = new Map(); B.kindleByCfi = new Map(); B.sel = null; B.opened = Date.now(); B.offeredNext = false; B.offeredEnd = false; B.temp = new Set();
   H.active = ACT;
   wake(true);
   document.body.dataset.view = 'ebook';
@@ -710,14 +710,7 @@ function onSectionLoad(e){
     // (foliate shows a tapped highlight's bar from its own click: a new bar stays)
     if (bar !== undefined || sel) { setTimeout(() => { if (H.ctx === bar) H.hide(); }, 0); return; }
     if (alongTap(doc, index, ev)) return;                // the audiobook goes to the sentence tapped
-    if (room().w >= 1000 && !(C.Focus && C.Focus.on())) return;
-    // the sides turn the page, in Scroll too (a screen at a time, then on into the next chapter);
-    // not when the tap was on a highlight and opened its bar
-    const fx = (doc.defaultView.frameElement.getBoundingClientRect().left + ev.clientX) / room().w;
-    setTimeout(() => {
-      if (H.visible()) return;
-      if (fx < 0.28) B.view.goLeft(); else if (fx > 0.72) B.view.goRight(); else toggleChrome();
-    }, 0);
+    pageTap((doc.defaultView.frameElement.getBoundingClientRect().left + ev.clientX) / room().w);
   });
   // Scroll: a sideways swipe turns too (Pages has foliate's own)
   doc.addEventListener('touchstart', ev => { const t = ev.touches[0]; B.swipe = ev.touches.length === 1 ? { x: t.clientX, y: t.clientY, at: ev.timeStamp } : null; }, { passive: true });
@@ -748,8 +741,27 @@ function drawNextChapter(l){
   b.innerHTML = '<span class="mute">Next</span><b' + (next && isRtlText(next.label) ? ' dir="rtl"' : '') + '>' + esc(next ? (next.label || '').trim() : 'Go on') + '</b><span aria-hidden="true">›</span>';
   b.hidden = false;
 }
+// A tap on the page, fx across the screen (0 to 1): the sides turn it, in Scroll too (a screen at a time,
+// then on into the next chapter), and the middle brings the bars or puts them away. Not when the tap was
+// on a highlight and opened its bar. A mouse on a wide screen leaves the page alone (it has the keys and
+// the bar); a finger turns it at any width, a tablet held sideways too.
+function pageTap(fx){
+  if (room().w >= 1000 && !B.touch && !(C.Focus && C.Focus.on())) return;
+  setTimeout(() => {
+    if (H.visible()) return;
+    if (fx < 0.28) B.view.goLeft(); else if (fx > 0.72) B.view.goRight(); else toggleChrome();
+  }, 0);
+}
+// The margins beside the text are outside the page's frame, so the frame never hears a tap there: it
+// comes to the reader as a tap on the book itself, and does what one on the text would.
+document.addEventListener('pointerdown', e => { if (B.view && e.target === B.view) B.touch = e.pointerType === 'touch'; }, true);
+document.addEventListener('click', e => {
+  if (C.S.route[0] !== 'ebook' || !B.view || e.target !== B.view) return;
+  if (C.S.popAtClick != null || H.visible()) return;   // that tap puts the menu or the highlight's bar away, and does only that
+  pageTap(e.clientX / room().w);
+});
 // (in focus mode, the bar comes and goes instead: focus.js)
-function toggleChrome(){ if (C.Focus && C.Focus.on()) { C.Focus.bar(); return; } if (B.chrome) { B.chrome = false; document.body.classList.add('bookbare'); } else showChrome(); }
+function toggleChrome(){ if (C.Focus && C.Focus.on()) { C.Focus.bar(null, B.touch); return; } if (B.chrome) { B.chrome = false; document.body.classList.add('bookbare'); } else showChrome(); }
 
 // Pages for page goals: a page counts once it has been on screen for five seconds, the way
 // KOReader counts the Kindle's. The printed page when the book has one, else foliate's location.
@@ -761,10 +773,19 @@ function notePage(l){
   if (B.pageKey && B.pageKey !== key && now - (B.pageAt || now) >= 5000) addPages(B.pageKey);
   if (B.pageKey !== key) { B.pageKey = key; B.pageAt = now; }
 }
+// Where the page is, to tell a turn from foliate saying again where it is (it does after every touch
+// on the page, a tap too): the chapter and foliate's own page in it, which it counts from the middle of
+// the screen; in Scroll how far down. Its CFI won't do: after a turn the same page can come back with
+// another one, and that put away the bars a tap had just brought.
+function spotOf(l){
+  const r = B.view && B.view.renderer, ch = l.section ? l.section.current : '';
+  if (r && r.scrolled) return ch + '@' + Math.round(r.start);
+  if (r && typeof r.page === 'number') return ch + ':' + r.page;
+  return l.cfi;
+}
 function onRelocate(e){
-  const l = e.detail, moved = !B.loc || B.loc.cfi !== l.cfi; B.loc = l; notePage(l); drawNextChapter(l);
-  // the bars go when the page turns; foliate also says where it is after every touch on the page, a
-  // tap too, and that one (the same place) put away the bars the tap had just brought
+  const l = e.detail, spot = spotOf(l), moved = B.spot !== spot; B.spot = spot; B.loc = l; notePage(l); drawNextChapter(l);
+  // the bars go when the page turns
   if (moved && Date.now() - B.opened > 2500) hideChrome();
   followBar();
   if (B.forget && Date.now() - (B.forgetAt || 0) > 2000) B.forget = false;   // reading on after Forget: the place counts again
@@ -1120,8 +1141,10 @@ function openPhoneMenu(anchor){
 // a touch screen brings them or puts them away.
 function showChrome(){ B.chrome = true; document.body.classList.remove('bookbare'); }
 function hideChrome(){
-  if ((C.Focus && C.Focus.on()) || !B.view) return;
+  if (!B.view) return;
   if (!$('#pop').hidden || document.body.classList.contains('btocsheet') || panelShown() || H.visible() || (B.tts && B.tts.on) || (alongOn() && B.id === AL.book) || $('#bjump')) return;
+  if (Date.now() - (B.slidAt || 0) < 2000) return;                 // a jump with the phone's slider: the slider stays, to try again
+  if (C.Focus && C.Focus.on()) { C.Focus.bar(false); return; }     // focus mode's own bar goes the same way
   B.chrome = false; document.body.classList.add('bookbare');
 }
 document.addEventListener('mousemove', e => {
@@ -1888,7 +1911,7 @@ window.addEventListener('pagehide', () => { if (B.view) savePosition(true); });
 window.addEventListener('resize', () => { clearTimeout(B.rsT); B.rsT = setTimeout(() => { applyBookType(); if (B.d && $('#btop')) drawTop(); }, 200); });
 // The phone's slider: drag to anywhere in the book.
 document.addEventListener('input', e => { if (e.target.id !== 'bslide') return; B.sliding = true; const st = $('#bslidet'); if (st) st.textContent = Math.round(e.target.value / 10) + '%'; });
-document.addEventListener('change', e => { if (e.target.id !== 'bslide' || !B.view) return; B.view.goToFraction(e.target.value / 1000).catch(() => {}).finally(() => { B.sliding = false; }); });
+document.addEventListener('change', e => { if (e.target.id !== 'bslide' || !B.view) return; B.slidAt = Date.now(); B.view.goToFraction(e.target.value / 1000).catch(() => {}).finally(() => { B.sliding = false; }); });
 window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#ebook/')) { cleanup(); document.body.classList.remove('btocsheet', 'bpanelsheet', 'bookbare'); } });
 
 C.views.ebook = args => {

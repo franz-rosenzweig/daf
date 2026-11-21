@@ -60,19 +60,20 @@ function edges(on){
     '<div class="fedge l" data-fe="toc" title="Contents"></div><div class="fedge r" data-fe="panel" title="Side panel"></div><div class="fscrim" data-fe="close" hidden></div>';
   e.addEventListener('click', ev => {
     const k = ev.target.dataset.fe;
-    if (k === 'bar') bar(!root.classList.contains('fbar'));
+    if (k === 'bar') bar(!root.classList.contains('fbar'), ev.pointerType === 'touch');
     else if (k === 'toc') drawer('ftoc');
     else if (k === 'panel') drawer('fpanel');
     else if (k === 'close') close();
   });
   document.body.appendChild(e);
 }
-// The bar (and a phone's slider under a book), for a few seconds or until the page is touched; kept
-// while its menus are open.
-function bar(on){
+// The bar (and a phone's slider under a book): until the page is touched or turned (book.js), and when
+// a mouse brought it also gone after a few seconds; kept while its menus are open. Brought by a finger
+// (stay) it waits for the finger: gone by itself, the tap meant for its round menu turned the page.
+function bar(on, stay){
   clearTimeout(F.barT);
   root.classList.toggle('fbar', !!on);
-  if (on) F.barT = setTimeout(function again(){ if ($('#pop') && !$('#pop').hidden) F.barT = setTimeout(again, 2000); else root.classList.remove('fbar'); }, 4500);
+  if (on && !stay) F.barT = setTimeout(function again(){ if ($('#pop') && !$('#pop').hidden) F.barT = setTimeout(again, 2000); else root.classList.remove('fbar'); }, 4500);
 }
 function drawer(which, force){
   const open = force != null ? !!force : !root.classList.contains(which);
@@ -99,10 +100,10 @@ document.addEventListener('click', e => {
 });
 // A touch on the page puts the bar away again. Not one on what comes with the bar (a phone's slider
 // and round menu under a book, the player): put away as the finger lands, its tap went through to
-// the page and turned it instead.
+// the page and turned it instead. Nor one in a book's margins: book.js takes it as a tap on the text.
 document.addEventListener('pointerdown', e => {
   if (!F.on || !root.classList.contains('fbar')) return;
-  if (e.target.closest && e.target.closest('.rv > .top, .pdfv > .top, .bookfoot, .bctl, .player, #pop, #fedges, .inkpal, .inkpop, #selbar, .modal')) return;
+  if (e.target.closest && e.target.closest('.rv > .top, .pdfv > .top, .bookfoot, .bctl, .player, #pop, #fedges, .inkpal, .inkpop, #selbar, .modal, foliate-view')) return;
   bar(false);
 }, true);
 document.addEventListener('keydown', e => {
@@ -117,6 +118,6 @@ const watch = () => { new MutationObserver(sync).observe(document.body, { attrib
 if (document.body) watch(); else document.addEventListener('DOMContentLoaded', watch);
 
 // panel(), toc(): the bar's own buttons in focus mode open the same drawers the edges do (true: open).
-C.Focus = { button, toggle, on: () => F.on, bar: () => bar(!root.classList.contains('fbar')), close, escape,
+C.Focus = { button, toggle, on: () => F.on, bar: (on, stay) => bar(on == null ? !root.classList.contains('fbar') : on, stay), close, escape,
   panel: open => drawer('fpanel', open), toc: open => drawer('ftoc', open) };
 })();
