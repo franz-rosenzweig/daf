@@ -21,7 +21,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from . import ai, db
+from . import ai, db, outbound
 
 COLORS = ["#7a1f2b", "#3d5468", "#6b4a2b", "#2f5d46", "#4b3a78", "#8a5a12"]
 KINDS = ("book", "article", "video", "feed")
@@ -314,6 +314,8 @@ def _ask_model(name, goal, have, skipped, n=6):
     got = json.loads(m.group(0))
     keep = []
     for g in got if isinstance(got, list) else []:
+        if len(keep) >= n:                        # no more than were asked for: each link gets tried
+            break
         if not isinstance(g, dict) or g.get("kind") not in KINDS or not str(g.get("title") or "").strip():
             continue
         keep.append({"kind": g["kind"], "title": str(g["title"]).strip()[:200], "by": str(g.get("by") or "").strip()[:120],
@@ -322,12 +324,13 @@ def _ask_model(name, goal, have, skipped, n=6):
 
 
 def _opens(url):
-    """True when the address answers (the model's links are only offered once they do)."""
+    """True when the address answers (the model's links are only offered once they do). Public addresses
+    only, redirects included (outbound.py): the model's answer can carry links planted in the area's articles."""
     if not re.match(r"^https?://\S+$", url or ""):
         return False
     try:
         req = urllib.request.Request(url, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with outbound.open_public(req, timeout=10) as r:
             return r.status < 400
     except Exception:  # noqa: BLE001
         return False

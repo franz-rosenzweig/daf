@@ -37,7 +37,7 @@ import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-from . import config, content, db
+from . import config, content, db, outbound
 
 log = logging.getLogger("daf.episodes")
 UA = "Daf/1.0 (personal reading app)"
@@ -75,8 +75,9 @@ def _seconds(s):
 
 
 def _get(url, timeout=30, limit=8 * 1024 * 1024):
+    """A show's feed, or a file it names (transcript, chapters): public addresses only (outbound.py)."""
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with outbound.open_public(req, timeout=timeout) as r:
         return r.read(limit), r.headers.get_content_type()
 
 
@@ -462,11 +463,12 @@ def _chapters_json(url):
             if c.get("startTime") is not None and c.get("toc") is not False and str(c.get("title") or "").strip()]
 
 
-def _chapters_probe(src):
-    """The audio file's own chapters (ID3 CHAP, MP4 chapters); ffprobe reads a remote file's head only."""
+def _chapters_probe(path):
+    """The audio file's own chapters (ID3 CHAP, MP4 chapters), from a file on disk: ffprobe never fetches
+    anything itself (a feed's address goes through _download, which only goes to public addresses)."""
     if not shutil.which("ffprobe"):
         return []
-    r = subprocess.run(["ffprobe", "-v", "error", "-user_agent", UA, "-show_chapters", "-of", "json", src],
+    r = subprocess.run(["ffprobe", "-v", "error", "-protocol_whitelist", "file", "-show_chapters", "-of", "json", str(path)],
                        capture_output=True, text=True, timeout=90)
     try:
         chs = json.loads(r.stdout or "{}").get("chapters", [])
@@ -476,12 +478,13 @@ def _chapters_probe(src):
     return [c for c in out if c["title"]]
 
 
-def _download(url, folder):
-    """The episode's audio into folder (on disk: /tmp is memory on this server)."""
+def _download(url, folder, head=None):
+    """The episode's audio into folder (on disk: /tmp is memory on this server); with head, only its
+    first head bytes (where an MP3 keeps its chapters). Public addresses only (outbound.py)."""
     path = Path(folder) / "audio"
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     got = 0
-    with urllib.request.urlopen(req, timeout=60) as r, open(path, "wb") as f:
+    with outbound.open_public(req, timeout=60) as r, open(path, "wb") as f:
         while True:
             chunk = r.read(1 << 20)
             if not chunk:
@@ -490,6 +493,8 @@ def _download(url, folder):
             if got > MAX_AUDIO:
                 raise RuntimeError("the audio is over 1.5 GB")
             f.write(chunk)
+            if head and got >= head:
+                break
     return str(path)
 
 
@@ -500,6 +505,8 @@ def transcribe(audio):
         d = conn.execute("SELECT * FROM docs WHERE kind = 'podcast' AND enclosure = ? LIMIT 1", (audio,)).fetchone()
         m = ensure_meta(conn, audio, dict(d) if d else None) or {}
     chapters, lines, source, lang = [], None, None, None
+    tmpdir = config.STATE / "tmp"
+    tmpdir.mkdir(parents=True, exist_ok=True)
     if m.get("chapters_url"):
         try:
             chapters = _chapters_json(m["chapters_url"])
@@ -516,12 +523,11 @@ def transcribe(audio):
     if lines:
         if not chapters:
             try:
-                chapters = _chapters_probe(audio)
+                with tempfile.TemporaryDirectory(dir=tmpdir) as tmp:
+                    chapters = _chapters_probe(_download(audio, tmp, head=8 << 20))
             except Exception:  # noqa: BLE001
                 chapters = []
     else:
-        tmpdir = config.STATE / "tmp"
-        tmpdir.mkdir(parents=True, exist_ok=True)
         from . import downloads
         with db.session() as conn:
             kept = downloads.kept(conn, audio)

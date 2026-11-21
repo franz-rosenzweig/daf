@@ -45,8 +45,9 @@ from . import config, freehand, sketchbook as SB
 log = logging.getLogger(__name__)
 
 START, END = "<!-- daf-sketchbook -->", "<!-- daf-sketchbook-end -->"
-REGION = re.compile(re.escape(START) + r".*?" + re.escape(END) + r"\n?", re.S)
-DAF_END = "<!-- daf-end -->"
+# Markers are lines of their own (vaultnotes.REGION says why).
+REGION = re.compile(r"(?ms)^" + re.escape(START) + r"[ \t]*$.*?^" + re.escape(END) + r"[ \t]*$\n?")
+DAF_END = re.compile(r"(?m)^<!-- daf-end -->[ \t]*$")
 SUFFIX = " — Sketchbook"
 MEDIA = "_media"
 INK_PLUGIN, INK_CANVAS = "0.6.1", "0.5.0"      # the Ink plugin's version and its ink-canvas format (its manifest, INK_CANVAS_FORMAT_VERSION)
@@ -284,8 +285,8 @@ def _embed_in(own, rel):
     m = REGION.search(text)
     if m:
         new = text[:m.start()] + region + text[m.end():]
-    elif DAF_END in text:
-        at = text.index(DAF_END) + len(DAF_END)
+    elif DAF_END.search(text):
+        at = DAF_END.search(text).end()
         new = text[:at] + "\n\n" + region.rstrip("\n") + text[at:]
     else:
         new = text.rstrip("\n") + "\n\n" + region

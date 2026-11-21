@@ -18,7 +18,7 @@ from starlette.concurrency import run_in_threadpool
 
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from . import ai, auth, catalog, config, db, digest, ebooks, feedback, goals, gpodder, imports, jump, library, lookup, media, notes, paper_pages, phone, reader, review, sync, today as T, torah, vaultnotes
+from . import ai, auth, catalog, config, db, digest, ebooks, feedback, goals, gpodder, imports, jump, library, lookup, media, notes, outbound, paper_pages, phone, reader, review, sync, today as T, torah, vaultnotes
 from .sources import checks, kindle, paper
 
 log = logging.getLogger(__name__)
@@ -141,6 +141,14 @@ def device(request: Request, c=Depends(conn)):
     name = auth.check_device(c, h[7:].strip() if h.lower().startswith("bearer ") else None)
     if not name:
         raise HTTPException(401, "Unknown device")
+    return name
+
+
+def kindle_device(name=Depends(device)):
+    """The Kindle's routes take the Kindle's own token (made on the server with `daf kindle-token kindle`),
+    not every device's: they hand over its private books' md5s, highlights and Sketchbook pages."""
+    if name != "kindle" and not name.startswith("kindle-"):
+        raise HTTPException(403, "Only the Kindle's token")
     return name
 
 
@@ -2755,13 +2763,13 @@ async def post_book_file(book_id: str, request: Request, c=Depends(conn)):
 # ---- the Kindle's downloads (kindlequeue.py): its plugin fetches what's waiting on Wi-Fi ----
 
 @app.get("/api/kindle/inbox")
-def kindle_inbox(name=Depends(device), c=Depends(conn)):
+def kindle_inbox(name=Depends(kindle_device), c=Depends(conn)):
     from . import kindlequeue
     return {"files": kindlequeue.inbox(c)}
 
 
 @app.get("/api/kindle/inbox/{qid}/file")
-def kindle_inbox_file(qid: str, name=Depends(device), c=Depends(conn)):
+def kindle_inbox_file(qid: str, name=Depends(kindle_device), c=Depends(conn)):
     from . import kindlequeue
     p, fname = kindlequeue.file_for(c, qid)
     if not p:
@@ -2770,7 +2778,7 @@ def kindle_inbox_file(qid: str, name=Depends(device), c=Depends(conn)):
 
 
 @app.post("/api/kindle/inbox/{qid}/done")
-async def kindle_inbox_done(qid: str, request: Request, name=Depends(device), c=Depends(conn)):
+async def kindle_inbox_done(qid: str, request: Request, name=Depends(kindle_device), c=Depends(conn)):
     """{error?}: the plugin has the file in its shelf (or couldn't)."""
     from . import kindlequeue
     b = await _body(request)
@@ -2778,7 +2786,7 @@ async def kindle_inbox_done(qid: str, request: Request, name=Depends(device), c=
 
 
 @app.post("/api/kindle/shelves")
-async def kindle_shelves_report(request: Request, name=Depends(device), c=Depends(conn)):
+async def kindle_shelves_report(request: Request, name=Depends(kindle_device), c=Depends(conn)):
     """{shelves: [folder names in the Kindle's home folder], files: [{path, md5}]}, from the plugin.
     With files, Daf's Kindle shelves follow it, and the answer has the moves Daf asks of it."""
     from . import kindlequeue, kindleshelves
@@ -2790,7 +2798,7 @@ async def kindle_shelves_report(request: Request, name=Depends(device), c=Depend
 
 
 @app.post("/api/kindle/moves/{move_id}/done")
-async def kindle_move_done(move_id: int, request: Request, name=Depends(device), c=Depends(conn)):
+async def kindle_move_done(move_id: int, request: Request, name=Depends(kindle_device), c=Depends(conn)):
     """{path} where the book is now, or {error}: a move Daf asked for, made by the plugin (or not)."""
     from . import kindleshelves
     b = await _body(request)
@@ -4529,7 +4537,7 @@ def get_podcast_audio(u: str, request: Request, c=Depends(conn)):
     if request.headers.get("range"):
         h["Range"] = request.headers["range"]
     try:
-        r = urllib.request.urlopen(urllib.request.Request(u, headers=h), timeout=30)
+        r = outbound.open_public(urllib.request.Request(u, headers=h), timeout=30)    # the feed chose it
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"The podcast's server didn't answer: {e}")
     out = {k: r.headers[k] for k in ("Content-Length", "Content-Range", "Accept-Ranges") if r.headers.get(k)}
@@ -5096,8 +5104,9 @@ def phone_feed_news(cursor: int = -1, name=Depends(device), c=Depends(conn)):
     top = c.execute("SELECT COALESCE(MAX(rowid), 0) FROM docs WHERE where_ = 'feed'").fetchone()[0]
     if cursor < 0 or not feeds:
         return {"cursor": top, "feeds": len(feeds), "items": []}
-    rows = c.execute(f"SELECT rowid AS n, id, title, source, feed FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND rowid > ? "
+    rows = c.execute(f"SELECT rowid AS n, id, title, source, author, feed FROM docs WHERE where_ = 'feed' AND status = 'unseen' AND rowid > ? "
                      f"AND feed IN ({','.join('?' * len(feeds))}) ORDER BY rowid LIMIT 20", (cursor, *feeds)).fetchall()
+    rows = [r for r in rows if phone.shown(dict(r), s)]
     return {"cursor": top, "feeds": len(feeds),
             "items": [{"id": r["id"], "title": r["title"], "source": r["source"], "route": "#read/" + _urlq(r["id"], safe="")} for r in rows]}
 
@@ -5292,7 +5301,7 @@ async def make_device(request: Request, c=Depends(conn)):
     name = str(b.get("name") or "").strip().lower()
     if not DEVICE_NAME.match(name):
         raise HTTPException(400, "A name of 1 to 24 lower-case letters, digits or dashes")
-    if name == "kindle":
+    if name == "kindle" or name.startswith("kindle-"):
         raise HTTPException(400, "The Kindle's token is made on the server: daf kindle-token kindle")
     c.execute("DELETE FROM devices WHERE name = ?", (name,))
     if name.startswith("android-"):
@@ -5359,7 +5368,7 @@ async def share_post(request: Request, c=Depends(conn)):
 # ---- the Kindle plugin --------------------------------------------------------
 
 @app.post("/api/kindle/pages")
-async def kindle_pages(request: Request, name=Depends(device), c=Depends(conn)):
+async def kindle_pages(request: Request, name=Depends(kindle_device), c=Depends(conn)):
     body = await request.json()
     added = kindle.ingest_plugin(c, body.get("books"), body.get("pages"))
     if added:
@@ -5368,7 +5377,7 @@ async def kindle_pages(request: Request, name=Depends(device), c=Depends(conn)):
 
 
 @app.post("/api/kindle/annotations")
-def kindle_annotations(b=Depends(json_body), name=Depends(device), c=Depends(conn)):
+def kindle_annotations(b=Depends(json_body), name=Depends(kindle_device), c=Depends(conn)):
     """{books: [{md5, file, title, authors, annotations: [...]}]}: each book's KOReader highlights and
     notes, as the Daf plugin read them from its notes file. Kept per book (the newest replaces the
     last) and read on the next sync like a Syncthing copy (library.sidecars), within minutes. Since KoInsight went
@@ -5391,7 +5400,7 @@ def kindle_annotations(b=Depends(json_body), name=Depends(device), c=Depends(con
 
 
 @app.get("/api/kindle/today")
-def kindle_today(name=Depends(device), c=Depends(conn)):
+def kindle_today(name=Depends(kindle_device), c=Depends(conn)):
     """What the Kindle needs for its sleep screen. The Kindle adds its own minutes
     (fresher than ours) to `other`, the counted minutes from every other source."""
     s = config.load_settings()
@@ -5411,7 +5420,7 @@ def kindle_today(name=Depends(device), c=Depends(conn)):
 
 
 @app.get("/api/kindle/home")
-def kindle_home(name=Depends(device), c=Depends(conn)):
+def kindle_home(name=Depends(kindle_device), c=Depends(conn)):
     """Everything the Daf screen on the Kindle shows: today, the review, the nightstand.
     The plugin keeps the last answer, so the screen works with Wi-Fi off."""
     out = kindle_today(name, c)
@@ -5453,25 +5462,27 @@ def kindle_home(name=Depends(device), c=Depends(conn)):
 
 
 @app.get("/api/kindle/book")
-def kindle_book(md5: str = "", name=Depends(device), c=Depends(conn)):
+def kindle_book(md5: str = "", name=Depends(kindle_device), c=Depends(conn)):
     """For the book just opened on the Kindle: where Daf has you in it, and the highlights made in
     Daf that the Kindle doesn't have yet (the plugin adds them to KOReader)."""
     bid = library.book_for_md5(c, md5.strip().lower())
     if not bid:
         return {"known": False}
-    b = c.execute("SELECT title, private FROM books WHERE id = ?", (bid,)).fetchone()
+    b = c.execute("SELECT title, author, private FROM books WHERE id = ?", (bid,)).fetchone()
+    # a private book's name stays in Daf, as on the nightstand (the plugin never shows this title)
+    hidden = not b or bool(b["private"]) or library.is_private(f"{b['title'] or ''} {b['author'] or ''}", config.load_settings())
     pos = c.execute("SELECT fraction, chapter, updated FROM book_positions WHERE book_id = ?", (bid,)).fetchone()
     hls = [dict(r) for r in c.execute(
         "SELECT h.id, h.text, h.chapter, h.color, s.user_note AS note FROM highlights h LEFT JOIN review_state s ON s.hl_id = h.id "
         "WHERE h.book_id = ? AND h.source = 'epub' AND h.deleted = 0 AND h.id NOT IN (SELECT hl_id FROM kindle_pushed) "
         "ORDER BY h.created", (bid,))]
     from . import sketchbook                   # its Sketchbook's pages, as bookmarks with a note (acked at /api/sketchbook/kindle/ack)
-    return {"known": True, "book_id": bid, "title": b["title"] if b else None,
+    return {"known": True, "book_id": bid, "title": None if hidden else b["title"],
             "daf": dict(pos) if pos else None, "highlights": hls, "sketchbook": sketchbook.for_kindle(c, bid)}
 
 
 @app.post("/api/kindle/highlights/ack")
-async def kindle_highlights_ack(request: Request, name=Depends(device), c=Depends(conn)):
+async def kindle_highlights_ack(request: Request, name=Depends(kindle_device), c=Depends(conn)):
     b = await _body(request)
     ids = [i for i in (b.get("ids") or []) if isinstance(i, str)]
     c.executemany("INSERT OR REPLACE INTO kindle_pushed (hl_id, device, at) VALUES (?, ?, ?)", [(i, name, int(time.time())) for i in ids])
@@ -5479,7 +5490,7 @@ async def kindle_highlights_ack(request: Request, name=Depends(device), c=Depend
 
 
 @app.post("/api/kindle/review")
-async def kindle_review(request: Request, name=Depends(device), c=Depends(conn)):
+async def kindle_review(request: Request, name=Depends(kindle_device), c=Depends(conn)):
     """Keep / Less / Later from the Kindle, one or a queued batch: {"actions": [{"id", "action"}]}."""
     body = await _body(request)
     s = config.load_settings()

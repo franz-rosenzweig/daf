@@ -8,7 +8,7 @@ import time
 import urllib.error
 import urllib.request
 
-from . import config, content
+from . import config, content, outbound
 from .sources import karakeep
 
 DIR = config.STATE / "pdf"
@@ -24,7 +24,7 @@ def _fetch(url):
     spelling of the host before giving up (never skip verification)."""
     def get(u):
         req = urllib.request.Request(u, headers={"User-Agent": UA, "Accept": "application/pdf,*/*"})
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with outbound.open_public(req, timeout=60) as r:     # a saved link: public addresses only
             return r.read(80_000_000)
     try:
         return get(url)

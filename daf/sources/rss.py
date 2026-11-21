@@ -29,7 +29,7 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-from .. import config, content
+from .. import config, content, outbound
 
 UA = "Mozilla/5.0 (compatible; Daf feed reader; +https://github.com/franz-rosenzweig/daf)"
 EVERY = 1800                     # seconds between two reads of one feed
@@ -208,24 +208,30 @@ def folders(conn=None, hidden=False):
 
 class _Https(urllib.request.HTTPRedirectHandler):
     """A redirect to plain http is followed over https: plenty of networks don't let port 80 out,
-    and the feeds that send you there serve https too (Chrome Releases → feeds.feedburner.com)."""
+    and the feeds that send you there serve https too (Chrome Releases → feeds.feedburner.com).
+    And only to a public address, like the first one (outbound.py)."""
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         if newurl.startswith("http://"):
             newurl = "https://" + newurl[7:]
+        if not outbound.public_url(newurl):
+            return None
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def _get(url, headers=None, timeout=25, verify=True):
+    """A feed, a page that names one, or its icon: public addresses only (a page or a reader app chose it)."""
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5", **(headers or {})})
     ctx = None if verify else ssl._create_unverified_context()  # noqa: SLF001 - a feed set to skip the certificate check
     opener = urllib.request.build_opener(_Https, urllib.request.HTTPSHandler(context=ctx))
     try:
-        return opener.open(req, timeout=timeout)
+        return outbound.open_public(req, timeout, opener)
+    except outbound.NotPublic:
+        raise FeedError("Daf only reads feeds on public addresses") from None
     except urllib.error.URLError as e:
         if isinstance(e, urllib.error.HTTPError) or not url.startswith("http://"):
             raise
         req.full_url = "https://" + url[7:]          # a plain http feed: its https address, the same way
-        return opener.open(req, timeout=timeout)
+        return outbound.open_public(req, timeout, opener)
 
 
 def _parse(data, ctype=""):

@@ -544,7 +544,7 @@ def router():
     from starlette.concurrency import run_in_threadpool
 
     from . import library
-    from .app import conn, device, json_body, user, user_or_device
+    from .app import conn, json_body, kindle_device, user, user_or_device
 
     r = APIRouter()
 
@@ -572,7 +572,7 @@ def router():
         return await run_in_threadpool(at, c, book_id, place, bool(b.get("music")))
 
     @r.post("/api/kindle/where")
-    def post_kindle_where(b=Depends(json_body), name=Depends(device), c=Depends(conn)):
+    def post_kindle_where(b=Depends(json_body), name=Depends(kindle_device), c=Depends(conn)):
         """{md5, text, fraction}: the page the Kindle is on, from the plugin when Sound is on there."""
         md5 = str(b.get("md5") or "").strip().lower()
         bid = library.book_for_md5(c, md5) if re.fullmatch(r"[0-9a-f]{32}", md5) else None

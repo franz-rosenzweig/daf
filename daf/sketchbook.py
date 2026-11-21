@@ -317,7 +317,7 @@ def kindle_echo(conn, text, note):
 
 def router():
     """The routes, for app.py to include at its end (they use its conn, device, json_body and user)."""
-    from .app import conn, device, json_body, user
+    from .app import conn, json_body, kindle_device, user
     r = APIRouter(prefix="/api/sketchbook")
 
     @r.get("/img/{name}", dependencies=[Depends(user)])
@@ -341,7 +341,7 @@ def router():
         return await run_in_threadpool(_dictate, data, ext)
 
     @r.post("/kindle/ack")
-    def kindle_ack_route(b=Depends(json_body), name=Depends(device), c=Depends(conn)):
+    def kindle_ack_route(b=Depends(json_body), name=Depends(kindle_device), c=Depends(conn)):
         """The Kindle's plugin has these pages as bookmarks now (or took away the ones emptied)."""
         return {"ok": True, "acked": kindle_ack(c, b.get("items") if isinstance(b, dict) else None)}
 

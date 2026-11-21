@@ -17,7 +17,17 @@ from urllib.parse import quote, urlparse
 from . import config, today as T, vaultmd
 
 START, END = "<!-- daf -->", "<!-- daf-end -->"
-REGION = re.compile(re.escape(START) + r".*?" + re.escape(END), re.S)
+# Daf's markers are lines of their own: a title, a heading or a quote with the same text in it is never
+# one, and _sealed keeps what Daf writes between them (a chapter's name, an article's text) from making
+# a line that would be.
+REGION = re.compile(r"(?ms)^" + re.escape(START) + r"[ \t]*$.*?^" + re.escape(END) + r"[ \t]*$")
+MARKERISH = re.compile(r"(?m)^([ \t]*)<!--")
+
+
+def _sealed(parts):
+    """The region from its lines (START first, END last); no line between them starts like a marker."""
+    inside = [MARKERISH.sub(r"\1<\\!--", "\n".join(parts[1:-1]))] if len(parts) > 2 else []
+    return "\n".join([parts[0], *inside, parts[-1]])
 ENTRY = re.compile(r"(?ms)^(?P<body>(?:(?!\^daf-).)*?)\s\^daf-(?P<id>[hn][0-9a-f]{8})\s*$")
 
 
@@ -69,7 +79,7 @@ def _render(book, hl_notes, reading_notes, settings, listened=()):
         kind = "voice note" if n["source"] == "voice" else "note"
         parts += [f"**{when}{where}** · {kind}", f"{n['text'].strip()} ^daf-n{_short(n['id'])}", ""]
     parts.append(END)
-    return "\n".join(parts)
+    return _sealed(parts)
 
 
 def _existing_entries(region_text):
@@ -101,7 +111,7 @@ def new_book_note(conn, b):
         "---\ntype: book\n" f"title: {_yaml(b['title'])}\nauthor: {_yaml(b['author'])}\n"
         'categories: "[[Books]]"\ntags:\n  - books\n  - references\n'
         f"created: {now}\nstatus: reading\nformat: paper\ndatasource: daf\n---\n"
-        f"# {b['title']}\n\n", encoding="utf-8")
+        f"# {' '.join(b['title'].split())}\n\n", encoding="utf-8")
     conn.execute("UPDATE books SET vault_path = ? WHERE id = ?", (rel, b["id"]))
     return rel
 
@@ -206,8 +216,9 @@ def _clip_name(title):
 
 
 def _yaml(v):
-    v = (v or "").replace("\n", " ").strip()
-    return '"' + v.replace('"', "'") + '"' if v else '""'
+    """A YAML string on one line: JSON's quoting is YAML's, and every kind of line break goes, so a
+    title can't end the value and start a key of its own."""
+    return json.dumps(" ".join((v or "").split()), ensure_ascii=False)
 
 
 def _ts(t):
@@ -301,7 +312,7 @@ def _fm(m, settings):
     out = [("title", _yaml(m["title"]))]
     names = _authors(m["author"], m["category"])
     if names:
-        out.append(("author", "".join(f'\n  - "[[{n}]]"' for n in names)))
+        out.append(("author", "".join(f"\n  - {_yaml(f'[[{n}]]')}" for n in names)))
     out += [("url", _yaml(m["url"])), ("daf", _yaml(m["daf"])), ("source", _yaml(m["source"])), ("category", m["category"])]
     if m["published"]:
         out.append(("published", _date(m["published"], settings)))
@@ -314,7 +325,7 @@ def _fm(m, settings):
     out.append(("categories", f'\n  - "[[{CATEGORIES.get(m["category"], "Clippings")}]]"'))
     show = re.sub(r"[\[\]|#^]+", "", m["source"]).strip()
     if m["category"] == "podcast" and show:
-        out.append(("show", f'"[[{show}]]"'))
+        out.append(("show", _yaml(f"[[{show}]]")))
     return [(k, v) for k, v in out if k not in NOT_DAFS]
 
 
@@ -325,7 +336,7 @@ def _fm_text(pairs):
 def _new_note(m, settings):
     tags = "".join(f"  - {t}\n" for t in TAGS.get(m["category"], ["clippings"]))
     return ("---\n" + _fm_text(_fm(m, settings)) + "tags:\n" + tags + "datasource: daf\n---\n#ai-assisted-note\n"
-            f"# {vaultmd._esc(m['title'])}\n\n" + START + "\n" + END + "\n")
+            f"# {vaultmd._esc(' '.join((m['title'] or '').split()))}\n\n" + START + "\n" + END + "\n")
 
 
 def _frontmatter(text):
@@ -529,7 +540,7 @@ def write_article(conn, settings, doc_id, backfill=False):
     if doc:
         parts += _text_sections(m_, doc)
     parts.append(END)
-    region = "\n".join(parts)
+    region = _sealed(parts)
     new = text[:m.start()] + region + text[m.end():] if m else text.rstrip("\n") + "\n\n" + region + "\n"
     if own:
         new = _keep_daf_link(new, m_, settings)
