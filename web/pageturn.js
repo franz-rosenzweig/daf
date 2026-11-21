@@ -43,8 +43,11 @@ PT.attach = view => {
   // foliate's swipe drags the page and settles it; with Slide and Curl the finger is ours instead
   const scrollBy = r.scrollBy.bind(r), snap = r.snap.bind(r);
   r.scrollBy = (dx, dy) => { if (!ours()) scrollBy(dx, dy); };
-  // (foliate's own swipe, None: a finger that rested before it lifted carries no speed into the snap)
-  r.snap = (vx, vy) => { if (ours()) return; if (S && S.still) { vx = 0; vy = 0; } snap(vx, vy); };
+  // (foliate's own swipe, None: a finger that rested before it lifted carries no speed into the snap.
+  // After a tap there's nothing to settle, and while a turn is under way the snap would set off into
+  // the next chapter beside it at a chapter's end: two chapters loading at once, one never done, and
+  // foliate turned no page again till the book was opened anew.)
+  r.snap = (vx, vy) => { if (ours() || (S && (S.tapped || S.busy))) return; if (S && S.still) { vx = 0; vy = 0; } snap(vx, vy); };
   const s = S;
   r.addEventListener('relocate', e => { s.index = e.detail.index; });
   view.addEventListener('load', e => fingers(e.detail.doc, s));
@@ -187,7 +190,7 @@ function fingers(target, s){
   // where the finger is on the screen: the chapter's frame moves as its page turns under the finger
   const xy = e => { const a = e.changedTouches[0], fr = win.frameElement, b = fr ? fr.getBoundingClientRect() : { left: 0, top: 0 }; return [b.left + a.clientX, b.top + a.clientY]; };
   target.addEventListener('touchstart', e => {
-    f = null; moved = e.timeStamp; swiping = false; if (S === s) s.still = false;
+    f = null; moved = e.timeStamp; swiping = false; if (S === s) { s.still = false; s.tapped = false; }
     if (S !== s || e.touches.length !== 1 || !ours()) return;
     const [x, y] = xy(e);
     f = { x, y };
@@ -211,7 +214,7 @@ function fingers(target, s){
     cancelAnimationFrame(d.raf); d.raf = requestAnimationFrame(() => d.on());
   }, { passive: true });
   target.addEventListener('touchend', e => {
-    if (S === s) s.still = swiping && e.timeStamp - moved > 120;
+    if (S === s) { s.still = swiping && e.timeStamp - moved > 120; s.tapped = !swiping; }
     if (f) up(f, false, e.timeStamp); f = null; swiping = false;
   }, { passive: true });
   target.addEventListener('touchcancel', () => {
