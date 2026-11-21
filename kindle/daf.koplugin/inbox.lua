@@ -188,6 +188,7 @@ local function landed(daf, n)
         C.refreshShown()
     end)
     pcall(function() daf:coversAhead() end)
+    if daf.morning then return end      -- brought in while the Kindle sleeps: nothing on the sleep screen
     UIManager:show(InfoMessage:new{
         text = n == 1 and _("Daf put a book on your Kindle.") or string.format(_("Daf put %d books on your Kindle."), n),
         timeout = 4,

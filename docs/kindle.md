@@ -112,6 +112,8 @@ The Kindle also tells Daf which shelves it has, so the shelf list in Daf is the 
 
 ## Articles on the Kindle
 
+**The morning's Edition** comes in by itself: going to sleep, the Kindle sets an alarm for just after the [Edition](edition.md#on-the-kindle) is ready, wakes behind the sleep screen to bring it in, and sleeps again. Its lines in KOReader's log start with `[Daf] morning:`.
+
 **Send to the Kindle** in Daf makes an EPUB of one article or a digest of several, and it comes in with the Kindle's next Wi-Fi sync, into a "Daf" shelf (see [The Feed and the Library](feed-and-library.md#send-to-kindle)). Reading it counts as reading those articles, and highlights come back to them.
 
 If something seems stuck, wake the Kindle with Wi-Fi on, open **Tools → Daf**, and press **Send reading time now**.

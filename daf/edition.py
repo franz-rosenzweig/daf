@@ -30,7 +30,8 @@ import subprocess
 import threading
 import time
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as dtime, timedelta
+from functools import lru_cache
 
 from . import config, db, today as T
 
@@ -53,9 +54,16 @@ DEFAULTS = {
     "topics": [],           # [{name, words: [...], adj: "more" | "less" | "mute" | "", mine: True on one you added yourself}]
     "topics_removed": [],   # the names you removed: "Name them again" leaves them out
     "sources": {},          # {source: "more" | "less" | "mute"}; "folder:Name" mutes a Feed folder
+    "desks": [],            # the news desks: the places you want the news from (DESK_KEYS)
 }
+# A news desk, kept in settings "edition.desks"; none are built in, since they're the reader's own places:
+#   {"key": "home", "name": "the section's name", "at_least": 1,
+#    "sources": [feed titles that are always on it], "folders": [Feed folders],
+#    "any": true for every post in those folders, false for only the ones that name the place,
+#    "words": [the place's names, which put any headline on it], "lean": [closer places, ahead within the desk]}
+DESK_KEYS = ("key", "name", "at_least", "sources", "folders", "any", "words", "lean")
 ADJ = {"more": 1.6, "less": 0.55, "mute": 0.0, "": 1.0}
-OWN = ("topics", "sources", "topics_removed")     # changed through their own controls on the Taste page, never as plain settings
+OWN = ("topics", "sources", "topics_removed", "desks")     # changed through their own controls on the Taste page, never as plain settings
 WATCHES_PER_DAY = 7         # Invidious keeps the order you watched in, not the dates: plays a day turn places into days
                             # (measured from iv-suggest's dated plays when it's there, see invidious())
 BOOST, FLOOR = 2.0, 0.7     # a source's multiplier: the one you return to most at BOOST, one you never touched at FLOOR
@@ -101,7 +109,38 @@ def settings(s=None):
     e["topics"] = [t for t in e["topics"] if isinstance(t, dict) and t.get("name")] if isinstance(e["topics"], list) else []
     e["topics_removed"] = [n for n in e["topics_removed"] if isinstance(n, str) and n][-200:] if isinstance(e["topics_removed"], list) else []
     e["sources"] = e["sources"] if isinstance(e["sources"], dict) else {}
+    e["desks"] = [_desk(d) for d in (e["desks"] if isinstance(e["desks"], list) else []) if isinstance(d, dict) and d.get("key") and d.get("name")]
     return e
+
+
+def _desk(d):
+    d = {k: d.get(k) for k in DESK_KEYS}
+    try:
+        d["at_least"] = max(0, min(3, int(1 if d["at_least"] is None else d["at_least"])))
+    except (TypeError, ValueError):
+        d["at_least"] = 1
+    for k in ("sources", "folders", "words", "lean"):
+        d[k] = [str(x) for x in d[k] if x] if isinstance(d[k], list) else []
+    d["any"] = bool(d["any"])
+    return d
+
+
+def set_desk(key, at_least):
+    """A desk's "at least", from the Taste page's Mix."""
+    s = config.load_settings()
+    cur = dict(s.get("edition") or {})
+    desks = [dict(d) for d in (cur.get("desks") or []) if isinstance(d, dict)]
+    for d in desks:
+        if d.get("key") == key:
+            d["at_least"] = max(0, min(3, int(at_least)))
+    cur["desks"] = desks
+    s["edition"] = cur
+    config.save_settings(s)
+    return settings(s)
+
+
+def desks_brief(e):
+    return [{"key": d["key"], "name": d["name"], "at_least": d["at_least"]} for d in e["desks"]]
 
 
 def save(changes):
@@ -572,8 +611,37 @@ def score(cands, prof, e, now, parasha=None):
         f = prof["facts"].get(key) or {}
         c["facts"] = {k: f[k] for k in ("watched", "opened", "played", "highlighted", "saved", "up", "down") if f.get(k)}
         c["familiar"] = src > 0.25 or bool(c.get("lane"))
+        d = desk_of(c, e["desks"]) if c["kind"] == "article" else None
+        c["desk"] = d["name"] if d else ""
+        c["lean"] = _named(d.get("lean"), c["title"]) if d else ""     # the headline's own place (a summary often names its paper, "The Oslo Times")
+        c["desk_rank"] = round(c["score"] + (0.3 if c["lean"] else 0) + 0.4 * fresh, 4) if d else 0
         del c["_ws"], c["_tm"]
     return kept
+
+
+@lru_cache(maxsize=64)
+def _words_re(ws):
+    return re.compile(r"(?<!\w)(" + "|".join(re.escape(w) for w in sorted(ws, key=len, reverse=True)) + r")(?!\w)", re.I) if ws else None
+
+
+def _named(ws, text):
+    """The first of these words or places the text names ("" for none)."""
+    rx = _words_re(tuple(ws or ()))
+    m = rx.search(text or "") if rx else None
+    return m.group(1).lower() if m else ""
+
+
+def desk_of(c, desks):
+    """The news desk a piece is on (settings "edition.desks"), or None: its source's or folder's desk first, then the place its title names."""
+    for d in desks:
+        if c.get("source") in (d.get("sources") or []):
+            return d
+        if c.get("folder") in (d.get("folders") or []) and (d.get("any") or _named(d.get("words"), f'{c["title"]} {(c.get("summary") or "")[:300]}')):
+            return d
+    for d in desks:
+        if _named(d.get("words"), c.get("title")):
+            return d
+    return None
 
 
 # ---- the whole text -------------------------------------------------------------------------------
@@ -650,6 +718,17 @@ def shortlist(cands, e, day):
         if len(out) >= 60:
             break
     out += [c for c in ranked if c["parasha"] and c not in out][:4]
+    for d in e["desks"]:                 # the news desks' best, fresh and close to home, whatever their score
+        if d["at_least"] <= 0:
+            continue
+        per_d = Counter()
+        for c in sorted((c for c in cands if c.get("desk") == d["name"]), key=lambda c: -c["desk_rank"]):
+            if c in out or per_d[source_key(c["source"])] >= 2:
+                continue
+            per_d[source_key(c["source"])] += 1
+            out.append(c)
+            if sum(per_d.values()) >= 6:
+                break
     rng = random.Random(day.isoformat())
     strangers = [c for c in cands if not c["familiar"] and c not in out and c["score"] >= 0
                  and ((c["kind"] == "article" and ((c["minutes"] or 0) >= 4 or len(c["summary"]) >= 150))   # with_text checks the rest
@@ -669,6 +748,8 @@ def fact_line(c, parasha=None):
         return "Outside your usual"
     if c.get("parasha") and parasha:
         return f"On this week's parasha, {parasha.get('name')}"
+    if c.get("desk"):
+        return f"{c['lean'].title()} news" if c.get("lean") and not re.search(r"[א-ת]", c["lean"]) else f"News from {c['desk']}"
     if f.get("up"):
         return f"You liked {name} before"
     if c.get("lane"):
@@ -720,6 +801,12 @@ def pick_local(short, e):
     for c in [c for c in ranked if c["torah"]][:e["torah"]]:
         if ok(c):
             take(c, "Torah")
+    for d in e["desks"]:
+        for c in sorted([c for c in short if c.get("desk") == d["name"] and not c.get("stranger")], key=lambda c: -c["desk_rank"]):
+            if sum(1 for x in chosen if x.get("desk") == d["name"]) >= d["at_least"]:
+                break
+            if ok(c):
+                take(c, d["name"])
     for c in ranked:
         if len(chosen) >= e["pieces"] - e["wildcard"]:
             break
@@ -736,6 +823,24 @@ def pick_local(short, e):
     return chosen
 
 
+def paper_order(chosen, e):
+    """In the order of a paper: the lead, the news desks, the rest as chosen (a section's pieces side by side),
+    the Torah column, and the wildcard at the back."""
+    if not chosen:
+        return chosen
+    names = [d["name"] for d in e["desks"]]
+    lead, rest = chosen[0], chosen[1:]
+    news = sorted([c for c in rest if c.get("section") in names], key=lambda c: names.index(c["section"]))
+    torah_ = [c for c in rest if c.get("section") == "Torah"]
+    back = [c for c in rest if c.get("section") == "Wildcard"]
+    mid = [c for c in rest if c not in news and c not in torah_ and c not in back]
+    first = {}
+    for i, c in enumerate(mid):
+        first.setdefault(c.get("section"), i)
+    mid.sort(key=lambda c: first[c.get("section")])
+    return [lead] + news + mid + torah_ + back
+
+
 def section_for(c):
     from .sources import rss
     if c["kind"] == "video":
@@ -744,6 +849,8 @@ def section_for(c):
         return "Listen"
     if c.get("torah"):
         return "Torah"
+    if c.get("desk"):
+        return c["desk"]
     pool = (c.get("folder") or "") if c.get("origin") == "pool" else ""
     return ((c.get("topic") or pool).split(" & ")[0].split(",")[0][:18]) or "Read"
 
@@ -754,6 +861,7 @@ paper, not a feed: pick the {n} best pieces for them from the candidates below.
 Rules:
 - {n} pieces, fewer only if fewer are worth their time. At most {videos} videos (kind video) and {podcasts} podcast episodes.
 - At least {torah} piece on Torah or Jewish learning, if a candidate fits (TORAH or PARASHA in its facts).
+{desks}
 - {wildcard} wildcard: a good piece from a candidate marked STRANGER, with section "Wildcard".
 - At most {per} pieces from the same source. Prefer substance and things they would be glad to have read over
   churn, ads, listicles, release notes, comment threads and near-duplicates of each other.
@@ -801,9 +909,21 @@ def _facts_text(c, parasha):
         f.append(f"from their \"{c['lane']}\" lane of video suggestions")
     if c.get("rising"):
         f.append("rising for them lately: " + ", ".join(c["rising"]))
+    if c.get("desk"):
+        f.append(f"DESK {c['desk']}" + (f" (about {c['lean']})" if c.get("lean") else ""))
     if c.get("stranger"):
         f.append("STRANGER (outside their usual)")
     return ", ".join(f) or "-"
+
+
+def _desks_rule(e):
+    on = [(d["name"], d["at_least"]) for d in e["desks"] if d["at_least"] > 0]
+    if not on:
+        return "- No news desks today: treat DESK in the facts as any other topic."
+    names = " and ".join(f"{n} from the {name} desk" for name, n in on)
+    return (f"- The paper's news pages: at least {names} (DESK in its facts), each with its desk's name as its section. "
+            "They're the places the reader wants the news from: prefer real, fresh reporting on what is happening there "
+            "over opinion pieces or old news, and a piece about the closer place (\"about ...\" in its facts) over the wider region.")
 
 
 def pick_ai(short, prof, e, parasha):
@@ -812,7 +932,7 @@ def pick_ai(short, prof, e, parasha):
     lines = "\n".join(f'{c["id"]} | {c["kind"]} | {clean(c["source"])} | {c["minutes"] or "?"} | {clean(c["title"])} | '
                       f'{clean(c["summary"])[:160]} | {_facts_text(c, parasha)}' for c in short)
     text = PROMPT.format(n=e["pieces"], videos=e["videos"], podcasts=e["podcasts"], torah=e["torah"], wildcard=e["wildcard"],
-                         per=PER_SOURCE, taste=_taste_text(prof), lines=lines)
+                         per=PER_SOURCE, taste=_taste_text(prof), lines=lines, desks=_desks_rule(e))
     out = ai.run(text, timeout=300)
     m = re.search(r"\{.*\}", out, re.S)
     got = json.loads(m.group(0) if m else out).get("pieces") or []
@@ -828,7 +948,7 @@ def pick_ai(short, prof, e, parasha):
             continue
         per[k] += 1
         kinds[c["kind"]] += 1
-        c["section"] = re.sub(r"\s+", " ", str(g.get("section") or section_for(c)))[:20].strip() or section_for(c)
+        c["section"] = c["desk"] if c.get("desk") else (re.sub(r"\s+", " ", str(g.get("section") or section_for(c)))[:20].strip() or section_for(c))
         why = re.sub(r"\s+", " ", str(g.get("why") or "")).strip().rstrip(".")
         c["why"] = why[:80] if why else fact_line(c, parasha)
         chosen.append(c)
@@ -836,11 +956,28 @@ def pick_ai(short, prof, e, parasha):
             break
     if len(chosen) < min(e["pieces"], len(short)) // 2:
         raise RuntimeError(f"the model picked {len(chosen)} usable pieces")
-    if e["wildcard"] and not any(c.get("stranger") for c in chosen):     # the one rule it most often forgets
+    def put(c):                          # in a free place, or in the weakest one no rule asked for
+        if len(chosen) < e["pieces"]:
+            chosen.append(c)
+            return True
+        spare = [i for i, x in enumerate(chosen) if i and not x.get("desk") and not x.get("torah") and not x.get("stranger")]
+        if not spare:
+            return False
+        chosen[min(spare, key=lambda i: chosen[i]["score"])] = c
+        return True
+
+    for d in e["desks"]:                 # the rules it can forget: the news desks, then the wildcard
+        for c in sorted([c for c in short if c.get("desk") == d["name"] and c not in chosen], key=lambda c: -c["desk_rank"]):
+            if sum(1 for x in chosen if x.get("desk") == d["name"]) >= d["at_least"]:
+                break
+            if per[source_key(c["source"])] < PER_SOURCE and put(c):
+                per[source_key(c["source"])] += 1
+                c["section"], c["why"] = d["name"], fact_line(c, parasha)
+    if e["wildcard"] and not any(c.get("stranger") for c in chosen):
         for c in sorted([c for c in short if c.get("stranger") and c not in chosen], key=lambda c: -c["score"]):
             if per[source_key(c["source"])] < PER_SOURCE and kinds[c["kind"]] < cap.get(c["kind"], 99):
                 c["section"], c["why"] = "Wildcard", "Outside your usual"
-                (chosen.append if len(chosen) < e["pieces"] else chosen.__setitem__)(*([c] if len(chosen) < e["pieces"] else [-1, c]))
+                put(c)
                 break
     if chosen:
         chosen[0]["section"] = "Lead"
@@ -1034,6 +1171,7 @@ def build(day=None, use_ai=None, dry=False, conn=None):
             chosen = pick_local(short, e)
             for c in chosen:
                 c["why"] = fact_line(c, parasha)
+        chosen = paper_order(chosen, e)
         items = [{"id": c["id"], "kind": c["kind"], "section": c["section"], "why": c.get("why") or "", "title": c["title"],
                   "source": c["source"], "publication": source_key(c["source"]), "minutes": c["minutes"], "thumb": c["thumb"], "url": c["url"], "summary": dek(c["summary"]),
                   "score": c["score"]} for c in chosen]
@@ -1068,7 +1206,7 @@ def send_kindle(day=None):
         conn.commit()                       # the Hebrew date's cache row: not held through the pictures
         res = kindlesend.make_epub(conn, [it["id"] for it in ed["items"]], when=when,
                                    title=f"Daf, {day.strftime('%A')} {day.day} {day.strftime('%B')} {day.year}",
-                                   fname=f"Daf {day.isoformat()} (Edition).epub", front=front)
+                                   fname=kindle_file(day), front=front)
         conn.execute("UPDATE editions SET kindle = ? WHERE day = ?", (res["file"], day.isoformat()))
         return res
 
@@ -1086,6 +1224,42 @@ def front_page(conn, ed, day):
         f'{" · " + H.escape(it["why"]) if it.get("why") else ""}</p></li>' for it in ed["items"])
     return (f'<h1 class="mast">Daf</h1><p class="date">{day.strftime("%A")}, {day.day} {day.strftime("%B")} {day.year}'
             f'{"<br/>" + H.escape(heb) if heb else ""}</p><ol class="toc">{rows}</ol>')
+
+
+WAKE_AFTER = 15            # minutes after the edition's "ready by" hour, for the Kindle to wake and fetch it
+WAKE_AGAIN = 30           # minutes, when it woke and today's copy wasn't there yet
+WAKE_UNTIL = 4            # hours after "ready by" that it keeps trying
+
+
+def kindle_file(day):
+    return f"Daf {day.isoformat()} (Edition).epub"
+
+
+def kindle_delivered(conn, day):
+    """When the Kindle's plugin brought in that day's copy (epoch), or None."""
+    r = conn.execute("SELECT delivered FROM kindle_queue WHERE name = ? AND delivered IS NOT NULL ORDER BY delivered DESC LIMIT 1",
+                     (kindle_file(day),)).fetchone()
+    return r[0] if r else None
+
+
+def kindle_wake(conn, s=None, now=None):
+    """When the Kindle should next wake by itself to bring in the Edition (epoch seconds), or None: a little
+    after it's ready on the next edition day; and again soon, until late morning, while today's copy isn't on it."""
+    s = s or config.load_settings()
+    e = settings(s)
+    if not (e["on"] and e["kindle"]):
+        return None
+    tz = T.tz_of(s)
+    now = now or datetime.now(tz)
+    at = lambda d: datetime.combine(d, dtime(e["hour"], 0), tz) + timedelta(minutes=WAKE_AFTER)     # noqa: E731
+    today = now.date()
+    if DAYS[today.weekday()] in e["days"] and at(today) <= now < at(today) + timedelta(hours=WAKE_UNTIL) and not kindle_delivered(conn, today):
+        return int((now + timedelta(minutes=WAKE_AGAIN)).timestamp())
+    for i in range(8):
+        d = today + timedelta(days=i)
+        if DAYS[d.weekday()] in e["days"] and at(d) > now:
+            return int(at(d).timestamp())
+    return None
 
 
 def get(conn, day):
@@ -1210,6 +1384,7 @@ def public(conn, day):
         items = [state(conn, it) for it in ed["items"]]
         left = sum((it.get("minutes") or 0) for it in items if not it["done"])
         out["edition"] = {"day": ed["day"], "made": ed["made"], "how": ed["how"], "kindle": ed["kindle"], "items": items,
+                          "on_kindle": kindle_delivered(conn, date.fromisoformat(ed["day"])) if ed["kindle"] else None,
                           "done": sum(1 for it in items if it["done"] or it["opened"]), "left": left,
                           "number": conn.execute("SELECT COUNT(*) FROM editions WHERE day <= ?", (ed["day"],)).fetchone()[0]}
         try:
@@ -1239,7 +1414,7 @@ def taste_page(conn):
     adj = {k: v for k, v in e["sources"].items() if v in ("more", "less")}
     return {"topics": p["topics"], "sources": [{"name": k, "weight": round(v, 3), "facts": p["facts"].get(k) or {}, "adj": adj.get(k, "")} for k, v in top],
             "pool": pool_page(conn, e), "muted": [m for m in muted if m[7:] not in _hidden_folders(conn)], "seen": p["seen"], "rising": p["rising"], "named": p["named"], "report": report(conn),
-            "settings": {k: v for k, v in e.items() if k not in OWN}}
+            "settings": dict({k: v for k, v in e.items() if k not in OWN}, desks=desks_brief(e))}
 
 
 def _hidden_folders(conn):

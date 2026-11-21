@@ -777,7 +777,13 @@ async def put_edition_settings(request: Request):
         else:
             src.pop(name, None)
         changes["sources"] = src
-    return {"settings": {k: v for k, v in edition.save(changes).items() if k not in edition.OWN}}
+    if isinstance(body.get("desk"), dict):            # {"key", "at_least"}: a news desk's row in the Mix
+        try:
+            edition.set_desk(str(body["desk"].get("key") or ""), int(body["desk"].get("at_least", 1)))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "desk")
+    e = edition.save(changes)
+    return {"settings": dict({k: v for k, v in e.items() if k not in edition.OWN}, desks=edition.desks_brief(e))}
 
 
 @app.post("/api/edition/topics", dependencies=[Depends(user)])
@@ -5413,7 +5419,12 @@ def kindle_today(name=Depends(kindle_device), c=Depends(conn)):
     m = goals.main_of(gl)
     # `goal` stays the day's minutes target: the Kindle adds its own fresher minutes to `other`.
     # `main` is the main goal, for the screen to show when it isn't minutes a day.
-    return {"date": day.isoformat(), "tz_offset": offset, "goal": summary["goal"],
+    try:
+        from . import edition
+        wake = edition.kindle_wake(c, s)       # when to wake by itself for the morning's Edition (the plugin sets the alarm)
+    except Exception:  # noqa: BLE001
+        wake = None
+    return {"date": day.isoformat(), "tz_offset": offset, "goal": summary["goal"], "wake": wake,
             "counted": summary["counted"], "kindle": summary["minutes"]["kindle"], "other": round(other, 1),
             "year_day": (y["today_index"] or 0) + 1, "year_hours": y["total_hours"], "days_goal": y["days_goal"],
             "main": m and {k: m[k] for k in ("id", "kind", "period", "label", "text", "done", "target", "unit", "met")}}
