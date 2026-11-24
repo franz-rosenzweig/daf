@@ -81,9 +81,11 @@ It comes as a private podcast. Every piece is a chapter, so the skip button on m
 
 What I listen to counts. AntennaPod tells Daf what I played through its sync, and a piece whose chapter I heard most of counts as opened, both for the row of marks at the top of the paper and for the taste. A chapter I skipped stays unopened, the same as a piece I passed by in the paper.
 
+It can also be a conversation. With two hosts set in `"audio_hosts"`, each with a name, one of Kokoro's voices and a speed, the model writes it as a morning podcast between them instead: one brings most of the stories and the other comes at each one fresh, reacting, asking what I'd ask and pushing back when something doesn't add up. The facts still come only from the pieces; what the hosts think about them is said as their own take. Each turn is read in its host's voice, and the transcript says who's talking.
+
 Hebrew words are the weak spot. The voice is an English one, so the script spells Hebrew names and places the way they're said, with hyphens and apostrophes (Kir-yat Sh'mo-na), which helps a lot but isn't perfect.
 
-To set it up, `"audio": true` goes in the Edition's settings (and `"audio_minutes"` for a length other than twenty minutes), and `daf listen-feed` prints the feed's address, which goes into the podcast app as a new podcast by its address. The address has its own key in it, so the app needs no sign-in; running `daf listen-feed` again makes a new address and the old one stops working. Episodes are kept for two weeks. `daf edition --audio` makes today's now.
+To set it up, `"audio": true` goes in the Edition's settings (and `"audio_minutes"` for a length other than twenty minutes, and for two hosts something like `"audio_hosts": [{"name": "Ada", "voice": "bf_emma", "speed": 1.2}, {"name": "Ben", "voice": "am_michael", "speed": 1.2}]`), and `daf listen-feed` prints the feed's address, which goes into the podcast app as a new podcast by its address. The address has its own key in it, so the app needs no sign-in; running `daf listen-feed` again makes a new address and the old one stops working. Episodes are kept for two weeks. `daf edition --audio` makes today's now.
 
 ## Setting it up
 

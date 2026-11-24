@@ -60,6 +60,7 @@ DEFAULTS = {
     "desks": [],            # the news desks: the places you want the news from (DESK_KEYS)
     "audio": False,         # read it aloud each morning too, as an episode in a private podcast feed (edition_audio.py)
     "audio_minutes": 20,    # about how long that episode is
+    "audio_hosts": [],      # two or three [{name, voice, speed}] make it a conversation; fewer, one voice (Listen's)
 }
 # A news desk, kept in settings "edition.desks"; none are built in, since they're the reader's own places:
 #   {"key": "home", "name": "the section's name", "at_least": 1,
@@ -114,6 +115,7 @@ def settings(s=None):
     e["hour"] = max(3, min(11, e["hour"]))
     e["audio_minutes"] = max(5, min(45, e["audio_minutes"]))
     e["audio"] = e["audio"] is True
+    e["audio_hosts"] = [h for h in map(_host, e["audio_hosts"] if isinstance(e["audio_hosts"], list) else []) if h][:3]
     e["halflife"] = max(3, min(365, e["halflife"]))
     e["days"] = [d for d in e["days"] if d in DAYS] if isinstance(e["days"], list) else DEFAULTS["days"]
     e["topics"] = [t for t in e["topics"] if isinstance(t, dict) and t.get("name")] if isinstance(e["topics"], list) else []
@@ -121,6 +123,21 @@ def settings(s=None):
     e["sources"] = e["sources"] if isinstance(e["sources"], dict) else {}
     e["desks"] = [_desk(d) for d in (e["desks"] if isinstance(e["desks"], list) else []) if isinstance(d, dict) and d.get("key") and d.get("name")]
     return e
+
+
+def _host(h):
+    """A host of the spoken Edition: a name to go by on air, a Kokoro voice and its speed."""
+    if not isinstance(h, dict):
+        return None
+    name = " ".join(str(h.get("name") or "").split())[:24]
+    voice = str(h.get("voice") or "")
+    if not re.fullmatch(r"[A-Za-z][A-Za-z .'-]*", name) or not re.fullmatch(r"[a-z]{2}_[a-z0-9]+", voice):
+        return None
+    try:
+        speed = max(0.5, min(2.0, float(h.get("speed") or 1.0)))
+    except (TypeError, ValueError):
+        speed = 1.0
+    return {"name": name, "voice": voice, "speed": speed}
 
 
 def _desk(d):
