@@ -1282,8 +1282,9 @@ def build(day=None, use_ai=None, dry=False, conn=None):
 
 
 def send_kindle(day=None):
-    """The day's edition as one EPUB for the Kindle: a contents page with the sections and the reasons,
-    then every piece Daf has text for (articles; videos and episodes once their transcripts are in)."""
+    """The day's edition as one EPUB for the Kindle: a front page with every headline a link to its piece
+    (and a cover drawn like a paper's, for the Kindle's library), then every piece Daf has text for
+    (articles; videos and episodes once their transcripts are in)."""
     from . import kindlesend
     s = config.load_settings()
     day = day or T.today(s)
@@ -1302,18 +1303,23 @@ def send_kindle(day=None):
 
 
 def front_page(conn, ed, day):
-    import html as H
-    from . import torah
+    """The Kindle copy's front page and cover (frontpage.Paper), with what they need from the database."""
+    from . import frontpage, pages, torah
     try:
-        heb = (torah.hebrew_date(conn, day) or {}).get("text") or ""
+        h = torah.hebrew_date(conn, day) or {}
     except Exception:  # noqa: BLE001
-        heb = ""
-    rows = "".join(
-        f'<li><p class="k">{H.escape(it["section"])}{" · " + {"video": "video", "podcast": "podcast"}[it["kind"]] if it["kind"] in ("video", "podcast") else ""}</p>'
-        f'<p class="t">{H.escape(it["title"])}</p><p class="m">{H.escape(source_key(it["source"]))}{" · " + str(it["minutes"]) + " min" if it.get("minutes") else ""}'
-        f'{" · " + H.escape(it["why"]) if it.get("why") else ""}</p></li>' for it in ed["items"])
-    return (f'<h1 class="mast">Daf</h1><p class="date">{day.strftime("%A")}, {day.day} {day.strftime("%B")} {day.year}'
-            f'{"<br/>" + H.escape(heb) if heb else ""}</p><ol class="toc">{rows}</ol>')
+        h = {}
+    heb = f'{h["text"]} {h["year"]}' if h.get("text") and h.get("year") else (h.get("text") or "")
+    number = conn.execute("SELECT COUNT(*) FROM editions WHERE day <= ?", (ed["day"],)).fetchone()[0]
+    items = [dict(it, publication=source_key(it.get("source")), summary=dek(it.get("summary"))) for it in ed["items"]]
+    thumbs = {}
+    for it in items:
+        r = conn.execute("SELECT thumb FROM docs WHERE id = ?", (it["id"],)).fetchone()
+        t = (r and r[0]) or it.get("thumb") or ""
+        m = re.fullmatch(r"/api/thumb/([0-9a-f]{16}\.jpg)", t)
+        if m and (pages.THUMBS / m.group(1)).is_file():
+            thumbs[it["id"]] = (pages.THUMBS / m.group(1)).read_bytes()
+    return frontpage.Paper(items, day, number, heb, h.get("he") or "", thumbs)
 
 
 WAKE_AFTER = 15            # minutes after the edition's "ready by" hour, for the Kindle to wake and fetch it

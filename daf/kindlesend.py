@@ -102,7 +102,6 @@ _OPENER = urllib.request.build_opener(_PublicRedirects)
 
 def _fetch_image(url):
     """(bytes, media type, extension) of an image made ready for the Kindle, or None."""
-    from PIL import Image
     u = urllib.parse.urlparse(url or "")
     if u.scheme not in ("http", "https") or not u.hostname or not _public(u.hostname):
         return None
@@ -114,6 +113,12 @@ def _fetch_image(url):
         return None
     if len(data) > IMG_MAX_BYTES:
         return None
+    return _ready(data)
+
+
+def _ready(data):
+    """(bytes, media type, extension) of image bytes made ready for the Kindle, or None."""
+    from PIL import Image
     try:
         im = Image.open(io.BytesIO(data))
         im.load()
@@ -136,12 +141,14 @@ class _Images:
 
     def __init__(self, urls=()):
         from concurrent.futures import ThreadPoolExecutor
-        self.files, self.total = [], 0
+        self.files, self.total, self.names = [], 0, {}
         urls = list(dict.fromkeys(u for u in urls if u))[:IMG_MAX_COUNT * 2]
         with ThreadPoolExecutor(6) as pool:
             self.got = dict(zip(urls, pool.map(_fetch_image, urls)))
 
     def add(self, url):
+        if url in self.names:
+            return self.names[url]
         if len(self.files) >= IMG_MAX_COUNT or self.total >= IMG_BUDGET:
             return None
         got = self.got.get(url)
@@ -151,10 +158,17 @@ class _Images:
         name = f"images/img{len(self.files) + 1}.{ext}"
         self.files.append((name, data, mt))
         self.total += len(data)
+        self.names[url] = name
         return name
 
+    def put(self, key, data):
+        """An image Daf has itself (a piece's thumbnail), under a key of its own."""
+        if key not in self.got:
+            self.got[key] = _ready(data)
+        return self.add(key)
 
-def _chapter(d, blocks, images=None):
+
+def _chapter(d, blocks, images=None, back=None):
     rtl = bool(HEBREW.search(d["title"] or "")) or sum(1 for b in blocks[:8] if HEBREW.search(b.get("x") or "")) >= 3
     meta = " · ".join(html.escape(x) for x in (d.get("author"), d.get("source")) if x)
     body = [f"<h1>{html.escape(d['title'] or 'Untitled')}</h1>"]
@@ -186,6 +200,8 @@ def _chapter(d, blocks, images=None):
         body.append("</ul>")
     if d.get("url"):
         body.append(f'<p class="src"><a href="{html.escape(d["url"], quote=True)}">{html.escape(d["url"])}</a></p>')
+    if back:
+        body.append(f'<p class="back"><a href="{back}">Front page</a></p>')
     lang = "he" if rtl else "en"
     dir_attr = ' dir="rtl"' if rtl else ""
     return lang, (f'<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="{lang}" lang="{lang}"'
@@ -201,10 +217,18 @@ p{margin:0 0 0.7em;text-indent:0} .meta{color:#555;font-size:0.9em;margin-bottom
 .cap{font-size:0.85em;color:#555;font-style:italic} .src{font-size:0.8em;color:#555;margin-top:2em;word-break:break-all}
 blockquote{margin:0.8em 1.2em;font-style:italic} ul{margin:0 0 0.8em 1.2em}
 .fig{margin:1em 0;text-align:center} .fig img{max-width:100%;height:auto}
-.front .mast{font-size:2.6em;text-align:center;margin:0.4em 0 0.1em} .front .date{text-align:center;color:#444;margin-bottom:1em}
-.front .toc{list-style:none;margin:0;padding:0;border-top:3px double #333} .front .toc li{border-bottom:1px solid #bbb;padding:0.35em 0}
-.front .k{font-size:0.7em;letter-spacing:0.08em;text-transform:uppercase;color:#555;margin:0} .front .t{font-weight:bold;margin:0}
-.front .m{font-size:0.8em;color:#555;margin:0}
+.front .mast{font-size:3.2em;font-weight:bold;text-align:center;margin:0.1em 0 0;line-height:1.1}
+.front .dl{text-align:center;font-size:0.72em;letter-spacing:0.05em;text-transform:uppercase;border-top:3px double #000;border-bottom:1px solid #000;padding:0.35em 0;margin:0.2em 0 0.6em}
+.front .st{border-bottom:1px solid #999;padding:0.45em 0 0.5em}
+.front .st p{text-align:left;hyphens:none;-webkit-hyphens:none;adobe-hyphenate:none}
+.front .k{font-size:0.68em;letter-spacing:0.08em;text-transform:uppercase;color:#555;margin:0}
+.front .t{font-weight:bold;font-size:1.1em;line-height:1.2;margin:0.1em 0 0.15em}
+.front .lead .t{font-size:1.6em;line-height:1.12}
+.front .t a{color:#000;text-decoration:none}
+.front .dek{margin:0.25em 0 0.3em}
+.front .m{font-size:0.78em;color:#555;margin:0}
+.front .pic{margin:0 0 0.4em;text-align:center} .front .pic img{width:100%;height:auto}
+.back{margin-top:1.6em;text-align:center;font-size:0.85em} .back a{color:#000}
 """
 
 
@@ -215,7 +239,10 @@ def _slug(s, n=60):
 
 def make_epub(conn, ids, when=None, title=None, fname=None, front=None):
     """Write the EPUB for these documents into KINDLE_DIR. Returns {file, title, count, skipped}.
-    title/fname name it (the Edition does), and front is XHTML for a first page before the pieces."""
+    title/fname name it (the Edition does), and front is XHTML for a first page before the pieces, or
+    something to call for it once the pieces are known (the Edition's frontpage.Paper): it's given
+    {"href": {id: its chapter}, "images": the book's images, "blocks": {id: its blocks}} and gives back the
+    page, or (page, cover JPEG bytes). Each piece then ends with a link back to that page."""
     docs, skipped = [], []
     for i in ids:
         d = reader.get_doc(conn, i, prefetch=True)
@@ -237,7 +264,12 @@ def make_epub(conn, ids, when=None, title=None, fname=None, front=None):
         fname = f"Daf digest {when.strftime('%Y-%m-%d %H%M')} ({len(docs)} articles).epub"
     uid = "urn:uuid:" + str(uuid.uuid4())
     images = _Images(b.get("src") for _, bl in docs for b in bl if b.get("t") == "img")
-    chapters = [_chapter(d, bl, images) for d, bl in docs]
+    chapters = [_chapter(d, bl, images, back="c1.xhtml" if front else None) for d, bl in docs]
+    cover = None
+    if callable(front):
+        made = front({"href": {d["id"]: f"c{n}.xhtml" for n, (d, _) in enumerate(docs, 2)}, "images": images,
+                      "blocks": {d["id"]: bl for d, bl in docs}})
+        front, cover = made if isinstance(made, tuple) else (made, None)
     if front:
         chapters.insert(0, ("en", '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml">'
                                f'<head><title>{html.escape(title or "Daf")}</title><link rel="stylesheet" href="style.css"/></head>'
@@ -245,11 +277,14 @@ def make_epub(conn, ids, when=None, title=None, fname=None, front=None):
     lang = "he" if all(c[0] == "he" for c in chapters) else "en"
     items = "".join(f'<item id="c{n}" href="c{n}.xhtml" media-type="application/xhtml+xml"/>' for n in range(1, len(chapters) + 1))
     items += "".join(f'<item id="i{n}" href="{name}" media-type="{mt}"/>' for n, (name, _, mt) in enumerate(images.files, 1))
+    if cover:
+        items += '<item id="cover" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image"/>'
     spine = "".join(f'<itemref idref="c{n}"/>' for n in range(1, len(chapters) + 1))
+    cover_meta = '<meta name="cover" content="cover"/>' if cover else ""
     opf = (f'<?xml version="1.0" encoding="utf-8"?>\n<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">'
            f'<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="uid">{uid}</dc:identifier>'
            f'<dc:title>{html.escape(title)}</dc:title><dc:creator>{html.escape(docs[0][0].get("author") or "Daf") if len(docs) == 1 else "Daf"}</dc:creator>'
-           f'<dc:language>{lang}</dc:language><dc:publisher>Daf</dc:publisher>'
+           f'<dc:language>{lang}</dc:language><dc:publisher>Daf</dc:publisher>{cover_meta}'
            f'<meta property="dcterms:modified">{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}</meta></metadata>'
            f'<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>'
            f'<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="css" href="style.css" media-type="text/css"/>{items}</manifest>'
@@ -278,6 +313,8 @@ def make_epub(conn, ids, when=None, title=None, fname=None, front=None):
             z.writestr(f"OEBPS/c{n}.xhtml", xhtml, compress_type=zipfile.ZIP_DEFLATED)
         for name, data, _ in images.files:
             z.writestr(f"OEBPS/{name}", data, compress_type=zipfile.ZIP_STORED)
+        if cover:
+            z.writestr("OEBPS/images/cover.jpg", cover, compress_type=zipfile.ZIP_STORED)
     tmp.replace(path)
     now = int(time.time())
     conn.executemany("INSERT OR REPLACE INTO kindle_sent (doc_id, file, at) VALUES (?, ?, ?)", [(d["id"], fname, now) for d, _ in docs])
