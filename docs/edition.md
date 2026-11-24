@@ -75,7 +75,7 @@ The Kindle doesn't wait for me to pick it up. When it goes to sleep, the Daf plu
 
 ## To listen to
 
-The Edition is also a morning programme I can hear on a walk or a bike ride. Once the paper is made, the model writes it as a script for one voice: the day, a quick run through the headlines, then every piece in the paper's order, each told in a few minutes from its own text, and a line at the end on what's most worth reading in full. It keeps to what the pieces say and adds nothing of its own. Kokoro reads it in the same voice as Listen, about twice as fast as it plays, so a twenty-minute episode is ready a quarter of an hour after the paper, long before I'm out the door. If the model is off, the episode is made from each piece's opening lines instead.
+The Edition is also a morning programme I can hear on a walk or a bike ride. Once the paper is made, the model writes it as a script for one voice: the day, a quick run through the headlines, then every piece in the paper's order, each told in a few minutes from its own text, and a line at the end on what's most worth reading in full. It keeps to what the pieces say and adds nothing of its own. Kokoro reads it in the same voice as Listen, which takes about as long as the episode plays, so it's ready half an hour or so after the paper, long before I'm out the door. If the model is off, the episode is made from each piece's opening lines instead.
 
 It comes as a private podcast. Every piece is a chapter, so the skip button on my earphones moves from story to story, and each chapter's link opens the piece in Daf when I want to read it properly. The episode carries its own transcript, which the podcast app can show and Daf keeps on the episode's page, so nothing has to transcribe it.
 
