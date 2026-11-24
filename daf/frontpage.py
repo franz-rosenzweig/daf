@@ -205,12 +205,47 @@ def wide(data, width=1200, ratio=0.5):
     return out.getvalue()
 
 
+FACE_SHARE = 0.02                             # a face over this share of a picture makes it a portrait
+
+
+@lru_cache(maxsize=1)
+def _faces():
+    """OpenCV's frontal-face detector, or None where OpenCV isn't installed (it's optional)."""
+    try:
+        import cv2
+    except ImportError:
+        return None
+    c = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    return None if c.empty() else c
+
+
+def big_face(data):
+    """Whether a picture is mostly someone's face (one covering more than FACE_SHARE of it), the kind a
+    front page does better without: someone glaring or aiming at the reader first thing in the morning.
+    Always False without OpenCV."""
+    det = _faces()
+    if det is None:
+        return False
+    from PIL import Image
+    import numpy as np
+    try:
+        im = Image.open(io.BytesIO(data))
+        im.load()
+        g = np.array(im.convert("L"))
+        h, w = g.shape[:2]
+        found = det.detectMultiScale(g, scaleFactor=1.1, minNeighbors=6, minSize=(max(24, w // 14), max(24, h // 14)))
+        return any(fw * fh / float(w * h) > FACE_SHARE for (_, _, fw, fh) in found)
+    except Exception:  # noqa: BLE001 - a picture the detector can't read isn't a face
+        return False
+
+
 def pick_picture(items, candidates):
-    """(item id, image bytes, where it came from) of the first photograph in the paper's order, or None.
+    """(item id, image bytes, where it came from) of the first photograph in the paper's order that isn't
+    mostly a face, or None (the page goes without one rather than lead with a portrait).
     candidates: {item id: [(key, bytes), …]} with the piece's own pictures, best first."""
     for it in items:
         for key, data in candidates.get(it["id"], []):
-            if data and photo_score(data) >= PHOTO:
+            if data and photo_score(data) >= PHOTO and not big_face(data):
                 return it["id"], data, key
     return None
 

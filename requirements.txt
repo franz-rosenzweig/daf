@@ -9,3 +9,5 @@ feedparser==6.0.11        # the Feed, once Daf reads the feeds itself (daf/sourc
 yt-dlp[default]
 faster-whisper==1.2.1
 av<16                      # faster-whisper 1.2.1 passes av.open(metadata_errors=…), which PyAV 16 dropped
+# The Edition's Kindle front page skips photographs that are mostly a face (daf/frontpage.py); without it, it doesn't check.
+opencv-python-headless>=4.10

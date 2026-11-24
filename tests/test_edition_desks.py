@@ -54,6 +54,16 @@ class Desks(unittest.TestCase):
         got = [c["title"] for c in edition.paper_order(chosen, e)]
         self.assertEqual(got, ["lead", "nor", "lis", "ideas 1", "ideas 2", "science", "t", "w"])
 
+    def test_rules_keep_torah_to_its_column(self):
+        e = dict(edition.DEFAULTS, desks=[], pieces=6, wildcard=0, torah=1)
+        short = [piece(f"Dvar Torah {i}", source=f"Torah {i}", score=3.0 - i / 10, torah=True) for i in range(4)]
+        short += [piece(f"Essay {i}", source=f"Mag {i}", score=1.0 - i / 10) for i in range(6)]
+        got = edition.pick_local(short, e)
+        self.assertEqual(sum(1 for c in got if c["torah"]), 1)
+        self.assertEqual(len(got), 6)
+        got = edition.pick_local(short, dict(e, torah=2))
+        self.assertEqual(sum(1 for c in got if c["torah"]), 2)
+
     def test_rules_keep_the_desks(self):
         e = dict(edition.DEFAULTS, desks=DESKS, pieces=5, wildcard=0, torah=0)
         short = [piece(f"Essay {i}", source=f"Mag {i}", score=2.0 - i / 10) for i in range(8)]
