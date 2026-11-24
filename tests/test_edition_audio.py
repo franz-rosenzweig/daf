@@ -60,7 +60,7 @@ class Folder(unittest.TestCase):
              "url": "https://daf.example/#read/a2", "heard": [201.6, 290]}]
         m = {"key": key, "day": key[:10], "made": int(key[11:]), "title": "Wednesday, 18 March", "how": "model", "minutes": 20,
              "voice": "af_heart", "speed": 1.0, "seconds": 300.0, "bytes": 12345, "spoken": int(key[11:]) + 900, "took": 600,
-             "chapters": chapters, "lines": [[0, 4.5, "Good morning."], [5, 30, "Here's what's in it."]], "parts": []}
+             "chapters": chapters, "lines": [[0, 4.5, "Good morning."], [5, 30, "Here's what's in it.", "Ben"]], "parts": []}
         (EA.DIR / f"{key}.json").write_text(json.dumps(m))
         (EA.DIR / f"{key}.mp3").write_bytes(b"ID3" + b"\0" * 100)
         return m
@@ -91,6 +91,24 @@ class Script(unittest.TestCase):
         self.assertEqual(parts[0]["text"], "Wednesday. Three pieces.\n\nA harbour, moss, a map.")
         self.assertEqual(parts[1]["text"], "The harbour at night is quiet.")
         self.assertTrue(parts[3]["text"].startswith("From Atlas Weekly: An old map."))      # the rules' lines for the one it skipped
+
+    def test_a_conversation_comes_back_as_turns(self):
+        out = ("=== intro ===\n**ADA:** Morning. It's Wednesday.\nBen: (laughs) Already?\n"
+               "=== 1 ===\nAda: The harbour story first.\n\nBen: [chuckles] Go on.\nIt's a long one.\n"
+               "=== 2 ===\nBen: Moss.\n=== 3 ===\nAda: A map.\n=== end ===\nAda: Bye.\nBen: Bye.\n")
+        parts = EA.parse(out, PS, ["Ada", "Ben"])
+        self.assertEqual(parts[0]["text"], "Ada: Morning. It's Wednesday.\n\nBen: Already?")
+        self.assertEqual(parts[1]["text"], "Ada: The harbour story first.\n\nBen: Go on. It's a long one.")
+        self.assertEqual(parts[-1]["text"], "Ada: Bye.\n\nBen: Bye.")
+        self.assertEqual(EA.who("Ben: Go on.", [{"name": "Ada"}, {"name": "Ben"}]), (1, "Go on."))
+        self.assertEqual(EA.who("Note: not a host.", [{"name": "Ada"}, {"name": "Ben"}]), (None, "Note: not a host."))
+
+    def test_the_conversation_prompt_names_its_hosts(self):
+        p = EA.prompt(PS, FACTS, 20, [{"name": "Ada", "voice": "x_a", "speed": 1}, {"name": "Ben", "voice": "x_b", "speed": 1}])
+        for x in ("between the hosts of a morning podcast, Ada and Ben", "Ada has read everything", "(Ada: ...)",
+                  "no stage directions", "Wednesday, 18 March", "Length: about", "=== intro ==="):
+            self.assertIn(x, p)
+        self.assertIn("script for one voice", EA.prompt(PS, FACTS, 20, [{"name": "", "voice": "x", "speed": 1}]))
 
     def test_parse_refuses_something_that_isnt_a_script(self):
         with self.assertRaises(ValueError):
@@ -127,7 +145,8 @@ class Voice(Folder):
         orig = EA.speak
         EA.speak = lambda text, v, s: sec(lengths[text])
         try:
-            pcm, times, lines = EA.voice([{"key": "intro", "text": "Hello.\n\nSecond paragraph."}, {"key": "1", "text": "A piece."}], "v", 1.0)
+            pcm, times, lines = EA.voice([{"key": "intro", "text": "Hello.\n\nSecond paragraph."}, {"key": "1", "text": "A piece."}],
+                                         [{"name": "", "voice": "v", "speed": 1.0}])
         finally:
             EA.speak = orig
         g = EA.GAP
@@ -135,6 +154,27 @@ class Voice(Folder):
         self.assertEqual(times[1][0], round(1 + g["para"] + 2 + g["part"], 2))
         self.assertEqual(lines[1][0], round(1 + g["para"], 2))
         self.assertAlmostEqual(len(pcm) / 2 / EA.RATE, 1 + g["para"] + 2 + g["part"] + 3, places=3)
+
+    def test_each_turn_is_read_by_its_host(self):
+        heard = []
+
+        def fake(text, v, s):
+            heard.append((text, v, s))
+            return b"\x01\x00" * EA.RATE
+        hosts = [{"name": "Ada", "voice": "bf_one", "speed": 1.2}, {"name": "Ben", "voice": "am_two", "speed": 1.1}]
+        orig = EA.speak
+        EA.speak = fake
+        try:
+            pcm, times, lines = EA.voice([{"key": "intro", "text": "Ada: Morning.\n\nBen: Morning to you.\n\nAnd to the listener."},
+                                          {"key": "1", "text": "Ada: First story."}], hosts)
+        finally:
+            EA.speak = orig
+        self.assertEqual(heard, [("Morning.", "bf_one", 1.2), ("Morning to you.", "am_two", 1.1),
+                                 ("And to the listener.", "am_two", 1.1), ("First story.", "bf_one", 1.2)])
+        self.assertEqual([l[3] for l in lines], ["Ada", "Ben", "Ben", "Ada"])
+        g = EA.GAP
+        self.assertEqual(lines[1][0], round(1 + g["turn"], 2))                 # a new speaker comes in quickly
+        self.assertEqual(lines[2][0], round(2 + g["turn"] + g["para"], 2))     # the same one carrying on, a breath
 
     def test_kokoro_restarting_midway_is_waited_for(self):
         calls = []
@@ -200,6 +240,7 @@ class Feed(Folder):
         self.assertEqual(ch["chapters"][1], {"startTime": 31.6, "endTime": 200, "title": "The harbour at night", "url": "https://daf.example/#read/a1"})
         kind, tr = EA.file_for("2026-03-18-1773820800.transcript.json")
         self.assertEqual(tr["segments"][0], {"startTime": 0, "endTime": 4.5, "body": "Good morning."})
+        self.assertEqual(tr["segments"][1], {"startTime": 5, "endTime": 30, "body": "Here's what's in it.", "speaker": "Ben"})
         for bad in ("../daf.db", "2026-03-18-1773820800.json", "x.mp3", "2026-03-18-1773820800.mp3/..", "2026-03-19-1.mp3"):
             self.assertEqual(EA.file_for(bad), (None, None), bad)
 
@@ -258,7 +299,13 @@ class Settings(unittest.TestCase):
         self.assertEqual(edition.settings({"edition": {"audio": True, "audio_minutes": 500}})["audio_minutes"], 45)
         self.assertIs(edition.settings({"edition": {"audio": "yes"}})["audio"], False)
         a = EA.settings({"edition": {"on": True, "audio": True}, "tts_voice": "bf_emma", "tts_speed": 1.1})
-        self.assertEqual((a["on"], a["voice"], a["speed"]), (True, "bf_emma", 1.1))
+        self.assertEqual((a["on"], a["hosts"]), (True, [{"name": "", "voice": "bf_emma", "speed": 1.1}]))
+        two = [{"name": "Ada", "voice": "bf_one", "speed": 1.2}, {"name": "Ben", "voice": "am_two", "speed": "1.1"}]
+        self.assertEqual(EA.settings({"edition": {"on": True, "audio": True, "audio_hosts": two}})["hosts"],
+                         [{"name": "Ada", "voice": "bf_one", "speed": 1.2}, {"name": "Ben", "voice": "am_two", "speed": 1.1}])
+        self.assertEqual(len(EA.settings({"edition": {"audio_hosts": two[:1]}})["hosts"][0]["name"]), 0)   # one host: Listen's voice
+        bad = [{"name": "Ada: x", "voice": "bf_one"}, {"name": "Ben", "voice": "../etc"}, {"name": "Cy", "voice": "am_c", "speed": 9}, "x"]
+        self.assertEqual(edition.settings({"edition": {"audio_hosts": bad}})["audio_hosts"], [{"name": "Cy", "voice": "am_c", "speed": 2.0}])
         self.assertFalse(EA.settings({"edition": {"on": False, "audio": True}})["on"])
 
 

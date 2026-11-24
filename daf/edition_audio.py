@@ -40,7 +40,7 @@ WPM = 155                  # Kokoro's words a minute at speed 1 with the pauses 
 FRAME = (150, 50)          # words for the opening (the day and the headlines) and for the end
 PIECE_WORDS = 1800         # of each piece's text, for the model
 RATE = 24000               # Kokoro's PCM: 16-bit, mono
-GAP = {"para": 0.45, "part": 1.6}       # seconds of quiet between paragraphs, and between pieces
+GAP = {"para": 0.45, "turn": 0.3, "part": 1.6}       # seconds of quiet between paragraphs, between hosts' turns, and between pieces
 DEVICE = "listen"
 PATH = "/api/edition/listen/"
 NAME = "Daf Edition"
@@ -53,8 +53,9 @@ def settings(s=None):
     from . import edition
     s = s if s is not None else config.load_settings()
     e = edition.settings(s)
+    one = [{"name": "", "voice": s.get("tts_voice") or "af_heart", "speed": float(s.get("tts_speed") or 1.0)}]
     return {"on": bool(e["on"] and e["audio"]), "minutes": e["audio_minutes"],
-            "voice": s.get("tts_voice") or "af_heart", "speed": float(s.get("tts_speed") or 1.0)}
+            "hosts": e["audio_hosts"] if len(e["audio_hosts"]) >= 2 else one}
 
 
 # ---- what it says ---------------------------------------------------------------------------------
@@ -111,20 +112,55 @@ def budgets(ps, minutes):
     return [max(60, round(left * x / sum(w) / 10) * 10) for x in w]
 
 
-def prompt(ps, facts, minutes):
+def prompt(ps, facts, minutes, hosts=None):
     words = minutes * WPM
     each = budgets(ps, minutes)
-    head = (
+    names = [h["name"] for h in hosts or []] if hosts and len(hosts) >= 2 else []
+    day = (facts["date"] + (f", {facts['hebrew']}" if facts["hebrew"] else "")
+           + (f"; this week's parasha is {facts['parasha']}" if facts["parasha"] else ""))
+    length = (f"It should take about {minutes} minutes to read aloud: about {words} words in all, and no more than {round(words * 1.1)}. "
+              "Each piece below has its length in words; keep to it, since the listener's walk is only so long. Choose what matters "
+              "most rather than squeezing everything in.\n\n")
+    if names:
+        a, b = names[0], names[1]
+        cast = (f"{a} and {b}" if len(names) == 2 else ", ".join(names[:-1]) + f" and {names[-1]}")
+        head = (
+            f"Write today's Edition as a conversation between the hosts of a morning podcast, {cast}, made for one listener, "
+            "who will hear it through earphones on a walk or a bike ride and hasn't read any of it.\n\n"
+            f"{a} has read everything and brings most of the stories. {b} has read them too but comes at each one fresh: reacts, asks "
+            "the question the listener would ask, pushes back when something doesn't add up, and now and then ties it to something "
+            f"earlier in the show. Now and then {b} brings a story instead. They like each other, they're curious and a little funny, "
+            "and they talk like two friends at a kitchen table, not like an advert.\n\n"
+            + length +
+            "How it goes:\n"
+            f"- Open with the day ({day}), then the two of them run through what's coming, a short phrase for each story, passed back and forth.\n"
+            "- Then every piece, in the order given, none left out. Whoever brings it says where it's from in passing (the publication, "
+            "or the writer when the text names one), and between them they tell it: what happened or what the writer argues, the best "
+            "detail or two, and why it matters.\n"
+            "- The facts come only from the text: no facts, numbers, names or quotes it doesn't have, and when the text is unclear, "
+            "leave that part out rather than guess. The hosts may react, wonder, joke and disagree, but that is their own take, so "
+            "it should sound like one (\"I'd want to know who paid for that\", \"that seems like a stretch\"), never like a fact.\n"
+            "- A natural line to move to the next piece. No \"welcome back\", no \"stay tuned\", no slogans, no sponsors.\n"
+            "- Pieces marked \"Second look\" ran in an earlier edition and weren't opened; say so in a few words before the first of them.\n"
+            "- End with each host naming the one piece they'd read in full, and a quick goodbye.\n\n"
+            "How they talk:\n"
+            "- Mostly short turns of one to three sentences, a longer one when someone is explaining. They can cut in or finish "
+            "each other's thought.\n"
+            "- None of the tics of made-up podcasts: don't open replies with \"Exactly\", \"Absolutely\", \"Right\", \"Totally\" or "
+            "\"Wow\"; no \"that's wild\", \"mind-blowing\", \"let's dive in\" or \"unpack\"; no praising each other's points. "
+            "They rarely need to say each other's names.\n"
+            f"- Every turn is its own line starting with the speaker's name and a colon ({a}: ...), with a blank line between turns. "
+            "Only the words they say: no stage directions, sound effects, or notes on how a line is said.\n\n"
+            "Written for the ear:\n"
+            "- Short sentences. Spell out numbers, dates and money the way they're said "
+        )
+    else:
+        head = (
         "Write today's Edition as a script for one voice to read aloud: a short morning programme made for one listener, "
         "who will hear it through earphones on a walk or a bike ride and hasn't read any of it.\n\n"
-        f"It should take about {minutes} minutes to read aloud: about {words} words in all, and no more than {round(words * 1.1)}. "
-        "Each piece below has its length in words; keep to it, since the listener's walk is only so long. Choose what matters "
-        "most rather than squeezing everything in.\n\n"
+        + length +
         "How it goes:\n"
-        f"- Begin with the day ({facts['date']}"
-        + (f", {facts['hebrew']}" if facts["hebrew"] else "")
-        + (f"; this week's parasha is {facts['parasha']}" if facts["parasha"] else "")
-        + "), then run through the headlines quickly, a short phrase for each, so the listener knows what's coming.\n"
+        f"- Begin with the day ({day}), then run through the headlines quickly, a short phrase for each, so the listener knows what's coming.\n"
         "- Then every piece, in the order given, none left out. Say where it's from in passing (the publication, or the writer "
         "when the text names one), then tell it: what happened or what the writer argues, the best detail or two, and why it "
         "matters. Keep to what the text says. Add no facts, numbers, quotes or opinions of your own; when the text is unclear, "
@@ -134,6 +170,8 @@ def prompt(ps, facts, minutes):
         "- End with a line or two: the one or two pieces most worth reading in full, and that's the edition.\n\n"
         "Written for the ear:\n"
         "- Short sentences, in paragraphs of two to five sentences. Spell out numbers, dates and money the way they're said "
+        )
+    head += (
         "(\"about three hundred million dollars\", \"the nineteen-forties\"). No abbreviations, symbols, lists, headings, links, "
         "brackets, slashes or emoji: the voice reads every character.\n"
         "- Hebrew, Yiddish and Aramaic words, and Israeli names and places, are read by an English voice, so write them in English "
@@ -156,14 +194,29 @@ def prompt(ps, facts, minutes):
     return head + "\n".join(body)
 
 
-def parse(out, ps):
+STAGE = re.compile(r"[\[(]\s*(?:laugh|chuckl|sigh|paus|beat|smil|grin|both)\w*[^\])\n]*[\])]", re.I)
+
+
+def _turns(text, names):
+    """A conversation as the voice needs it: each host's turn its own paragraph, starting "Name: ", and no
+    stage directions (Kokoro would read them out)."""
+    t = STAGE.sub("", re.sub(r"[*_]{1,3}", "", text or ""))
+    if names:
+        canon = {n.lower(): n for n in names}
+        alt = "|".join(re.escape(n) for n in names)
+        t = re.sub(rf"^[ \t]*({alt})[ \t]*:[ \t]*", lambda m: "\n" + canon[m.group(1).lower()] + ": ", t, flags=re.M | re.I)
+    return t
+
+
+def parse(out, ps, names=()):
     """The model's script as parts [{key, text}] in the paper's order: "intro", each piece's number, "end".
-    A piece it left out gets the rules' few lines, so every chapter is there."""
+    A piece it left out gets the rules' few lines, so every chapter is there. With hosts' names, each turn
+    is a paragraph starting with its host's name."""
     found = {}
     marks = list(MARK.finditer(out or ""))
     for i, m in enumerate(marks):
         end = marks[i + 1].start() if i + 1 < len(marks) else len(out)
-        text = speakable(out[m.end():end])
+        text = speakable(_turns(out[m.end():end], names))
         if text:
             found[m.group(1).lower()] = text
     if not found.get("intro") or sum(1 for p in ps if str(p["n"]) in found) < max(1, len(ps) // 2):
@@ -213,7 +266,7 @@ def script_rules(ps, facts, minutes):
     return parts
 
 
-def script(conn, ed, day, minutes, use_ai=True):
+def script(conn, ed, day, minutes, use_ai=True, hosts=None):
     """(parts, how): the script, by the model or by the rules."""
     from . import ai
     ps = pieces(conn, ed)
@@ -221,7 +274,8 @@ def script(conn, ed, day, minutes, use_ai=True):
     conn.commit()                         # the Hebrew date's cache row: not held through the model
     if use_ai:
         try:
-            return parse(ai.run(prompt(ps, facts, minutes), timeout=900), ps), "model"
+            names = [h["name"] for h in hosts or [] if h["name"]] if hosts and len(hosts) >= 2 else []
+            return parse(ai.run(prompt(ps, facts, minutes, hosts), timeout=900), ps, names), "model"
         except Exception as ex:  # noqa: BLE001 - the rules still make an episode
             log.warning("edition audio: the model didn't write it (%s); the rules do", ex)
             return script_rules(ps, facts, minutes), f"rules ({str(ex)[:120]})"
@@ -284,22 +338,41 @@ def _quiet(sec):
     return b"\x00\x00" * int(RATE * sec)
 
 
-def voice(parts, voice_, speed):
-    """All the parts read, as one PCM stream, with each part's [start, end] and each paragraph's
-    [start, end, text] in seconds."""
+def who(para, hosts):
+    """(the host's index or None, the words) for a paragraph: a host's turn starts with their name and a colon."""
+    m = re.match(r"([A-Za-z][A-Za-z .'-]{0,23}):\s+", para)
+    if m:
+        for i, h in enumerate(hosts):
+            if h["name"] and h["name"].lower() == m.group(1).strip().lower():
+                return i, para[m.end():].strip()
+    return None, para.strip()
+
+
+def voice(parts, hosts):
+    """All the parts read, each turn in its host's voice and speed (one host: every paragraph in the one
+    voice), as one PCM stream, with each part's [start, end] and each paragraph's [start, end, text, host's
+    name] in seconds. A paragraph without a name is the last speaker's."""
     pcm = bytearray()
     times, lines = [], []
+    cur = 0
     for i, part in enumerate(parts):
         if i:
             pcm += _quiet(GAP["part"])
         start = len(pcm) / 2 / RATE
-        for j, para in enumerate(p for p in part["text"].split("\n\n") if p.strip()):
-            if j:
-                pcm += _quiet(GAP["para"])
+        first = True
+        for para in part["text"].split("\n\n"):
+            n, words = who(para, hosts)
+            if not words:
+                continue
+            nxt = cur if n is None else n
+            if not first:
+                pcm += _quiet(GAP["turn"] if nxt != cur else GAP["para"])
+            cur, first = nxt, False
+            h = hosts[cur]
             a = len(pcm) / 2 / RATE
-            got = speak(para, voice_, speed)
+            got = speak(words, h["voice"], h["speed"])
             pcm += got[: len(got) - len(got) % 2]
-            lines.append([round(a, 2), round(len(pcm) / 2 / RATE, 2), para])
+            lines.append([round(a, 2), round(len(pcm) / 2 / RATE, 2), words, h["name"]])
         times.append([round(start, 2), round(len(pcm) / 2 / RATE, 2)])
     return bytes(pcm), times, lines
 
@@ -365,15 +438,16 @@ def make(day=None, use_ai=None, minutes=None):
         kept = DIR / f"{key_of(ed)}.script.json"      # a second try reads the same script, so the voice's parts are still good
         try:
             got = json.loads(kept.read_text())
-            if got.get("minutes") != minutes:
-                raise ValueError("another length")
+            if got.get("minutes") != minutes or got.get("hosts") != [h["name"] for h in a["hosts"]]:
+                raise ValueError("another length or other hosts")
             parts, how = got["parts"], got["how"]
         except (OSError, ValueError, KeyError):
-            parts, how = script(conn, ed, day, minutes, use_ai=edition.settings(s)["ai"] if use_ai is None else use_ai)
-            kept.write_text(json.dumps({"parts": parts, "how": how, "minutes": minutes}, ensure_ascii=False))
+            parts, how = script(conn, ed, day, minutes, use_ai=edition.settings(s)["ai"] if use_ai is None else use_ai, hosts=a["hosts"])
+            kept.write_text(json.dumps({"parts": parts, "how": how, "minutes": minutes, "hosts": [h["name"] for h in a["hosts"]]},
+                                       ensure_ascii=False))
         ps = pieces(conn, ed)
     t0 = time.time()
-    pcm, times, lines = voice(parts, a["voice"], a["speed"])
+    pcm, times, lines = voice(parts, a["hosts"])
     base = config.public_url(s)
     chapters = []
     for part, (start, end) in zip(parts, times):
@@ -387,17 +461,17 @@ def make(day=None, use_ai=None, minutes=None):
         p = ps[int(part["key"]) - 1]
         chapters.append({"start": start, "end": end, "title": p["title"], "id": p["id"], "publication": p["publication"],
                          "url": f"{base}/#read/{p['id']}", "heard": [start, end]})
-    key = key_of(ed)
+    key = f"{ed['day']}-{int(time.time())}"         # its own name each time, so a podcast app sees an episode made again as new
     title = f"{day.strftime('%A')}, {day.day} {day.strftime('%B')}"
     encode(pcm, DIR / f"{key}.mp3", title, chapters)
     meta = {"key": key, "day": ed["day"], "made": ed["made"], "title": title, "how": how, "minutes": minutes,
-            "voice": a["voice"], "speed": a["speed"], "seconds": round(len(pcm) / 2 / RATE, 1),
+            "hosts": a["hosts"], "seconds": round(len(pcm) / 2 / RATE, 1),
             "bytes": (DIR / f"{key}.mp3").stat().st_size, "spoken": int(time.time()), "took": int(time.time() - t0),
             "chapters": chapters, "lines": lines, "parts": parts}
     tmp = DIR / f"{key}.json.tmp"
     tmp.write_text(json.dumps(meta, ensure_ascii=False))
     tmp.replace(DIR / f"{key}.json")
-    (DIR / f"{key}.script.json").unlink(missing_ok=True)       # it's in the episode's facts now
+    (DIR / f"{key_of(ed)}.script.json").unlink(missing_ok=True)       # it's in the episode's facts now
     for old in DIR.glob(f"{ed['day']}-*"):           # an edition made again replaces its episode
         if not old.name.startswith(key + "."):
             old.unlink(missing_ok=True)
@@ -527,7 +601,8 @@ def chapters_json(m):
 
 def transcript_json(m):
     """Podcasting 2.0 transcript, a segment per paragraph (the times are the voice's own, not guessed)."""
-    return {"version": "1.0.0", "segments": [{"startTime": a, "endTime": b, "body": t} for a, b, t in m["lines"]]}
+    return {"version": "1.0.0", "segments": [{"startTime": l[0], "endTime": l[1], "body": l[2]}
+                                             | ({"speaker": l[3]} if len(l) > 3 and l[3] else {}) for l in m["lines"]]}
 
 
 def file_for(name):
@@ -590,7 +665,7 @@ def store_transcript(audio):
     m = meta_for(audio)
     if not m:
         raise RuntimeError("That episode is gone")
-    lines = [{"ts": int(a), "spk": None, "x": t} for a, b, t in m["lines"]]
+    lines = [{"ts": int(l[0]), "spk": (l[3] if len(l) > 3 and l[3] else None), "x": l[2]} for l in m["lines"]]
     chapters = [{"t": float(c["start"]), "title": c["title"]} for c in m["chapters"]]
     bl = media._blocks_from_lines(lines, [{"start_time": c["t"], "title": c["title"]} for c in chapters])
     with db.session() as conn:
