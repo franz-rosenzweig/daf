@@ -58,6 +58,8 @@ DEFAULTS = {
     "topics_removed": [],   # the names you removed: "Name them again" leaves them out
     "sources": {},          # {source: "more" | "less" | "mute"}; "folder:Name" mutes a Feed folder
     "desks": [],            # the news desks: the places you want the news from (DESK_KEYS)
+    "audio": False,         # read it aloud each morning too, as an episode in a private podcast feed (edition_audio.py)
+    "audio_minutes": 20,    # about how long that episode is
 }
 # A news desk, kept in settings "edition.desks"; none are built in, since they're the reader's own places:
 #   {"key": "home", "name": "the section's name", "at_least": 1,
@@ -102,7 +104,7 @@ def settings(s=None):
     s = s if s is not None else config.load_settings()
     e = dict(DEFAULTS)
     e.update({k: v for k, v in (s.get("edition") or {}).items() if k in DEFAULTS})
-    for k in ("pieces", "videos", "podcasts", "torah", "wildcard", "callback", "longest", "halflife", "hour"):
+    for k in ("pieces", "videos", "podcasts", "torah", "wildcard", "callback", "longest", "halflife", "hour", "audio_minutes"):
         try:
             e[k] = int(e[k])
         except (TypeError, ValueError):
@@ -110,6 +112,8 @@ def settings(s=None):
     e["pieces"] = max(3, min(20, e["pieces"]))
     e["callback"] = max(0, min(3, e["callback"]))
     e["hour"] = max(3, min(11, e["hour"]))
+    e["audio_minutes"] = max(5, min(45, e["audio_minutes"]))
+    e["audio"] = e["audio"] is True
     e["halflife"] = max(3, min(365, e["halflife"]))
     e["days"] = [d for d in e["days"] if d in DAYS] if isinstance(e["days"], list) else DEFAULTS["days"]
     e["topics"] = [t for t in e["topics"] if isinstance(t, dict) and t.get("name")] if isinstance(e["topics"], list) else []
@@ -351,8 +355,9 @@ def taste(conn, e=None, now=None, iv=None, more=None):
             add(now - 21 * 86400, 0.8 if "later" in name else 2.0, v["author"], v["title"], "saved")
 
     # podcasts: AntennaPod's plays (gpodder) and Audiobookshelf's episodes
+    # (the Edition's own episodes aren't a taste: they're the Edition, and their pieces count as opened)
     for r in conn.execute("SELECT a.position, a.total, a.timestamp, e.title, e.podcast_title FROM gp_actions a "
-                          "LEFT JOIN gp_episodes e ON e.url = a.episode WHERE a.action = 'play'"):
+                          "LEFT JOIN gp_episodes e ON e.url = a.episode WHERE a.action = 'play' AND a.episode NOT LIKE '%/api/edition/listen/%'"):
         share = min(1.0, (r["position"] or 0) / r["total"]) if r["total"] else 0.3
         add(r["timestamp"], 0.5 + 1.5 * share, r["podcast_title"], r["title"], "played")
     for r in conn.execute("SELECT title, author, seconds, start FROM sessions WHERE source = 'podcast' AND origin = 'audiobookshelf'"):
@@ -572,7 +577,7 @@ def candidates(conn, e, now, used, iv=None):
                 continue
 
     for r in conn.execute("SELECT e.url, e.link, e.title, e.podcast_title, e.published, e.duration, e.notes, e.image FROM gp_episodes e "
-                          "JOIN gp_subs s ON s.url = e.podcast WHERE s.removed IS NULL AND e.published >= ? AND ?",
+                          "JOIN gp_subs s ON s.url = e.podcast WHERE s.removed IS NULL AND s.url NOT LIKE '%/api/edition/listen/%' AND e.published >= ? AND ?",
                           (since, 1 if e["podcasts"] else 0)):
         notes = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", r["notes"] or "")).strip()
         keep({"id": "ep:" + hashlib.sha1(r["url"].encode()).hexdigest()[:16], "kind": "podcast", "title": r["title"] or "",

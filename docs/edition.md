@@ -73,6 +73,18 @@ Each edition goes to the Kindle as one book, "Daf, Tuesday 10 November 2026", th
 
 The Kindle doesn't wait for me to pick it up. When it goes to sleep, the Daf plugin sets an alarm for a quarter past the edition's **Ready by** hour on the next edition day, which Daf tells it. The alarm wakes it behind the sleep screen; it turns on the Wi-Fi if it has to, brings in the edition, sets the next alarm and goes back to sleep, all in a minute or two and without changing what the screen shows. If the edition wasn't there yet, it tries again every half hour until late morning. It never wakes on a day without an edition. The plugin needs to be on the Kindle from November 20, 2026 or later for this.
 
+## To listen to
+
+The Edition is also a morning programme I can hear on a walk or a bike ride. Once the paper is made, the model writes it as a script for one voice: the day, a quick run through the headlines, then every piece in the paper's order, each told in a few minutes from its own text, and a line at the end on what's most worth reading in full. It keeps to what the pieces say and adds nothing of its own. Kokoro reads it in the same voice as Listen, which takes about as long as the episode plays, so it's ready half an hour or so after the paper, long before I'm out the door. If the model is off, the episode is made from each piece's opening lines instead.
+
+It comes as a private podcast. Every piece is a chapter, so the skip button on my earphones moves from story to story, and each chapter's link opens the piece in Daf when I want to read it properly. The episode carries its own transcript, which the podcast app can show and Daf keeps on the episode's page, so nothing has to transcribe it.
+
+What I listen to counts. AntennaPod tells Daf what I played through its sync, and a piece whose chapter I heard most of counts as opened, both for the row of marks at the top of the paper and for the taste. A chapter I skipped stays unopened, the same as a piece I passed by in the paper.
+
+Hebrew words are the weak spot. The voice is an English one, so the script spells Hebrew names and places the way they're said, with hyphens and apostrophes (Kir-yat Sh'mo-na), which helps a lot but isn't perfect.
+
+To set it up, `"audio": true` goes in the Edition's settings (and `"audio_minutes"` for a length other than twenty minutes), and `daf listen-feed` prints the feed's address, which goes into the podcast app as a new podcast by its address. The address has its own key in it, so the app needs no sign-in; running `daf listen-feed` again makes a new address and the old one stops working. Episodes are kept for two weeks. `daf edition --audio` makes today's now.
+
 ## Setting it up
 
 The Edition is off until **Every morning** is on. It needs nothing else for the Feed and the podcasts. For the YouTube channels it reads Invidious's own database, so two lines go in `daf.env`:
