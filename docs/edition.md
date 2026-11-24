@@ -28,8 +28,10 @@ Each candidate gets a score from my **taste**, which Daf builds from what I real
 - documents I opened, read for a while, highlighted or saved in Daf, and what I read of Daf's articles on the Kindle;
 - my watch history on Invidious, and the videos I put on my own playlists there (a "Blocked" list counts against);
 - the episodes I played in AntennaPod and Audiobookshelf;
-- the books I've been reading on the Kindle, lightly;
+- everything else I read, watch and listen to: the books I read on the Kindle and in Daf's reader, my audiobooks in Audiobookshelf, my Hardcover shelves (what I'm reading, what I've read and how I rated it, what I want to read), the manga I read in Daf or on the Kindle, the films and shows I watched on Jellyfin, and what I asked Seerr for;
 - my 👍 and 👎 on earlier editions, and the pieces I left alone on days I read the paper. A day I didn't open it at all doesn't count against anything in it.
+
+A title by itself tells Daf very little about which articles I'd want, so each of those comes with what it's about: a book's tags and description from Calibre, an audiobook's genres and description, a manga's genres from Komga or AniList, and a film's or a show's genres, keywords and summary. Fiction on a screen counts lightly and only by its genres and keywords, because a thriller's plot is all police and agents, and those are the words of the news. A documentary or a lecture counts fully, since it says much more about what I'd like to read. A show counts once however many episodes I watched, with more weight for more episodes. Books I've marked private stay out, and so does anything my private titles match. Some days a piece names something I'm in the middle of, such as an essay on the book I'm reading, and then its reason says so: "Goes with Middlemarch, which you're reading". It has to name the book, its author or the show, because matching on shared words tied a film about a war veteran to news about veterans.
 
 Older habits fade, so the taste follows me as I change: by default something I did a month ago counts half as much as something I did today. Invidious keeps the order I watched in but not the dates, so Daf turns places into days with how many videos I really play a day, which iv-suggest records.
 
@@ -57,7 +59,7 @@ A story from any feed of mine counts too when its headline names the place. The 
 
 ## Taste
 
-**Taste**, at the top of the Edition, shows what Daf thinks I like, and it's where I change it. At the top, **Last 2 weeks** says how it's doing: how many pieces it showed, how many I opened and read, and my thumbs. **Picking up on** lists the words I've taken up lately.
+**Taste**, at the top of the Edition, shows what Daf thinks I like, and it's where I change it. At the top, **Last 2 weeks** says how it's doing: how many pieces it showed, how many I opened and read, and my thumbs. **Picking up on** lists the words I've taken up lately, and **Lately** the books, shows and films I'm in the middle of or just finished.
 
 - **Topics:** the subjects my reading falls into, each with how much of it lately and an arrow for rising or fading. **More**, **Less** and **Mute** turn one up, down or off. The model names the topics the first time from my taste and the topics I named in iv-suggest, and **Name them again** asks it again after my reading has moved on.
 - **Topics of my own:** the model only knows what I've already been reading, so when I want the paper to follow something new I type it into **Add a topic** under the list, "woodworking" for instance, and press **Add**. A topic is really a handful of words Daf looks for in titles and summaries. If I know which words I want, I put them in **Words**. If I leave that empty, Daf asks the model for fifteen or so, which takes a few seconds, and if the model is off it goes by the words in the name. A topic I add starts on **More**, so it counts from the next edition, and resting the pointer on any topic's name shows its words.
@@ -78,4 +80,4 @@ The Edition is off until **Every morning** is on. It needs nothing else for the 
     DAF_INVIDIOUS_PSQL=docker exec -i invidious-db psql -U kemal -d invidious
     DAF_INVIDIOUS_USER=your-account
 
-Without them the Edition simply leaves Invidious out. The model is the one in **Preferences → AI**. `daf edition` shows today's from the command line, `daf edition --build` makes one now, `--dry-run --json` shows what it would pick and the shortlist it chose from, and `daf edition --taste` prints the taste.
+Without them the Edition simply leaves Invidious out. Jellyfin and Seerr need their keys where Daf reads keys from (`DAF_SECRET_FILES` or `daf.env`): `JELLYFIN_URL`, `JELLYFIN_API_KEY` and `JELLYFIN_USER` (my account there, which is also how Daf knows which Seerr requests are mine), and `DAF_SEERR_KEY` (or `HOMEPAGE_VAR_JELLYSEERR_KEY`) with `DAF_SEERR_URL` if Seerr isn't on port 5055. Without them those two are left out too, and the rest still counts. The model is the one in **Preferences → AI**. `daf edition` shows today's from the command line, `daf edition --build` makes one now, `--dry-run --json` shows what it would pick and the shortlist it chose from, and `daf edition --taste` prints the taste.

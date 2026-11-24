@@ -4,8 +4,10 @@ could read.
 Candidates are the last day or two of the Feed, new uploads from the YouTube channels you follow on
 Invidious, and new episodes of the podcasts you follow (AntennaPod's subscriptions, through Daf's gpodder
 service). What you actually read, watch and listen to becomes a taste (`taste()`): Daf's reading sessions,
-opened and saved documents and their highlights, Invidious's watch history, podcast plays, the books read
-on the Kindle, and your thumbs on past editions, with older habits fading (`halflife`, in days). A piece
+opened and saved documents and their highlights, Invidious's watch history, podcast plays, your thumbs on
+past editions, and everything else you read, watch and listen to (elsewhere.py: books, audiobooks, manga,
+your Hardcover shelves, what you watched on Jellyfin and asked Seerr for, each with what it's about), with
+older habits fading (`halflife`, in days). A piece
 an edition showed you and you never opened counts a little against its source and its words.
 
 Every candidate gets a score from that taste (how much its source means to you, how much its words do,
@@ -273,10 +275,12 @@ def invidious():
     return out
 
 
-def taste(conn, e=None, now=None, iv=None):
+def taste(conn, e=None, now=None, iv=None, more=None):
     """{sources: {key: 0..1 on a log curve}, mult: {key: FLOOR..BOOST}, words: {word: weight -1..1}, rising: [{word, recent, lift}],
     facts: {key: Counter}, topics: [{name, weight, trend}], seen: {fact: count}, recent: [titles finished lately],
-    down: [titles you turned down], named: [topics named in iv-suggest]}."""
+    down: [titles you turned down], named: [topics named in iv-suggest], lately: [{title, kind, verb, words}] (elsewhere.lately)}.
+    more: elsewhere.things() already gathered (tests pass their own), else they're gathered here."""
+    from . import elsewhere
     e = e or settings()
     now = now or time.time()
     half = e["halflife"] * 86400
@@ -354,10 +358,11 @@ def taste(conn, e=None, now=None, iv=None):
     for r in conn.execute("SELECT title, author, seconds, start FROM sessions WHERE source = 'podcast' AND origin = 'audiobookshelf'"):
         add(r["start"], 0.4 + min(1.0, (r["seconds"] or 0) / 1800), r["author"], r["title"], "played")
 
-    # books on the Kindle: what they're about, lightly
-    for r in conn.execute("SELECT title, MAX(author), SUM(seconds), MAX(start) FROM sessions WHERE source = 'kindle' "
-                          "AND start > ? GROUP BY title", (now - 180 * 86400,)):
-        add(r[3], 0.3 * min(5.0, (r[2] or 0) / 3600), None, f"{r[0] or ''} {r[1] or ''}")
+    # everything else: books (the Kindle, Daf's reader, Hardcover), audiobooks, manga, Jellyfin, Seerr, each with
+    # what it's about. They aren't sources a paper draws from, so they teach words only.
+    more = elsewhere.things(conn, now) if more is None else more
+    for t in more:
+        add(t["when"], t["w"], None, t["text"], t["kind"])
 
     # your thumbs, and what an edition showed you that you left alone
     down = []
@@ -395,7 +400,8 @@ def taste(conn, e=None, now=None, iv=None):
     mult.update({s: round(FLOOR * 0.6, 4) for s, v in src_w.items() if v < -0.5})
     return {"sources": sources, "mult": mult, "words": vocab, "rising": rising(events, now),
             "facts": {s: dict(c) for s, c in facts.items()}, "topics": topic_weights(events, e, now), "seen": dict(seen),
-            "recent": [t for _, t in sorted(recent, reverse=True)[:12]], "down": down[-12:], "named": iv["named"]}
+            "recent": [t for _, t in sorted(recent, reverse=True)[:12]], "down": down[-12:], "named": iv["named"],
+            "lately": elsewhere.lately(more, now)}
 
 
 def rising(events, now):
@@ -584,8 +590,9 @@ def _muted(c, e):
 
 
 def score(cands, prof, e, now, parasha=None):
-    """Adds c["score"], c["topic"], c["facts"] to each candidate; drops what you muted."""
-    from . import torah
+    """Adds c["score"], c["topic"], c["facts"], c["near"] (what you're into lately that it goes with) to each
+    candidate; drops what you muted."""
+    from . import elsewhere, torah
     kept = []
     raw = []
     for c in cands:
@@ -600,6 +607,7 @@ def score(cands, prof, e, now, parasha=None):
     hi = hi if hi > 0 else 1
     rise = {r["word"] for r in prof.get("rising") or []}
     any_src = bool(prof.get("mult"))
+    lately = elsewhere.matchers(prof.get("lately") or [], kept)
     for c in kept:
         key = source_key(c["source"])
         src = prof["sources"].get(key, 0.0)
@@ -613,6 +621,7 @@ def score(cands, prof, e, now, parasha=None):
             smult *= ADJ[e["sources"]["folder:" + c["folder"]]]
         fresh = 0.5 ** (max(0, now - (c["published"] or now)) / 86400)
         c["rising"] = sorted(c["_ws"] & rise)
+        c["near"] = elsewhere.near(c, lately) if lately else None
         # relevance: a floor, so a piece from a source you love still counts when its words are new to Daf
         rel = 0.35 + 0.65 * max(-0.5, min(1.5, c["_tm"] / hi))
         rel += 0.12 * min(2, len(c["rising"])) + (0.18 if c.get("lane") else 0) + 0.08 * fresh
@@ -837,6 +846,9 @@ def fact_line(c, parasha=None):
         return f"{c['lean'].title()} news" if c.get("lean") and not re.search(r"[א-ת]", c["lean"]) else f"News from {c['desk']}"
     if f.get("up"):
         return f"You liked {name} before"
+    if c.get("near"):
+        from .elsewhere import near_line
+        return near_line(c["near"])
     if c.get("lane"):
         return f"From your “{c['lane']}” lane"
     if f.get("watched"):
@@ -958,7 +970,8 @@ Rules:
   Wildcard; "Lead" for the first), and "why": the reason it is here, spoken to the reader in at most eight words,
   using ONLY that candidate's facts and the reader's taste below. Don't repeat the title or the length, and never
   invent a fact or a number. Good: "You've watched 24 Fireship videos", "This week's parasha", "You've opened 20 from
-  The Conversation", "Recovery runs through what you listen to", "Outside your usual" (always this for the wildcard).
+  The Conversation", "Goes with Middlemarch, which you're reading", "Recovery runs through what you listen to",
+  "Outside your usual" (always this for the wildcard).
 
 The reader's taste (what they actually read, watch and listen to; weights 0..1):
 {taste}
@@ -979,7 +992,13 @@ def _taste_text(prof):
     return (f"- topics: {topics}\n- topics they named themselves: {named}\n- sources: {likes}\n"
             f"- words that recur in what they finish: {words_}\n- taken up lately: {rise}\n"
             f"- recently finished: {'; '.join(prof['recent'][:10]) or 'nothing yet'}\n"
+            f"- away from the paper lately: {'; '.join(_lately_text(t) for t in prof.get('lately') or []) or 'nothing known'}\n"
             f"- turned down: {'; '.join(prof['down'][:8]) or 'nothing yet'}")
+
+
+def _lately_text(t):
+    kind = {"book": "book", "audiobook": "audiobook", "manga": "manga", "screen": "film or show", "requested": "film or show"}.get(t["kind"], t["kind"])
+    return f'{t["title"]} ({kind}, {t["verb"]})'
 
 
 def _facts_text(c, parasha):
@@ -996,6 +1015,9 @@ def _facts_text(c, parasha):
         f.append(f"from their \"{c['lane']}\" lane of video suggestions")
     if c.get("rising"):
         f.append("rising for them lately: " + ", ".join(c["rising"]))
+    if c.get("near"):
+        from .elsewhere import VERBS
+        f.append(f'goes with {c["near"]["title"]}, {VERBS.get(c["near"]["verb"], "on their shelf")}')
     if c.get("desk"):
         f.append(f"DESK {c['desk']}" + (f" (about {c['lean']})" if c.get("lean") else ""))
     if c.get("stranger"):
@@ -1269,7 +1291,7 @@ def build(day=None, use_ai=None, dry=False, conn=None):
         ed = {"day": day.isoformat(), "made": int(now), "items": items, "how": how, "candidates": len(cands),
               "parasha": (parasha or {}).get("name")}
         if dry:
-            ed["shortlist"] = [{k: c.get(k) for k in ("id", "kind", "source", "title", "minutes", "score", "topic", "facts", "stranger")} for c in short]
+            ed["shortlist"] = [{k: c.get(k) for k in ("id", "kind", "source", "title", "minutes", "score", "topic", "facts", "stranger", "near")} for c in short]
             ed["second_look"] = [{k: c.get(k) for k in ("id", "source", "title", "from", "missed", "score", "gold")} for c in cb[:12]]
             return ed
         for c in chosen:
@@ -1512,6 +1534,7 @@ def taste_page(conn):
     adj = {k: v for k, v in e["sources"].items() if v in ("more", "less")}
     return {"topics": p["topics"], "sources": [{"name": k, "weight": round(v, 3), "facts": p["facts"].get(k) or {}, "adj": adj.get(k, "")} for k, v in top],
             "pool": pool_page(conn, e), "muted": [m for m in muted if m[7:] not in _hidden_folders(conn)], "seen": p["seen"], "rising": p["rising"], "named": p["named"], "report": report(conn),
+            "lately": [{"title": t["title"], "kind": t["kind"], "verb": t["verb"]} for t in p.get("lately") or []],
             "settings": dict({k: v for k, v in e.items() if k not in OWN}, desks=desks_brief(e))}
 
 

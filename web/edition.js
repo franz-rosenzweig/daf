@@ -145,7 +145,8 @@ async function taste(){
 function drawTaste(){
   const page = $('#edtaste'); if (!page || !T) return;
   const s = T.settings, seen = T.seen || {};
-  const learn = [['watched', 'Watched'], ['opened', 'Opened'], ['played', 'Played'], ['highlighted', 'Highlighted'], ['saved', 'Saved'], ['up', 'Thumbs up'], ['down', 'Thumbs down']]
+  const learn = [['watched', 'Watched'], ['opened', 'Opened'], ['played', 'Played'], ['highlighted', 'Highlighted'], ['saved', 'Saved'], ['up', 'Thumbs up'], ['down', 'Thumbs down'],
+    ['book', 'Books'], ['audiobook', 'Audiobooks'], ['manga', 'Manga'], ['screen', 'Films and shows'], ['requested', 'Requested']]
     .filter(([k]) => seen[k]).map(([k, l]) => '<span class="edlchip"><b>' + l + '</b> ' + seen[k] + '</span>').join('');
   const top = Math.max(0.01, ...T.topics.map(t => t.weight));
   const topics = (T.topics.length ? T.topics.map(t => '<div class="edtrow"><span class="edtn" title="' + esc((t.words || []).join(', ')) + '">' + esc(t.name) + '</span><div class="edbar"><i style="width:' + Math.round(100 * t.weight / top) + '%"></i></div>' +
@@ -159,9 +160,11 @@ function drawTaste(){
   const sw = (k, l) => '<label class="edmrow"><span>' + l + '</span><input type="checkbox" class="sw" data-flag="' + k + '"' + (s[k] ? ' checked' : '') + '></label>';
   const days = '<div class="edmrow"><span>Days</span><div class="eddays">' + DAYS.map(([k, l]) => '<button class="' + (s.days.includes(k) ? 'on' : '') + '" data-day="' + k + '">' + l + '</button>').join('') + '</div></div>';
   const rp = T.report || {}, rise = (T.rising || []).map(r => '<span class="edlchip">' + esc(r.word) + '</span>').join('');
+  const lately = (T.lately || []).map(t => '<span class="edlchip">' + esc(t.title) + '</span>').join('');
   const how = rp.shown ? '<div class="edlearn"><span class="edlh2">Last 2 weeks</span>' + [['Shown', rp.shown], ['Opened', rp.opened], ['Read', rp.read], ['👍', rp.up], ['👎', rp.down]]
     .map(([l, n]) => '<span class="edlchip"><b>' + l + '</b> ' + n + '</span>').join('') + '</div>' : '';
   page.innerHTML = how + (learn ? '<div class="edlearn">' + learn + '</div>' : '') + (rise ? '<div class="edlearn"><span class="edlh2">Picking up on</span>' + rise + '</div>' : '') +
+    (lately ? '<div class="edlearn"><span class="edlh2">Lately</span>' + lately + '</div>' : '') +
     '<div class="edtcols"><section class="card"><div class="cardh"><h2>Topics</h2><button class="linkbtn tiny" data-ed="topics">Name them again</button></div>' + topics + '</section>' +
     '<div class="edtside"><section class="card"><h2>Mix</h2>' + sw('on', 'Every morning') + days + mix + sw('kindle', 'Kindle') + sw('ai', 'Chosen by the model') + '</section></div></div>' +
     ((T.pool || []).length ? '<section class="card"><div class="cardh"><h2>Pool</h2><span class="mute tiny">' + T.pool.reduce((n, c) => n + c.feeds, 0) + ' feeds · ' +
