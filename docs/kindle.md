@@ -96,6 +96,10 @@ When you open a book in KOReader, the plugin asks Daf about it. If you read furt
 
 It works the other way in Daf: if the Kindle is further along, Daf's reader offers to go to the Kindle's page.
 
+The audiobook counts too. If I listened to the book after I last turned a page on the Kindle, the Kindle asks "You listened further in the audiobook: 60%, “Chapter Six” (Nov 23, 21:53). Go there?" when I open it, and **Go there** puts me on the page with the sentence the narrator was reading. Daf finds that place by listening to the twenty seconds before where I stopped and looking for those words in the book. That takes a few seconds, so the question can come a little after the book opens. With a prepared audiobook it comes right away. If I listened and also read further in Daf, whichever I did last is the one it offers. **Stay here** is remembered for that spot, the same as before.
+
+And the other way: when I close a book that has an audiobook, or the Kindle goes to sleep in it, the plugin tells Daf the page I'm on, so **Listen from here** on the book's page starts the audiobook where I stopped reading on the Kindle.
+
 ## Highlights, both ways
 
 Highlights you make in Daf's reader are added to the book on the Kindle as KOReader highlights, with their notes, the next time you open it, and the Kindle says "Added 3 highlights you made in Daf". KOReader draws every color gray, so on the Kindle they all look the same. If an edition is different enough that a highlight can't be found, it says so.

@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-23-kindle-audiobook', date: 'Nov 23', title: 'The Kindle follows the audiobook', text: 'Open a book on the Kindle after listening to its audiobook, and it asks “You listened further in the audiobook… Go there?” and puts you on the sentence the narrator was reading. Listen from here on a book’s page starts from the Kindle’s page when you read there last.', go: '#books' },
   { id: '2026-11-17-music-radio', date: 'Nov 17', title: 'Radio, and Music in articles and PDFs', text: 'Music’s menu has Radio: your own stations, a tap to play, Edit to add or remove one. And an article or a PDF has a note button in its bar that opens the Music menu (on a phone, Music in an article’s … menu).', go: '#today' },
   { id: '2026-11-17-music-albums', date: 'Nov 17', title: 'Sort any album into Music', text: 'Albums › All albums in the Music menu opens every album in your music folder. Open one to hear it, then tap the moods and tags it should have: every track on it gets them at once.', go: '#music' },
   { id: '2026-11-17-music', date: 'Nov 17', title: 'Your own music under the book', text: 'The Sound menu has a Music part that plays from your music folder: pick a mood, narrow it with the tags under it, or play an album through. Auto lets the scene you’re reading pick what fits. Today has a Music row too, for reading on the Kindle or on paper. The three dots beside a track change its moods or drop it from reading.', go: '#books' },

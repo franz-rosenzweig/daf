@@ -9,7 +9,8 @@ Daf for KOReader.
     from the last time Daf answered.
 
   * From Daf to the Kindle: when a book opens, if Daf has you further along (read in
-    Daf's book reader since you last read it here), offer to go there; and add the
+    Daf's book reader, or listened to in its audiobook, since you last read it here), offer to
+    go there (the audiobook's place found by its words; askAudio); and add the
     highlights you made in Daf as KOReader highlights, with their notes. Each is added once.
     The book's Sketchbook pages come too, as bookmarks at their chapter's start with the
     typed text as the bookmark's note (pushSketchbook); changed in Daf, changed here.
@@ -27,7 +28,7 @@ Daf for KOReader.
     (documents/ABOUT ME.txt), shown from the menu and at the foot of the sleep screen.
 
 Settings live in settings/daf.lua (url, token, sleep_screen, last_start, cache, home,
-pending_review, paths, show_on_wake, about_on_sleep, about_file).
+pending_review, paths, show_on_wake, about_on_sleep, about_file, declined_pos, declined_audio).
 Nothing here edits settings.reader.lua directly; the screensaver message is set
 through G_reader_settings in memory, which KOReader saves itself.
 ]]
@@ -523,7 +524,15 @@ function Daf:syncFromDaf(manual)
     end
     local added = self:pushHighlights(res.highlights or {})
     local pages = self:pushSketchbook(res.sketchbook or {})
-    local offered = self:offerPosition(md5, res.daf)
+    self.has_audio = res.audio and true or false
+    -- The audiobook first, when it was played after this Kindle's last page and after Daf's place:
+    -- then Daf's place, the way it always was (also when the audiobook's place doesn't come).
+    local offered = false
+    if res.audio then
+        local since = math.max(self:lastReadHere(md5), type(res.daf) == "table" and tonumber(res.daf.updated) or 0) + 60
+        offered = self:askAudio(md5, since, 0, function() return self:offerPosition(md5, res.daf) end)
+    end
+    if not offered then offered = self:offerPosition(md5, res.daf) end
     if manual and added == 0 and pages == 0 and not offered then
         UIManager:show(InfoMessage:new{ text = _("Nothing new from Daf for this book."), timeout = 3 })
     end
@@ -699,6 +708,96 @@ function Daf:offerPosition(md5, daf)
         cancel_callback = function()
             declined[md5] = daf.updated
             self.settings:saveSetting("declined_pos", declined)
+            self.settings:flush()
+        end,
+    })
+    return true
+end
+
+-- The audiobook's place (/api/kindle/audio): Daf finds it in the book by hearing the audiobook there,
+-- which takes a few seconds when the whole audiobook isn't prepared, so a "pending" answer is asked
+-- again every five seconds (eight times at most) while this book stays open. `otherwise` runs when
+-- it was pending and no place came in the end.
+function Daf:askAudio(md5, since, tries, otherwise)
+    local res = request("GET", self.settings:readSetting("url") .. "/api/kindle/audio?md5=" .. md5 .. "&since=" .. math.floor(since),
+        self.settings:readSetting("token"))
+    if type(res) ~= "table" then
+        if tries > 0 and otherwise then otherwise() end
+        return false
+    end
+    if res.offer and self:offerAudio(md5, res.offer) then return true end
+    if res.pending and tries < 8 then
+        local doc = self.ui.document
+        UIManager:scheduleIn(5, function()
+            if self.ui.document ~= doc or not online() then return end
+            pcall(function() self:askAudio(md5, since, tries + 1, otherwise) end)
+        end)
+        return true
+    end
+    if tries > 0 and otherwise then otherwise() end
+    return false
+end
+
+-- The words Daf sent, found in this book: the hit nearest `fraction` (a passage can come twice). When
+-- all ten don't match (a quote mark, a paragraph between them), the first six, then the last six.
+function Daf:locateNear(text, fraction)
+    local doc = self.ui.document
+    local words = {}
+    for w in tostring(text or ""):gmatch("%S+") do table.insert(words, w) end
+    if #words < 4 then return nil end
+    local total = doc:getPageCount() or 1
+    local tries = { table.concat(words, " ", 1, math.min(#words, 10)) }
+    if #words > 6 then
+        table.insert(tries, table.concat(words, " ", 1, 6))
+        table.insert(tries, table.concat(words, " ", #words - 5, #words))
+    end
+    for _i, q in ipairs(tries) do
+        local ok, res = pcall(doc.findAllText, doc, q, true, 0, 20, false)
+        if ok and type(res) == "table" and res[1] then
+            local best, bestd
+            for _j, r in ipairs(res) do
+                local pg = doc:getPageFromXPointer(r.start)
+                local d = math.abs((pg or 1) / total - (fraction or 0))
+                if not bestd or d < bestd then best, bestd = r.start, d end
+            end
+            return best
+        end
+    end
+    return nil
+end
+
+function Daf:offerAudio(md5, o)
+    if type(o) ~= "table" or not o.fraction or not o.last then return false end
+    local declined = self.settings:readSetting("declined_audio") or {}
+    if declined[md5] == o.last then return false end
+    local doc = self.ui.document
+    local page, total = self.view.state.page, doc:getPageCount() or 1
+    local xp = self.ui.rolling and self:locateNear(o.words, o.fraction) or nil
+    local target = xp and doc:getPageFromXPointer(xp) or math.max(1, math.floor(o.fraction * total + 0.5))
+    if page and math.abs(target - page) <= 1 then return false end
+    local chapter = (self.ui.toc and self.ui.toc:getTocTitleByPage(target)) or o.chapter
+    if chapter == "" then chapter = o.chapter end
+    local offset = tonumber(self.settings:readSetting("tz_offset")) or -25200
+    local when = os.date("!%b %d, %H:%M", o.last + offset)
+    local where = string.format("%d%%", math.floor(target / total * 100 + 0.5)) .. (chapter and (", “" .. chapter .. "”") or "")
+    local ConfirmBox = require("ui/widget/confirmbox")
+    UIManager:show(ConfirmBox:new{
+        text = string.format(_("You listened further in the audiobook: %s (%s).\n\nGo there?"), where, when),
+        ok_text = _("Go there"),
+        cancel_text = _("Stay here"),
+        ok_callback = function()
+            if xp then
+                if self.ui.link then pcall(function() self.ui.link:addCurrentLocationToStack() end) end
+                self.ui:handleEvent(Event:new("GotoXPointer", xp, xp))
+            elseif self.ui.rolling then
+                self.ui:handleEvent(Event:new("GotoPercent", o.fraction * 100))
+            else
+                self.ui:handleEvent(Event:new("GotoPage", target))
+            end
+        end,
+        cancel_callback = function()
+            declined[md5] = o.last
+            self.settings:saveSetting("declined_audio", declined)
             self.settings:flush()
         end,
     })
@@ -954,24 +1053,35 @@ function Daf:sendWhere()
     self.where_task = function()
         self.where_task = nil
         if not self.ui.document or not online() then return end
-        pcall(function()
-            local md5 = self:docMd5()
-            if not md5 or not md5:match("^%x+$") then return end
-            local doc, text = self.ui.document, nil
-            local page, total = doc:getCurrentPage(), doc:getPageCount() or 1
-            if self.ui.rolling and page < total then
-                local a, b = doc:getPageXPointer(page), doc:getPageXPointer(page + 1)
-                if a and b then text = doc:getTextFromXPointers(a, b) end
-            end
-            if text then text = text:sub(1, 600):gsub("[\192-\255][\128-\191]*$", "") end
-            request("POST", self.settings:readSetting("url") .. "/api/kindle/where", self.settings:readSetting("token"),
-                { md5 = md5, text = text, fraction = page / math.max(1, total) })
-        end)
+        pcall(function() self:postWhere() end)
     end
     UIManager:scheduleIn(3, self.where_task)
 end
 
+-- The page this book is on, to Daf: for Sound, and in a book with an audiobook for Listen from here
+-- (closing the book or the Kindle sleeping in it sends it, Sound on or not).
+function Daf:postWhere()
+    local md5 = self:docMd5()
+    if not md5 or not md5:match("^%x+$") then return end
+    local doc, text = self.ui.document, nil
+    local page, total = doc:getCurrentPage(), doc:getPageCount() or 1
+    if self.ui.rolling and page < total then
+        local a, b = doc:getPageXPointer(page), doc:getPageXPointer(page + 1)
+        if a and b then text = doc:getTextFromXPointers(a, b) end
+    end
+    if text then text = text:sub(1, 600):gsub("[\192-\255][\128-\191]*$", "") end
+    request("POST", self.settings:readSetting("url") .. "/api/kindle/where", self.settings:readSetting("token"),
+        { md5 = md5, text = text, fraction = page / math.max(1, total) })
+end
+
+function Daf:sendPageForAudio()
+    if not self.has_audio or not self.ui.document or not self:configured() or not online() then return end
+    if self.where_task then UIManager:unschedule(self.where_task); self.where_task = nil end
+    pcall(function() self:postWhere() end)
+end
+
 function Daf:onSuspend()
+    self:sendPageForAudio()
     flushStatistics()
     self:refreshSleepMessage(true)
     if online() then pcall(function() self:flushReview(); self:send(true, true) end) end
@@ -1038,6 +1148,7 @@ function Daf:morningFetch()
 end
 
 function Daf:onCloseDocument()
+    self:sendPageForAudio()
     if online() then pcall(function() self:send(true) end) end
     self:refreshSleepMessage(true)
 end
