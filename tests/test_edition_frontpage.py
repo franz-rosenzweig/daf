@@ -98,6 +98,12 @@ class Pictures(unittest.TestCase):
                 sys.modules["cv2"] = saved
             frontpage._faces.cache_clear()
 
+    def test_a_photograph_without_a_face(self):
+        if frontpage._faces() is None:
+            self.skipTest("no OpenCV")
+        self.assertFalse(frontpage.big_face(photo()))
+        self.assertFalse(frontpage.big_face(b"not an image"))
+
     def test_no_opencv_no_check(self):
         if frontpage._faces() is not None:
             self.skipTest("OpenCV is installed")
