@@ -10,7 +10,7 @@ import re
 import time
 from datetime import datetime, timezone
 
-from . import config
+from . import config, edition_audio
 
 
 def _ts(s):
@@ -74,6 +74,9 @@ def actions_upload(conn, actions):
              a.get("total"), _ts(a.get("timestamp") or now), a.get("device"), a.get("guid"), now))
         if str(a.get("action", "")).lower() == "play":
             started, pos = int(a.get("started") or 0), int(a.get("position") or 0)
+            if edition_audio.is_ours(a["episode"]):       # the Edition read aloud: name it, and mark the pieces heard
+                edition_audio.remember(conn, a["episode"])
+                edition_audio.heard(conn, a["episode"], started, pos, _ts(a.get("timestamp") or now))
             secs = pos - started
             if 0 < secs < 4 * 3600:
                 ep = conn.execute("SELECT title, podcast_title FROM gp_episodes WHERE url = ?", (a["episode"],)).fetchone()

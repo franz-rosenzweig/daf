@@ -499,8 +499,11 @@ def _download(url, folder, head=None):
 
 
 def transcribe(audio):
-    """The job (media.py's "podtr"): the show's own transcript if the feed links one, else whisper."""
-    from . import media
+    """The job (media.py's "podtr"): the show's own transcript if the feed links one, else whisper. The
+    Edition's own episodes have theirs already (edition_audio.store_transcript)."""
+    from . import edition_audio, media
+    if edition_audio.is_ours(audio):
+        return edition_audio.store_transcript(audio)
     with db.session() as conn:
         d = conn.execute("SELECT * FROM docs WHERE kind = 'podcast' AND enclosure = ? LIMIT 1", (audio,)).fetchone()
         m = ensure_meta(conn, audio, dict(d) if d else None) or {}

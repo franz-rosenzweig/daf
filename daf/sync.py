@@ -271,9 +271,11 @@ def _quiet(f):
 def extras():
     """After each sync, outside its transaction: the morning email when it's time, feedback that
     couldn't reach GitHub, and an import a restart interrupted."""
-    from . import digest, edition, feedback, imports
+    from . import digest, edition, edition_audio, feedback, imports
     # the Edition asks the model, which can take a few minutes: never on the sync's own thread
     threading.Thread(target=_quiet(edition.maybe_build), name="edition", daemon=True).start()
+    # and reading it aloud takes ten or fifteen: its own thread, which waits for the edition to be there
+    threading.Thread(target=_quiet(edition_audio.maybe_make), name="edition-audio", daemon=True).start()
     for f in (digest.maybe_send, feedback.retry, imports.resume):
         try:
             f()

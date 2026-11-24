@@ -730,6 +730,36 @@ def post_edition_kindle(body=Depends(json_body)):
         raise HTTPException(400, str(e))
 
 
+def listen_device(token: str, c=Depends(conn)):
+    """The Edition's podcast feed and its files (edition_audio.py): the token in the address is the
+    "listen" device's, so a podcast app needs no sign-in. Any other address simply isn't there."""
+    from . import edition_audio
+    if auth.check_device(c, token) != edition_audio.DEVICE:
+        raise HTTPException(404, "Not here")
+    return token
+
+
+NO_STORE = {"Cache-Control": "private, no-store"}      # one listener's episodes: never kept by the tunnel's cache
+
+
+@app.api_route("/api/edition/listen/{token}/feed.xml", methods=["GET", "HEAD"])
+def get_listen_feed(token=Depends(listen_device)):
+    from . import edition_audio
+    return Response(edition_audio.feed(token), media_type="application/rss+xml; charset=utf-8", headers=NO_STORE)
+
+
+@app.api_route("/api/edition/listen/{token}/{name}", methods=["GET", "HEAD"])
+def get_listen_file(name: str, token=Depends(listen_device)):
+    """An episode (<key>.mp3), its chapters (<key>.chapters.json) or its transcript (<key>.transcript.json)."""
+    from . import edition_audio
+    kind, x = edition_audio.file_for(name)
+    if kind == "mp3":
+        return FileResponse(x, media_type="audio/mpeg", headers=NO_STORE)
+    if kind == "json":
+        return JSONResponse(x, headers=NO_STORE)
+    raise HTTPException(404, "Not here")
+
+
 @app.post("/api/edition/vote", dependencies=[Depends(user)])
 async def post_edition_vote(request: Request, c=Depends(conn)):
     from . import edition

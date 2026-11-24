@@ -389,6 +389,12 @@ def cmd_podcasts_import(a):
     print(f"From Nextcloud: {r['subs']} subscriptions, {r['removed']} unsubscribed, {r['actions']} episodes' listening.")
 
 
+def cmd_listen_feed(a):
+    from . import edition_audio
+    with db.session() as conn:
+        print(edition_audio.feed_url(edition_audio.feed_token(conn)))
+
+
 def cmd_edition(a):
     from datetime import date
     from . import edition
@@ -409,6 +415,13 @@ def cmd_edition(a):
         return
     if a.kindle:
         print(edition.send_kindle(day))
+        return
+    if a.audio:
+        from . import edition_audio
+        m = edition_audio.make(day, use_ai=False if a.no_ai else None, minutes=a.minutes)
+        print(f"{m['key']}.mp3: {m['seconds'] / 60:.1f} min ({m['how']}), read in {m['took']} s")
+        for c in m["chapters"]:
+            print(f"  {int(c['start']) // 60:>2}:{int(c['start']) % 60:02d}  {c['title']}")
         return
     if a.topics:
         for t in edition.seed_topics():
@@ -518,7 +531,9 @@ def main(argv=None):
     x.add_argument("--date"); x.add_argument("--build", action="store_true", help="make (or remake) it now")
     x.add_argument("--dry-run", action="store_true", help="choose without saving, and show the shortlist with --json")
     x.add_argument("--no-ai", action="store_true", help="the rules alone, no model"); x.add_argument("--kindle", action="store_true", help="send it to the Kindle")
+    x.add_argument("--audio", action="store_true", help="read it aloud now, for the podcast feed"); x.add_argument("--minutes", type=int, help="with --audio: about how long")
     x.add_argument("--taste", action="store_true", help="what Daf thinks you like"); x.add_argument("--topics", action="store_true", help="have the model name your topics (again)"); x.add_argument("--json", action="store_true"); x.set_defaults(f=cmd_edition)
+    x = sub.add_parser("listen-feed", help="a new address for the Edition's podcast feed (the old one stops working)"); x.set_defaults(f=cmd_listen_feed)
     x = sub.add_parser("feeds-list", help="the feeds the Feed follows"); x.add_argument("--json", action="store_true"); x.set_defaults(f=cmd_feeds_list)
     x = sub.add_parser("feeds-add", help="follow a feed, or move one to a folder"); x.add_argument("url"); x.add_argument("--folder", default=""); x.add_argument("--title")
     x.add_argument("--full", action="store_true", help="always load the whole article")
