@@ -103,18 +103,24 @@ def day_facts(conn, day, ed):
             "parasha": ed.get("parasha") or ""}
 
 
-def budgets(ps, minutes):
+def words_for(minutes, hosts=None):
+    """How many words fill that many minutes, at the voices' own speed (a host at 1.2 gets through a fifth more)."""
+    speeds = [float(h.get("speed") or 1.0) for h in hosts or []] or [1.0]
+    return round(minutes * WPM * sum(speeds) / len(speeds))
+
+
+def budgets(ps, minutes, hosts=None):
     """Words for each piece: the time left after the opening and the end, shared by how long each is to
     read (by its square root, so a long read gets more but doesn't swallow the rest), the lead a bit more.
     The model was a third over when it had only the total to go by."""
-    left = max(60 * len(ps), minutes * WPM - sum(FRAME))
+    left = max(60 * len(ps), words_for(minutes, hosts) - sum(FRAME))
     w = [max(1.0, min(25.0, float(p.get("minutes") or 4))) ** 0.5 * (1.3 if p["section"] == "Lead" else 1.0) for p in ps]
     return [max(60, round(left * x / sum(w) / 10) * 10) for x in w]
 
 
 def prompt(ps, facts, minutes, hosts=None):
-    words = minutes * WPM
-    each = budgets(ps, minutes)
+    words = words_for(minutes, hosts)
+    each = budgets(ps, minutes, hosts)
     names = [h["name"] for h in hosts or []] if hosts and len(hosts) >= 2 else []
     day = (facts["date"] + (f", {facts['hebrew']}" if facts["hebrew"] else "")
            + (f"; this week's parasha is {facts['parasha']}" if facts["parasha"] else ""))
@@ -138,8 +144,9 @@ def prompt(ps, facts, minutes, hosts=None):
             "or the writer when the text names one), and between them they tell it: what happened or what the writer argues, the best "
             "detail or two, and why it matters.\n"
             "- The facts come only from the text: no facts, numbers, names or quotes it doesn't have, and when the text is unclear, "
-            "leave that part out rather than guess. The hosts may react, wonder, joke and disagree, but that is their own take, so "
-            "it should sound like one (\"I'd want to know who paid for that\", \"that seems like a stretch\"), never like a fact.\n"
+            "leave that part out rather than guess. The hosts may react, wonder, joke and disagree, but that is their own take, and "
+            "it should sound like a take, never like a fact. When a piece doesn't say something, they simply don't go there: they "
+            "talk about the article, the writer or the study as readers would, and never mention a text, a script or these notes.\n"
             "- A natural line to move to the next piece. No \"welcome back\", no \"stay tuned\", no slogans, no sponsors.\n"
             "- Pieces marked \"Second look\" ran in an earlier edition and weren't opened; say so in a few words before the first of them.\n"
             "- End with each host naming the one piece they'd read in full, and a quick goodbye.\n\n"
