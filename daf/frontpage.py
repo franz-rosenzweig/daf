@@ -205,66 +205,13 @@ def wide(data, width=1200, ratio=0.5):
     return out.getvalue()
 
 
-FACE_SHARE = 0.02                             # a face over this share of a picture makes it a portrait
-
-
-@lru_cache(maxsize=1)
-def _faces():
-    """OpenCV's frontal-face detector, or None where it isn't there: OpenCV is optional, and OpenCV 5
-    dropped the cascades (requirements.txt keeps it below 5). Never raises, so the check can't cost
-    the Kindle its copy."""
-    try:
-        import cv2
-        c = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-        return None if c.empty() else c
-    except Exception:  # noqa: BLE001 - no OpenCV, or one without the cascades
-        log.info("front page: no face detector, so no face check", exc_info=True)
-        return None
-
-
-def big_face(data):
-    """Whether a picture is mostly someone's face (one covering more than FACE_SHARE of it), the kind a
-    front page does better without: someone glaring or aiming at the reader first thing in the morning.
-    OpenCV's frontal-face cascade, asked for four confirmations (six missed a tilted face), and the face
-    has to be found in the mirror image too, which faces are and stray textures mostly aren't. Tried on
-    50 pictures from three editions: all five portraits caught, two drawings wrongly (the next picture
-    is used then). Always False without OpenCV."""
-    det = _faces()
-    if det is None:
-        return False
-    try:
-        from PIL import Image
-        import numpy as np
-        im = Image.open(io.BytesIO(data))
-        im.load()
-        g = np.array(im.convert("L"))
-        h, w = g.shape[:2]
-
-        def found(img):
-            got = det.detectMultiScale(img, scaleFactor=1.1, minNeighbors=4, minSize=(max(24, w // 14), max(24, h // 14)))
-            return [tuple(int(v) for v in f) for f in got if f[2] * f[3] / float(w * h) > FACE_SHARE]
-        here = found(g)
-        if not here:
-            return False
-        for mx, my, mw, mh in found(np.ascontiguousarray(g[:, ::-1])):
-            x2 = w - mx - mw                  # where the mirror's face sits in the picture itself
-            for x, y, fw, fh in here:
-                ix = max(0, min(x + fw, x2 + mw) - max(x, x2))
-                iy = max(0, min(y + fh, my + mh) - max(y, my))
-                if ix * iy > 0.4 * fw * fh:
-                    return True
-        return False
-    except Exception:  # noqa: BLE001 - a picture the detector can't read isn't a face
-        return False
-
-
 def pick_picture(items, candidates):
-    """(item id, image bytes, where it came from) of the first photograph in the paper's order that isn't
-    mostly a face, or None (the page goes without one rather than lead with a portrait).
+    """(item id, image bytes, where it came from) of the first photograph in the paper's order, or None
+    (the page goes without one).
     candidates: {item id: [(key, bytes), …]} with the piece's own pictures, best first."""
     for it in items:
         for key, data in candidates.get(it["id"], []):
-            if data and photo_score(data) >= PHOTO and not big_face(data):
+            if data and photo_score(data) >= PHOTO:
                 return it["id"], data, key
     return None
 
