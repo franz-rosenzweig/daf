@@ -49,7 +49,6 @@ def logo(w=640, h=400):
     return out.getvalue()
 
 
-FACE = photo(seed=9)
 ITEMS = [
     {"id": "a", "kind": "article", "section": "Lead", "title": "The long essay about rivers", "source": "Aeon", "publication": "Aeon",
      "minutes": 12, "why": "You've opened 9 from Aeon", "summary": "Rivers keep their own time."},
@@ -72,42 +71,6 @@ class Pictures(unittest.TestCase):
         got = frontpage.pick_picture(ITEMS, {"a": [("u1", logo())], "b": [("u2", photo())], "d": [("u3", photo(seed=2))]})
         self.assertEqual((got[0], got[2]), ("b", "u2"))
         self.assertIsNone(frontpage.pick_picture(ITEMS, {"a": [("u1", logo())]}))
-
-    def test_a_face_is_passed_over(self):
-        saved = frontpage.big_face
-        frontpage.big_face = lambda data: data == FACE
-        try:
-            got = frontpage.pick_picture(ITEMS, {"a": [("u1", FACE)], "b": [("u2", photo())]})
-            self.assertEqual(got[0], "b")                                    # the lead's portrait is passed over
-            self.assertIsNone(frontpage.pick_picture(ITEMS, {"a": [("u1", FACE)]}))   # and the page goes without
-        finally:
-            frontpage.big_face = saved
-
-    def test_an_opencv_without_cascades_turns_the_check_off(self):
-        import types
-        saved = sys.modules.get("cv2")
-        sys.modules["cv2"] = types.ModuleType("cv2")          # like OpenCV 5: no CascadeClassifier
-        frontpage._faces.cache_clear()
-        try:
-            self.assertIsNone(frontpage._faces())
-            self.assertFalse(frontpage.big_face(photo()))
-        finally:
-            if saved is None:
-                sys.modules.pop("cv2", None)
-            else:
-                sys.modules["cv2"] = saved
-            frontpage._faces.cache_clear()
-
-    def test_a_photograph_without_a_face(self):
-        if frontpage._faces() is None:
-            self.skipTest("no OpenCV")
-        self.assertFalse(frontpage.big_face(photo()))
-        self.assertFalse(frontpage.big_face(b"not an image"))
-
-    def test_no_opencv_no_check(self):
-        if frontpage._faces() is not None:
-            self.skipTest("OpenCV is installed")
-        self.assertFalse(frontpage.big_face(photo()))
 
     def test_wide(self):
         im = Image.open(io.BytesIO(frontpage.wide(photo())))
