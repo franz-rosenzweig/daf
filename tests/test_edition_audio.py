@@ -128,6 +128,24 @@ class Voice(Folder):
         self.assertEqual(lines[1][0], round(1 + g["para"], 2))
         self.assertAlmostEqual(len(pcm) / 2 / EA.RATE, 1 + g["para"] + 2 + g["part"] + 3, places=3)
 
+    def test_kokoro_restarting_midway_is_waited_for(self):
+        calls = []
+
+        def flaky(text, v, s):
+            calls.append(text)
+            if len(calls) == 1:
+                raise ConnectionResetError("Remote end closed connection without response")
+            return b"\x01\x00" * EA.RATE
+        orig = EA._kokoro_pcm, EA._wait_for_kokoro
+        EA._kokoro_pcm, EA._wait_for_kokoro = flaky, lambda: calls.append("waited")
+        try:
+            self.assertEqual(len(EA.speak("Hello.", "v", 1.0)), 2 * EA.RATE)
+            self.assertEqual(calls, ["Hello.", "waited", "Hello."])
+            EA.speak("Hello.", "v", 1.0)                       # kept: not asked again
+            self.assertEqual(len(calls), 3)
+        finally:
+            EA._kokoro_pcm, EA._wait_for_kokoro = orig
+
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "needs ffmpeg")
     def test_the_mp3_has_its_chapters(self):
         out = EA.DIR / "t.mp3"
@@ -154,6 +172,12 @@ class Feed(Folder):
         self.assertTrue(items[0].find("podcast:chapters", ns).attrib["url"].endswith("/tok123/2026-03-18-1773820800.chapters.json"))
         self.assertEqual(items[0].find("itunes:duration", ns).text, "300")
         self.assertIn("1. The harbour at night (The Harbour Review)", items[0].find("description").text)
+
+    def test_a_script_waiting_to_be_read_isnt_an_episode(self):
+        self.episode()
+        (EA.DIR / "2026-03-18-1773899999.script.json").write_text(json.dumps({"parts": [], "how": "model", "minutes": 20}))
+        self.assertEqual([m["key"] for m in EA.episodes()], ["2026-03-18-1773820800"])
+        self.assertEqual(EA.get(date(2026, 3, 18))["key"], "2026-03-18-1773820800")
 
     def test_an_episode_without_its_sound_isnt_listed(self):
         self.episode()

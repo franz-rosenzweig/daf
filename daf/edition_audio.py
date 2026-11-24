@@ -23,6 +23,7 @@ import re
 import subprocess
 import threading
 import time
+import urllib.error
 import urllib.request
 from datetime import date, datetime, timezone
 from email.utils import format_datetime
@@ -42,6 +43,7 @@ GAP = {"para": 0.45, "part": 1.6}       # seconds of quiet between paragraphs, a
 DEVICE = "listen"
 PATH = "/api/edition/listen/"
 NAME = "Daf Edition"
+EPISODE = re.compile(r"\d{4}-\d{2}-\d{2}-\d+\.json")     # an episode's facts (not its script waiting to be read)
 MARK = re.compile(r"^\s*={2,}\s*(intro|end|\d{1,2})\b[^\n=]*={2,}\s*$", re.M | re.I)
 _making = threading.Lock()
 
@@ -216,23 +218,54 @@ def script(conn, ed, day, minutes, use_ai=True):
 
 # ---- the voice ------------------------------------------------------------------------------------
 
-def speak(text, voice, speed):
-    """Kokoro's PCM for one paragraph, kept by text and voice so a second try picks up where it stopped."""
-    from . import reader
+def speak(text, voice, speed, tries=4):
+    """Kokoro's PCM for one paragraph, kept by text and voice so a second try picks up where it stopped.
+    Kokoro's memory only grows, so its container is capped and restarts itself when it reaches the cap,
+    which a long read can do: then this waits for it to come back and asks again."""
     PARTS.mkdir(parents=True, exist_ok=True)
     path = PARTS / (hashlib.sha1(f"{voice}|{speed}|{text}".encode()).hexdigest() + ".pcm")
     if not path.exists():
-        body = json.dumps({"model": "kokoro", "input": text[:4000], "voice": voice, "response_format": "pcm",
-                           "speed": speed, "stream": False}).encode()
-        req = urllib.request.Request(reader._kokoro() + "/v1/audio/speech", data=body, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=300) as r:
-            data = r.read()
+        for n in range(tries):
+            try:
+                data = _kokoro_pcm(text, voice, speed)
+                break
+            except OSError as ex:            # refused, dropped, timed out, or a 5xx while it starts
+                if n == tries - 1 or (isinstance(ex, urllib.error.HTTPError) and ex.code < 500):
+                    raise
+                log.info("edition audio: Kokoro went away (%s); waiting for it", str(ex)[:80])
+                _wait_for_kokoro()
         if len(data) < RATE // 10:
             raise RuntimeError("Kokoro sent no sound")
         tmp = path.with_suffix(".tmp")
         tmp.write_bytes(data)
         tmp.replace(path)
     return path.read_bytes()
+
+
+def _kokoro_pcm(text, voice, speed):
+    from . import reader
+    body = json.dumps({"model": "kokoro", "input": text[:4000], "voice": voice, "response_format": "pcm",
+                       "speed": speed, "stream": False}).encode()
+    try:
+        base = reader._kokoro()
+    except RuntimeError as ex:               # not running at all (between a stop and its restart)
+        raise ConnectionError(str(ex)) from ex
+    req = urllib.request.Request(base + "/v1/audio/speech", data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        return r.read()
+
+
+def _wait_for_kokoro(most=180):
+    from . import reader
+    end = time.time() + most
+    time.sleep(5)
+    while time.time() < end:
+        try:
+            with urllib.request.urlopen(reader._kokoro() + "/v1/audio/voices", timeout=10) as r:
+                r.read()
+            return
+        except Exception:  # noqa: BLE001 - still starting
+            time.sleep(5)
 
 
 def _quiet(sec):
@@ -294,7 +327,7 @@ def key_of(ed):
 def get(day):
     """The episode's facts for a day (the newest, if the edition was made again), or None."""
     day = day.isoformat() if isinstance(day, date) else day
-    found = sorted(DIR.glob(f"{day}-*.json")) if DIR.exists() else []
+    found = sorted(p for p in DIR.glob(f"{day}-*.json") if EPISODE.fullmatch(p.name)) if DIR.exists() else []
     for p in reversed(found):
         try:
             m = json.loads(p.read_text())
@@ -316,7 +349,16 @@ def make(day=None, use_ai=None, minutes=None):
         ed = edition.get(conn, day)
         if not ed or not ed["items"]:
             raise ValueError("No edition for that day")
-        parts, how = script(conn, ed, day, minutes, use_ai=edition.settings(s)["ai"] if use_ai is None else use_ai)
+        DIR.mkdir(parents=True, exist_ok=True)
+        kept = DIR / f"{key_of(ed)}.script.json"      # a second try reads the same script, so the voice's parts are still good
+        try:
+            got = json.loads(kept.read_text())
+            if got.get("minutes") != minutes:
+                raise ValueError("another length")
+            parts, how = got["parts"], got["how"]
+        except (OSError, ValueError, KeyError):
+            parts, how = script(conn, ed, day, minutes, use_ai=edition.settings(s)["ai"] if use_ai is None else use_ai)
+            kept.write_text(json.dumps({"parts": parts, "how": how, "minutes": minutes}, ensure_ascii=False))
         ps = pieces(conn, ed)
     t0 = time.time()
     pcm, times, lines = voice(parts, a["voice"], a["speed"])
@@ -333,7 +375,6 @@ def make(day=None, use_ai=None, minutes=None):
         p = ps[int(part["key"]) - 1]
         chapters.append({"start": start, "end": end, "title": p["title"], "id": p["id"], "publication": p["publication"],
                          "url": f"{base}/#read/{p['id']}", "heard": [start, end]})
-    DIR.mkdir(parents=True, exist_ok=True)
     key = key_of(ed)
     title = f"{day.strftime('%A')}, {day.day} {day.strftime('%B')}"
     encode(pcm, DIR / f"{key}.mp3", title, chapters)
@@ -344,6 +385,7 @@ def make(day=None, use_ai=None, minutes=None):
     tmp = DIR / f"{key}.json.tmp"
     tmp.write_text(json.dumps(meta, ensure_ascii=False))
     tmp.replace(DIR / f"{key}.json")
+    (DIR / f"{key}.script.json").unlink(missing_ok=True)       # it's in the episode's facts now
     for old in DIR.glob(f"{ed['day']}-*"):           # an edition made again replaces its episode
         if not old.name.startswith(key + "."):
             old.unlink(missing_ok=True)
@@ -419,7 +461,7 @@ def feed_url(token, s=None):
 
 def episodes():
     out = []
-    for p in sorted(DIR.glob("????-??-??-*.json"), reverse=True) if DIR.exists() else []:
+    for p in sorted((p for p in DIR.glob("????-??-??-*.json") if EPISODE.fullmatch(p.name)), reverse=True) if DIR.exists() else []:
         try:
             m = json.loads(p.read_text())
         except ValueError:
