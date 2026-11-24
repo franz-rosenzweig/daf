@@ -100,7 +100,8 @@ def library(force=False, max_age=60):
         _, accts = _conf()
         series = {s["id"]: {"id": s["id"], "name": display(s["metadata"].get("title") or s["name"]), "folder": s["name"],
                             "count": s["booksCount"], "direction": s["metadata"].get("readingDirection") or "",
-                            "status": s["metadata"].get("status"), "summary": s["metadata"].get("summary") or ""}
+                            "status": s["metadata"].get("status"), "summary": s["metadata"].get("summary") or "",
+                            "genres": list(s["metadata"].get("genres") or []), "tags": list(s["metadata"].get("tags") or [])}
                   for s in _all("/api/v1/series")}
         books = {}
         for who in [WRITER] + [a for a in accts if a != WRITER]:

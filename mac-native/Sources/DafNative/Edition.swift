@@ -321,7 +321,8 @@ struct TasteView: View {
     ]
     private static let days = [("sun", "Sun"), ("mon", "Mon"), ("tue", "Tue"), ("wed", "Wed"), ("thu", "Thu"), ("fri", "Fri"), ("sat", "Sat")]
     private static let learned = [("watched", "Watched"), ("opened", "Opened"), ("played", "Played"), ("highlighted", "Highlighted"),
-                                  ("saved", "Saved"), ("up", "Thumbs up"), ("down", "Thumbs down")]
+                                  ("saved", "Saved"), ("up", "Thumbs up"), ("down", "Thumbs down"), ("book", "Books"),
+                                  ("audiobook", "Audiobooks"), ("manga", "Manga"), ("screen", "Films and shows"), ("requested", "Requested")]
 
     var body: some View {
         ScrollView {
@@ -356,6 +357,8 @@ struct TasteView: View {
         if !learn.isEmpty { chipRow(nil, learn) }
         let rising = t.a("rising").compactMap { $0.s("word") }
         if !rising.isEmpty { chipRow("Picking up on", rising.map { ($0, nil) }) }
+        let lately = t.a("lately").compactMap { $0.s("title") }
+        if !lately.isEmpty { chipRow("Lately", lately.map { ($0, nil) }) }
     }
 
     private func chipRow(_ head: String?, _ list: [(String, Int?)]) -> some View {
