@@ -70,8 +70,16 @@ class Script(unittest.TestCase):
     def test_prompt_has_every_piece_the_day_and_the_length(self):
         p = EA.prompt(PS, FACTS, 20)
         for x in ("The harbour at night", "Moss on Mars?", "An old map", "Missed on Tuesday", "Wednesday, 18 March",
-                  "28 Adar", "Vayakhel", "about 3400 words", "=== intro ===", "=== end ==="):
+                  "28 Adar", "Vayakhel", "about 3100 words", "no more than 3410", "=== intro ===", "=== end ==="):
             self.assertIn(x, p)
+
+    def test_each_piece_gets_its_share_and_the_lead_the_most(self):
+        b = EA.budgets(PS, 20)
+        self.assertEqual(len(b), 3)
+        self.assertEqual(max(b), b[0])
+        self.assertAlmostEqual(sum(b), 20 * EA.WPM - sum(EA.FRAME), delta=30)
+        self.assertIn(f"Length: about {b[1]} words", EA.prompt(PS, FACTS, 20))
+        self.assertTrue(all(x >= 60 for x in EA.budgets(PS * 10, 5)))      # never nothing, however short
 
     def test_parse_keeps_the_papers_order_and_fills_a_missing_piece(self):
         out = ("=== intro ===\nWednesday. Three pieces.\n\nA harbour, moss, a map.\n"

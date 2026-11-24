@@ -36,7 +36,8 @@ log = logging.getLogger("daf.edition_audio")
 DIR = config.STATE / "edition-audio"
 PARTS = DIR / "parts"
 KEEP_DAYS = 14
-WPM = 170                  # Kokoro's words a minute at speed 1 (measured: 74 words in 25 seconds)
+WPM = 155                  # Kokoro's words a minute at speed 1 with the pauses (measured: 4,460 words in 28.5 minutes)
+FRAME = (150, 50)          # words for the opening (the day and the headlines) and for the end
 PIECE_WORDS = 1800         # of each piece's text, for the model
 RATE = 24000               # Kokoro's PCM: 16-bit, mono
 GAP = {"para": 0.45, "part": 1.6}       # seconds of quiet between paragraphs, and between pieces
@@ -101,13 +102,24 @@ def day_facts(conn, day, ed):
             "parasha": ed.get("parasha") or ""}
 
 
+def budgets(ps, minutes):
+    """Words for each piece: the time left after the opening and the end, shared by how long each is to
+    read (by its square root, so a long read gets more but doesn't swallow the rest), the lead a bit more.
+    The model was a third over when it had only the total to go by."""
+    left = max(60 * len(ps), minutes * WPM - sum(FRAME))
+    w = [max(1.0, min(25.0, float(p.get("minutes") or 4))) ** 0.5 * (1.3 if p["section"] == "Lead" else 1.0) for p in ps]
+    return [max(60, round(left * x / sum(w) / 10) * 10) for x in w]
+
+
 def prompt(ps, facts, minutes):
     words = minutes * WPM
+    each = budgets(ps, minutes)
     head = (
         "Write today's Edition as a script for one voice to read aloud: a short morning programme made for one listener, "
         "who will hear it through earphones on a walk or a bike ride and hasn't read any of it.\n\n"
-        f"It should take about {minutes} minutes to read aloud, so about {words} words in all. Give each piece its share by how much "
-        "there is to it; the lead may have more, a short news item less.\n\n"
+        f"It should take about {minutes} minutes to read aloud: about {words} words in all, and no more than {round(words * 1.1)}. "
+        "Each piece below has its length in words; keep to it, since the listener's walk is only so long. Choose what matters "
+        "most rather than squeezing everything in.\n\n"
         "How it goes:\n"
         f"- Begin with the day ({facts['date']}"
         + (f", {facts['hebrew']}" if facts["hebrew"] else "")
@@ -137,8 +149,8 @@ def prompt(ps, facts, minutes):
         + "=== end ===\n(the closing lines)\n\n"
         "The pieces:\n")
     body = []
-    for p in ps:
-        body.append(f"--- {p['n']} ---\nSection: {p['section']}\nFrom: {p['publication']}\nTitle: {p['title']}\n"
+    for p, n in zip(ps, each):
+        body.append(f"--- {p['n']} ---\nSection: {p['section']}\nFrom: {p['publication']}\nTitle: {p['title']}\nLength: about {n} words\n"
                     + (f"First ran: {p['callback']}\n" if p.get("callback") else "")
                     + f"Text:\n{p['text']}\n")
     return head + "\n".join(body)
