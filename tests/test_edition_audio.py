@@ -80,6 +80,10 @@ class Script(unittest.TestCase):
         self.assertAlmostEqual(sum(b), 20 * EA.WPM - sum(EA.FRAME), delta=30)
         self.assertIn(f"Length: about {b[1]} words", EA.prompt(PS, FACTS, 20))
         self.assertTrue(all(x >= 60 for x in EA.budgets(PS * 10, 5)))      # never nothing, however short
+        fast = [{"name": "A", "voice": "x_a", "speed": 1.2}, {"name": "B", "voice": "x_b", "speed": 1.2}]
+        self.assertEqual(EA.words_for(20, fast), round(20 * EA.WPM * 1.2))         # faster voices need more words for the same minutes
+        self.assertGreater(sum(EA.budgets(PS, 20, fast)), sum(EA.budgets(PS, 20)))
+        self.assertIn(f"about {EA.words_for(20, fast)} words", EA.prompt(PS, FACTS, 20, fast))
 
     def test_parse_keeps_the_papers_order_and_fills_a_missing_piece(self):
         out = ("=== intro ===\nWednesday. Three pieces.\n\nA harbour, moss, a map.\n"
@@ -108,6 +112,7 @@ class Script(unittest.TestCase):
         for x in ("between the hosts of a morning podcast, Ada and Ben", "Ada has read everything", "(Ada: ...)",
                   "no stage directions", "Wednesday, 18 March", "Length: about", "=== intro ==="):
             self.assertIn(x, p)
+        self.assertIn("never mention a text", p)
         self.assertIn("script for one voice", EA.prompt(PS, FACTS, 20, [{"name": "", "voice": "x", "speed": 1}]))
 
     def test_parse_refuses_something_that_isnt_a_script(self):
