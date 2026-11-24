@@ -316,7 +316,7 @@ struct TasteView: View {
 
     private static let mix: [(String, String, Int, Int, Int, String)] = [
         ("pieces", "Pieces", 3, 20, 1, ""), ("videos", "Videos", 0, 6, 1, "up to "), ("podcasts", "Podcasts", 0, 6, 1, "up to "),
-        ("torah", "Torah", 0, 4, 1, "at least "), ("wildcard", "Wildcard", 0, 3, 1, ""), ("longest", "Longest piece", 5, 120, 5, " min"),
+        ("torah", "Torah", 0, 4, 1, "at least "), ("wildcard", "Wildcard", 0, 3, 1, ""), ("callback", "Second look", 0, 3, 1, "up to "), ("longest", "Longest piece", 5, 120, 5, " min"),
         ("halflife", "Habits fade over", 7, 180, 7, " days"), ("hour", "Ready by", 3, 11, 1, ":00"),
     ]
     private static let days = [("sun", "Sun"), ("mon", "Mon"), ("tue", "Tue"), ("wed", "Wed"), ("thu", "Thu"), ("fri", "Fri"), ("sat", "Sat")]

@@ -45,6 +45,7 @@ DEFAULTS = {
     "podcasts": 0,          # at most
     "torah": 1,             # at least, when there is one
     "wildcard": 1,          # from outside your usual
+    "callback": 2,          # at most: a second look at pieces earlier editions showed you that you never opened
     "longest": 45,          # minutes; nothing longer
     "halflife": 30,         # days for a habit to count half as much
     "days": ["sun", "mon", "tue", "wed", "thu", "fri"],
@@ -69,6 +70,8 @@ WATCHES_PER_DAY = 7         # Invidious keeps the order you watched in, not the 
 BOOST, FLOOR = 2.0, 0.7     # a source's multiplier: the one you return to most at BOOST, one you never touched at FLOOR
 RISING = {"recent": 14, "baseline": 90, "min_recent": 3, "min_lift": 3.0}   # days, and the floors a rising word must clear
 PER_SOURCE = 2              # in one edition
+CALLBACK = "Second look"    # the section of the pieces an earlier edition showed you that you never opened
+CALLBACK_DAYS = (2, 30)     # from editions at least this many days old and at most this many
 MIN_WORDS = 150             # an article must have at least this much real text (a teaser, a paid post's lead-in, a link: out)
 WHOLE = 400                 # a feed body this long is the article itself; anything shorter is checked against its page
 STOP = set("""a about above after again against all also am an and any are aren't as at be because been before being
@@ -97,12 +100,13 @@ def settings(s=None):
     s = s if s is not None else config.load_settings()
     e = dict(DEFAULTS)
     e.update({k: v for k, v in (s.get("edition") or {}).items() if k in DEFAULTS})
-    for k in ("pieces", "videos", "podcasts", "torah", "wildcard", "longest", "halflife", "hour"):
+    for k in ("pieces", "videos", "podcasts", "torah", "wildcard", "callback", "longest", "halflife", "hour"):
         try:
             e[k] = int(e[k])
         except (TypeError, ValueError):
             e[k] = DEFAULTS[k]
     e["pieces"] = max(3, min(20, e["pieces"]))
+    e["callback"] = max(0, min(3, e["callback"]))
     e["hour"] = max(3, min(11, e["hour"]))
     e["halflife"] = max(3, min(365, e["halflife"]))
     e["days"] = [d for d in e["days"] if d in DAYS] if isinstance(e["days"], list) else DEFAULTS["days"]
@@ -460,16 +464,23 @@ def topic_weights(events, e, now):
     return out
 
 
+def touched(conn, doc_id):
+    """Whether you did anything with a piece: opened it (here or on the Kindle) or gave it a thumb."""
+    d = conn.execute("SELECT opened FROM docs WHERE id = ?", (doc_id,)).fetchone()
+    return bool((d and d["opened"]) or conn.execute("SELECT 1 FROM sessions WHERE item = ?", (doc_id,)).fetchone()
+                or conn.execute("SELECT 1 FROM edition_votes WHERE id = ?", (doc_id,)).fetchone())
+
+
 def skipped(conn, now):
-    """Pieces an edition showed you at least two days ago that you never opened: (when, weight, source, text)."""
+    """Pieces an edition showed you at least two days ago that you never opened: (when, weight, source, text).
+    Only from editions you read something of: a paper you didn't open at all that day says nothing about
+    what was in it."""
     out = []
     for r in conn.execute("SELECT day, made, items FROM editions WHERE made < ?", (now - 2 * 86400,)):
-        for it in json.loads(r["items"] or "[]"):
-            d = conn.execute("SELECT opened FROM docs WHERE id = ?", (it.get("id"),)).fetchone()
-            touched = (d and d["opened"]) or conn.execute("SELECT 1 FROM sessions WHERE item = ?", (it.get("id"),)).fetchone() \
-                or conn.execute("SELECT 1 FROM edition_votes WHERE id = ?", (it.get("id"),)).fetchone()
-            if not touched:
-                out.append((r["made"], -0.5, it.get("source"), it.get("title")))
+        items = json.loads(r["items"] or "[]")
+        left = [it for it in items if not touched(conn, it.get("id"))]
+        if len(left) < len(items):
+            out += [(r["made"], -0.5, it.get("source"), it.get("title")) for it in left]
     return out
 
 
@@ -700,6 +711,80 @@ def with_text(conn, short, keep=True):
              len([c for c in out if c["kind"] == "article"]), len([c for c in short if c["kind"] == "article"]), len(need),
              len([1 for c, bl in got if bl and content.words(bl) >= MIN_WORDS]))
     return [c for c in short if c in out]
+
+
+# ---- a second look -------------------------------------------------------------------------------
+
+def callbacks(conn, e, prof, now, day, parasha=None):
+    """Pieces earlier editions (CALLBACK_DAYS back) showed you that you never opened, best first, for a
+    second look. Each was chosen for an edition once already; today's taste ranks them again. One from a
+    paper you didn't open at all that day (so you never saw it) comes ahead of one you passed by on a day
+    you read others, and older ones fade. A piece gets one second look, never two. The news desks and the
+    Torah column are for their own day, so they're left out."""
+    once, rows = set(), []
+    for r in conn.execute("SELECT day, items FROM editions WHERE day != ?", (day.isoformat(),)):      # today's is being made again
+        items = json.loads(r["items"] or "[]")
+        once |= {it.get("id") for it in items if it.get("callback")}
+        age = (day - date.fromisoformat(r["day"])).days
+        if CALLBACK_DAYS[0] <= age <= CALLBACK_DAYS[1]:
+            rows.append((r["day"], age, items))
+    desks = {d["name"] for d in e["desks"]}
+    read = {norm_title(r[0]) for r in conn.execute(
+        "SELECT title FROM docs WHERE opened IS NOT NULL AND opened >= ?", (now - 90 * 86400,))}
+    cands, titles = [], set()
+    for d, age, items in sorted(rows, key=lambda x: x[1]):
+        left = [it for it in items if not touched(conn, it.get("id"))]
+        missed = len(left) == len(items)
+        for it in left:
+            if it.get("id") in once or it.get("section") in desks or it.get("section") in ("Torah", CALLBACK):
+                continue
+            if (it.get("kind") == "video" and not e["videos"]) or (it.get("kind") == "podcast" and not e["podcasts"]):
+                continue
+            r = conn.execute("SELECT d.kind, d.title, d.source, d.url, d.summary, d.words, d.duration, d.thumb, d.published, d.added, "
+                             "d.status, d.deleted, d.where_, f.folder FROM docs d LEFT JOIN feeds f ON f.id = d.feed WHERE d.id = ?",
+                             (it["id"],)).fetchone()
+            if not r or r["status"] == "deleted" or r["deleted"]:
+                continue
+            t = norm_title(r["title"])
+            if not t or t in read or t in titles:
+                continue
+            if r["kind"] == "article" and body_words(conn, it["id"]) < MIN_WORDS:
+                continue
+            titles.add(t)
+            cands.append({"id": it["id"], "kind": r["kind"], "title": r["title"] or "", "source": r["source"] or "", "folder": r["folder"] or "",
+                          "url": r["url"], "summary": re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", r["summary"] or it.get("summary") or "")).strip()[:400],
+                          "minutes": it.get("minutes"), "thumb": r["thumb"] or it.get("thumb") or "", "published": r["published"] or r["added"],
+                          "origin": "feed", "from": d, "age": age, "missed": missed, "was_lead": it.get("section") == "Lead",
+                          "why_then": it.get("why") or ""})
+    out = [c for c in score(cands, prof, e, now, parasha) if not c.get("desk")]
+    for c in out:
+        c["gold"] = round(c["score"] * (1.3 if c["missed"] else 1.0) * (1.15 if c["was_lead"] else 1.0) * 0.5 ** (c["age"] / 21), 4)
+    return sorted(out, key=lambda c: -c["gold"])
+
+
+def callback_line(c, day):
+    """Why a second-look piece is back: when it was in the paper, and why it was then."""
+    d = date.fromisoformat(c["from"])
+    when = d.strftime("%A") if (day - d).days < 7 else f"{d.day} {d.strftime('%B')}"
+    head = ("Missed on " if c["missed"] else "Skipped on ") + when
+    then = c.get("why_then") or ""
+    return f"{head} · {then}" if then and len(head) + len(then) <= 72 else head
+
+
+def take_callbacks(cb, chosen, n, day):
+    """Up to n of the ranked second-look pieces, one a source, keeping the edition's own cap per source."""
+    per = Counter(source_key(c["source"]) for c in chosen)
+    titles = {norm_title(c["title"]) for c in chosen}
+    out = []
+    for c in cb:
+        if len(out) >= n:
+            break
+        k = source_key(c["source"])
+        if per[k] >= PER_SOURCE or any(source_key(x["source"]) == k for x in out) or norm_title(c["title"]) in titles:
+            continue
+        c["section"], c["why"] = CALLBACK, callback_line(c, day)
+        out.append(c)
+    return out
 
 
 # ---- choosing -------------------------------------------------------------------------------------
@@ -1158,27 +1243,32 @@ def build(day=None, use_ai=None, dry=False, conn=None):
         prof = taste(conn, e, now, iv)
         cands = score(candidates(conn, e, now, used, iv), prof, e, now, parasha)
         short = with_text(conn, shortlist(cands, e, day), keep=not dry)
+        cb = callbacks(conn, e, prof, now, day, parasha) if e["callback"] else []
+        n_cb = min(e["callback"], len(cb), e["pieces"] // 3)        # a second look is never more than a third of the paper
+        fresh = dict(e, pieces=e["pieces"] - n_cb)
         how = "rules"
         chosen = None
         if (e["ai"] if use_ai is None else use_ai) and short:
             try:
-                chosen = pick_ai(short, prof, e, parasha)
+                chosen = pick_ai(short, prof, fresh, parasha)
                 how = "model"
             except Exception as ex:  # noqa: BLE001 - the rules still make an edition
                 log.warning("edition: the model didn't pick (%s); the rules do", ex)
                 how = f"rules ({str(ex)[:120]})"
         if not chosen:
-            chosen = pick_local(short, e)
+            chosen = pick_local(short, fresh)
             for c in chosen:
                 c["why"] = fact_line(c, parasha)
         chosen = paper_order(chosen, e)
+        chosen += take_callbacks(cb, chosen, n_cb, day)             # at the back of the paper
         items = [{"id": c["id"], "kind": c["kind"], "section": c["section"], "why": c.get("why") or "", "title": c["title"],
                   "source": c["source"], "publication": source_key(c["source"]), "minutes": c["minutes"], "thumb": c["thumb"], "url": c["url"], "summary": dek(c["summary"]),
-                  "score": c["score"]} for c in chosen]
+                  "score": c["score"]} | ({"callback": c["from"]} if c.get("section") == CALLBACK and c.get("from") else {}) for c in chosen]
         ed = {"day": day.isoformat(), "made": int(now), "items": items, "how": how, "candidates": len(cands),
               "parasha": (parasha or {}).get("name")}
         if dry:
             ed["shortlist"] = [{k: c.get(k) for k in ("id", "kind", "source", "title", "minutes", "score", "topic", "facts", "stranger")} for c in short]
+            ed["second_look"] = [{k: c.get(k) for k in ("id", "source", "title", "from", "missed", "score", "gold")} for c in cb[:12]]
             return ed
         for c in chosen:
             _materialize(conn, c)
