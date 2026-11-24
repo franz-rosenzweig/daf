@@ -868,10 +868,12 @@ def pick_local(short, e):
     """The mix rules over the scores, without the model."""
     chosen, per, kinds = [], Counter(), Counter()
     cap = {"video": e["videos"], "podcast": e["podcasts"]}
+    torah_most = max(1, e["torah"])     # "at least" for the Torah column, but the scores alone mustn't fill the paper with it
 
     def ok(c):
         k = source_key(c["source"])
-        return c not in chosen and per[k] < PER_SOURCE and kinds[c["kind"]] < cap.get(c["kind"], 99)
+        return (c not in chosen and per[k] < PER_SOURCE and kinds[c["kind"]] < cap.get(c["kind"], 99)
+                and not (c.get("torah") and sum(1 for x in chosen if x.get("torah")) >= torah_most))
 
     def take(c, section):
         chosen.append(c)
