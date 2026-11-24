@@ -517,6 +517,8 @@ def forget(conn, book_id):
 def kindle_where(conn, book_id, text, fraction):
     w = {"book_id": book_id, "text": (text or "")[:600], "fraction": fraction, "at": time.time()}
     conn.execute("INSERT INTO kv (k, v) VALUES ('kindle_where', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", (json.dumps(w),))
+    # the book's own, for Listen from here (audiomap.reading_place): the Kindle's page, kept per book
+    conn.execute("INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", ("kindle_page:" + book_id, json.dumps(w)))
     return w
 
 
@@ -573,7 +575,8 @@ def router():
 
     @r.post("/api/kindle/where")
     def post_kindle_where(b=Depends(json_body), name=Depends(kindle_device), c=Depends(conn)):
-        """{md5, text, fraction}: the page the Kindle is on, from the plugin when Sound is on there."""
+        """{md5, text, fraction}: the page the Kindle is on, from the plugin when Sound is on there, and when
+        a book with an audiobook is closed or the Kindle sleeps in it."""
         md5 = str(b.get("md5") or "").strip().lower()
         bid = library.book_for_md5(c, md5) if re.fullmatch(r"[0-9a-f]{32}", md5) else None
         if not bid:

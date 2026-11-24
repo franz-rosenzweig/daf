@@ -657,3 +657,78 @@ def to_book(conn, book_id, t, exact=False):
             log.info("to_book %s: %s", book_id, e)
     c = max(0, min(c, B["total"] - 1))
     return {"words": snippet(B, c), "fraction": round(fraction_of(B, c), 5), "chapter": chapter_at(B, c), "how": how}
+
+
+# ---- the Kindle: the audiobook's place offered there, and where I'm reading for Listen from here --
+
+_offers, _offers_lock = {}, threading.Lock()
+
+
+def kindle_offer(conn, book_id, since):
+    """For the book just opened on the Kindle: where its audiobook is, as a place in the book, when it
+    was played after `since` (the Kindle's last page turn in it, or Daf's own place if that's newer).
+    {"offer": {words, fraction, chapter, how, at, last}}, or {"pending": True} while Daf hears it (the
+    plugin waits 15 seconds at most for an answer, so the hearing runs on a thread of its own and the
+    plugin asks again), or {} when there's nothing to offer."""
+    from . import absapi
+    item = absapi.for_book(conn, book_id)
+    if not item:
+        return {}
+    p = absapi.playable(item)
+    at, last = float(p.get("at") or 0), int(p.get("last") or 0)
+    if at <= 30 or p.get("done") or last <= since:
+        return {}
+    k = (book_id, item, int(at))
+    with _offers_lock:
+        if k in _offers:
+            r = _offers[k]
+            return {"pending": True} if r is None else ({"offer": {**r, "at": at, "last": last}} if r else {})
+    r = to_book(conn, book_id, at)                    # the whole audiobook matched: its points say, at once
+    if r and r["how"] == "words":
+        with _offers_lock:
+            _offers[k] = r
+        return {"offer": {**r, "at": at, "last": last}}
+    if not r:
+        return {}
+    with _offers_lock:
+        if len(_offers) > 100:
+            _offers.clear()
+        _offers[k] = None
+    threading.Thread(target=_offer_work, args=(k,), daemon=True, name="daf-kindle-audio").start()
+    return {"pending": True}
+
+
+def _offer_work(k):
+    from . import db
+    book_id, _item, at = k
+    r = None
+    try:
+        with db.session() as conn:
+            r = to_book(conn, book_id, at, exact=True)
+    except Exception:  # noqa: BLE001 - nothing is offered
+        log.exception("the audiobook's place for the Kindle, %s", book_id)
+    with _offers_lock:
+        _offers[k] = r or {}
+
+
+def reading_place(conn, book_id):
+    """Where I'm reading the book: the newer of Daf's place and the Kindle's, {cfi, fraction, text,
+    updated, where ("daf" or "kindle")}, or None. The Kindle's is its last page turn (page of pages),
+    with the page's words when the plugin sent them for that page (kv "kindle_page:<book>")."""
+    import json
+    pos = conn.execute("SELECT cfi, fraction, updated FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
+    daf = {"cfi": pos["cfi"], "fraction": pos["fraction"], "updated": int(pos["updated"] or 0), "where": "daf"} if pos else None
+    md5s = [k[4:] for (k,) in conn.execute("SELECT key FROM book_keys WHERE book_id = ? AND key LIKE 'md5:%'", (book_id,))]
+    k = conn.execute(f"SELECT page, total, start FROM pages WHERE md5 IN ({','.join('?' * len(md5s))}) ORDER BY start DESC LIMIT 1",
+                     md5s).fetchone() if md5s else None
+    kin = {"fraction": k["page"] / k["total"], "updated": int(k["start"]), "where": "kindle"} if k and k["total"] else None
+    r = conn.execute("SELECT v FROM kv WHERE k = ?", ("kindle_page:" + book_id,)).fetchone()
+    try:
+        w = json.loads(r[0]) if r else None
+    except ValueError:
+        w = None
+    if w and w.get("text") and (not kin or w.get("at", 0) >= kin["updated"] - 120):
+        kin = {"fraction": w.get("fraction") if w.get("fraction") is not None else (kin or {}).get("fraction"),
+               "text": w["text"], "updated": max(int(w.get("at") or 0), (kin or {}).get("updated", 0)), "where": "kindle"}
+    have = [x for x in (daf, kin) if x and (x.get("fraction") is not None or x.get("cfi") or x.get("text"))]
+    return max(have, key=lambda x: x["updated"]) if have else None

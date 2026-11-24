@@ -4877,11 +4877,10 @@ def get_abs_book(book_id: str, offer: int = 0, since: int = 0, fraction: float =
     if not item:
         return {"item": None}
     p = _abs(absapi.playable, item)
-    pos = c.execute("SELECT fraction, chapter, updated FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
     from . import readalong
     out = {"item": item, "title": p["title"], "duration": p["duration"], "at": p["at"], "done": p["done"], "last": p["last"],
            "chapter": audiomap.audio_chapter([{"start": x["t"], "title": x["title"]} for x in p["chapters"]], p["at"] or 0),
-           "reading": dict(pos) if pos else None, "along": readalong.status(c, book_id)}
+           "reading": audiomap.reading_place(c, book_id), "along": readalong.status(c, book_id)}
     if offer and p["at"] and p["at"] > 30 and not p["done"] and (p["last"] or 0) > since:
         try:
             m = audiomap.to_book(c, book_id, p["at"], exact=True)
@@ -4932,14 +4931,14 @@ def get_abs_book_place(book_id: str, t: float, exact: int = 1, c=Depends(conn)):
 @app.post("/api/abs/book/{book_id}/start", dependencies=[Depends(user)])
 def post_abs_book_start(book_id: str, b=Depends(json_body), c=Depends(conn)):
     """{cfi, fraction, text, exact}: where in the audiobook a place in the book is (the reader's page;
-    without one, the book's kept place) → {t, chapter, how}."""
+    without one, where I'm reading it: Daf's place or the Kindle's, whichever is newer) → {t, chapter, how}."""
     from . import audiomap
     place = {k: b.get(k) for k in ("cfi", "fraction", "text") if b.get(k) is not None}
     if not place:
-        pos = c.execute("SELECT cfi, fraction FROM book_positions WHERE book_id = ?", (book_id,)).fetchone()
-        if not pos:
+        pos = audiomap.reading_place(c, book_id)
+        place = {k: pos[k] for k in ("cfi", "fraction", "text") if pos and pos.get(k) is not None}
+        if not place:
             raise HTTPException(404, "No place in this book yet")
-        place = dict(pos)
     r = audiomap.from_book(c, book_id, place, exact=b.get("exact", True) is not False)
     if not r:
         raise HTTPException(404, "No audiobook and EPUB for this book")
@@ -5487,9 +5486,27 @@ def kindle_book(md5: str = "", name=Depends(kindle_device), c=Depends(conn)):
         "SELECT h.id, h.text, h.chapter, h.color, s.user_note AS note FROM highlights h LEFT JOIN review_state s ON s.hl_id = h.id "
         "WHERE h.book_id = ? AND h.source = 'epub' AND h.deleted = 0 AND h.id NOT IN (SELECT hl_id FROM kindle_pushed) "
         "ORDER BY h.created", (bid,))]
-    from . import sketchbook                   # its Sketchbook's pages, as bookmarks with a note (acked at /api/sketchbook/kindle/ack)
+    from . import absapi, sketchbook           # its Sketchbook's pages, as bookmarks with a note (acked at /api/sketchbook/kindle/ack)
     return {"known": True, "book_id": bid, "title": None if hidden else b["title"],
-            "daf": dict(pos) if pos else None, "highlights": hls, "sketchbook": sketchbook.for_kindle(c, bid)}
+            "daf": dict(pos) if pos else None, "highlights": hls, "sketchbook": sketchbook.for_kindle(c, bid),
+            "audio": bool(absapi.for_book(c, bid))}
+
+
+@app.get("/api/kindle/audio")
+def kindle_audio(md5: str = "", since: int = 0, name=Depends(kindle_device), c=Depends(conn)):
+    """For the book just opened on the Kindle, when it has an audiobook: where the audiobook is, as a
+    place in the book, if it was played after `since` (the Kindle's last page turn in it, or Daf's place
+    if that's newer). {offer: {words, fraction, chapter, at, last}}, {pending: true} while Daf hears it
+    (ask again in a few seconds), or {}."""
+    from . import audiomap
+    bid = library.book_for_md5(c, md5.strip().lower())
+    if not bid:
+        return {}
+    try:
+        return audiomap.kindle_offer(c, bid, since)
+    except Exception as e:  # noqa: BLE001 - ABS away, or no EPUB: nothing to offer
+        log.info("kindle audio %s: %s", bid, e)
+        return {}
 
 
 @app.post("/api/kindle/highlights/ack")

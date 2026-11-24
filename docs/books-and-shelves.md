@@ -91,8 +91,8 @@ The **Highlights** card lists the book's highlights in reading order, under chap
 Some of my books are in Audiobookshelf too, and Daf knows which audiobook is which book. Then the two keep each other's place.
 
 - **Listen** on the book's page plays the audiobook in Daf's player from where I am in it, and it says how far that is.
-- **Listen from here** starts it where I'm reading instead. In the book itself, the **…** menu has **The audiobook from here**, for the page I'm on.
-- When I open the book after listening, Daf says "In the audiobook you're at" and the chapter, with **Go there** and **Stay here**, the same way it offers the Kindle's page.
+- **Listen from here** starts it where I'm reading instead: in Daf or on the Kindle, whichever I read last. In the book itself, the **…** menu has **The audiobook from here**, for the page I'm on.
+- When I open the book after listening, Daf says "In the audiobook you're at" and the chapter, with **Go there** and **Stay here**, the same way it offers the Kindle's page. The Kindle asks the same when I open the book there ([The Kindle](kindle.md#your-place-both-ways)).
 
 Where I stop listening goes back to Audiobookshelf as I go, so its app carries on from the same place.
 
