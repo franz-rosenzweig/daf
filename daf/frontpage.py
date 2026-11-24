@@ -210,13 +210,16 @@ FACE_SHARE = 0.02                             # a face over this share of a pict
 
 @lru_cache(maxsize=1)
 def _faces():
-    """OpenCV's frontal-face detector, or None where OpenCV isn't installed (it's optional)."""
+    """OpenCV's frontal-face detector, or None where it isn't there: OpenCV is optional, and OpenCV 5
+    dropped the cascades (requirements.txt keeps it below 5). Never raises, so the check can't cost
+    the Kindle its copy."""
     try:
         import cv2
-    except ImportError:
+        c = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        return None if c.empty() else c
+    except Exception:  # noqa: BLE001 - no OpenCV, or one without the cascades
+        log.info("front page: no face detector, so no face check", exc_info=True)
         return None
-    c = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    return None if c.empty() else c
 
 
 def big_face(data):
@@ -226,9 +229,9 @@ def big_face(data):
     det = _faces()
     if det is None:
         return False
-    from PIL import Image
-    import numpy as np
     try:
+        from PIL import Image
+        import numpy as np
         im = Image.open(io.BytesIO(data))
         im.load()
         g = np.array(im.convert("L"))

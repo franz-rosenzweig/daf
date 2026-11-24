@@ -10,4 +10,4 @@ yt-dlp[default]
 faster-whisper==1.2.1
 av<16                      # faster-whisper 1.2.1 passes av.open(metadata_errors=…), which PyAV 16 dropped
 # The Edition's Kindle front page skips photographs that are mostly a face (daf/frontpage.py); without it, it doesn't check.
-opencv-python-headless>=4.10
+opencv-python-headless>=4.10,<5     # 5 dropped the face cascades

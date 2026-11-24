@@ -83,6 +83,21 @@ class Pictures(unittest.TestCase):
         finally:
             frontpage.big_face = saved
 
+    def test_an_opencv_without_cascades_turns_the_check_off(self):
+        import types
+        saved = sys.modules.get("cv2")
+        sys.modules["cv2"] = types.ModuleType("cv2")          # like OpenCV 5: no CascadeClassifier
+        frontpage._faces.cache_clear()
+        try:
+            self.assertIsNone(frontpage._faces())
+            self.assertFalse(frontpage.big_face(photo()))
+        finally:
+            if saved is None:
+                sys.modules.pop("cv2", None)
+            else:
+                sys.modules["cv2"] = saved
+            frontpage._faces.cache_clear()
+
     def test_no_opencv_no_check(self):
         if frontpage._faces() is not None:
             self.skipTest("OpenCV is installed")
