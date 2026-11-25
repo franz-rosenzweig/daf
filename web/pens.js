@@ -643,7 +643,7 @@ function hwrAsk(msg){
     hwr.onmessage = e => { const w = hwrWait.get(e.data.id); if (!w) return; hwrWait.delete(e.data.id); if (e.data.error) w[1](new Error(e.data.error)); else w[0](e.data.result); };
     hwr.onerror = e => { for (const w of hwrWait.values()) w[1](new Error(e.message || 'the handwriting reader stopped')); hwrWait.clear(); hwr = null; };
   }
-  return new Promise((ok, no) => { const id = ++hwrSeq; hwrWait.set(id, [ok, no]); hwr.postMessage(Object.assign({ id, url: new URL('/vendor/hwr/grape-2.0.bin', location.href).href }, msg)); });
+  return new Promise((ok, no) => { const id = ++hwrSeq; hwrWait.set(id, [ok, no]); hwr.postMessage(Object.assign({ id, urls: ['/api/hwr/model', '/vendor/hwr/grape-2.0.bin'].map(u => new URL(u, location.href).href) }, msg)); });
 }
 const hebrew = () => { try { return !!(window.dafShell && dafShell.can && dafShell.can('ink')); } catch(e){ return false; } };
 const languages = () => hebrew() ? ['en', 'he'] : ['en'];
