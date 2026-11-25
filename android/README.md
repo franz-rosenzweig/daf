@@ -33,6 +33,14 @@ page and app is `docs/SHELL.md`; the brief is `docs/NATIVE.md`, round 2.
   are made small and kept in the app's files (`Board.kt`). They refresh with the widget above, and
   every half hour themselves. On Android 15 and later they draw their own pictures for the
   widget picker from the phone's last answer, once a day (`setWidgetPreviews`).
+  Each answer draws every placed widget again by its own kind: the receiver's widgets by
+  Android's list (`Board.drawAll`), not Glance's `getGlanceIds`, which goes by the class's name.
+  Until 0.6.3 the release's R8 merged the six Glance classes into one, so after a refresh every
+  widget whose session had ended was drawn as Keep reading; `proguard-rules.pro` keeps them apart.
+  To see the widgets as the release draws them, build the release with WidgetLab in it (a
+  build type of `initWith release`, debug-signed, with `src/debug` as its sources) and open
+  WidgetLab with `--es base … --es token …`; several kinds at once with `--es w A,B,C` and each
+  Feed widget's part with `--es feeds "folder:X,feed:Y"`.
 - **Share into Daf**, in any app's share sheet as "Save to Daf": a link, or text with a link in
   it, goes to the Library (`/api/save`); a photo of a marked page goes to `/share`, becomes a
   paper page, and Daf opens on it while the lines are read.

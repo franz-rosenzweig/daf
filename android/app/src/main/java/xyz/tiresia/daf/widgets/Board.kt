@@ -96,17 +96,24 @@ object Board {
         }
     }
 
-    /** Every placed widget drawn again from what's kept. */
+    /**
+     * Every placed widget drawn again from what's kept, each by its own kind: the widgets placed for
+     * each receiver, by Android's own list. Not by Glance's getGlanceIds, which finds a kind's widgets
+     * by its class's name: shrunk for the release, the six kinds had come out as one class, so each
+     * kind was handed every widget and they all ended up drawn alike (proguard-rules.pro keeps them
+     * apart now too).
+     */
     @JvmStatic
     fun drawAll(c: Context) = runBlocking {
         val m = GlanceAppWidgetManager(c)
-        for ((_, make) in all) {
+        for ((receiver, make) in all) {
             val w = make()
-            for (id in runCatching { m.getGlanceIds(w.javaClass) }.getOrDefault(emptyList())) {
+            for (appWidgetId in placed(c, receiver)) {
                 runCatching {                       // one widget gone meanwhile mustn't stop the others
+                    val id = m.getGlanceIdBy(appWidgetId)
                     updateAppWidgetState(c, id) { it[V] = System.currentTimeMillis() }
                     w.update(c, id)
-                }
+                }.onFailure { e -> android.util.Log.w("Daf", "widget $appWidgetId (${receiver.simpleName}) not drawn again", e) }
             }
         }
     }
