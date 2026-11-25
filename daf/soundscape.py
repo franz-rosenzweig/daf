@@ -575,8 +575,9 @@ def router():
 
     @r.post("/api/kindle/where")
     def post_kindle_where(b=Depends(json_body), name=Depends(kindle_device), c=Depends(conn)):
-        """{md5, text, fraction}: the page the Kindle is on, from the plugin when Sound is on there, and when
-        a book with an audiobook is closed or the Kindle sleeps in it."""
+        """{md5, text, fraction}: the page the Kindle is on, from the plugin when Sound is on there, as pages
+        turn while the book's Notebook is open by itself, and when a book with an audiobook is closed or
+        the Kindle sleeps in it. → {ok, follow}: whether to go on sending it as pages turn."""
         md5 = str(b.get("md5") or "").strip().lower()
         bid = library.book_for_md5(c, md5) if re.fullmatch(r"[0-9a-f]{32}", md5) else None
         if not bid:
@@ -586,7 +587,8 @@ def router():
         except (TypeError, ValueError):
             f = None
         kindle_where(c, bid, str(b.get("text") or ""), f)
-        return {"ok": True}
+        from . import sketchbook
+        return {"ok": True, "follow": sketchbook.following(c, bid)}     # the book's Notebook still following it
 
     @r.get("/api/sound/kindle", dependencies=[Depends(user)])
     async def get_kindle_sound(after: float = 0, wait: int = 0, music: int = 0):

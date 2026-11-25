@@ -98,6 +98,8 @@ It works the other way in Daf: if the Kindle is further along, Daf's reader offe
 
 The audiobook counts too. If I listened to the book after I last turned a page on the Kindle, the Kindle asks "You listened further in the audiobook: 60%, “Chapter Six” (Nov 23, 21:53). Go there?" when I open it, and **Go there** puts me on the page with the sentence the narrator was reading. Daf finds that place by listening to the twenty seconds before where I stopped and looking for those words in the book. That takes a few seconds, so the question can come a little after the book opens. With a prepared audiobook it comes right away. If I listened and also read further in Daf, whichever I did last is the one it offers. **Stay here** is remembered for that spot, the same as before.
 
+If I have a book's Notebook open by itself in Daf (on the tablet, say) while I read the book on the Kindle, the Kindle sends Daf each page as I turn it, so the Notebook keeps up with the chapter I'm in. It starts when the book opens or the Kindle wakes in it, and stops about ten minutes after I close the Notebook.
+
 And the other way: when I close a book that has an audiobook, or the Kindle goes to sleep in it, the plugin tells Daf the page I'm on, so **Listen from here** on the book's page starts the audiobook where I stopped reading on the Kindle.
 
 ## Highlights, both ways

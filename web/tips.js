@@ -28,6 +28,7 @@ const TIPS = [
 
 // Newest first. go: where "Show me" takes you.
 const NEWS = [
+  { id: '2026-11-25-notebook-alone', date: 'Nov 25', title: 'The Notebook by itself', text: 'Notebook on a book’s page opens its Notebook on the whole screen, for writing while you read the book on paper or on the Kindle. It starts at the chapter you’re in and keeps up as you turn pages on the Kindle, and it never moves your place in Daf.', go: '#books' },
   { id: '2026-11-23-kindle-audiobook', date: 'Nov 23', title: 'The Kindle follows the audiobook', text: 'Open a book on the Kindle after listening to its audiobook, and it asks “You listened further in the audiobook… Go there?” and puts you on the sentence the narrator was reading. Listen from here on a book’s page starts from the Kindle’s page when you read there last.', go: '#books' },
   { id: '2026-11-17-music-radio', date: 'Nov 17', title: 'Radio, and Music in articles and PDFs', text: 'Music’s menu has Radio: your own stations, a tap to play, Edit to add or remove one. And an article or a PDF has a note button in its bar that opens the Music menu (on a phone, Music in an article’s … menu).', go: '#today' },
   { id: '2026-11-17-music-albums', date: 'Nov 17', title: 'Sort any album into Music', text: 'Albums › All albums in the Music menu opens every album in your music folder. Open one to hear it, then tap the moods and tags it should have: every track on it gets them at once.', go: '#music' },

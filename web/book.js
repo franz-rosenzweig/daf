@@ -85,8 +85,13 @@ function applyBookType(){
 window.addEventListener('daf-type', () => { applyBookType(); setTimeout(redrawAll, 120); });
 
 /* ---------- open ---------- */
-async function openBook(id, at){
+async function openBook(id, at, notes){
   cleanup();
+  // The Notebook by itself (#ebook/<id>/notes): the book read on the Kindle or on paper, its Notebook here.
+  // The book is open behind it, unseen, for its chapters and highlights, and to follow where I'm reading;
+  // it keeps no place, counts no time and offers nothing.
+  B.notes = !!notes; B.followAt = 0;
+  document.body.classList.toggle('booknotes', B.notes);
   B.id = id; B.loc = null; B.spot = null; B.forget = false; B.pageKey = null; B.pagesNew = new Set(); B.byCfi = new Map(); B.kindleByCfi = new Map(); B.sel = null; B.opened = Date.now(); B.offeredNext = false; B.offeredEnd = false; B.temp = new Set();
   H.active = ACT;
   wake(true);
@@ -107,12 +112,16 @@ async function openBook(id, at){
   fileP.catch(() => {});
   let d;
   try { d = await api('/api/ebooks/' + encodeURIComponent(id)); }
-  catch(e){ $('#bstage').innerHTML = '<div class="placeholder">' + esc(e.message) + ' <a href="#book/' + encodeURIComponent(id) + '">Back to the book</a></div>'; return; }
+  catch(e){
+    if (B.notes && B.id === id) { fileStop.abort(); return notesAlone(id, null); }
+    $('#bstage').innerHTML = '<div class="placeholder">' + esc(e.message) + ' <a href="#book/' + encodeURIComponent(id) + '">Back to the book</a></div>'; return;
+  }
   if (B.id !== id) return;
+  if (B.notes && (!d.format || d.format === 'PDF')) { fileStop.abort(); return notesAlone(id, d); }
   // A book Calibre has only as a PDF: its pages as printed, in the PDF view (pdfview.js)
   if (d.format === 'PDF') { fileStop.abort(); location.replace('#pdf/book/' + encodeURIComponent(id) + (at && at.startsWith('hl:') ? '/' + at : '')); return; }
   B.d = d;
-  if (C.Sound) C.Sound.open(id);
+  if (C.Sound && !B.notes) C.Sound.open(id);
   inkLoad(d);
   d.highlights.forEach(h => { h.source = 'epub'; B.byCfi.set(h.pos.cfi, h); });
   d.other_highlights.forEach(h => { if (h.sec == null) h.sec = xpIndex(h.xp); });     // Calibre's come with their chapter
@@ -128,7 +137,7 @@ async function openBook(id, at){
       if (again && again.ok) blob = await again.blob();
     }
     file = new File([blob], 'book.' + (d.format === 'KEPUB' ? 'epub' : (d.format || 'epub').toLowerCase()), { type: blob.type });
-  } catch(e){ $('#bstage').innerHTML = '<div class="placeholder">' + esc(e.message) + '</div>'; return; }
+  } catch(e){ if (B.notes && B.id === id) return notesAlone(id, d); $('#bstage').innerHTML = '<div class="placeholder">' + esc(e.message) + '</div>'; return; }
   if (B.id !== id) return;
   const view = document.createElement('foliate-view');
   view.id = 'fv';
@@ -176,8 +185,10 @@ async function openBook(id, at){
   drawToc();
   Pens.use(INKSURF);
   TOCAT.clear(); SECDOC.clear();
-  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, panel: { el: () => B.id === id ? $('#bpanel') : null, draw: t => { B.panel = t; drawPanel(); } }, resized: () => { applyBookType(); if (C.Margin) C.Margin.draw(); }, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
-  if (C.Margin) C.Margin.attach({ item: 'book:' + id, host: () => B.id === id ? $('#bstage') : null, places: marginPlaces, open: marginOpen, relayout: applyBookType, ok: () => !B.scans,
+  if (C.Sketch && B.notes) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, full: true, highlights: notebookHls, resized: () => {},
+    close: () => { location.hash = '#book/' + encodeURIComponent(id); } });   // the Notebook by itself, the whole page
+  else if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', view, panel: { el: () => B.id === id ? $('#bpanel') : null, draw: t => { B.panel = t; drawPanel(); } }, resized: () => { applyBookType(); if (C.Margin) C.Margin.draw(); }, highlights: notebookHls, go: jumpTo });   // the Notebook beside it (sketchbook.js)
+  if (C.Margin && !B.notes) C.Margin.attach({ item: 'book:' + id, host: () => B.id === id ? $('#bstage') : null, places: marginPlaces, open: marginOpen, relayout: applyBookType, ok: () => !B.scans,
     pageW: () => (parseFloat(B.view && B.view.renderer.getAttribute('max-inline-size')) || 600) * 1.12 + 72 });   // the margin (study.js)
   // Where to start: a highlight we were sent to, else the newest of here / this device / the Kindle.
   const local = store.get('bookpos.' + id, null);
@@ -192,6 +203,13 @@ async function openBook(id, at){
     else if (mine && mine.cfi) await view.init({ lastLocation: mine.cfi });
     else await view.init({ showTextStart: true });
   } catch(e){ await view.init({ showTextStart: true }).catch(() => {}); }
+  if (B.notes) {                     // the Kindle's page when it's newer than Daf's place, and then follow where I'm reading
+    const k = d.kindle, mineAt = mine ? (mine.updated || mine.at || 0) : 0;
+    if (k && k.at > mineAt && (k.text || k.fraction != null)) { await followTo({ where: 'kindle', text: k.text, fraction: k.fraction }); B.followAt = k.at; }
+    else B.followAt = mineAt;
+    follow();
+    return;
+  }
   if (target) await jumpTo(target);
   else if (at && at.startsWith('hl:')) toast('That highlight isn’t in this book any more');
   else if (words) await goToWords(words);
@@ -652,6 +670,7 @@ C.BookAlong = {
 };
 
 function cleanup(){
+  clearInterval(B.followT);
   inkFlush();
   alongUnmark();
   if (B.tts && B.tts.on && B.tts.unfollow) { B.tts.unfollow(); B.tts.unfollow = null; }   // it reads on, off the page
@@ -660,6 +679,7 @@ function cleanup(){
   if (B.view) { try { savePosition(true); } catch(e){} try { B.view.close(); } catch(e){} B.view.remove(); }
   if (B.scans) B.scans.close();
   B.view = null; B.id = null; B.d = null; B.scans = null;
+  B.notes = false; document.body.classList.remove('booknotes');     // (after the place above: a Notebook by itself saves none)
   if (H.active === ACT) H.active = null;
   delete document.body.dataset.flow;
 }
@@ -784,6 +804,7 @@ function spotOf(l){
   return l.cfi;
 }
 function onRelocate(e){
+  if (B.notes) { B.loc = e.detail; return; }          // the Notebook by itself: the book only says where it is
   const l = e.detail, spot = spotOf(l), moved = B.spot !== spot; B.spot = spot; B.loc = l; notePage(l); drawNextChapter(l);
   // the bars go when the page turns
   if (moved && Date.now() - B.opened > 2500) hideChrome();
@@ -817,7 +838,7 @@ function onRelocate(e){
   if (B.panel === 'info' && panelShown()) drawPanelInfoProgress();
 }
 function savePosition(now){
-  const l = B.loc, id = B.id; if (!l || !l.cfi || !id || B.forget) return;
+  const l = B.loc, id = B.id; if (!l || !l.cfi || !id || B.forget || B.notes) return;
   const body = { cfi: l.cfi, fraction: l.fraction || 0, chapter: l.tocItem?.label || null };
   store.set('bookpos.' + id, { ...body, at: Math.floor(Date.now() / 1000) });
   if (now && B.pageKey && Date.now() - (B.pageAt || 0) >= 5000) addPages(B.pageKey);
@@ -1111,6 +1132,13 @@ function drawMarks(){
 // notebook, Ask and focus mode are in the … menu. It fades once you turn a page (chrome below).
 function drawTop(){
   const d = B.d, tip = a => C.Keys.tip('book', a);
+  if (B.notes) {                 // the Notebook by itself: back, the book, and Read when there's a file to read
+    const t = String(d.title || '').split(/:\s/)[0], rtl = isRtlText(d.title) ? ' dir="rtl"' : '';
+    $('#btop').innerHTML = '<a class="ib" href="#book/' + encodeURIComponent(d.id) + '" aria-label="Back to the book">' + I.back + '</a>' +
+      (PHONE() ? '<div class="btitle2"' + rtl + '><b>' + esc(t) + '</b><span>' + esc(d.author || '') + '</span></div>' : '<span class="btitle-top mute"' + rtl + '>' + esc(t) + '</span>') +
+      (d.format ? '<a class="btn sm" href="#ebook/' + encodeURIComponent(d.id) + '">Read</a>' : '<span class="bgap"></span>');
+    return;
+  }
   if (PHONE()) {
     $('#btop').innerHTML = '<a class="ib bclose" href="#book/' + encodeURIComponent(d.id) + '" aria-label="Close the book">' + ICON.x + '</a>' +
       '<div class="btitle2"' + (isRtlText(d.title) ? ' dir="rtl"' : '') + '><b>' + esc(String(d.title || '').split(/:\s/)[0]) + '</b><span>' + esc(d.author || '') + '</span></div>' + (C.Sketch ? C.Sketch.button() : '<span class="bgap"></span>');
@@ -1141,7 +1169,7 @@ function openPhoneMenu(anchor){
 // a touch screen brings them or puts them away.
 function showChrome(){ B.chrome = true; document.body.classList.remove('bookbare'); }
 function hideChrome(){
-  if (!B.view) return;
+  if (!B.view || B.notes) return;
   if (!$('#pop').hidden || document.body.classList.contains('btocsheet') || panelShown() || H.visible() || (B.tts && B.tts.on) || (alongOn() && B.id === AL.book) || $('#bjump')) return;
   if (Date.now() - (B.slidAt || 0) < 2000) return;                 // a jump with the phone's slider: the slider stays, to try again
   if (C.Focus && C.Focus.on()) { C.Focus.bar(false); return; }     // focus mode's own bar goes the same way
@@ -1771,7 +1799,7 @@ function openMore(anchor){
 const phoneKeeps = () => !!(window.dafShell && dafShell.can && dafShell.can('offline'));
 function showKeys(){ C.Keys.sheet('book'); }
 function onKey(e){
-  if (C.S.route[0] !== 'ebook' || !B.view) return;
+  if (C.S.route[0] !== 'ebook' || !B.view || B.notes) return;
   const tag = (e.target.tagName || '').toLowerCase();
   if (tag === 'input' || tag === 'textarea') { if (e.key === 'Escape') { if (e.target.id === 'bjump') closeJump(); else e.target.blur(); } return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1797,7 +1825,7 @@ document.addEventListener('keydown', onKey);
 document.addEventListener('pointerdown', () => { B.lastActive = Date.now(); }, { passive: true });
 
 document.addEventListener('click', async e => {
-  if (C.S.route[0] !== 'ebook') return;
+  if (C.S.route[0] !== 'ebook' || B.notes) return;
   const t = e.target;
   const bq = t.closest('[data-bkq]'); if (bq) { ask(bq.dataset.bkq, null); return; }
   const sb = t.closest('[data-sb]');
@@ -1899,10 +1927,42 @@ document.addEventListener('keydown', e => {
 let qT = null;
 document.addEventListener('input', e => { if (e.target.id === 'bq') { clearTimeout(qT); qT = setTimeout(() => runSearch(e.target.value), 300); } });
 
+/* ---------- the Notebook by itself: following where I'm reading ---------- */
+// A book with no file here (a paper book, a PDF): its Notebook's General page, with no chapters to follow.
+function notesAlone(id, d){
+  B.d = d || { id, title: '' };
+  drawTop();
+  if (!d) api('/api/books/' + encodeURIComponent(id)).then(b => { if (B.id === id && B.notes && b) { B.d = { id, title: b.title, author: b.author }; drawTop(); } }).catch(() => {});
+  if (C.Sketch) C.Sketch.attach({ item: 'book:' + id, kind: 'book', full: true, close: () => { location.hash = '#book/' + encodeURIComponent(id); } });
+}
+// Every 20 seconds while it's open (and showing), Daf is asked where I'm reading the book: the newer of
+// its own place (another device) and the Kindle's page, which the Kindle sends as it turns while this asks
+// (sketchbook.following). A newer place moves the unseen book there, and the Notebook goes to its chapter
+// (unless I picked another one).
+async function followTo(p){
+  if (!B.view || !p) return;
+  try {
+    if (p.where === 'daf' && p.cfi) await B.view.goTo(p.cfi);
+    else { const cfi = p.text ? await findText(p.text) : null; if (cfi) await B.view.goTo(cfi); else if (p.fraction != null) await B.view.goToFraction(p.fraction); }
+  } catch(e){}
+}
+function follow(){
+  clearInterval(B.followT);
+  const id = B.id, ask = async () => {
+    if (!B.notes || B.id !== id || !B.view) { clearInterval(B.followT); return; }
+    if (document.hidden) return;
+    let r; try { r = await api('/api/sketchbook/follow/' + encodeURIComponent(id), { method: 'POST' }); } catch(e){ return; }
+    const p = r && r.place;
+    if (p && p.updated > (B.followAt || 0) && B.id === id) { B.followAt = p.updated; await followTo(p); }
+  };
+  ask(); B.followT = setInterval(ask, 20000);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && B.notes && B.view) follow(); });
+
 /* ---------- reading time ---------- */
 setInterval(() => {
   // (not while the audiobook reads it: that hour is Audiobookshelf's listening time already)
-  const reading = C.S.route[0] === 'ebook' && B.view && B.d && !document.hidden && Date.now() - B.lastActive < 120000 && !(alongHere() && C.Player.playing()) && (!C.Split || C.Split.mine());
+  const reading = C.S.route[0] === 'ebook' && B.view && B.d && !B.notes && !document.hidden && Date.now() - B.lastActive < 120000 && !(alongHere() && C.Player.playing()) && (!C.Split || C.Split.mine());
   if (reading) C.sendBeat({ book_id: B.d.id, seconds: 15, at: Math.floor(Date.now() / 1000) });
   const c = $('#bcounting'); if (c) c.classList.toggle('off', !reading);
 }, 15000);
@@ -1916,7 +1976,8 @@ window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#eb
 
 C.views.ebook = args => {
   const id = decodeURIComponent(args[0] || ''), at = args[1] ? decodeURIComponent(args.slice(1).join('/')) : null;
-  if (B.id === id && B.view) {
+  if (at === 'notes') return B.id === id && B.view && B.notes ? undefined : openBook(id, null, true);   // the Notebook by itself
+  if (B.id === id && B.view && !B.notes) {
     H.active = ACT;
     if (at && at.startsWith('hl:')) { const h = findHl(at.slice(3)); if (h) return jumpTo(h); }
     else if (at && at.startsWith('q:')) return goToWords(decodeURIComponent(at.slice(2)));
