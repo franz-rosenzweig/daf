@@ -45,6 +45,10 @@ html.skdrag .skframe{pointer-events:none}
 .skb[hidden]{display:none}
 html.skside .skb{top:0;right:0;bottom:0;width:var(--skr);border-left:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
 html.skbottom .skb{left:0;right:0;bottom:0;height:var(--skb);border-top:1px solid var(--line);box-shadow:0 -6px 22px rgba(0,0,0,.08);padding-bottom:env(safe-area-inset-bottom,0px)}
+html.skfull .skb{left:0;right:0;top:var(--btop,56px);bottom:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+html.skfull .skgrip{display:none}
+/* the Notebook by itself (book.js's #ebook/<id>/notes): the book is open behind it, unseen */
+body.booknotes .rvgrid,body.booknotes .progress{visibility:hidden}
 html.sktop .skb{left:0;right:0;top:0;height:var(--skt);border-bottom:1px solid var(--line);box-shadow:0 6px 22px rgba(0,0,0,.08);padding-top:env(safe-area-inset-top,0px);flex-direction:column-reverse}
 .skgrip{flex:none;display:grid;place-items:center;touch-action:none;-webkit-tap-highlight-color:transparent}
 .skgrip i{display:block;border-radius:3px;background:color-mix(in srgb,var(--fg) 26%,transparent)}

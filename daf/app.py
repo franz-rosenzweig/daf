@@ -5519,7 +5519,16 @@ def kindle_book(md5: str = "", name=Depends(kindle_device), c=Depends(conn)):
     from . import absapi, sketchbook           # its Sketchbook's pages, as bookmarks with a note (acked at /api/sketchbook/kindle/ack)
     return {"known": True, "book_id": bid, "title": None if hidden else b["title"],
             "daf": dict(pos) if pos else None, "highlights": hls, "sketchbook": sketchbook.for_kindle(c, bid),
-            "audio": bool(absapi.for_book(c, bid))}
+            "audio": bool(absapi.for_book(c, bid)), "follow": sketchbook.following(c, bid)}
+
+
+@app.get("/api/kindle/follow")
+def kindle_follow(md5: str = "", name=Depends(kindle_device), c=Depends(conn)):
+    """Is the book open on the Kindle followed by its Notebook somewhere (sketchbook.following)? The plugin
+    asks when the Kindle wakes in a book; while it is, it sends its page as it turns."""
+    from . import sketchbook
+    bid = library.book_for_md5(c, md5.strip().lower())
+    return {"follow": bool(bid) and sketchbook.following(c, bid)}
 
 
 @app.get("/api/kindle/audio")

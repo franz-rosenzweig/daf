@@ -152,6 +152,10 @@ def details(conn, book_id):
                      md5s).fetchone() if md5s else None
     out["kindle"] = {"page": k["page"], "total": k["total"], "fraction": round(k["page"] / k["total"], 4) if k["total"] else None,
                      "at": k["start"]} if k else None
+    from . import audiomap      # the Kindle's page with its words, when the plugin sent them for it (for the Notebook by itself)
+    rp = audiomap.reading_place(conn, book_id)
+    if rp and rp["where"] == "kindle" and rp.get("text") and out["kindle"]:
+        out["kindle"]["text"] = rp["text"]
     secs = conn.execute("SELECT COALESCE(SUM(seconds), 0) FROM sessions WHERE source = 'ebook' AND item = ?", (book_id,)).fetchone()[0]
     out["minutes_here"] = round(secs / 60)
     return out

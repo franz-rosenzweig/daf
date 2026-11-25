@@ -19,6 +19,12 @@ In a book, an article or a video the Notebook is the first tab of the side panel
 
 It stays open in focus mode, and its pens stay with it.
 
+## By itself
+
+Sometimes I read the book somewhere else, in a paper copy or on the Kindle, and only want to write about it on the tablet. **Notebook** on a book's page opens the book's Notebook by itself, on the whole screen, with the same pages, cards and pens as beside the book. The book isn't on screen, and opening it this way doesn't move my place in Daf or count any reading time. **Read** in the bar opens the book itself instead, and ✕ or the back arrow takes me back to the book's page.
+
+It opens at the chapter I'm in, whichever is newer: my place in Daf, or the page the Kindle was last on. While it's open, it keeps checking where I'm reading. If I'm reading on the Kindle, the Kindle sends each page to Daf as I turn it, so when I start a new chapter there, the Notebook goes to that chapter's page here a few seconds later. If I picked another chapter myself, it stays where I put it. With a paper book Daf can't know where I am, so I pick the chapter from the chapter button. A book that Daf has no file for at all has only its General page.
+
 ## The top of it
 
 Along the top are **General**, the chapter, **Pages** and **List**, and ✕.

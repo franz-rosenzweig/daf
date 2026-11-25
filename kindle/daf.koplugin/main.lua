@@ -24,6 +24,8 @@ Daf for KOReader.
   * Home (home.lua) and the shelves (shelf.lua), drawn with canvas.lua, with book covers from
     covers.lua (made ahead for the whole library after Home appears); and outside a book,
     the book's global settings in KOReader's menu too (readerprefs.lua).
+  * The Notebook by itself: while a book's Notebook is open alone in Daf (read here, written
+    there), each page turned goes to Daf so the Notebook keeps to the chapter (setFollow).
   * About me: a note for whoever finds the Kindle, kept only in a text file on the Kindle
     (documents/ABOUT ME.txt), shown from the menu and at the foot of the sleep screen.
 
@@ -525,6 +527,7 @@ function Daf:syncFromDaf(manual)
     local added = self:pushHighlights(res.highlights or {})
     local pages = self:pushSketchbook(res.sketchbook or {})
     self.has_audio = res.audio and true or false
+    self:setFollow(res.follow)
     -- The audiobook first, when it was played after this Kindle's last page and after Daf's place:
     -- then Daf's place, the way it always was (also when the audiobook's place doesn't come).
     local offered = false
@@ -1048,7 +1051,7 @@ end
 -- Sound in Daf: a few seconds after a page turns, the page (its words and how far in) goes to Daf,
 -- which plays that scene's sound on a phone or a computer (Today's Sound row). Off unless chosen.
 function Daf:sendWhere()
-    if not self.settings:isTrue("sound") or not self.ui.document or not self:configured() then return end
+    if not (self.settings:isTrue("sound") or self.follow) or not self.ui.document or not self:configured() then return end
     if self.where_task then UIManager:unschedule(self.where_task) end
     self.where_task = function()
         self.where_task = nil
@@ -1070,8 +1073,29 @@ function Daf:postWhere()
         if a and b then text = doc:getTextFromXPointers(a, b) end
     end
     if text then text = text:sub(1, 600):gsub("[\192-\255][\128-\191]*$", "") end
-    request("POST", self.settings:readSetting("url") .. "/api/kindle/where", self.settings:readSetting("token"),
+    local res = request("POST", self.settings:readSetting("url") .. "/api/kindle/where", self.settings:readSetting("token"),
         { md5 = md5, text = text, fraction = page / math.max(1, total) })
+    if type(res) == "table" then self.follow = res.follow and true or false end
+end
+
+-- The book's Notebook open by itself in Daf (on the tablet, say, while this book is read here): the page
+-- goes to Daf as it turns, so the Notebook follows to the chapter (sendWhere). Daf says so when the book
+-- opens, when the Kindle wakes in it, and in answer to each page sent; it stops ten minutes after the
+-- Notebook closes. Turned on, the page goes at once.
+function Daf:setFollow(on)
+    local was = self.follow
+    self.follow = on and true or false
+    if self.follow and not was and self.ui.document and online() then pcall(function() self:postWhere() end) end
+end
+
+function Daf:checkFollow()
+    if not self.ui.document or not self:configured() or not online() then return end
+    pcall(function()
+        local md5 = self:docMd5()
+        if not md5 or not md5:match("^%x+$") then return end
+        local res = request("GET", self.settings:readSetting("url") .. "/api/kindle/follow?md5=" .. md5, self.settings:readSetting("token"))
+        if type(res) == "table" then self:setFollow(res.follow) end
+    end)
 end
 
 function Daf:sendPageForAudio()
@@ -1155,10 +1179,12 @@ end
 
 function Daf:onNetworkConnected()
     UIManager:scheduleIn(2, function() pcall(function() self:flushReview(); self:send(true) end) end)
+    if self.ui.document then UIManager:scheduleIn(4, function() self:checkFollow() end) end
 end
 
 function Daf:onResume()
     self.last_refresh = 0
+    if self.ui.document then UIManager:scheduleIn(6, function() self:checkFollow() end) end
     -- Optionally, the first wake of the morning opens the Daf screen.
     if self.settings:isTrue("show_on_wake") and self.settings:readSetting("shown_day") ~= self:localDate() then
         local offset = tonumber(self.settings:readSetting("tz_offset")) or -25200

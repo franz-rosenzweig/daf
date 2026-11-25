@@ -105,6 +105,7 @@ const sideways = () => innerWidth > (S.editing && S.fullH && innerWidth === S.fu
 const phone = () => Math.min(S.fullW || innerWidth, S.fullH || innerHeight) < 600;
 const sheetH = () => phone() ? 0.6 : 0.56;
 function sizes(){
+  if (S.ctx && S.ctx.full) return { mode: 'full' };        // by itself (the book read elsewhere): the whole page
   if (sideways()) { const m = paperW() + 2; return { mode: 'side', w: Math.round(clamp(innerWidth * store.get('w', 0.4), m, Math.max(m, innerWidth - 320))) }; }
   // the keyboard up while typing in it (the app's window shrinks): most of what's left
   const typing = S.editing && S.fullH && innerHeight < S.fullH * 0.8;
@@ -119,6 +120,7 @@ function place(){
   r.classList.toggle('skside', S.shown && z.mode === 'side');
   r.classList.toggle('skbottom', S.shown && z.mode === 'bottom');
   r.classList.toggle('sktop', S.shown && z.mode === 'top');
+  r.classList.toggle('skfull', S.shown && z.mode === 'full');
   r.style.setProperty('--skr', ((S.shown && z.mode === 'side' ? z.w : 0) + (S.extra || 0)) + 'px');
   r.style.setProperty('--skb', (S.shown && z.mode === 'bottom' ? z.h : 0) + 'px');
   r.style.setProperty('--skt', (S.shown && z.mode === 'top' ? z.h : 0) + 'px');
@@ -260,7 +262,7 @@ function drawHead(){
   }
   S.el.querySelectorAll('[data-skv]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.skv === S.view)));
   const b = (k, label, icon) => '<button class="ib" data-sk="' + k + '" title="' + label + '" aria-label="' + label + '">' + icon + '</button>';
-  S.el.querySelector('.skhb').innerHTML = (S.mode !== 'side' && !phone() ? b('flip', S.mode === 'top' ? 'Move to the bottom' : 'Move to the top', S.mode === 'top' ? IC.toBottom : IC.toTop) : '') + b('close', 'Close the Notebook', IC.close);
+  S.el.querySelector('.skhb').innerHTML = (S.mode !== 'side' && S.mode !== 'full' && !phone() ? b('flip', S.mode === 'top' ? 'Move to the bottom' : 'Move to the top', S.mode === 'top' ? IC.toBottom : IC.toTop) : '') + b('close', 'Close the Notebook', IC.close);
   const was = !pick.hidden;
   pick.hidden = !(S.picking && many());
   if (!pick.hidden && !was) {                       // (drawn when it opens, not again while it's open)
@@ -301,7 +303,7 @@ function onHead(e){
     show1(tab, x); return;
   }
   const k = t.dataset.sk;
-  if (k === 'close') hide();
+  if (k === 'close') { if (S.ctx && S.ctx.full && S.ctx.close) { flush(); S.ctx.close(); } else hide(); }
   else if (k === 'text') typeAt(null);
   else if (k === 'mic') dictate();
   else if (k === 'shot') shoot();
@@ -1208,7 +1210,7 @@ function show(){
   drawTools();
   if (!S.pages.has(key())) setCur([]);
   setView(S.view); load(S.tab); loadHls();
-  store.set(openKey(), true);
+  if (!S.ctx.full) store.set(openKey(), true);    // (by itself it says nothing of the Notebook beside the book)
   buttons(); relayout();
 }
 function hide(keep){
@@ -1290,7 +1292,7 @@ function attach(ctx){
     try { for (const c of ctx.view.renderer.getContents()) watchDoc(c.doc); } catch(e){}
     S.off = () => { ctx.view.removeEventListener('relocate', on); ctx.view.removeEventListener('load', loaded); };
   }
-  if (store.get(openKey(), false)) { if (S.shown) { place(); show1(S.tab, S.meta); Pens.use(surface); drawTools(); relayout(); loadHls(); if (S.view === 'list') loadAll(); host(ctx.panel && S.ptab !== 'notebook' ? S.ptab : null); S.el.querySelector('.skptabs').hidden = !ctx.panel; } else show(); }
+  if (ctx.full || store.get(openKey(), false)) { if (S.shown) { place(); show1(S.tab, S.meta); Pens.use(surface); drawTools(); relayout(); loadHls(); if (S.view === 'list') loadAll(); host(ctx.panel && S.ptab !== 'notebook' ? S.ptab : null); S.el.querySelector('.skptabs').hidden = !ctx.panel; } else show(); }
   else if (S.shown) hide(true);
   buttons();
 }

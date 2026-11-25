@@ -315,6 +315,26 @@ def kindle_echo(conn, text, note):
 
 # ---- the API ----------------------------------------------------------------------------------------
 
+# ---- the Notebook by itself, the book read on the Kindle or on paper (web/book.js's #ebook/<id>/notes) ----
+
+FOLLOW = 600      # seconds after the Notebook's last ask that the Kindle still sends its pages for it
+
+
+def following(conn, book_id, mark=False):
+    """Is this book's Notebook open by itself somewhere (asked in the last ten minutes)? Then the Kindle
+    sends its page as it turns (POST /api/kindle/where), and the Notebook follows it to the chapter.
+    mark: it's asking now."""
+    k = "notes_open:" + book_id
+    if mark:
+        conn.execute("INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", (k, str(int(time.time()))))
+        return True
+    r = conn.execute("SELECT v FROM kv WHERE k = ?", (k,)).fetchone()
+    try:
+        return bool(r) and time.time() - int(r[0]) < FOLLOW
+    except ValueError:
+        return False
+
+
 def router():
     """The routes, for app.py to include at its end (they use its conn, device, json_body and user)."""
     from .app import conn, json_body, kindle_device, user
@@ -344,6 +364,17 @@ def router():
     def kindle_ack_route(b=Depends(json_body), name=Depends(kindle_device), c=Depends(conn)):
         """The Kindle's plugin has these pages as bookmarks now (or took away the ones emptied)."""
         return {"ok": True, "acked": kindle_ack(c, b.get("items") if isinstance(b, dict) else None)}
+
+    @r.post("/follow/{book_id}", dependencies=[Depends(user)])
+    def post_follow(book_id: str, c=Depends(conn)):
+        """The Notebook open by itself for a book, asking every so often: where I'm reading it now (the
+        newer of Daf's place and the Kindle's, audiomap.reading_place), which it follows to the chapter;
+        and while it asks, the Kindle sends its page as it turns."""
+        from . import audiomap
+        if not re.fullmatch(r"[\w:.-]{1,120}", book_id):
+            raise HTTPException(400, "Bad book")
+        following(c, book_id, mark=True)
+        return {"place": audiomap.reading_place(c, book_id)}
 
     @r.get("/{item}/all", dependencies=[Depends(user)])
     def get_all(item: str, c=Depends(conn)):
