@@ -106,7 +106,7 @@ const phone = () => Math.min(S.fullW || innerWidth, S.fullH || innerHeight) < 60
 const sheetH = () => phone() ? 0.6 : 0.56;
 function sizes(){
   if (S.ctx && S.ctx.full) return { mode: 'full' };        // by itself (the book read elsewhere): the whole page
-  if (sideways()) { const m = paperW() + 2; return { mode: 'side', w: Math.round(clamp(innerWidth * store.get('w', 0.4), m, Math.max(m, innerWidth - 320))) }; }
+  if (sideways()) { const m = 300; return { mode: 'side', w: Math.round(clamp(innerWidth * store.get('w', 0.4), m, Math.max(m, innerWidth - 320))) }; }
   // the keyboard up while typing in it (the app's window shrinks): most of what's left
   const typing = S.editing && S.fullH && innerHeight < S.fullH * 0.8;
   const h = typing ? innerHeight - 110 : Math.round(clamp(innerHeight * store.get('h', sheetH()), 170, Math.max(170, innerHeight - (phone() ? 90 : 180))));
@@ -380,16 +380,16 @@ function frameOf(b, W, strokes){
   for (const s of strokes) for (const p of s.pts) low = Math.max(low, p[1] + (s.size || 6) / 2);
   return { k, ox: 0, oy: 0, h: Math.max(3, Math.ceil(low / LINE) + 1) * LINE * k };      // whole lines, one to spare
 }
-// The page is one size on this screen, as paper is: as wide as the panel first opens beside a book
-// (four tenths of the screen's long side), the same upright and sideways. A wider panel leaves room
-// around it and the lines stay as they are, and the panel's edge stops at the page's width, so the
-// lines never change size as it's dragged. A phone's page is its whole width.
-// (with a mouse the page is narrower, so the Notebook can be pushed further to the side: the pen is the tablet's)
+// The page fills the Notebook, beside a book (the panel, the sheet) or by itself, upright and sideways,
+// as a notes app fits its page to the screen: handwriting can't reflow, so the writing and its lines are
+// drawn to the page's width and grow and shrink with it. paperW is the panel's width when it first
+// opens beside a book (four tenths of the screen's long side; with a mouse less, so the Notebook can be
+// pushed further to the side: the pen is the tablet's), and what a drag closes it below.
+// With a mouse the page stops at MOUSE_W and sits in the middle: a monitor's width of ruled lines is no page.
+const MOUSE_W = 960;
 function paperW(){ return Math.round(clamp(Math.max(S.fullW || innerWidth, S.fullH || innerHeight) * (matchMedia('(pointer: coarse)').matches ? 0.4 : 0.27), 300, 720)); }
 function pageW(room){
-  const w = S.fullW || innerWidth, h = S.fullH || innerHeight;
-  if (Math.min(w, h) < 600) return room;                 // a phone: all of its width
-  return Math.min(room, paperW() - 20);
+  return matchMedia('(pointer: coarse)').matches ? room : Math.min(room, MOUSE_W);
 }
 // The page's highlights, as cards: this chapter's (an article's, all of them), in reading order.
 const cardsHere = () => S.ctx && S.ctx.highlights ? S.hls.filter(h => (h.tab || '') === S.tab).sort((a, b) => a.key - b.key) : [];

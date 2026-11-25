@@ -41,7 +41,7 @@ The highlights are still highlights. They go to the review, the Highlights page 
 
 ## Writing, drawing and typing
 
-The page is one size on each screen, like a sheet of paper. On the tablet it's as wide as the Notebook is when it first opens beside a book, upright or sideways, so my handwriting and the lines stay the same size whichever way I hold it. When I drag the Notebook wider, the page stays as it is and sits in the middle with room around it, and the edge won't go narrower than the page, so the lines never change size while I drag. On a phone the page is the phone's whole width.
+The page fills the Notebook, beside the book or by itself, upright or sideways, the way a notes app fits its page to the screen. Handwriting can't rewrap the way typed text does, so my writing and the ruled lines are drawn to the page's width: they're bigger when the Notebook is wide (by itself on the tablet held sideways, say) and smaller when it's a narrow panel, and dragging the panel wider makes them grow. On a computer with a mouse the page stops at a comfortable width and sits in the middle.
 
 The tools float at the bottom of the page: the pens, then **Type**, the microphone, and (in a manga or a PDF) the camera.
 
