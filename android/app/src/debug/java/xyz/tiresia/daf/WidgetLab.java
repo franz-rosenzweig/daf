@@ -25,6 +25,10 @@ import java.util.Collections;
  *   adb shell am start -n xyz.tiresia.daf.debug/xyz.tiresia.daf.WidgetLab \
  *       --es w KeepReadingReceiver --es sizes 110x110,300x130,300x300 [--ez dark true] [--es feed folder:Craft]
  *
+ * Several kinds at once, each at the sizes asked for: --es w KeepReadingReceiver,FeedReceiver,FeedReceiver,
+ * and with --es feeds "folder:Craft,," each Feed widget in turn gets its own part of the Feed
+ * ("" is everything), the way two Feed widgets on a home screen are set to different things.
+ *
  * Each widget is bound to a host of this page's own, and let go again when the page closes.
  */
 public class WidgetLab extends Activity {
@@ -39,6 +43,9 @@ public class WidgetLab extends Activity {
         host.deleteHost();                                   // what an earlier page left bound
         host.startListening();
         Intent in = getIntent();
+        // a build of the release kind (shrunk as the release is) has no debug extras in MainActivity: Daf's address here
+        if (in.getStringExtra("base") != null) Server.setBase(this, in.getStringExtra("base"));
+        if (in.getStringExtra("token") != null) Server.setToken(this, in.getStringExtra("token"));
         String which = in.getStringExtra("w") == null ? "KeepReadingReceiver" : in.getStringExtra("w");
         String sizes = in.getStringExtra("sizes") == null ? "110x110,300x130,300x300" : in.getStringExtra("sizes");
         boolean dark = in.getBooleanExtra("dark", false);
@@ -52,7 +59,11 @@ public class WidgetLab extends Activity {
         scroll.addView(col);
         setContentView(scroll);
         AppWidgetManager m = AppWidgetManager.getInstance(this);
-        ComponentName cn = new ComponentName(this, "xyz.tiresia.daf." + which);
+        String[] feeds = in.getStringExtra("feeds") == null ? null : in.getStringExtra("feeds").split(",", -1);
+        int feedNo = 0;
+        java.util.LinkedHashMap<String, ArrayList<Integer>> byKind = new java.util.LinkedHashMap<>();
+        for (String kind : which.split(",")) {
+        ComponentName cn = new ComponentName(this, "xyz.tiresia.daf." + kind.trim());
         for (String s : sizes.split(",")) {
             String[] wh = s.trim().split("x");
             int w = Integer.parseInt(wh[0]), h = Integer.parseInt(wh[1]);
@@ -65,7 +76,7 @@ public class WidgetLab extends Activity {
             o.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, h);
             o.putParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, new ArrayList<>(Collections.singletonList(new SizeF(w, h))));
             TextView label = new TextView(this);
-            label.setText(which.replace("Receiver", "") + " " + w + "×" + h);
+            label.setText(kind.trim().replace("Receiver", "") + " " + w + "×" + h);
             label.setTextColor(dark ? Color.LTGRAY : Color.DKGRAY);
             col.addView(label);
             if (!m.bindAppWidgetIdIfAllowed(id, cn, o)) {
@@ -73,6 +84,13 @@ public class WidgetLab extends Activity {
                 continue;
             }
             if (in.getStringExtra("feed") != null) Board.INSTANCE.setFeedSource(this, id, in.getStringExtra("feed"));
+            if (feeds != null && kind.trim().equals("FeedReceiver") && feedNo < feeds.length) {
+                Board.INSTANCE.setFeedSource(this, id, feeds[feedNo].trim());
+                label.setText(label.getText() + " · " + (feeds[feedNo].trim().isEmpty() ? "Everything" : feeds[feedNo].trim()));
+                feedNo++;
+            }
+            if (!byKind.containsKey(cn.getClassName())) byKind.put(cn.getClassName(), new ArrayList<>());
+            byKind.get(cn.getClassName()).add(id);
             AppWidgetProviderInfo info = m.getAppWidgetInfo(id);
             AppWidgetHostView v = host.createView(this, id, info);
             v.updateAppWidgetSize(o, Collections.singletonList(new SizeF(w, h)));
@@ -80,9 +98,13 @@ public class WidgetLab extends Activity {
             lp.setMargins(0, (int) (4 * dp), 0, (int) (20 * dp));
             col.addView(v, lp);
         }
-        int[] all = new int[ids.size()];
-        for (int i = 0; i < all.length; i++) all[i] = ids.get(i);
-        sendBroadcast(new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).setComponent(cn).putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, all));
+        }
+        for (java.util.Map.Entry<String, ArrayList<Integer>> e : byKind.entrySet()) {
+            int[] all = new int[e.getValue().size()];
+            for (int i = 0; i < all.length; i++) all[i] = e.getValue().get(i);
+            sendBroadcast(new Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).setComponent(new ComponentName(this, e.getKey()))
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, all));
+        }
     }
 
     @Override
