@@ -18,7 +18,7 @@ from starlette.concurrency import run_in_threadpool
 
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from . import ai, auth, catalog, config, db, digest, ebooks, feedback, goals, gpodder, imports, jump, library, lookup, media, notes, outbound, paper_pages, phone, reader, review, sync, today as T, torah, vaultnotes
+from . import ai, auth, catalog, config, db, digest, ebooks, feedback, goals, gpodder, hwrmodel, imports, jump, library, lookup, media, notes, outbound, paper_pages, phone, reader, review, sync, today as T, torah, vaultnotes
 from .sources import checks, kindle, paper
 
 log = logging.getLogger(__name__)
@@ -5580,6 +5580,12 @@ def _font_dir():
     d = config.STATE / "fonts"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+@app.get("/api/hwr/model", dependencies=[Depends(user)])
+def get_hwr_model(request: Request):
+    """The handwriting model learned from your own writing (hwrmodel.py); 404 when there is none."""
+    return hwrmodel.response(request.headers.get("if-none-match"))
 
 
 @app.get("/api/fonts", dependencies=[Depends(user)])

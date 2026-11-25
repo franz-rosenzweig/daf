@@ -52,6 +52,7 @@ CALIBRE_DBS = [Path(os.environ.get("DAF_CALIBRE_DB", "/srv/docker/cwa-library/me
 KARAKEEP_DB = Path("/srv/docker/karakeep-app/db.db")
 # Calibre-Web-Automated imports whatever lands here into the Calibre library (then Daf's Books).
 CWA_INGEST = Path(os.environ.get("DAF_CWA_INGEST", "/srv/docker/cwa-ingest"))
+HWR_MODEL = os.environ.get("DAF_HWR_MODEL", "")   # a handwriting model learned from your own writing (hwrmodel.py); unset = Grape as shipped
 FRESHRSS_URL = os.environ.get("DAF_FRESHRSS_URL", "http://127.0.0.1:8080")   # a sandbox points it elsewhere
 KARAKEEP_URL = "https://keep.tiresia.xyz"
 

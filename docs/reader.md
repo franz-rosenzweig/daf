@@ -132,7 +132,7 @@ On a tablet with a pen (the S Pen on a Galaxy Tab, or an Apple Pencil on an iPad
 - **Typed, in its place**: the handwriting turns into typed text, where it was and about its size.
 - **Copy**.
 
-English is read on the device by Grape, the reader FineNotes uses, in Daf itself, so it works in the browser too and offline once its 5.7 MB model has come. Hebrew is read by Google's handwriting reader in the Android app (0.5.2 and later), which it fetches from Google once, about 20 MB; pick **עברית** on the card. Lines drawn clean as shapes and the highlighter's strokes aren't read.
+English is read on the device by Grape, the reader FineNotes uses, in Daf itself, so it works in the browser too and offline once its 5.7 MB model has come. If you've taught FineNotes your handwriting, Daf can read with what it learned instead (Operations has the one setting), which gets a good deal more of your writing right. Hebrew is read by Google's handwriting reader in the Android app (0.5.2 and later), which it fetches from Google once, about 20 MB; pick **עברית** on the card. Lines drawn clean as shapes and the highlighter's strokes aren't read.
 
 For notes beside the page instead of on it, there's [the Notebook](sketchbook.md).
 

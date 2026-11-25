@@ -60,6 +60,12 @@ self.addEventListener('fetch', e => {
   if (url.pathname.startsWith('/api/')) {
     if (ANDROID_KEEPS && (BOOK_FILE.test(url.pathname) || MANGA_PAGE.test(url.pathname))) return;
     if (PICTURE.test(url.pathname)) { e.respondWith(deviceFirst(IMG, req)); return; }
+    // The handwriting model learned from your writing: the server's when it answers (an ETag keeps it cheap), else the copy kept here.
+    if (url.pathname === '/api/hwr/model') {
+      e.respondWith(fetch(req).then(r => { if (r.ok) keep(DATA, req, r.clone()).catch(() => {}); return r; })
+        .catch(() => caches.open(DATA).then(c => c.match(req)).then(m => m || Response.error())));
+      return;
+    }
     if (BOOK_FILE.test(url.pathname)) {
       if (req.cache === 'reload' || req.cache === 'no-cache') {
         e.respondWith(fetch(req).then(r => { if (r.ok) keep(BOOKS, url.origin + url.pathname, r.clone()).catch(() => {}); return r; }));
